@@ -1,0 +1,2 @@
+-- Canonical schema lives at /supabase/schema.sql
+-- Supabase SQL Editor에서 해당 파일을 실행하세요.
