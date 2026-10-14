@@ -67,13 +67,15 @@ export async function persistPayment(
   status: PaymentIntentStatus,
   paymentKey: string | null,
 ): Promise<PersistPaymentResult> {
-  const { client, usingServiceRole } = createPaymentDbClient();
+  const { client, usingServiceRole, serviceRoleSource, missing } = createPaymentDbClient();
   if (!client) {
-    console.info('[SponsorAuction] payments 저장 생략: Supabase 환경 변수가 없습니다.', {
+    console.error('[SponsorAuction] payments 저장 생략: 서버용 Supabase 환경 변수가 없습니다.', {
       order_id: intent.orderId,
       status,
+      expected: ['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEY', 'NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL'],
+      env: missing,
     });
-    return { ok: true, skipped: true, reason: 'SUPABASE_NOT_CONFIGURED' };
+    return { ok: true, skipped: true, reason: 'SUPABASE_ADMIN_NOT_CONFIGURED' };
   }
 
   const row = toRow(intent, status, paymentKey);
@@ -99,6 +101,7 @@ export async function persistPayment(
     amount: row.amount,
     status: row.status,
     usingServiceRole,
+    serviceRoleSource,
   });
 
   const { error } = await client.from('payments').upsert(row, { onConflict: 'order_id' });
