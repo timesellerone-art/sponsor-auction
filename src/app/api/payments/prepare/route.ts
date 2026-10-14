@@ -13,6 +13,12 @@ import { MAX_BID_AMOUNT } from '@/lib/validation';
 import { persistPayment } from '@/lib/payments/persist';
 import type { PreparePaymentInput, PreparePaymentResult } from '@/types/payment';
 
+const PREPARE_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const PREPARE_SUPABASE_SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
+const PREPARE_SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+
 function parseBody(value: unknown): PreparePaymentInput | null {
   if (!value || typeof value !== 'object') {
     return null;
@@ -61,7 +67,11 @@ export async function POST(request: Request) {
     };
 
     putIntent(intent);
-    const pending = await persistPayment(intent, 'pending', null);
+    const pending = await persistPayment(intent, 'pending', null, {
+      url: PREPARE_SUPABASE_URL,
+      serviceKey: PREPARE_SUPABASE_SERVICE_KEY,
+      anonKey: PREPARE_SUPABASE_ANON_KEY,
+    });
     if (!pending.ok) {
       console.error('[SponsorAuction] pending payment 저장 실패', pending);
     }

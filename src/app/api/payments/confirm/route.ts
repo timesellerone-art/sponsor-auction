@@ -11,6 +11,20 @@ import { persistPayment } from '@/lib/payments/persist';
 import { confirmTossPayment, isDemoPaymentKey } from '@/lib/payments/toss';
 import type { ConfirmPaymentInput, ConfirmPaymentResult } from '@/types/payment';
 
+const CONFIRM_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const CONFIRM_SUPABASE_SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
+const CONFIRM_SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+
+function paymentDbConfig() {
+  return {
+    url: CONFIRM_SUPABASE_URL,
+    serviceKey: CONFIRM_SUPABASE_SERVICE_KEY,
+    anonKey: CONFIRM_SUPABASE_ANON_KEY,
+  };
+}
+
 function jsonError(
   status: number,
   errorCode: string,
@@ -58,6 +72,11 @@ export async function POST(request: Request) {
       amount: parsed.amount,
       paymentKeyPrefix: parsed.paymentKey.slice(0, 8),
       tossSecretConfigured: isTossSecretConfigured(),
+      supabase: {
+        hasUrl: Boolean(CONFIRM_SUPABASE_URL),
+        hasServiceKey: Boolean(CONFIRM_SUPABASE_SERVICE_KEY),
+        hasAnonKey: Boolean(CONFIRM_SUPABASE_ANON_KEY),
+      },
     });
 
     const cookieStore = await cookies();
@@ -85,7 +104,7 @@ export async function POST(request: Request) {
         intentAmount: intent.amount,
       });
       updateIntent(intent.orderId, { status: 'failed' });
-      await persistPayment(intent, 'failed', parsed.paymentKey);
+      await persistPayment(intent, 'failed', parsed.paymentKey, paymentDbConfig());
       return jsonError(
         409,
         'AMOUNT_MISMATCH',
@@ -107,7 +126,7 @@ export async function POST(request: Request) {
       }
 
       const replayKey = existing.paymentKey ?? parsed.paymentKey;
-      const replaySaved = await persistPayment(intent, 'confirmed', replayKey);
+      const replaySaved = await persistPayment(intent, 'confirmed', replayKey, paymentDbConfig());
       if (!replaySaved.ok) {
         return jsonError(500, replaySaved.errorCode, replaySaved.errorMessage, {
           supabaseError: replaySaved.supabaseError,
@@ -154,7 +173,7 @@ export async function POST(request: Request) {
       const toss = await confirmTossPayment(parsed);
       if (!toss.ok) {
         updateIntent(intent.orderId, { status: 'failed', paymentKey: parsed.paymentKey });
-        await persistPayment(intent, 'failed', parsed.paymentKey);
+        await persistPayment(intent, 'failed', parsed.paymentKey, paymentDbConfig());
         const errorCode = toss.errorCode || 'TOSS_CONFIRM_FAILED';
         const errorMessage =
           toss.errorMessage || toss.error || '결제 승인에 실패했습니다. 낙찰은 진행되지 않았습니다.';
@@ -170,7 +189,12 @@ export async function POST(request: Request) {
       }
     }
 
-    const saved = await persistPayment(intent, 'confirmed', parsed.paymentKey);
+    const saved = await persistPayment(
+      intent,
+      'confirmed',
+      parsed.paymentKey,
+      paymentDbConfig(),
+    );
     if (!saved.ok) {
       return jsonError(500, saved.errorCode, saved.errorMessage, {
         supabaseError: saved.supabaseError,

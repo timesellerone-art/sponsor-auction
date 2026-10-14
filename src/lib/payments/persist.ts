@@ -1,6 +1,9 @@
-import 'server-only';
-
-import { createPaymentDbClient } from '@/lib/supabase/admin';
+import { createClient } from '@supabase/supabase-js';
+import {
+  describePaymentSupabaseConfig,
+  readPaymentSupabaseConfig,
+  type PaymentSupabaseConfig,
+} from '@/lib/supabase/payment-config';
 import type { Database } from '@/types/database';
 import type { PaymentIntent, PaymentIntentStatus } from '@/types/payment';
 
@@ -66,19 +69,25 @@ export async function persistPayment(
   intent: Pick<PaymentIntent, 'orderId' | 'auctionId' | 'bidId' | 'amount' | 'orderName'>,
   status: PaymentIntentStatus,
   paymentKey: string | null,
+  configOverride?: Partial<PaymentSupabaseConfig>,
 ): Promise<PersistPaymentResult> {
-  const { client, usingServiceRole, keySource, missing } = createPaymentDbClient();
-  if (!client) {
+  const config = readPaymentSupabaseConfig(configOverride);
+  const writeKey = config.serviceKey || config.anonKey;
+  const usingServiceRole = Boolean(config.serviceKey);
+  const keySource = config.serviceKey
+    ? 'SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SERVICE_KEY'
+    : config.anonKey
+      ? 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
+      : null;
+
+  if (!config.url || !writeKey) {
+    const described = describePaymentSupabaseConfig(config);
     const errorMessage =
-      'Supabase 환경 변수를 읽지 못해 payments를 저장하지 못했습니다. Vercel에 NEXT_PUBLIC_SUPABASE_URL과 SUPABASE_SERVICE_ROLE_KEY(또는 NEXT_PUBLIC_SUPABASE_ANON_KEY)를 등록하세요.';
+      'Supabase 환경 변수를 읽지 못해 payments를 저장하지 못했습니다. Vercel Production에 NEXT_PUBLIC_SUPABASE_URL과 NEXT_PUBLIC_SUPABASE_ANON_KEY(또는 SUPABASE_SERVICE_ROLE_KEY)가 있는지 확인하세요.';
     console.error('[SponsorAuction] payments 저장 실패: 환경 변수가 undefined입니다.', {
       order_id: intent.orderId,
       status,
-      undefinedNames: missing.undefinedNames,
-      presence: missing.presence,
-      hasUrl: missing.hasUrl,
-      hasServiceRole: missing.hasServiceRole,
-      hasAnon: missing.hasAnon,
+      ...described,
     });
     return {
       ok: false,
@@ -87,11 +96,19 @@ export async function persistPayment(
       supabaseError: {
         message: errorMessage,
         code: 'SUPABASE_ENV_UNDEFINED',
-        details: missing.undefinedNames.join(', '),
-        hint: '키 값은 로그하지 않습니다. Vercel Environment Variables에서 undefined인 이름을 확인하세요.',
+        details: JSON.stringify(described),
+        hint: '키 값은 로그하지 않습니다. Vercel Environment Variables의 Production 범위를 확인하세요.',
       },
     };
   }
+
+  const client = createClient<Database>(config.url, writeKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
 
   const row = toRow(intent, status, paymentKey);
 
