@@ -14,8 +14,24 @@ export type SupabaseEnv = {
 export type SupabaseAdminEnv = {
   url: string;
   serviceRoleKey: string;
-  serviceRoleSource: 'SUPABASE_SERVICE_ROLE_KEY' | 'SUPABASE_SECRET_KEY';
+  serviceRoleSource: string;
 };
+
+export const SUPABASE_URL_ENV_NAMES = [
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_PROJECT_URL',
+  'SUPABASE_PROJECT_URL',
+] as const;
+
+export const SUPABASE_SERVICE_KEY_ENV_NAMES = [
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_SECRET_KEY',
+  'SUPABASE_KEY',
+  'SUPABASE_SERVICE_KEY',
+  'SERVICE_ROLE_KEY',
+  'SUPABASE_SERVICE_ROLE',
+] as const;
 
 function readEnv(name: string) {
   const value = process.env[name]?.trim().replace(/^["']+|["']+$/g, '') || '';
@@ -28,7 +44,32 @@ function readEnv(name: string) {
   return value;
 }
 
-function readFirstEnv(names: string[]) {
+function readJwtRole(token: string) {
+  const parts = token.split('.');
+  if (parts.length < 2) {
+    return null;
+  }
+  try {
+    const json = Buffer.from(parts[1], 'base64url').toString('utf8');
+    const payload = JSON.parse(json) as { role?: string };
+    return payload.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function describeEnvName(name: string) {
+  const raw = process.env[name];
+  const value = readEnv(name);
+  return {
+    present: Boolean(raw && String(raw).trim()),
+    usable: Boolean(value),
+    length: value.length,
+    jwtRole: value ? readJwtRole(value) : null,
+  };
+}
+
+function readFirstEnv(names: readonly string[]) {
   for (const name of names) {
     const value = readEnv(name);
     if (value) {
@@ -36,6 +77,44 @@ function readFirstEnv(names: string[]) {
     }
   }
   return { name: names[0] ?? '', value: '' };
+}
+
+function readServiceRoleKey(options?: { silent?: boolean }) {
+  for (const name of SUPABASE_SERVICE_KEY_ENV_NAMES) {
+    const value = readEnv(name);
+    if (!value) {
+      continue;
+    }
+    const role = readJwtRole(value);
+    if (role === 'anon' || role === 'authenticated') {
+      if (!options?.silent) {
+        console.error('[SponsorAuction] 서버용 키가 아님(anon/authenticated). 건너뜁니다.', {
+          source: name,
+          jwtRole: role,
+          length: value.length,
+        });
+      }
+      continue;
+    }
+    return { name, value, jwtRole: role };
+  }
+
+  for (const name of Object.keys(process.env)) {
+    if (!/SERVICE_ROLE/i.test(name) || /ANON|PUBLISHABLE|NEXT_PUBLIC/i.test(name)) {
+      continue;
+    }
+    const value = readEnv(name);
+    if (!value) {
+      continue;
+    }
+    const role = readJwtRole(value);
+    if (role === 'anon' || role === 'authenticated') {
+      continue;
+    }
+    return { name, value, jwtRole: role };
+  }
+
+  return { name: '', value: '', jwtRole: null as string | null };
 }
 
 function normalizeSupabaseUrl(url: string) {
@@ -78,8 +157,8 @@ export function getSupabaseEnv(): SupabaseEnv | null {
 
 /** 서버 전용. payments 저장은 anon 키가 아니라 service_role 시크릿을 사용합니다. */
 export function getSupabaseAdminEnv(): SupabaseAdminEnv | null {
-  const urlResult = readFirstEnv(['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL']);
-  const keyResult = readFirstEnv(['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEY']);
+  const urlResult = readFirstEnv(SUPABASE_URL_ENV_NAMES);
+  const keyResult = readServiceRoleKey();
 
   if (!urlResult.value || !keyResult.value) {
     return null;
@@ -88,7 +167,7 @@ export function getSupabaseAdminEnv(): SupabaseAdminEnv | null {
   const url = normalizeSupabaseUrl(urlResult.value);
   if (!isLikelySupabaseUrl(url)) {
     console.error('[SponsorAuction] Supabase URL 형식이 올바르지 않습니다.', {
-      hasUrl: true,
+      source: urlResult.name,
       urlHost: (() => {
         try {
           return new URL(url).host;
@@ -111,17 +190,34 @@ export function getSupabaseAdminEnv(): SupabaseAdminEnv | null {
   return {
     url,
     serviceRoleKey: keyResult.value,
-    serviceRoleSource: keyResult.name as SupabaseAdminEnv['serviceRoleSource'],
+    serviceRoleSource: keyResult.name,
   };
 }
 
 export function describeSupabaseServerEnv() {
+  const urlStatus = Object.fromEntries(
+    SUPABASE_URL_ENV_NAMES.map((name) => [name, describeEnvName(name)]),
+  );
+  const keyStatus = Object.fromEntries(
+    SUPABASE_SERVICE_KEY_ENV_NAMES.map((name) => [name, describeEnvName(name)]),
+  );
+  const related = Object.keys(process.env)
+    .filter((name) => /supabase|service_role/i.test(name))
+    .sort()
+    .map((name) => ({ name, ...describeEnvName(name) }));
+
+  const empty = [
+    ...SUPABASE_URL_ENV_NAMES.filter((name) => !describeEnvName(name).usable),
+    ...SUPABASE_SERVICE_KEY_ENV_NAMES.filter((name) => !describeEnvName(name).usable),
+  ];
+
   return {
-    hasNextPublicUrl: Boolean(readEnv('NEXT_PUBLIC_SUPABASE_URL')),
-    hasSupabaseUrl: Boolean(readEnv('SUPABASE_URL')),
-    hasAnonKey: Boolean(readEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY') || readEnv('SUPABASE_ANON_KEY')),
-    hasServiceRoleKey: Boolean(readEnv('SUPABASE_SERVICE_ROLE_KEY')),
-    hasSecretKey: Boolean(readEnv('SUPABASE_SECRET_KEY')),
+    urlStatus,
+    keyStatus,
+    empty,
+    related,
+    hasAnyUrl: SUPABASE_URL_ENV_NAMES.some((name) => describeEnvName(name).usable),
+    hasAnyServiceKey: Boolean(readServiceRoleKey({ silent: true }).value),
   };
 }
 

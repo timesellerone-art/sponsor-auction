@@ -72,8 +72,13 @@ export async function persistPayment(
     console.error('[SponsorAuction] payments 저장 생략: 서버용 Supabase 환경 변수가 없습니다.', {
       order_id: intent.orderId,
       status,
-      expected: ['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEY', 'NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL'],
-      env: missing,
+      hint: 'Vercel에 SUPABASE_SERVICE_ROLE_KEY(또는 SUPABASE_KEY)와 NEXT_PUBLIC_SUPABASE_URL을 등록하세요. 키 값은 로그하지 않습니다.',
+      empty: missing.empty,
+      hasAnyUrl: missing.hasAnyUrl,
+      hasAnyServiceKey: missing.hasAnyServiceKey,
+      urlStatus: missing.urlStatus,
+      keyStatus: missing.keyStatus,
+      related: missing.related,
     });
     return { ok: true, skipped: true, reason: 'SUPABASE_ADMIN_NOT_CONFIGURED' };
   }
