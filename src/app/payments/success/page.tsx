@@ -9,6 +9,7 @@ import { showToast } from '@/components/Toast';
 import { pushNotification } from '@/lib/notifications';
 import { UPDATE_FAIL_MESSAGE, awardBid, getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
 import { advertiserPayableAmount } from '@/lib/fees';
+import { formatPaymentToast, parsePaymentError } from '@/lib/payments/errors';
 import { formatWon } from '@/lib/utils';
 import { VALIDATION } from '@/lib/validation';
 import type { ConfirmPaymentResult } from '@/types/payment';
@@ -44,7 +45,20 @@ function PaymentSuccessContent() {
       const amount = Number(params.get('amount'));
 
       if (!paymentKey || !orderId || !Number.isInteger(amount) || amount <= 0) {
-        setError('결제 결과 파라미터가 올바르지 않습니다. 낙찰은 진행되지 않았습니다.');
+        const info = parsePaymentError({
+          code: 'INVALID_SUCCESS_PARAMS',
+          message: '결제 결과 파라미터가 올바르지 않습니다. 낙찰은 진행되지 않았습니다.',
+        });
+        const feedback = formatPaymentToast(info);
+        console.error('[SponsorAuction] 결제 성공 URL 파라미터 오류', {
+          errorCode: info.code,
+          errorMessage: info.message,
+          paymentKey,
+          orderId,
+          amount,
+        });
+        showToast(feedback.text, feedback.variant, 9000);
+        setError(`[${info.code}] ${info.message}`);
         return;
       }
 
@@ -55,14 +69,29 @@ function PaymentSuccessContent() {
           body: JSON.stringify({ paymentKey, orderId, amount }),
         });
         const confirmPayload = (await confirmResponse.json().catch(() => null)) as
-          | (ConfirmPaymentResult & { error?: string })
+          | ConfirmPaymentResult
           | null;
 
         if (!confirmResponse.ok || !confirmPayload?.auctionId || !confirmPayload.bidId) {
-          setError(
-            confirmPayload?.error ||
+          const info = parsePaymentError({
+            code: confirmPayload?.errorCode || `HTTP_${confirmResponse.status}`,
+            message:
+              confirmPayload?.errorMessage ||
+              confirmPayload?.error ||
               '결제 승인에 실패했습니다. 낙찰은 진행되지 않았습니다.',
-          );
+          });
+          const feedback = formatPaymentToast(info);
+          console.error('[SponsorAuction] 결제 승인 실패', {
+            paymentKey,
+            orderId,
+            amount,
+            httpStatus: confirmResponse.status,
+            errorCode: info.code,
+            errorMessage: info.message,
+            payload: confirmPayload,
+          });
+          showToast(feedback.text, feedback.variant, 9000);
+          setError(`[${info.code}] ${info.message}\n${info.hint}`);
           return;
         }
 
@@ -75,18 +104,36 @@ function PaymentSuccessContent() {
         setAuctionHref(`/auctions/${confirmPayload.auctionId}`);
 
         if (!auction || !bid) {
-          setError('결제된 캠페인 정보를 찾지 못했습니다. 낙찰은 자동으로 반영되지 않았습니다.');
+          const info = parsePaymentError({
+            code: 'AWARD_TARGET_NOT_FOUND',
+            message: '결제된 캠페인 정보를 찾지 못했습니다. 낙찰은 자동으로 반영되지 않았습니다.',
+          });
+          const feedback = formatPaymentToast(info);
+          showToast(feedback.text, 'error', 9000);
+          setError(`[${info.code}] ${info.message}`);
           return;
         }
 
         if (advertiserPayableAmount(bid.bidAmount) !== confirmPayload.amount) {
-          setError('결제 금액이 제안 금액과 일치하지 않아 낙찰을 중단했습니다.');
+          const info = parsePaymentError({
+            code: 'AMOUNT_MISMATCH',
+            message: '결제 금액이 제안 금액과 일치하지 않아 낙찰을 중단했습니다.',
+          });
+          const feedback = formatPaymentToast(info);
+          showToast(feedback.text, 'error', 9000);
+          setError(`[${info.code}] ${info.message}`);
           return;
         }
 
         const awarded = await awardBid(confirmPayload.auctionId, confirmPayload.bidId);
         if (awarded.error && awarded.error !== VALIDATION.alreadyAwarded) {
-          setError(awarded.error || UPDATE_FAIL_MESSAGE);
+          const info = parsePaymentError({
+            code: 'AWARD_FAILED',
+            message: awarded.error || UPDATE_FAIL_MESSAGE,
+          });
+          const feedback = formatPaymentToast(info);
+          showToast(feedback.text, 'error', 9000);
+          setError(`[${info.code}] ${info.message}`);
           return;
         }
 
@@ -127,8 +174,18 @@ function PaymentSuccessContent() {
           router.replace(`/auctions/${confirmPayload.auctionId}`);
         }, 900);
       } catch (caught) {
-        console.warn('[SponsorAuction] 결제 성공 처리 중 예외가 발생했습니다.', caught);
-        setError('결제 처리 중 오류가 발생했습니다. 낙찰은 진행되지 않았을 수 있습니다.');
+        const info = parsePaymentError({
+          code: 'CONFIRM_CLIENT_EXCEPTION',
+          message: caught instanceof Error ? caught.message : '결제 처리 중 오류가 발생했습니다.',
+        });
+        const feedback = formatPaymentToast(info);
+        console.error('[SponsorAuction] 결제 성공 처리 중 예외가 발생했습니다.', {
+          errorCode: info.code,
+          errorMessage: info.message,
+          error: caught,
+        });
+        showToast(feedback.text, feedback.variant, 9000);
+        setError(`[${info.code}] ${info.message}`);
       }
     };
 
@@ -142,7 +199,7 @@ function PaymentSuccessContent() {
           <>
             <p className="text-sm font-semibold text-rose-700">결제 승인 실패</p>
             <h1 className="mt-2 text-xl font-bold text-zinc-950">낙찰이 확정되지 않았습니다</h1>
-            <p className="mt-3 text-sm leading-6 text-zinc-600" role="alert">
+            <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-600" role="alert">
               {error}
             </p>
             <Link

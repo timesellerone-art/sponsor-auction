@@ -4,6 +4,14 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, X } from 'lucide-react';
 import { showToast } from '@/components/Toast';
+import { getTossClientKey } from '@/lib/payments/env';
+import {
+  formatPaymentError,
+  formatPaymentToast,
+  parsePaymentError,
+  serializePaymentError,
+  type PaymentErrorInfo,
+} from '@/lib/payments/errors';
 import { cn, formatWon } from '@/lib/utils';
 import type { TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
 import type { PaymentMethod, PreparePaymentResult } from '@/types/payment';
@@ -20,6 +28,10 @@ const METHOD_OPTIONS: { value: PaymentMethod; label: string; hint: string }[] = 
   { value: 'EASY_PAY', label: '간편결제', hint: '토스페이 등' },
 ];
 
+function resolveClientKey(checkout: PreparePaymentResult | null) {
+  return checkout?.clientKey?.trim() || getTossClientKey() || '';
+}
+
 export function PaymentCheckoutModal({
   open,
   checkout,
@@ -31,6 +43,7 @@ export function PaymentCheckoutModal({
   const [busy, setBusy] = useState(false);
   const [method, setMethod] = useState<PaymentMethod>('CARD');
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [payError, setPayError] = useState<PaymentErrorInfo | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -56,6 +69,7 @@ export function PaymentCheckoutModal({
       widgetsRef.current = null;
       setReady(false);
       setLoadError(null);
+      setPayError(null);
       return;
     }
 
@@ -65,14 +79,15 @@ export function PaymentCheckoutModal({
       setReady(false);
       setLoadError(null);
 
-      if (checkout.demo || !checkout.clientKey) {
+      const clientKey = resolveClientKey(checkout);
+      if (!clientKey) {
         setReady(true);
         return;
       }
 
       try {
         const { loadTossPayments } = await import('@tosspayments/tosspayments-sdk');
-        const tossPayments = await loadTossPayments(checkout.clientKey);
+        const tossPayments = await loadTossPayments(clientKey);
         const widgets = tossPayments.widgets({ customerKey: checkout.customerKey });
         await widgets.setAmount({ currency: 'KRW', value: checkout.amount });
         await Promise.all([
@@ -91,9 +106,16 @@ export function PaymentCheckoutModal({
         widgetsRef.current = widgets;
         setReady(true);
       } catch (error) {
-        console.warn('[SponsorAuction] 토스페이먼츠 위젯 로딩에 실패했습니다.', error);
+        const info = parsePaymentError(error);
+        console.error('[SponsorAuction] 토스페이먼츠 위젯 로딩에 실패했습니다.', {
+          errorCode: info.code,
+          errorMessage: info.message,
+          error,
+        });
         if (!cancelled) {
-          setLoadError('결제 수단을 불러오지 못했습니다. 데모 결제로 진행할 수 있습니다.');
+          setLoadError(
+            `${formatPaymentError(info)} 결제 수단을 불러오지 못했습니다. 데모 결제로 진행할 수 있습니다.`,
+          );
           setReady(true);
         }
       }
@@ -111,7 +133,9 @@ export function PaymentCheckoutModal({
 
   const successUrl = `${window.location.origin}/payments/success`;
   const failUrl = `${window.location.origin}/payments/fail`;
-  const useToss = Boolean(widgetsRef.current) && !checkout.demo && !loadError;
+  const clientKey = resolveClientKey(checkout);
+  const isDemoCheckout = !clientKey;
+  const useToss = Boolean(widgetsRef.current) && !isDemoCheckout && !loadError;
 
   const handlePay = async () => {
     if (busy || !ready) {
@@ -119,6 +143,7 @@ export function PaymentCheckoutModal({
     }
 
     setBusy(true);
+    setPayError(null);
     try {
       if (useToss && widgetsRef.current) {
         await widgetsRef.current.requestPayment({
@@ -139,8 +164,31 @@ export function PaymentCheckoutModal({
       });
       window.location.assign(`${successUrl}?${params.toString()}`);
     } catch (error) {
-      console.warn('[SponsorAuction] 결제 요청 중 예외가 발생했습니다.', error);
-      showToast('결제가 취소되었거나 요청에 실패했습니다. 낙찰은 진행되지 않았습니다.');
+      const info = parsePaymentError(error);
+      const feedback = formatPaymentToast(info);
+      const logPayload = {
+        errorCode: info.code,
+        errorMessage: info.message,
+        kind: info.kind,
+        cancelled: info.cancelled,
+        aborted: info.aborted,
+        orderId: checkout.orderId,
+        raw: serializePaymentError(error),
+      };
+
+      if (info.kind === 'cancel' || info.aborted) {
+        console.info('[SponsorAuction] 결제 취소 또는 중단', logPayload);
+      } else {
+        console.error('[SponsorAuction] 결제 요청 실패', logPayload);
+      }
+
+      if (info.aborted) {
+        setBusy(false);
+        return;
+      }
+
+      setPayError(info);
+      showToast(feedback.text, feedback.variant, 9000);
       setBusy(false);
     }
   };
@@ -188,7 +236,25 @@ export function PaymentCheckoutModal({
             </p>
           </div>
 
-          {checkout.demo || loadError ? (
+          {payError ? (
+            <div
+              role="alert"
+              className={cn(
+                'rounded-xl border px-4 py-3 text-sm leading-6',
+                payError.kind === 'cancel'
+                  ? 'border-amber-200 bg-amber-50 text-amber-950'
+                  : 'border-rose-200 bg-rose-50 text-rose-950',
+              )}
+            >
+              <p className="font-semibold">
+                {payError.kind === 'cancel' ? '결제를 취소했습니다' : '결제에 실패했습니다'}
+              </p>
+              <p className="mt-1 font-mono text-xs">{formatPaymentError(payError)}</p>
+              <p className="mt-1 text-xs text-zinc-600">{payError.hint}</p>
+            </div>
+          ) : null}
+
+          {isDemoCheckout || loadError ? (
             <fieldset className="min-w-0">
               <legend className="text-sm font-medium text-zinc-800">결제 수단</legend>
               {loadError ? (

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { advertiserPayableAmount } from '@/lib/fees';
-import { getTossClientKey, isTossConfigured } from '@/lib/payments/env';
+import { getTossClientKey, isTossClientConfigured } from '@/lib/payments/env';
 import {
   PAYMENT_INTENT_COOKIE,
   PAYMENT_INTENT_TTL_MS,
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       orderName: intent.orderName,
       customerKey: sanitizeCustomerKey(parsed.customerKey),
       clientKey: getTossClientKey() || null,
-      demo: !isTossConfigured(),
+      demo: !isTossClientConfigured(),
     };
 
     const response = NextResponse.json(result);

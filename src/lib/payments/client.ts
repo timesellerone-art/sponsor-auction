@@ -1,4 +1,5 @@
 import { advertiserPayableAmount } from '@/lib/fees';
+import { getTossClientKey } from '@/lib/payments/env';
 import type { PreparePaymentResult } from '@/types/payment';
 import type { AuctionItem, BidItem } from '@/types/auction';
 
@@ -36,7 +37,15 @@ export async function prepareAwardPayment(input: {
       };
     }
 
-    return { data: payload, error: null };
+    const clientKey = payload.clientKey?.trim() || getTossClientKey() || null;
+    return {
+      data: {
+        ...payload,
+        clientKey,
+        demo: !clientKey,
+      },
+      error: null,
+    };
   } catch (error) {
     console.warn('[SponsorAuction] 결제 준비 요청 중 예외가 발생했습니다.', error);
     return { data: null, error: '결제를 준비하지 못했습니다. 다시 시도해 주세요.' };

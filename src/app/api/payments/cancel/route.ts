@@ -24,9 +24,10 @@ export async function POST(request: Request) {
     }
 
     updateIntent(orderId, { status: 'failed' });
+    console.info('[SponsorAuction] 결제 intent 취소 처리', { orderId });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.warn('[SponsorAuction] 결제 취소 처리 중 예외가 발생했습니다.', error);
+    console.error('[SponsorAuction] 결제 취소 처리 중 예외가 발생했습니다.', error);
     return NextResponse.json({ ok: true });
   }
 }
