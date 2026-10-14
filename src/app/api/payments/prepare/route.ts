@@ -10,6 +10,7 @@ import {
   sanitizeCustomerKey,
 } from '@/lib/payments/intent';
 import { MAX_BID_AMOUNT } from '@/lib/validation';
+import { persistPayment } from '@/lib/payments/persist';
 import type { PreparePaymentInput, PreparePaymentResult } from '@/types/payment';
 
 function parseBody(value: unknown): PreparePaymentInput | null {
@@ -60,6 +61,10 @@ export async function POST(request: Request) {
     };
 
     putIntent(intent);
+    const pending = await persistPayment(intent, 'pending', null);
+    if (!pending.ok) {
+      console.error('[SponsorAuction] pending payment 저장 실패', pending);
+    }
 
     const result: PreparePaymentResult = {
       orderId: intent.orderId,

@@ -7,8 +7,26 @@ import {
   resolveIntent,
   updateIntent,
 } from '@/lib/payments/intent';
+import { persistPayment } from '@/lib/payments/persist';
 import { confirmTossPayment, isDemoPaymentKey } from '@/lib/payments/toss';
 import type { ConfirmPaymentInput, ConfirmPaymentResult } from '@/types/payment';
+
+function jsonError(
+  status: number,
+  errorCode: string,
+  errorMessage: string,
+  extra?: Record<string, unknown>,
+) {
+  return NextResponse.json(
+    {
+      error: `[${errorCode}] ${errorMessage}`,
+      errorCode,
+      errorMessage,
+      ...extra,
+    },
+    { status },
+  );
+}
 
 function parseBody(value: unknown): ConfirmPaymentInput | null {
   if (!value || typeof value !== 'object') {
@@ -32,14 +50,7 @@ export async function POST(request: Request) {
     const parsed = parseBody(await request.json().catch(() => null));
     if (!parsed) {
       console.error('[SponsorAuction] 결제 승인 요청 본문이 올바르지 않습니다.');
-      return NextResponse.json(
-        {
-          error: '[INVALID_CONFIRM_BODY] 결제 승인 정보가 올바르지 않습니다.',
-          errorCode: 'INVALID_CONFIRM_BODY',
-          errorMessage: '결제 승인 정보가 올바르지 않습니다.',
-        },
-        { status: 400 },
-      );
+      return jsonError(400, 'INVALID_CONFIRM_BODY', '결제 승인 정보가 올바르지 않습니다.');
     }
 
     console.info('[SponsorAuction] 결제 승인 요청', {
@@ -60,13 +71,10 @@ export async function POST(request: Request) {
         orderId: parsed.orderId,
         amount: parsed.amount,
       });
-      return NextResponse.json(
-        {
-          error: '[INTENT_NOT_FOUND] 결제 요청이 만료되었거나 찾을 수 없습니다. 낙찰은 진행되지 않았습니다.',
-          errorCode: 'INTENT_NOT_FOUND',
-          errorMessage: '결제 요청이 만료되었거나 찾을 수 없습니다. 낙찰은 진행되지 않았습니다.',
-        },
-        { status: 409 },
+      return jsonError(
+        409,
+        'INTENT_NOT_FOUND',
+        '결제 요청이 만료되었거나 찾을 수 없습니다. 낙찰은 진행되지 않았습니다.',
       );
     }
 
@@ -77,13 +85,11 @@ export async function POST(request: Request) {
         intentAmount: intent.amount,
       });
       updateIntent(intent.orderId, { status: 'failed' });
-      return NextResponse.json(
-        {
-          error: '[AMOUNT_MISMATCH] 결제 금액이 주문 정보와 일치하지 않습니다. 낙찰은 진행되지 않았습니다.',
-          errorCode: 'AMOUNT_MISMATCH',
-          errorMessage: '결제 금액이 주문 정보와 일치하지 않습니다. 낙찰은 진행되지 않았습니다.',
-        },
-        { status: 409 },
+      await persistPayment(intent, 'failed', parsed.paymentKey);
+      return jsonError(
+        409,
+        'AMOUNT_MISMATCH',
+        '결제 금액이 주문 정보와 일치하지 않습니다. 낙찰은 진행되지 않았습니다.',
       );
     }
 
@@ -93,25 +99,30 @@ export async function POST(request: Request) {
         console.error('[SponsorAuction] 결제 승인 실패: 이미 다른 paymentKey로 처리됨', {
           orderId: parsed.orderId,
         });
-        return NextResponse.json(
-          {
-            error: '[ALREADY_CONFIRMED_OTHER_KEY] 이미 다른 결제로 처리된 주문입니다.',
-            errorCode: 'ALREADY_CONFIRMED_OTHER_KEY',
-            errorMessage: '이미 다른 결제로 처리된 주문입니다.',
-          },
-          { status: 409 },
+        return jsonError(
+          409,
+          'ALREADY_CONFIRMED_OTHER_KEY',
+          '이미 다른 결제로 처리된 주문입니다.',
         );
       }
 
+      const replayKey = existing.paymentKey ?? parsed.paymentKey;
+      const replaySaved = await persistPayment(intent, 'confirmed', replayKey);
+      if (!replaySaved.ok) {
+        return jsonError(500, replaySaved.errorCode, replaySaved.errorMessage, {
+          supabaseError: replaySaved.supabaseError,
+        });
+      }
       const replay: ConfirmPaymentResult = {
         orderId: intent.orderId,
         auctionId: intent.auctionId,
         bidId: intent.bidId,
         amount: intent.amount,
-        paymentKey: existing.paymentKey ?? parsed.paymentKey,
+        paymentKey: replayKey,
         alreadyConfirmed: true,
+        saved: !replaySaved.skipped,
       };
-      return NextResponse.json(replay);
+      return NextResponse.json(replay, { status: 200 });
     }
 
     if (existing?.status === 'failed' || existing?.status === 'expired') {
@@ -119,13 +130,10 @@ export async function POST(request: Request) {
         orderId: parsed.orderId,
         status: existing.status,
       });
-      return NextResponse.json(
-        {
-          error: '[INTENT_NOT_PENDING] 이미 취소되었거나 만료된 결제입니다. 낙찰은 진행되지 않았습니다.',
-          errorCode: 'INTENT_NOT_PENDING',
-          errorMessage: '이미 취소되었거나 만료된 결제입니다. 낙찰은 진행되지 않았습니다.',
-        },
-        { status: 409 },
+      return jsonError(
+        409,
+        'INTENT_NOT_PENDING',
+        '이미 취소되었거나 만료된 결제입니다. 낙찰은 진행되지 않았습니다.',
       );
     }
 
@@ -136,21 +144,17 @@ export async function POST(request: Request) {
         console.error('[SponsorAuction] 결제 승인 실패: TOSS_SECRET_KEY 없음', {
           orderId: parsed.orderId,
         });
-        return NextResponse.json(
-          {
-            error:
-              '[TOSS_SECRET_KEY_MISSING] TOSS_SECRET_KEY가 없어 결제를 승인할 수 없습니다. Vercel 서버 환경 변수에 시크릿 키를 등록해 주세요.',
-            errorCode: 'TOSS_SECRET_KEY_MISSING',
-            errorMessage:
-              'TOSS_SECRET_KEY가 없어 결제를 승인할 수 없습니다. Vercel 서버 환경 변수에 시크릿 키를 등록해 주세요.',
-          },
-          { status: 502 },
+        return jsonError(
+          502,
+          'TOSS_SECRET_KEY_MISSING',
+          'TOSS_SECRET_KEY가 없어 결제를 승인할 수 없습니다. Vercel 서버 환경 변수에 시크릿 키를 등록해 주세요.',
         );
       }
 
       const toss = await confirmTossPayment(parsed);
       if (!toss.ok) {
         updateIntent(intent.orderId, { status: 'failed', paymentKey: parsed.paymentKey });
+        await persistPayment(intent, 'failed', parsed.paymentKey);
         const errorCode = toss.errorCode || 'TOSS_CONFIRM_FAILED';
         const errorMessage =
           toss.errorMessage || toss.error || '결제 승인에 실패했습니다. 낙찰은 진행되지 않았습니다.';
@@ -160,15 +164,17 @@ export async function POST(request: Request) {
           errorCode,
           errorMessage,
         });
-        return NextResponse.json(
-          {
-            error: `[${errorCode}] ${errorMessage}`,
-            errorCode,
-            errorMessage,
-          },
-          { status: 402 },
-        );
+        return jsonError(402, errorCode, errorMessage, {
+          httpStatus: toss.httpStatus,
+        });
       }
+    }
+
+    const saved = await persistPayment(intent, 'confirmed', parsed.paymentKey);
+    if (!saved.ok) {
+      return jsonError(500, saved.errorCode, saved.errorMessage, {
+        supabaseError: saved.supabaseError,
+      });
     }
 
     updateIntent(intent.orderId, {
@@ -183,25 +189,20 @@ export async function POST(request: Request) {
       amount: intent.amount,
       paymentKey: parsed.paymentKey,
       alreadyConfirmed: false,
+      saved: !saved.skipped,
     };
 
     console.info('[SponsorAuction] 결제 승인 완료', {
       orderId: result.orderId,
       amount: result.amount,
       demoAllowed,
+      saved: result.saved,
     });
-    return NextResponse.json(result);
+    return NextResponse.json(result, { status: 200 });
   } catch (error) {
     console.error('[SponsorAuction] 결제 승인 중 예외가 발생했습니다.', error);
     const errorMessage =
       error instanceof Error ? error.message : '결제 승인에 실패했습니다. 낙찰은 진행되지 않았습니다.';
-    return NextResponse.json(
-      {
-        error: `[CONFIRM_EXCEPTION] ${errorMessage}`,
-        errorCode: 'CONFIRM_EXCEPTION',
-        errorMessage,
-      },
-      { status: 500 },
-    );
+    return jsonError(500, 'CONFIRM_EXCEPTION', errorMessage);
   }
 }

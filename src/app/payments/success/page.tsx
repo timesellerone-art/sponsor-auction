@@ -88,6 +88,7 @@ function PaymentSuccessContent() {
             httpStatus: confirmResponse.status,
             errorCode: info.code,
             errorMessage: info.message,
+            supabaseError: (confirmPayload as { supabaseError?: unknown } | null)?.supabaseError,
             payload: confirmPayload,
           });
           showToast(feedback.text, feedback.variant, 9000);

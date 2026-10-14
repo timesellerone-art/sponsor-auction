@@ -136,8 +136,8 @@ $$;
 
 create table if not exists public.payments (
   order_id text primary key,
-  auction_id uuid not null,
-  bid_id uuid not null,
+  auction_id text not null,
+  bid_id text not null,
   amount integer not null,
   order_name text not null,
   status public.payment_status not null default 'pending',
@@ -147,6 +147,12 @@ create table if not exists public.payments (
   constraint payments_amount_positive check (amount > 0),
   constraint payments_order_id_len check (char_length(order_id) >= 6)
 );
+
+-- 기존 uuid 컬럼은 mock/실서비스 id를 모두 받을 수 있도록 text로 맞춥니다.
+alter table if exists public.payments
+  alter column auction_id type text using auction_id::text;
+alter table if exists public.payments
+  alter column bid_id type text using bid_id::text;
 
 create unique index if not exists payments_payment_key_unique
   on public.payments (payment_key)
@@ -384,6 +390,28 @@ alter table public.profiles enable row level security;
 alter table public.auctions enable row level security;
 alter table public.bids enable row level security;
 alter table public.payouts enable row level security;
+alter table public.payments enable row level security;
+
+drop policy if exists "payments_select_public" on public.payments;
+create policy "payments_select_public"
+on public.payments for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "payments_insert_public" on public.payments;
+create policy "payments_insert_public"
+on public.payments for insert
+to anon, authenticated
+with check (amount > 0 and char_length(order_id) >= 6);
+
+drop policy if exists "payments_update_public" on public.payments;
+create policy "payments_update_public"
+on public.payments for update
+to anon, authenticated
+using (true)
+with check (true);
+
+grant select, insert, update on public.payments to anon, authenticated, service_role;
 
 drop policy if exists "profiles_select_public" on public.profiles;
 create policy "profiles_select_public"

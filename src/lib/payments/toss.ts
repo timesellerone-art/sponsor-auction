@@ -1,4 +1,4 @@
-import { getTossSecretKey } from '@/lib/payments/env';
+import { describeTossSecret, getTossSecretKey } from '@/lib/payments/env';
 
 const TOSS_CONFIRM_URL = 'https://api.tosspayments.com/v1/payments/confirm';
 
@@ -8,6 +8,7 @@ export type TossConfirmResult = {
   error?: string;
   errorCode?: string;
   errorMessage?: string;
+  httpStatus?: number;
 };
 
 export async function confirmTossPayment(input: {
@@ -29,9 +30,21 @@ export async function confirmTossPayment(input: {
     };
   }
 
-  const authorization = `Basic ${Buffer.from(`${secretKey}:`).toString('base64')}`;
+  const authorization = `Basic ${Buffer.from(`${secretKey}:`, 'utf8').toString('base64')}`;
+  const secretMeta = describeTossSecret(secretKey);
 
   try {
+    console.info('[SponsorAuction] Toss confirm 요청', {
+      url: TOSS_CONFIRM_URL,
+      orderId: input.orderId,
+      amount: input.amount,
+      paymentKeyPrefix: input.paymentKey.slice(0, 8),
+      authorizationScheme: 'Basic',
+      secretKeyKind: secretMeta.kind,
+      secretKeyPrefix: secretMeta.prefix,
+      secretKeyLength: secretMeta.length,
+    });
+
     const response = await fetch(TOSS_CONFIRM_URL, {
       method: 'POST',
       headers: {
@@ -45,40 +58,48 @@ export async function confirmTossPayment(input: {
       }),
     });
 
-    const payload = (await response.json().catch(() => null)) as {
-      code?: string;
-      message?: string;
-      status?: string;
-    } | null;
+    const rawBody = await response.text();
+    let payload: { code?: string; message?: string; status?: string } | null = null;
+    try {
+      payload = rawBody ? (JSON.parse(rawBody) as { code?: string; message?: string; status?: string }) : null;
+    } catch {
+      payload = null;
+    }
 
     if (response.ok) {
       console.info('[SponsorAuction] Toss confirm 성공', {
         orderId: input.orderId,
         amount: input.amount,
-        status: payload?.status ?? response.status,
+        httpStatus: response.status,
+        tossStatus: payload?.status,
       });
-      return { ok: true };
+      return { ok: true, httpStatus: response.status };
     }
 
     if (payload?.code === 'ALREADY_PROCESSED_PAYMENT') {
       console.info('[SponsorAuction] Toss confirm 이미 처리된 결제', {
         orderId: input.orderId,
         amount: input.amount,
+        httpStatus: response.status,
+        errorCode: payload.code,
+        errorMessage: payload.message,
       });
-      return { ok: true, alreadyConfirmed: true };
+      return { ok: true, alreadyConfirmed: true, httpStatus: response.status };
     }
 
     const errorCode = payload?.code || `HTTP_${response.status}`;
-    const errorMessage = payload?.message || '토스페이먼츠 결제 승인에 실패했습니다.';
+    const errorMessage = payload?.message || rawBody || '토스페이먼츠 결제 승인에 실패했습니다.';
     console.error('[SponsorAuction] Toss confirm 실패', {
       orderId: input.orderId,
       amount: input.amount,
       httpStatus: response.status,
       errorCode,
       errorMessage,
+      tossResponse: payload ?? rawBody,
     });
     return {
       ok: false,
+      httpStatus: response.status,
       errorCode,
       errorMessage,
       error: `[${errorCode}] ${errorMessage}`,

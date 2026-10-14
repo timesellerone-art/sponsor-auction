@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { PAYMENT_INTENT_COOKIE, resolveIntent, updateIntent } from '@/lib/payments/intent';
+import { persistPayment } from '@/lib/payments/persist';
 
 export async function POST(request: Request) {
   try {
@@ -24,6 +25,10 @@ export async function POST(request: Request) {
     }
 
     updateIntent(orderId, { status: 'failed' });
+    const saved = await persistPayment(intent, 'failed', intent.paymentKey);
+    if (!saved.ok) {
+      console.error('[SponsorAuction] 결제 취소 DB 반영 실패', saved);
+    }
     console.info('[SponsorAuction] 결제 intent 취소 처리', { orderId });
     return NextResponse.json({ ok: true });
   } catch (error) {

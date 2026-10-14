@@ -46,6 +46,7 @@ export type ConfirmPaymentResult = {
   amount: number;
   paymentKey: string;
   alreadyConfirmed: boolean;
+  saved?: boolean;
   error?: string;
   errorCode?: string;
   errorMessage?: string;
