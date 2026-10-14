@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server';
-
-export const runtime = 'nodejs';
 import { advertiserPayableAmount } from '@/lib/fees';
 import { getTossClientKey, isTossClientConfigured } from '@/lib/payments/env';
 import {

@@ -1,7 +1,5 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-
-export const runtime = 'nodejs';
 import { isTossSecretConfigured } from '@/lib/payments/env';
 import {
   PAYMENT_INTENT_COOKIE,

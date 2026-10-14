@@ -1,7 +1,5 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-
-export const runtime = 'nodejs';
 import { PAYMENT_INTENT_COOKIE, resolveIntent, updateIntent } from '@/lib/payments/intent';
 import { persistPayment } from '@/lib/payments/persist';
 
