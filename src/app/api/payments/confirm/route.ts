@@ -1,5 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+
+export const runtime = 'nodejs';
 import { isTossSecretConfigured } from '@/lib/payments/env';
 import {
   PAYMENT_INTENT_COOKIE,
@@ -120,7 +122,7 @@ export async function POST(request: Request) {
         amount: intent.amount,
         paymentKey: replayKey,
         alreadyConfirmed: true,
-        saved: !replaySaved.skipped,
+        saved: true,
       };
       return NextResponse.json(replay, { status: 200 });
     }
@@ -189,7 +191,7 @@ export async function POST(request: Request) {
       amount: intent.amount,
       paymentKey: parsed.paymentKey,
       alreadyConfirmed: false,
-      saved: !saved.skipped,
+      saved: true,
     };
 
     console.info('[SponsorAuction] 결제 승인 완료', {

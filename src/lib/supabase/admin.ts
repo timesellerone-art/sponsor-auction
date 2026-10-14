@@ -1,18 +1,21 @@
+import 'server-only';
+
 import { createClient } from '@supabase/supabase-js';
-import { describeSupabaseServerEnv, getSupabaseAdminEnv } from '@/lib/supabase/env';
+import { describeMissingPaymentEnv, getPaymentWriteEnv } from '@/lib/supabase/server-env';
 import type { Database } from '@/types/database';
 
 export function createPaymentDbClient() {
-  const env = getSupabaseAdminEnv();
+  const env = getPaymentWriteEnv();
   if (!env) {
     return {
       client: null,
       usingServiceRole: false as const,
-      missing: describeSupabaseServerEnv(),
+      keySource: null as string | null,
+      missing: describeMissingPaymentEnv(),
     };
   }
 
-  const client = createClient<Database>(env.url, env.serviceRoleKey, {
+  const client = createClient<Database>(env.url, env.key, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -27,8 +30,8 @@ export function createPaymentDbClient() {
 
   return {
     client,
-    usingServiceRole: true as const,
-    serviceRoleSource: env.serviceRoleSource,
-    missing: describeSupabaseServerEnv(),
+    usingServiceRole: env.usingServiceRole,
+    keySource: env.keySource,
+    missing: describeMissingPaymentEnv(),
   };
 }
