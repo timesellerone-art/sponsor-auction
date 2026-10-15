@@ -76,8 +76,8 @@ export function AdminAuctionTable({
   }, [auctions, filter, query]);
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-      <div className="flex flex-col gap-3 border-b border-zinc-200 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+    <div className="w-full min-w-0 rounded-2xl border border-zinc-200 bg-white">
+      <div className="flex min-w-0 flex-col gap-3 border-b border-zinc-200 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
         <label className="min-w-0 flex-1">
           <span className="sr-only">역경매 검색</span>
           <input
@@ -112,8 +112,16 @@ export function AdminAuctionTable({
           <AdminEmptyState message="조건에 맞는 역경매가 없습니다." />
         </div>
       ) : (
-        <div className="max-h-[70vh] overflow-auto">
-          <table className="min-w-[880px] w-full text-left text-sm">
+        <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto">
+          <table className="w-full min-w-[880px] table-fixed text-left text-sm">
+            <colgroup>
+              <col className="w-[28%]" />
+              <col className="w-[16%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[20%]" />
+            </colgroup>
             <thead className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
               <tr>
                 <th className="px-4 py-3 font-medium">제목</th>
@@ -137,27 +145,30 @@ export function AdminAuctionTable({
                     key={auction.id}
                     className="border-b border-zinc-100 last:border-0"
                   >
-                    <td className="max-w-[240px] px-4 py-3">
+                    <td className="min-w-0 max-w-[300px] overflow-hidden px-4 py-3 align-top whitespace-nowrap text-ellipsis">
                       <Link
                         href={`/auctions/${auction.id}`}
-                        className="font-medium text-zinc-950 hover:underline"
+                        title={title}
+                        className="block min-w-0 max-w-full overflow-hidden font-medium text-ellipsis whitespace-nowrap text-zinc-950 hover:underline"
                       >
                         {title}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-zinc-600">
-                      {auction.authorName || '미상'}
+                    <td className="min-w-0 max-w-[200px] overflow-hidden px-4 py-3 align-top text-zinc-600 text-ellipsis whitespace-nowrap">
+                      <span className="block min-w-0 truncate" title={auction.authorName || '미상'}>
+                        {auction.authorName || '미상'}
+                      </span>
                     </td>
-                    <td className="px-4 py-3 font-medium text-zinc-950">
+                    <td className="min-w-0 px-4 py-3 align-top font-medium whitespace-nowrap text-zinc-950">
                       {formatWon(auction.budget)}
                     </td>
-                    <td className="px-4 py-3 text-zinc-600">
+                    <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
                       {blinded ? '블라인드' : (STATUS_LABEL[status] ?? status)}
                     </td>
-                    <td className="px-4 py-3 text-zinc-600">
+                    <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
                       {formatDate(auction.createdAt)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="min-w-0 px-4 py-3 align-top">
                       <div className="flex flex-wrap gap-2">
                         {blinded ? (
                           <button

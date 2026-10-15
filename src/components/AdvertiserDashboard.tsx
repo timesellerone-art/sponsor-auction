@@ -116,8 +116,8 @@ export function AdvertiserDashboard() {
           </Link>
         </div>
       ) : (
-        <div className="mt-8 flex flex-col gap-10">
-          <section className="min-w-0">
+        <div className="mt-8 flex flex-col space-y-8 pb-4 sm:space-y-12">
+          <section className="mb-8 min-w-0 pb-8">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
                 <h2 className="text-lg font-bold text-zinc-950">진행 중인 역경매</h2>
@@ -134,13 +134,13 @@ export function AdvertiserDashboard() {
                 지금 진행 중인 내 역경매가 없습니다.
               </div>
             ) : (
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-4 mb-2 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {openDeals.map((deal) => (
-                  <div key={`open-${deal.auction.id}`} className="min-w-0">
+                  <div key={`open-${deal.auction.id}`} className="flex min-w-0 flex-col gap-3">
                     <AuctionCard auction={deal.auction} hideBidAction />
                     <Link
                       href={`/auctions/${deal.auction.id}#proposals`}
-                      className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800"
+                      className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800"
                     >
                       입찰 현황 보기
                     </Link>
@@ -150,7 +150,7 @@ export function AdvertiserDashboard() {
             )}
           </section>
 
-          <section className="min-w-0">
+          <section className="mt-8 min-w-0 pt-2">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
                 <h2 className="text-lg font-bold text-zinc-950">결제 완료 목록</h2>

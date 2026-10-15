@@ -26,9 +26,17 @@ export function AdminPayoutTable({
   }
 
   return (
-    <div className="min-w-0 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-      <div className="max-h-[70vh] overflow-auto">
-        <table className="min-w-[800px] w-full text-left text-sm">
+    <div className="w-full min-w-0 rounded-2xl border border-zinc-200 bg-white">
+      <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto">
+        <table className="w-full min-w-[800px] table-fixed text-left text-sm">
+          <colgroup>
+            <col className="w-[22%]" />
+            <col className="w-[28%]" />
+            <col className="w-[14%]" />
+            <col className="w-[16%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
+          </colgroup>
           <thead className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
             <tr>
               <th className="px-4 py-3 font-medium">크리에이터</th>
@@ -50,24 +58,35 @@ export function AdminPayoutTable({
                   key={payout.id}
                   className="border-b border-zinc-100 last:border-0"
                 >
-                  <td className="max-w-[220px] px-4 py-3">
-                    <p className="font-medium text-zinc-950">
+                  <td className="min-w-0 max-w-[220px] overflow-hidden px-4 py-3 align-top">
+                    <p
+                      className="min-w-0 overflow-hidden font-medium text-ellipsis whitespace-nowrap text-zinc-950"
+                      title={payout.creatorName || '이름 없음'}
+                    >
                       {payout.creatorName || '이름 없음'}
                     </p>
-                    <p className="mt-0.5 truncate text-xs text-zinc-500">
+                    <p
+                      className="mt-0.5 min-w-0 overflow-hidden text-xs text-ellipsis whitespace-nowrap text-zinc-500"
+                      title={payout.creatorEmail || '이메일 없음'}
+                    >
                       {payout.creatorEmail || '이메일 없음'}
                     </p>
                   </td>
-                  <td className="max-w-[220px] px-4 py-3 text-zinc-600">
-                    {payout.auctionTitle || '연결된 캠페인 없음'}
+                  <td className="min-w-0 max-w-[300px] overflow-hidden px-4 py-3 align-top text-zinc-600 text-ellipsis whitespace-nowrap">
+                    <span
+                      className="block min-w-0 truncate"
+                      title={payout.auctionTitle || '연결된 캠페인 없음'}
+                    >
+                      {payout.auctionTitle || '연결된 캠페인 없음'}
+                    </span>
                   </td>
-                  <td className="px-4 py-3 font-medium text-zinc-950">
+                  <td className="min-w-0 px-4 py-3 align-top font-medium whitespace-nowrap text-zinc-950">
                     {formatWon(payout.amount)}
                   </td>
-                  <td className="px-4 py-3 text-zinc-600">
+                  <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
                     {formatDate(payout.requestedAt)}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="min-w-0 px-4 py-3 align-top">
                     <span
                       className={
                         pending
@@ -78,7 +97,7 @@ export function AdminPayoutTable({
                       {STATUS_LABEL[payout.status] ?? payout.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="min-w-0 px-4 py-3 align-top">
                     {pending ? (
                       <button
                         type="button"

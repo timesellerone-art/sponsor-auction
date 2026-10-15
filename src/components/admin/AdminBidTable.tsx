@@ -23,8 +23,16 @@ export function AdminBidTable({ bids, auctions }: AdminBidTableProps) {
   );
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-zinc-200 bg-white">
-      <table className="min-w-[760px] w-full text-left text-sm">
+    <div className="w-full min-w-0 rounded-2xl border border-zinc-200 bg-white">
+      <div className="w-full min-w-0 overflow-x-auto">
+      <table className="w-full min-w-[760px] table-fixed text-left text-sm">
+        <colgroup>
+          <col className="w-[22%]" />
+          <col className="w-1/3" />
+          <col className="w-[12%]" />
+          <col className="w-[13%]" />
+          <col className="w-[20%]" />
+        </colgroup>
         <thead className="border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
           <tr>
             <th className="px-4 py-3 font-medium">크리에이터</th>
@@ -37,24 +45,35 @@ export function AdminBidTable({ bids, auctions }: AdminBidTableProps) {
         <tbody>
           {bids.map((bid) => (
             <tr key={bid.id} className="border-b border-zinc-100 last:border-0">
-              <td className="px-4 py-3">
-                <p className="font-medium text-zinc-950">
+              <td className="min-w-0 max-w-[220px] overflow-hidden px-4 py-3 align-top">
+                <p
+                  className="min-w-0 overflow-hidden font-medium text-ellipsis whitespace-nowrap text-zinc-950"
+                  title={bid.creatorName || '이름 없음'}
+                >
                   {bid.creatorName || '이름 없음'}
                 </p>
-                <p className="mt-1 line-clamp-1 text-xs text-zinc-500">
+                <p
+                  className="mt-1 min-w-0 overflow-hidden text-xs text-ellipsis whitespace-nowrap text-zinc-500"
+                  title={bid.proposalText || '제안 내용 없음'}
+                >
                   {bid.proposalText || '제안 내용 없음'}
                 </p>
               </td>
-              <td className="px-4 py-3 text-zinc-600">
-                {titleById.get(bid.auctionId) || '연결된 캠페인 없음'}
+              <td className="min-w-0 max-w-[300px] overflow-hidden px-4 py-3 align-top text-zinc-600 text-ellipsis whitespace-nowrap">
+                <span
+                  className="block min-w-0 truncate"
+                  title={titleById.get(bid.auctionId) || '연결된 캠페인 없음'}
+                >
+                  {titleById.get(bid.auctionId) || '연결된 캠페인 없음'}
+                </span>
               </td>
-              <td className="px-4 py-3 font-medium text-zinc-950">
+              <td className="min-w-0 px-4 py-3 align-top font-medium whitespace-nowrap text-zinc-950">
                 {formatWon(bid.bidAmount)}
               </td>
-              <td className="px-4 py-3 text-zinc-600">
+              <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
                 {formatWon(platformFeeFromAmount(bid.bidAmount))}
               </td>
-              <td className="max-w-[180px] px-4 py-3">
+              <td className="min-w-0 max-w-[200px] overflow-hidden px-4 py-3 align-top">
                 {bid.creatorChannelUrl ? (
                   <a
                     href={bid.creatorChannelUrl}
@@ -72,6 +91,7 @@ export function AdminBidTable({ bids, auctions }: AdminBidTableProps) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

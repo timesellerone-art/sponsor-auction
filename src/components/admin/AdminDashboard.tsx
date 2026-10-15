@@ -370,7 +370,7 @@ export function AdminDashboard() {
 
   return (
     <AccessGuard allow="admin">
-      <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-1 flex-col gap-6 overflow-x-hidden px-4 py-6 sm:px-6 sm:py-10">
+      <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-1 flex-col gap-6 overflow-x-clip px-4 py-6 sm:px-6 sm:py-10">
         <div>
           <p className="text-sm font-semibold tracking-wide text-teal-800">Admin</p>
           <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">
@@ -419,7 +419,7 @@ export function AdminDashboard() {
         </div>
 
         {loading ? (
-          <div className="h-64 animate-pulse rounded-2xl bg-white" />
+          <div className="h-64 w-full min-w-0 animate-pulse rounded-2xl bg-white" />
         ) : tab === 'auctions' ? (
           asAuctionList(auctions).length === 0 ? (
             <AdminEmptyState message={loadError ?? undefined} />
