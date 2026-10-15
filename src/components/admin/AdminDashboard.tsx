@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AdminAuctionTable } from '@/components/admin/AdminAuctionTable';
 import { AdminBidTable } from '@/components/admin/AdminBidTable';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
@@ -17,6 +18,7 @@ import {
   getProfiles,
   updateProfileStatus,
 } from '@/lib/admin';
+import { applyPaidPayoutLocal } from '@/lib/payouts';
 import { VALIDATION } from '@/lib/validation';
 import {
   UPDATE_FAIL_MESSAGE,
@@ -72,6 +74,7 @@ function asPayoutList(value: unknown): PayoutItem[] {
 }
 
 export function AdminDashboard() {
+  const router = useRouter();
   const [tab, setTab] = useState<TabId>('auctions');
   const [auctions, setAuctions] = useState<AuctionItem[]>([]);
   const [bids, setBids] = useState<BidItem[]>([]);
@@ -80,6 +83,25 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { busyKey: busyId, isBusy, run } = useActionLock();
+
+  const fetchPayouts = useCallback(async (keepPaid: PayoutItem[] = []) => {
+    try {
+      const payoutResult = await getPayouts();
+      setPayouts((prev) => {
+        const fresh = asPayoutList(payoutResult.data);
+        const paid = [
+          ...keepPaid,
+          ...prev.filter((item) => item.status === 'paid'),
+        ];
+        return paid.reduce((list, item) => applyPaidPayoutLocal(list, item), fresh);
+      });
+      if (payoutResult.data.length === 0 && payoutResult.error) {
+        setLoadError(payoutResult.error);
+      }
+    } catch (error) {
+      console.warn('[SponsorAuction] 정산 목록 재조회 실패', error);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -317,28 +339,29 @@ export function AdminDashboard() {
     });
   };
 
-  const handleApprovePayout = async (payout: PayoutItem) => {
+  const handleApprovePayout = async (payout: PayoutItem): Promise<PayoutItem | null> => {
     if (!payout?.id) {
-      return;
+      return null;
     }
     if (isBusy) {
       showToast(VALIDATION.actionInFlight);
-      return;
+      return null;
     }
 
     const latest = payouts.find((item) => item.id === payout.id) ?? payout;
     if (latest.status !== 'pending') {
       showToast(VALIDATION.payoutAlready);
-      return;
+      return null;
     }
 
     const confirmed = window.confirm(
       `"${payout.creatorName || '크리에이터'}"의 정산을 지급 처리할까요?`,
     );
     if (!confirmed) {
-      return;
+      return null;
     }
 
+    let paidItem: PayoutItem | null = null;
     await run(payout.id, async () => {
       try {
         const current = payouts.find((item) => item.id === payout.id) ?? latest;
@@ -355,8 +378,18 @@ export function AdminDashboard() {
           return;
         }
 
+        const paid: PayoutItem = {
+          ...current,
+          ...result.data,
+          id: current.id,
+          status: 'paid',
+          paidAt: result.data.paidAt || new Date().toISOString(),
+        };
+        paidItem = paid;
+        setPayouts((prev) => applyPaidPayoutLocal(prev, paid));
         showToast('지급 처리했습니다.', 'success');
-        await load();
+        router.refresh();
+        await fetchPayouts([paid]);
       } catch (error) {
         const detail =
           error instanceof Error ? error.message : '알 수 없는 오류';
@@ -364,6 +397,7 @@ export function AdminDashboard() {
         showToast(`지급 처리 실패: ${detail}`);
       }
     });
+    return paidItem;
   };
 
   const tabs: { id: TabId; label: string }[] = [
@@ -455,6 +489,7 @@ export function AdminDashboard() {
               payouts={asPayoutList(payouts)}
               busyId={busyId}
               onApprove={handleApprovePayout}
+              onRefresh={() => fetchPayouts()}
             />
           )
         ) : asBidList(bids).length === 0 ? (

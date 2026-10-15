@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import {
@@ -8,6 +9,7 @@ import {
   filterPayoutsByPeriod,
   summarizePayouts,
 } from '@/lib/payout-stats';
+import { applyPaidPayoutLocal } from '@/lib/payouts';
 import { formatDate, formatWon } from '@/lib/utils';
 import type { PayoutItem, PayoutPeriodFilter, PayoutStatus } from '@/types/admin';
 
@@ -27,26 +29,60 @@ const PERIODS: { id: PayoutPeriodFilter; label: string }[] = [
 type AdminPayoutTableProps = {
   payouts: PayoutItem[];
   busyId: string | null;
-  onApprove: (payout: PayoutItem) => void;
+  onApprove: (payout: PayoutItem) => void | Promise<void | PayoutItem | null>;
+  onRefresh?: () => void | Promise<void>;
 };
 
 export function AdminPayoutTable({
   payouts,
   busyId,
   onApprove,
+  onRefresh,
 }: AdminPayoutTableProps) {
+  const router = useRouter();
   const [period, setPeriod] = useState<PayoutPeriodFilter>('all');
   const [rangeFrom, setRangeFrom] = useState('');
   const [rangeTo, setRangeTo] = useState('');
+  const [rows, setRows] = useState<PayoutItem[]>(() =>
+    Array.isArray(payouts) ? payouts : [],
+  );
+
+  useEffect(() => {
+    const incoming = Array.isArray(payouts) ? payouts : [];
+    setRows((prev) => {
+      const paid = prev.filter((item) => item.status === 'paid');
+      return paid.reduce((list, item) => applyPaidPayoutLocal(list, item), incoming);
+    });
+  }, [payouts]);
 
   const filtered = useMemo(() => {
-    const list = Array.isArray(payouts) ? payouts.map(enrichPayout) : [];
+    const list = rows.map(enrichPayout);
     return filterPayoutsByPeriod(list, period, rangeFrom, rangeTo);
-  }, [payouts, period, rangeFrom, rangeTo]);
+  }, [rows, period, rangeFrom, rangeTo]);
 
   const stats = useMemo(() => summarizePayouts(filtered), [filtered]);
 
-  if (!Array.isArray(payouts) || payouts.length === 0) {
+  const markPaidLocally = (payout: PayoutItem, extra?: Partial<PayoutItem>) => {
+    setRows((prev) =>
+      applyPaidPayoutLocal(prev, {
+        ...payout,
+        ...extra,
+        status: 'paid',
+        paidAt: extra?.paidAt || payout.paidAt || new Date().toISOString(),
+      }),
+    );
+  };
+
+  const handleApprove = async (payout: PayoutItem) => {
+    const result = await onApprove(payout);
+    if (result && typeof result === 'object' && result.status === 'paid') {
+      markPaidLocally(payout, result);
+      router.refresh();
+      await onRefresh?.();
+    }
+  };
+
+  if (!Array.isArray(rows) || rows.length === 0) {
     return <AdminEmptyState message="정산 요청이 없습니다." />;
   }
 
@@ -202,14 +238,16 @@ export function AdminPayoutTable({
                           <button
                             type="button"
                             disabled={anyBusy}
-                            onClick={() => onApprove(payout)}
+                            onClick={() => {
+                              void handleApprove(payout);
+                            }}
                             className="inline-flex items-center gap-1 rounded-full border border-teal-200 px-3 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
                             {busy ? '처리 중...' : '지급 처리'}
                           </button>
                         ) : (
-                          <span className="text-xs text-zinc-400">처리 완료</span>
+                          <span className="text-xs font-semibold text-zinc-400">지급 완료</span>
                         )}
                       </td>
                     </tr>

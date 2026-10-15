@@ -181,4 +181,35 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(page.getByText('지급 완료').first()).toBeVisible();
     await expect(page.getByRole('button', { name: '지급 처리' }).first()).toBeVisible();
   });
+
+  test('지급 처리 성공 후 해당 행이 지급 완료로 바로 바뀐다', async ({ page }) => {
+    await unlockAdmin(page);
+    await page.getByRole('button', { name: '정산 관리' }).click();
+
+    const pendingRow = page
+      .locator('tbody tr')
+      .filter({ has: page.getByRole('button', { name: '지급 처리' }) })
+      .first();
+    await expect(pendingRow).toBeVisible();
+    await expect(pendingRow.getByText('지급 대기')).toBeVisible();
+
+    const campaign = (await pendingRow.locator('td').nth(1).innerText()).trim();
+    const pinnedRow = page
+      .locator('tbody tr')
+      .filter({ hasText: campaign })
+      .filter({ has: page.getByText('지급 대기') })
+      .first();
+
+    await acceptNextConfirm(page);
+    await pendingRow.getByRole('button', { name: '지급 처리' }).click();
+
+    await expect(
+      page.getByRole('alert').filter({ hasText: '지급 처리했습니다.' }),
+    ).toBeVisible();
+
+    const updatedRow = page.locator('tbody tr').filter({ hasText: campaign }).first();
+    await expect(updatedRow.getByRole('button', { name: '지급 처리' })).toHaveCount(0);
+    await expect(updatedRow.getByText('지급 완료').first()).toBeVisible();
+    await expect(pinnedRow).toHaveCount(0);
+  });
 });

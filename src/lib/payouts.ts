@@ -88,18 +88,68 @@ function payoutKeys(item: {
   return keys;
 }
 
+export function payoutsMatch(left: PayoutItem, right: PayoutItem) {
+  if (left.id && right.id && left.id === right.id) {
+    return true;
+  }
+  if (left.paymentOrderId && right.paymentOrderId && left.paymentOrderId === right.paymentOrderId) {
+    return true;
+  }
+  if (left.auctionId && left.bidId && right.auctionId === left.auctionId && right.bidId === left.bidId) {
+    return true;
+  }
+  return false;
+}
+
+export function applyPaidPayoutLocal(list: PayoutItem[], paid: PayoutItem): PayoutItem[] {
+  const nextPaid: PayoutItem = {
+    ...paid,
+    status: 'paid',
+    paidAt: paid.paidAt || new Date().toISOString(),
+  };
+  let matched = false;
+  const next = list.map((item) => {
+    if (!payoutsMatch(item, nextPaid)) {
+      return item;
+    }
+    matched = true;
+    return { ...item, ...nextPaid, id: item.id, status: 'paid' as const };
+  });
+  if (!matched) {
+    next.unshift(nextPaid);
+  }
+  return next;
+}
+
 export function mergePayoutLists(...lists: PayoutItem[][]) {
-  const seen = new Set<string>();
+  const byKey = new Map<string, PayoutItem>();
   const merged: PayoutItem[] = [];
+
+  const rememberKeys = (item: PayoutItem) => {
+    payoutKeys(item).forEach((key) => byKey.set(key, item));
+  };
 
   for (const list of lists) {
     for (const item of list) {
       const keys = payoutKeys(item);
-      if (keys.some((key) => seen.has(key))) {
+      const existing = keys.map((key) => byKey.get(key)).find(Boolean);
+      if (!existing) {
+        rememberKeys(item);
+        merged.push(item);
         continue;
       }
-      keys.forEach((key) => seen.add(key));
-      merged.push(item);
+      if (existing.status === 'paid' && item.status !== 'paid') {
+        continue;
+      }
+      if (item.status === 'paid' && existing.status !== 'paid') {
+        const index = merged.findIndex((row) => row === existing);
+        const replaced = { ...existing, ...item, id: existing.id, status: 'paid' as const };
+        if (index >= 0) {
+          merged[index] = replaced;
+        }
+        rememberKeys(replaced);
+        continue;
+      }
     }
   }
 
