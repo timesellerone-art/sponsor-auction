@@ -53,10 +53,12 @@ function toRow(
   status: PaymentIntentStatus,
   paymentKey: string | null,
 ): PaymentRow {
+  const auctionId = String(intent.auctionId ?? '').trim();
+  const bidId = String(intent.bidId ?? '').trim();
   return {
     order_id: String(intent.orderId),
-    auction_id: String(intent.auctionId),
-    bid_id: String(intent.bidId),
+    auction_id: auctionId,
+    bid_id: bidId,
     amount: Number(intent.amount),
     order_name: String(intent.orderName),
     status,
@@ -112,6 +114,20 @@ export async function persistPayment(
 
   const row = toRow(intent, status, paymentKey);
 
+  if (!row.auction_id || !row.bid_id) {
+    const supabaseError = {
+      message: 'auction_id 또는 bid_id가 비어 있어 payments 행을 완성할 수 없습니다.',
+      code: 'PAYMENT_IDS_MISSING',
+    };
+    logSupabaseError('validate', supabaseError, row);
+    return {
+      ok: false,
+      errorCode: 'PAYMENT_IDS_MISSING',
+      errorMessage: supabaseError.message,
+      supabaseError,
+    };
+  }
+
   if (!Number.isInteger(row.amount) || row.amount <= 0) {
     const supabaseError = {
       message: `amount 타입이 올바르지 않습니다: ${typeof intent.amount} / ${String(intent.amount)}`,
@@ -140,6 +156,8 @@ export async function persistPayment(
   if (!upsert.error) {
     console.info('[SponsorAuction] payments 저장 성공', {
       order_id: row.order_id,
+      auction_id: row.auction_id,
+      bid_id: row.bid_id,
       amount: row.amount,
       status: row.status,
       method: 'upsert',
@@ -176,6 +194,10 @@ export async function persistPayment(
     const updated = await client
       .from('payments')
       .update({
+        auction_id: row.auction_id,
+        bid_id: row.bid_id,
+        amount: row.amount,
+        order_name: row.order_name,
         status: row.status,
         payment_key: row.payment_key,
         confirmed_at: row.confirmed_at,

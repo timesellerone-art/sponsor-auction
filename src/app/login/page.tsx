@@ -47,7 +47,7 @@ export default function LoginPage() {
     if (role === 'admin' && reason?.startsWith('admin')) {
       return '/admin';
     }
-    if (role === 'advertiser' && reason?.startsWith('advertiser')) {
+    if (role === 'advertiser' || role === 'creator') {
       return '/my';
     }
     return '/';

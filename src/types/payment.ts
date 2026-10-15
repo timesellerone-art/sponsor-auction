@@ -22,6 +22,8 @@ export type PreparePaymentInput = {
   amount: number;
   orderName: string;
   customerKey?: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 };
 
 export type PreparePaymentResult = {
@@ -31,12 +33,18 @@ export type PreparePaymentResult = {
   customerKey: string;
   clientKey: string | null;
   demo: boolean;
+  auctionId: string;
+  bidId: string;
 };
 
 export type ConfirmPaymentInput = {
   paymentKey: string;
   orderId: string;
   amount: number;
+  auctionId?: string;
+  bidId?: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 };
 
 export type ConfirmPaymentResult = {

@@ -4,17 +4,12 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
+import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
 import { cn, formatDate, formatWon } from '@/lib/utils';
 import type { AuctionAdminFilter } from '@/types/admin';
-import type { AuctionItem, AuctionStatus } from '@/types/auction';
+import type { AuctionItem } from '@/types/auction';
 
-const STATUS_LABEL: Record<AuctionStatus, string> = {
-  active: '진행중',
-  matched: '매칭됨',
-  completed: '마감',
-  cancelled: '취소',
-  closed: '매칭 완료',
-};
+const STATUS_LABEL = AUCTION_STATUS_LABEL;
 
 const FILTERS: { id: AuctionAdminFilter; label: string }[] = [
   { id: 'all', label: '전체' },

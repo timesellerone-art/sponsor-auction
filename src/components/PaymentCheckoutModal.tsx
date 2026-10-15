@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, X } from 'lucide-react';
 import { showToast } from '@/components/Toast';
+import { rememberCheckoutContext } from '@/lib/payments/client';
 import { getTossClientKey } from '@/lib/payments/env';
 import {
   formatPaymentError,
@@ -131,8 +132,12 @@ export function PaymentCheckoutModal({
     return null;
   }
 
-  const successUrl = `${window.location.origin}/payments/success`;
-  const failUrl = `${window.location.origin}/payments/fail`;
+  const checkoutQuery = new URLSearchParams({
+    auctionId: checkout.auctionId,
+    bidId: checkout.bidId,
+  });
+  const successUrl = `${window.location.origin}/payments/success?${checkoutQuery.toString()}`;
+  const failUrl = `${window.location.origin}/payments/fail?${checkoutQuery.toString()}`;
   const clientKey = resolveClientKey(checkout);
   const isDemoCheckout = !clientKey;
   const useToss = Boolean(widgetsRef.current) && !isDemoCheckout && !loadError;
@@ -142,8 +147,24 @@ export function PaymentCheckoutModal({
       return;
     }
 
+    if (!checkout.auctionId || !checkout.bidId) {
+      const info = parsePaymentError({
+        code: 'PAYMENT_IDS_MISSING',
+        message: '경매/입찰 정보가 없어 결제를 진행할 수 없습니다.',
+      });
+      setPayError(info);
+      showToast(formatPaymentToast(info).text, 'error', 9000);
+      return;
+    }
+
     setBusy(true);
     setPayError(null);
+    rememberCheckoutContext({
+      orderId: checkout.orderId,
+      auctionId: checkout.auctionId,
+      bidId: checkout.bidId,
+      amount: checkout.amount,
+    });
     try {
       if (useToss && widgetsRef.current) {
         await widgetsRef.current.requestPayment({
@@ -161,8 +182,12 @@ export function PaymentCheckoutModal({
         orderId: checkout.orderId,
         amount: String(checkout.amount),
         method,
+        auctionId: checkout.auctionId,
+        bidId: checkout.bidId,
       });
-      window.location.assign(`${successUrl}?${params.toString()}`);
+      window.location.assign(
+        `${window.location.origin}/payments/success?${params.toString()}`,
+      );
     } catch (error) {
       const info = parsePaymentError(error);
       const feedback = formatPaymentToast(info);

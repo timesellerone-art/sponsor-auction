@@ -17,7 +17,7 @@ import { ACCESS_REASON } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
 import { buildFallbackReport } from '@/lib/ai-report';
 import { getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
-import { isMyAuction } from '@/lib/my-campaigns';
+import { isOwnedAuction } from '@/lib/my-campaigns';
 import { formatWon } from '@/lib/utils';
 import type { AiAnalyzeResponse, AiReport } from '@/types/ai';
 import { isAuctionClosed, type AuctionItem, type BidItem } from '@/types/auction';
@@ -181,7 +181,7 @@ export function AuctionDetail({ id }: { id: string }) {
   };
 
   const isOwner = Boolean(
-    auction && canCreateAuction && isMyAuction(auction.id),
+    auction && canCreateAuction && isOwnedAuction(auction, user),
   );
   const matched = Boolean(auction && isAuctionClosed(auction.status));
   const selectedBid =
@@ -252,7 +252,9 @@ export function AuctionDetail({ id }: { id: string }) {
               </p>
               {matched ? (
                 <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
-                  매칭 완료된 역경매입니다
+                  {auction.status === 'completed'
+                    ? '결제 완료된 역경매입니다'
+                    : '매칭 완료된 역경매입니다'}
                 </span>
               ) : null}
             </div>

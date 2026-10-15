@@ -26,6 +26,8 @@ const HINTS: Record<string, string> = {
   NEED_AGREEMENT_WITH_REQUIRED_TERMS: '토스 결제 위젯의 필수 약관에 동의한 뒤 다시 결제해 주세요.',
   REJECT_CARD_COMPANY: '카드사에서 결제를 거절했습니다. 잔액·한도·카드 상태를 확인해 주세요.',
   REJECT_CARD_PAYMENT: '카드 결제가 거절되었습니다. 잔액 부족이나 한도 초과일 수 있습니다.',
+  NOT_ENOUGH_BALANCE: '잔액이 부족합니다. 다른 결제 수단으로 다시 시도해 주세요.',
+  CARD_PROCESSING_ERROR: '카드 결제 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
   INVALID_CARD_NUMBER: '카드 번호가 올바르지 않습니다.',
   INVALID_CARD_EXPIRATION: '카드 유효기간이 올바르지 않습니다.',
   INVALID_STOPPED_CARD: '정지된 카드입니다. 다른 카드로 시도해 주세요.',

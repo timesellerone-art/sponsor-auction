@@ -9,6 +9,7 @@ import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { INSERT_FAIL_MESSAGE, createBid, getAuctionById } from '@/lib/auctions';
+import { rememberMyBid } from '@/lib/my-bids';
 import { getAuctionOwnerId, pushNotification } from '@/lib/notifications';
 import { cn, formatWon } from '@/lib/utils';
 import {
@@ -160,6 +161,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
           return;
         }
 
+        rememberMyBid(result.data.id);
         resetForm();
         showToast('제안을 제출했습니다.', 'success');
         const ownerId = getAuctionOwnerId(auction.id, latest.data?.authorId);

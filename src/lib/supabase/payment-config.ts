@@ -1,20 +1,4 @@
-/**
- * 결제 API 서버 번들에 환경 변수가 들어가도록
- * process.env.NAME 을 모듈 최상단에서 정적 참조합니다.
- */
-export const PAYMENT_SUPABASE_URL =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-
-export const PAYMENT_SUPABASE_SERVICE_ROLE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_SERVICE_KEY ||
-  process.env.SUPABASE_SECRET_KEY ||
-  '';
-
-export const PAYMENT_SUPABASE_ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  '';
+import { connection } from 'next/server';
 
 export type PaymentSupabaseConfig = {
   url: string;
@@ -22,13 +6,61 @@ export type PaymentSupabaseConfig = {
   anonKey: string;
 };
 
+function trimEnv(value: string | undefined) {
+  return value?.trim().replace(/^["']+|["']+$/g, '') || '';
+}
+
+/** 요청 시점에 읽습니다. 모듈 로드 시 빈 문자열로 고정하지 않습니다. */
 export function readPaymentSupabaseConfig(
   override?: Partial<PaymentSupabaseConfig>,
 ): PaymentSupabaseConfig {
+  const url = trimEnv(
+    override?.url || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL,
+  ).replace(/\/$/, '');
+  const serviceKey = trimEnv(
+    override?.serviceKey ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_SERVICE_KEY ||
+      process.env.SUPABASE_SECRET_KEY,
+  );
+  const anonKey = trimEnv(
+    override?.anonKey ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.SUPABASE_ANON_KEY,
+  );
+
+  return { url, serviceKey, anonKey };
+}
+
+export function isPublicSupabaseUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && parsed.hostname.endsWith('.supabase.co');
+  } catch {
+    return false;
+  }
+}
+
+export function publicSupabaseFromClient(url?: string, anonKey?: string): Partial<PaymentSupabaseConfig> {
+  const cleanedUrl = trimEnv(url).replace(/\/$/, '');
+  const cleanedKey = trimEnv(anonKey);
+  if (!cleanedUrl || !cleanedKey || cleanedKey.length < 20 || !isPublicSupabaseUrl(cleanedUrl)) {
+    return {};
+  }
+  return { url: cleanedUrl, anonKey: cleanedKey };
+}
+
+export async function paymentDbConfigForRequest(input?: {
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+}): Promise<PaymentSupabaseConfig> {
+  await connection();
+  const fromEnv = readPaymentSupabaseConfig();
+  const fromClient = publicSupabaseFromClient(input?.supabaseUrl, input?.supabaseAnonKey);
   return {
-    url: (override?.url || PAYMENT_SUPABASE_URL).trim().replace(/\/$/, ''),
-    serviceKey: (override?.serviceKey || PAYMENT_SUPABASE_SERVICE_ROLE_KEY).trim(),
-    anonKey: (override?.anonKey || PAYMENT_SUPABASE_ANON_KEY).trim(),
+    url: fromEnv.url || fromClient.url || '',
+    serviceKey: fromEnv.serviceKey,
+    anonKey: fromEnv.anonKey || fromClient.anonKey || '',
   };
 }
 

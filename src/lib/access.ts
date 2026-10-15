@@ -9,6 +9,7 @@ export const ACCESS_REASON = {
   'creator-forbidden': '크리에이터 전용 기능입니다.',
   'auth-required': '이 기능을 사용하려면 로그인이 필요합니다.',
   'award-auth': '낙찰하려면 광고주 계정으로 로그인해 주세요.',
+  'payment-auth': '결제는 로그인 후 이용할 수 있습니다.',
 } as const;
 
 export type AccessReason = keyof typeof ACCESS_REASON;

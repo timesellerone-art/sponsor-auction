@@ -1,5 +1,8 @@
+import type { AuctionItem } from '@/types/auction';
+import type { SessionUser } from '@/types/auth';
+
 const STORAGE_KEY = 'sponsor-auction-mine';
-const DEMO_CAMPAIGN_IDS = ['auc-001', 'auc-002'];
+const DEMO_CAMPAIGN_IDS = ['auc-001', 'auc-002', 'auc-004'];
 
 function asIdList(value: unknown): string[] {
   if (!Array.isArray(value)) {
@@ -11,22 +14,28 @@ function asIdList(value: unknown): string[] {
   );
 }
 
-export function getMyAuctionIds(): string[] {
+export function getStoredAuctionIds(): string[] {
   if (typeof window === 'undefined') {
-    return [...DEMO_CAMPAIGN_IDS];
+    return [];
   }
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      return [...DEMO_CAMPAIGN_IDS];
+      return [];
     }
-
-    const ids = asIdList(JSON.parse(raw) as unknown);
-    return ids.length > 0 ? ids : [...DEMO_CAMPAIGN_IDS];
+    return asIdList(JSON.parse(raw) as unknown);
   } catch {
-    return [...DEMO_CAMPAIGN_IDS];
+    return [];
   }
+}
+
+export function getMyAuctionIds(): string[] {
+  const stored = getStoredAuctionIds();
+  if (stored.length > 0) {
+    return stored;
+  }
+  return [...DEMO_CAMPAIGN_IDS];
 }
 
 export function isMyAuction(id: string) {
@@ -35,6 +44,22 @@ export function isMyAuction(id: string) {
   }
 
   return getMyAuctionIds().includes(id.trim());
+}
+
+export function isOwnedAuction(
+  auction: Pick<AuctionItem, 'id' | 'authorId' | 'authorName'> | null | undefined,
+  user: Pick<SessionUser, 'id' | 'name'> | null | undefined,
+) {
+  if (!auction?.id || !user?.id) {
+    return false;
+  }
+  if (auction.authorId && auction.authorId === user.id) {
+    return true;
+  }
+  if (auction.authorName && user.name && auction.authorName === user.name) {
+    return true;
+  }
+  return isMyAuction(auction.id);
 }
 
 export function rememberMyAuction(id: string) {

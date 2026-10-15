@@ -30,12 +30,12 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(page.getByText('관리자만 접근할 수 있는 페이지입니다.')).toBeVisible();
   });
 
-  test('크리에이터는 광고주 전용 /my 에 접근할 수 없다', async ({ page }) => {
+  test('크리에이터는 마이페이지에서 내 제안을 본다', async ({ page }) => {
     await signIn(page, CREATOR);
     await page.goto('/my');
-    await expect(page).not.toHaveURL(/\/my/);
-    await expect(page.getByRole('heading', { name: '내 역경매' })).toHaveCount(0);
-    await expect(page.getByText('광고주 전용 페이지입니다.')).toBeVisible();
+    await expect(page).toHaveURL(/\/my/);
+    await expect(page.getByRole('heading', { name: '내 제안' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '낙찰/결제 완료' })).toBeVisible();
   });
 
   test('관리자 로그인 후 대시보드와 통계 요약이 노출된다', async ({ page }) => {

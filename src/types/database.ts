@@ -148,6 +148,10 @@ export type Database = {
           confirmed_at?: string | null;
         };
         Update: {
+          auction_id?: string;
+          bid_id?: string;
+          amount?: number;
+          order_name?: string;
           status?: 'pending' | 'confirmed' | 'failed' | 'expired';
           payment_key?: string | null;
           confirmed_at?: string | null;

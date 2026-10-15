@@ -10,18 +10,19 @@ import { loginPath } from '@/lib/auth-guard';
 type AccessRole = 'admin' | 'advertiser' | 'creator';
 
 type AccessGuardProps = {
-  allow: AccessRole;
+  allow: AccessRole | readonly AccessRole[];
   children: ReactNode;
 };
 
-function matchesRole(allow: AccessRole, role: string | null | undefined) {
-  return role === allow;
+function allowedRoles(allow: AccessRole | readonly AccessRole[]) {
+  return Array.isArray(allow) ? [...allow] : [allow];
 }
 
 export function AccessGuard({ allow, children }: AccessGuardProps) {
   const router = useRouter();
   const { user, ready } = useAuth();
   const [allowed, setAllowed] = useState(false);
+  const allowKey = allowedRoles(allow).join('|');
 
   useEffect(() => {
     if (!ready) {
@@ -29,32 +30,33 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
     }
 
     syncRoleCookie(user?.role);
-    const ok = matchesRole(allow, user?.role);
+    const roles = allowKey.split('|').filter(Boolean) as AccessRole[];
+    const ok = Boolean(user?.role && roles.includes(user.role as AccessRole));
     if (ok) {
       setAllowed(true);
       return;
     }
 
     setAllowed(false);
+    const wantsAdmin = roles.includes('admin') && roles.length === 1;
     if (!user) {
-      const reason = allow === 'admin' ? 'admin-auth' : 'advertiser-auth';
+      const reason = wantsAdmin ? 'admin-auth' : 'advertiser-auth';
       showToast(ACCESS_REASON[reason]);
       const next = `${window.location.pathname}${window.location.search}`;
       router.replace(loginPath(reason, next));
       return;
     }
 
-    const forbidden =
-      allow === 'admin'
-        ? ACCESS_REASON['admin-forbidden']
-        : allow === 'advertiser'
-          ? ACCESS_REASON['advertiser-forbidden']
-          : ACCESS_REASON['creator-forbidden'];
+    const forbidden = wantsAdmin
+      ? ACCESS_REASON['admin-forbidden']
+      : roles.includes('advertiser') && !roles.includes('creator')
+        ? ACCESS_REASON['advertiser-forbidden']
+        : ACCESS_REASON['creator-forbidden'];
     showToast(forbidden);
     router.replace(
-      `/?reason=${allow === 'admin' ? 'admin-forbidden' : allow === 'advertiser' ? 'advertiser-forbidden' : 'creator-forbidden'}`,
+      `/?reason=${wantsAdmin ? 'admin-forbidden' : roles.includes('advertiser') && !roles.includes('creator') ? 'advertiser-forbidden' : 'creator-forbidden'}`,
     );
-  }, [allow, ready, router, user]);
+  }, [allowKey, ready, router, user]);
 
   if (!ready || !allowed) {
     return (

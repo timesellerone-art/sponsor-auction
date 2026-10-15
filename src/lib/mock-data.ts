@@ -33,7 +33,7 @@ export const mockAuctions: AuctionItem[] = [
     winnerBidId: null,
     deadline: '2026-10-25T23:59:59+09:00',
     createdAt: '2026-10-08T11:20:00+09:00',
-    bidsCount: 3,
+    bidsCount: 4,
   },
   {
     id: 'auc-002',
@@ -153,7 +153,7 @@ export const mockBids: BidItem[] = [
   {
     id: 'bid-005',
     auctionId: 'auc-004',
-    creatorId: 'usr-009',
+    creatorId: 'usr-demo-creator',
     creatorName: '머니노트 세린',
     creatorChannelUrl: 'https://x.com/moneynote_serin',
     bidAmount: 390_000,
@@ -161,6 +161,18 @@ export const mockBids: BidItem[] = [
       '실제 송금 플로우를 단계별로 캡처해 수수료 비교 스레드를 작성합니다. 팔로워 중 해외거주 비율이 높습니다.',
     status: 'selected',
     createdAt: '2026-09-15T11:18:00+09:00',
+  },
+  {
+    id: 'bid-demo-pending',
+    auctionId: 'auc-001',
+    creatorId: 'usr-demo-creator',
+    creatorName: '데모 크리에이터',
+    creatorChannelUrl: 'https://www.youtube.com/@demo-creator',
+    bidAmount: 880_000,
+    proposalText:
+      '데모 계정으로 제출한 진행 중 제안입니다. 한강 피크닉 콘셉트 숏폼 1편을 제안합니다.',
+    status: 'pending',
+    createdAt: '2026-10-10T09:30:00+09:00',
   },
 ];
 
@@ -559,6 +571,31 @@ function guardBidList(items: unknown): BidItem[] {
         bid.status === 'selected')
     );
   });
+}
+
+export async function getBidsByCreator(
+  userId: string,
+  options?: { creatorName?: string; bidIds?: string[] },
+): Promise<DataResult<BidItem[]>> {
+  try {
+    const creatorId = userId.trim();
+    const creatorName = options?.creatorName?.trim() ?? '';
+    const bidIds = new Set((options?.bidIds ?? []).filter((id) => id.trim().length > 0));
+    const bids = guardBidList(bidsStore).filter((item) => {
+      if (creatorId && item.creatorId === creatorId) {
+        return true;
+      }
+      if (creatorName && item.creatorName === creatorName) {
+        return true;
+      }
+      return bidIds.has(item.id);
+    });
+    return ok(bids);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : '제안 목록을 불러오지 못했습니다.';
+    return fail([], message);
+  }
 }
 
 export async function getBids(): Promise<DataResult<BidItem[]>> {

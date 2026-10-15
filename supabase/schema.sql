@@ -392,26 +392,49 @@ alter table public.bids enable row level security;
 alter table public.payouts enable row level security;
 alter table public.payments enable row level security;
 
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and role = 'admin'
+  );
+$$;
+
 drop policy if exists "payments_select_public" on public.payments;
-create policy "payments_select_public"
-on public.payments for select
-to anon, authenticated
-using (true);
-
 drop policy if exists "payments_insert_public" on public.payments;
-create policy "payments_insert_public"
-on public.payments for insert
-to anon, authenticated
-with check (amount > 0 and char_length(order_id) >= 6);
-
 drop policy if exists "payments_update_public" on public.payments;
-create policy "payments_update_public"
-on public.payments for update
-to anon, authenticated
-using (true)
-with check (true);
+drop policy if exists "payments_select_own" on public.payments;
 
-grant select, insert, update on public.payments to anon, authenticated, service_role;
+create policy "payments_select_own"
+on public.payments for select
+to authenticated
+using (
+  public.is_admin()
+  or exists (
+    select 1
+    from public.auctions a
+    where a.id::text = payments.auction_id
+      and a.author_id = auth.uid()
+  )
+  or exists (
+    select 1
+    from public.bids b
+    where b.id::text = payments.bid_id
+      and b.creator_id = auth.uid()
+  )
+);
+
+revoke all on public.payments from anon;
+revoke insert, update, delete on public.payments from authenticated;
+grant select on public.payments to authenticated;
+grant select, insert, update, delete on public.payments to service_role;
 
 drop policy if exists "profiles_select_public" on public.profiles;
 create policy "profiles_select_public"
@@ -429,8 +452,8 @@ drop policy if exists "profiles_update_authenticated" on public.profiles;
 create policy "profiles_update_authenticated"
 on public.profiles for update
 to authenticated
-using (auth.uid() is not null)
-with check (auth.uid() is not null);
+using (auth.uid() = id or public.is_admin())
+with check (auth.uid() = id or public.is_admin());
 
 drop policy if exists "auctions_select_public" on public.auctions;
 create policy "auctions_select_public"
@@ -439,51 +462,86 @@ to anon, authenticated
 using (true);
 
 drop policy if exists "auctions_insert_public" on public.auctions;
-create policy "auctions_insert_public"
+drop policy if exists "auctions_insert_own" on public.auctions;
+create policy "auctions_insert_own"
 on public.auctions for insert
-to anon, authenticated
+to authenticated
 with check (
-  char_length(trim(title)) >= 5
+  author_id = auth.uid()
+  and char_length(trim(title)) >= 5
   and char_length(trim(description)) >= 10
   and budget >= 10000
 );
 
 drop policy if exists "auctions_update_authenticated" on public.auctions;
-create policy "auctions_update_authenticated"
+drop policy if exists "auctions_update_own" on public.auctions;
+create policy "auctions_update_own"
 on public.auctions for update
 to authenticated
-using (auth.uid() is not null)
-with check (auth.uid() is not null);
+using (author_id = auth.uid() or public.is_admin())
+with check (author_id = auth.uid() or public.is_admin());
 
 drop policy if exists "auctions_delete_authenticated" on public.auctions;
-create policy "auctions_delete_authenticated"
+drop policy if exists "auctions_delete_own" on public.auctions;
+create policy "auctions_delete_own"
 on public.auctions for delete
 to authenticated
-using (auth.uid() is not null);
+using (author_id = auth.uid() or public.is_admin());
 
 drop policy if exists "bids_select_public" on public.bids;
-create policy "bids_select_public"
+drop policy if exists "bids_select_related" on public.bids;
+create policy "bids_select_related"
 on public.bids for select
-to anon, authenticated
-using (true);
+to authenticated
+using (
+  public.is_admin()
+  or creator_id = auth.uid()
+  or exists (
+    select 1
+    from public.auctions a
+    where a.id = bids.auction_id
+      and a.author_id = auth.uid()
+  )
+);
 
 drop policy if exists "bids_insert_public" on public.bids;
-create policy "bids_insert_public"
+drop policy if exists "bids_insert_own" on public.bids;
+create policy "bids_insert_own"
 on public.bids for insert
-to anon, authenticated
+to authenticated
 with check (
-  bid_amount > 0
+  creator_id = auth.uid()
+  and bid_amount > 0
   and char_length(trim(creator_name)) > 0
   and char_length(trim(creator_channel_url)) > 0
   and char_length(trim(proposal_text)) >= 20
 );
 
 drop policy if exists "bids_update_authenticated" on public.bids;
-create policy "bids_update_authenticated"
+drop policy if exists "bids_update_related" on public.bids;
+create policy "bids_update_related"
 on public.bids for update
 to authenticated
-using (auth.uid() is not null)
-with check (auth.uid() is not null);
+using (
+  public.is_admin()
+  or creator_id = auth.uid()
+  or exists (
+    select 1
+    from public.auctions a
+    where a.id = bids.auction_id
+      and a.author_id = auth.uid()
+  )
+)
+with check (
+  public.is_admin()
+  or creator_id = auth.uid()
+  or exists (
+    select 1
+    from public.auctions a
+    where a.id = bids.auction_id
+      and a.author_id = auth.uid()
+  )
+);
 
 drop policy if exists "payouts_select_public" on public.payouts;
 create policy "payouts_select_public"
@@ -495,12 +553,14 @@ drop policy if exists "payouts_update_authenticated" on public.payouts;
 create policy "payouts_update_authenticated"
 on public.payouts for update
 to authenticated
-using (auth.uid() is not null)
-with check (auth.uid() is not null);
+using (public.is_admin())
+with check (public.is_admin());
 
-grant execute on function public.award_auction(uuid, uuid) to anon, authenticated;
+grant execute on function public.award_auction(uuid, uuid) to authenticated, service_role;
+grant execute on function public.is_admin() to authenticated, service_role;
 
-revoke update, delete on public.auctions from anon;
-revoke update, delete on public.bids from anon;
+revoke insert, update, delete on public.auctions from anon;
+revoke insert, update, delete on public.bids from anon;
 revoke update, delete on public.profiles from anon;
 revoke update, delete on public.payouts from anon;
+revoke execute on function public.award_auction(uuid, uuid) from anon;

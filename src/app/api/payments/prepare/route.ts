@@ -10,14 +10,15 @@ import {
   sanitizeCustomerKey,
 } from '@/lib/payments/intent';
 import { MAX_BID_AMOUNT } from '@/lib/validation';
+import {
+  canPreparePayment,
+  forbiddenJson,
+  getPaymentActor,
+  unauthorizedJson,
+} from '@/lib/payments/guard';
 import { persistPayment } from '@/lib/payments/persist';
+import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
 import type { PreparePaymentInput, PreparePaymentResult } from '@/types/payment';
-
-const PREPARE_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const PREPARE_SUPABASE_SERVICE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
-const PREPARE_SUPABASE_ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
 
 function parseBody(value: unknown): PreparePaymentInput | null {
   if (!value || typeof value !== 'object') {
@@ -30,16 +31,26 @@ function parseBody(value: unknown): PreparePaymentInput | null {
   const amount = typeof body.amount === 'number' ? body.amount : Number.NaN;
   const orderName = typeof body.orderName === 'string' ? body.orderName.trim() : '';
   const customerKey = typeof body.customerKey === 'string' ? body.customerKey : '';
+  const supabaseUrl = typeof body.supabaseUrl === 'string' ? body.supabaseUrl.trim() : '';
+  const supabaseAnonKey = typeof body.supabaseAnonKey === 'string' ? body.supabaseAnonKey.trim() : '';
 
   if (!auctionId || !bidId || !orderName || !Number.isInteger(amount)) {
     return null;
   }
 
-  return { auctionId, bidId, amount, orderName, customerKey };
+  return { auctionId, bidId, amount, orderName, customerKey, supabaseUrl, supabaseAnonKey };
 }
 
 export async function POST(request: Request) {
   try {
+    const actor = await getPaymentActor();
+    if (!actor) {
+      return unauthorizedJson('결제를 준비하려면 로그인해 주세요.');
+    }
+    if (!canPreparePayment(actor)) {
+      return forbiddenJson('결제 준비는 광고주 계정만 할 수 있습니다.');
+    }
+
     const parsed = parseBody(await request.json().catch(() => null));
     if (!parsed) {
       return NextResponse.json(
@@ -67,11 +78,11 @@ export async function POST(request: Request) {
     };
 
     putIntent(intent);
-    const pending = await persistPayment(intent, 'pending', null, {
-      url: PREPARE_SUPABASE_URL,
-      serviceKey: PREPARE_SUPABASE_SERVICE_KEY,
-      anonKey: PREPARE_SUPABASE_ANON_KEY,
+    const dbConfig = await paymentDbConfigForRequest({
+      supabaseUrl: parsed.supabaseUrl,
+      supabaseAnonKey: parsed.supabaseAnonKey,
     });
+    const pending = await persistPayment(intent, 'pending', null, dbConfig);
     if (!pending.ok) {
       console.error('[SponsorAuction] pending payment 저장 실패', pending);
     }
@@ -83,6 +94,8 @@ export async function POST(request: Request) {
       customerKey: sanitizeCustomerKey(parsed.customerKey),
       clientKey: getTossClientKey() || null,
       demo: !isTossClientConfigured(),
+      auctionId: intent.auctionId,
+      bidId: intent.bidId,
     };
 
     const response = NextResponse.json(result);

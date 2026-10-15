@@ -7,6 +7,7 @@ import {
   getAuctions as getMockAuctions,
   getBids as getMockBids,
   getBidsByAuctionId as getMockBidsByAuctionId,
+  getBidsByCreator as getMockBidsByCreator,
   updateAuctionBlind as updateMockAuctionBlind,
   updateAuctionStatus as updateMockAuctionStatus,
 } from '@/lib/mock-data';
@@ -371,6 +372,91 @@ export async function createBid(
       console.info(`[SponsorAuction] 입찰 등록 종료 (${Date.now() - started}ms)`);
     }
   });
+}
+
+export async function getBidsByCreator(
+  userId: string,
+  options?: { creatorName?: string; bidIds?: string[] },
+): Promise<DataResult<BidItem[]>> {
+  const supabase = await getDataClient();
+  if (!supabase) {
+    return getMockBidsByCreator(userId, options);
+  }
+
+  const started = Date.now();
+  try {
+    const creatorId = userId.trim();
+    const creatorName = options?.creatorName?.trim() ?? '';
+    const bidIds = (options?.bidIds ?? []).filter((id) => id.trim().length > 0);
+    if (!creatorId && !creatorName && bidIds.length === 0) {
+      return fail([], '유효한 크리에이터 정보가 필요합니다.');
+    }
+
+    const queries: PromiseLike<{
+      data: unknown[] | null;
+      error: { message?: string; code?: string } | null;
+    }>[] = [];
+
+    const selectBids = (columns: string) => {
+      if (creatorId) {
+        queries.push(
+          supabase.from('bids').select(columns).eq('creator_id', creatorId).order('created_at', {
+            ascending: false,
+          }),
+        );
+      }
+      if (creatorName) {
+        queries.push(
+          supabase.from('bids').select(columns).eq('creator_name', creatorName).order('created_at', {
+            ascending: false,
+          }),
+        );
+      }
+      if (bidIds.length > 0) {
+        queries.push(
+          supabase.from('bids').select(columns).in('id', bidIds).order('created_at', {
+            ascending: false,
+          }),
+        );
+      }
+    };
+
+    selectBids(BID_COLUMNS);
+    let results = await Promise.all(queries);
+    const schemaError = results.find(
+      (item) => item.error && isSchemaMismatch(item.error),
+    );
+    if (schemaError) {
+      queries.length = 0;
+      selectBids(BID_COLUMNS_CORE);
+      results = await Promise.all(queries);
+    }
+
+    const merged: BidItem[] = [];
+    const seen = new Set<string>();
+    for (const result of results) {
+      if (result.error) {
+        logDbError('크리에이터 입찰 조회', result.error);
+        continue;
+      }
+      for (const row of result.data ?? []) {
+        const bid = mapBid(row as Partial<BidRow> & Pick<BidRow, 'id'>);
+        if (!bid.id || seen.has(bid.id)) {
+          continue;
+        }
+        seen.add(bid.id);
+        merged.push(bid);
+      }
+    }
+
+    merged.sort((left, right) => (right.createdAt || '').localeCompare(left.createdAt || ''));
+    return ok(merged);
+  } catch (error) {
+    logDbError('크리에이터 입찰 조회 예외', error);
+    return fail([], '제안 목록을 불러오지 못했습니다.');
+  } finally {
+    console.info(`[SponsorAuction] 크리에이터 입찰 조회 종료 (${Date.now() - started}ms)`);
+  }
 }
 
 export async function getBids(): Promise<DataResult<BidItem[]>> {

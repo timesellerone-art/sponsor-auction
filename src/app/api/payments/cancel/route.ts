@@ -1,17 +1,25 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { PAYMENT_INTENT_COOKIE, resolveIntent, updateIntent } from '@/lib/payments/intent';
+import { canPreparePayment, forbiddenJson, getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
 import { persistPayment } from '@/lib/payments/persist';
-
-const CANCEL_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const CANCEL_SUPABASE_SERVICE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '';
-const CANCEL_SUPABASE_ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '';
+import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json().catch(() => null)) as { orderId?: string } | null;
+    const actor = await getPaymentActor();
+    if (!actor) {
+      return unauthorizedJson('결제를 취소하려면 로그인해 주세요.');
+    }
+    if (!canPreparePayment(actor)) {
+      return forbiddenJson('결제 취소는 광고주 계정만 할 수 있습니다.');
+    }
+
+    const body = (await request.json().catch(() => null)) as {
+      orderId?: string;
+      supabaseUrl?: string;
+      supabaseAnonKey?: string;
+    } | null;
     const orderId = body?.orderId?.trim() ?? '';
     if (!orderId) {
       return NextResponse.json({ error: '주문번호가 필요합니다.' }, { status: 400 });
@@ -31,11 +39,11 @@ export async function POST(request: Request) {
     }
 
     updateIntent(orderId, { status: 'failed' });
-    const saved = await persistPayment(intent, 'failed', intent.paymentKey, {
-      url: CANCEL_SUPABASE_URL,
-      serviceKey: CANCEL_SUPABASE_SERVICE_KEY,
-      anonKey: CANCEL_SUPABASE_ANON_KEY,
+    const dbConfig = await paymentDbConfigForRequest({
+      supabaseUrl: body?.supabaseUrl,
+      supabaseAnonKey: body?.supabaseAnonKey,
     });
+    const saved = await persistPayment(intent, 'failed', intent.paymentKey, dbConfig);
     if (!saved.ok) {
       console.error('[SponsorAuction] 결제 취소 DB 반영 실패', saved);
     }

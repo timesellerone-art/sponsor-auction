@@ -85,8 +85,15 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
     const paymentDialog = page.getByRole('dialog', { name: '안전결제' });
     await expect(paymentDialog).toBeVisible();
     await paymentDialog.getByRole('button', { name: '결제하기' }).click();
-    await expect(page).toHaveURL(/\/(payments\/success|auctions\/)/);
-    await expect(page).toHaveURL(/\/auctions\//, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/payments\/success/);
+    await expect(
+      page.getByRole('heading', { name: '결제 및 낙찰이 완료되었습니다' }),
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText('주문번호')).toBeVisible();
+    await expect(page.getByText('결제금액')).toBeVisible();
+    await expect(page.getByRole('link', { name: '마이페이지(대시보드)로 이동' })).toBeVisible();
+    await page.getByRole('link', { name: '캠페인 보기' }).click();
+    await expect(page).toHaveURL(/\/auctions\//);
 
     await expect(
       page.getByRole('alert').filter({

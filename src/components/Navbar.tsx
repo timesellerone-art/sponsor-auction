@@ -16,8 +16,10 @@ import { isAdmin, memberRoleLabel } from '@/types/auth';
 
 export function Navbar() {
   const router = useRouter();
-  const { user, ready, canCreateAuction } = useAuth();
+  const { user, ready, canCreateAuction, canPlaceBid } = useAuth();
   const showAdmin = Boolean(ready && isAdmin(user?.role));
+  const showDashboard = Boolean(ready && (canCreateAuction || canPlaceBid));
+  const dashboardLabel = canPlaceBid ? '내 제안' : '내 역경매';
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const menuId = useId();
@@ -103,12 +105,12 @@ export function Navbar() {
           >
             역경매 둘러보기
           </Link>
-          {canCreateAuction ? (
+          {showDashboard ? (
             <Link
               href="/my"
               className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-950"
             >
-              내 역경매
+              {dashboardLabel}
             </Link>
           ) : null}
           {showAdmin ? (
@@ -204,13 +206,13 @@ export function Navbar() {
           >
             역경매 둘러보기
           </Link>
-          {canCreateAuction ? (
+          {showDashboard ? (
             <Link
               href="/my"
               className="rounded-lg px-3 py-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
               onClick={() => setOpen(false)}
             >
-              내 역경매
+              {dashboardLabel}
             </Link>
           ) : null}
           {showAdmin ? (

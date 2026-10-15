@@ -7,6 +7,7 @@ import { showToast } from '@/components/Toast';
 import { formatDateTime, formatWon } from '@/lib/utils';
 import { ACCESS_REASON } from '@/lib/access';
 import { VALIDATION, getAwardBlockReason } from '@/lib/validation';
+import { BID_STATUS_LABEL } from '@/lib/status-labels';
 import {
   isAuctionClosed,
   isBidSelected,
@@ -69,7 +70,9 @@ export function BidProposalList({
         </div>
         {closed ? (
           <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
-            매칭 완료된 역경매입니다
+            {auction.status === 'completed'
+              ? '결제 완료된 역경매입니다'
+              : '매칭 완료된 역경매입니다'}
           </span>
         ) : null}
       </div>
@@ -154,7 +157,9 @@ export function BidProposalList({
                     </button>
                   ) : winner ? (
                     <span className="shrink-0 rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800">
-                      낙찰됨
+                      {auction.status === 'completed'
+                        ? BID_STATUS_LABEL.selected
+                        : '낙찰됨'}
                     </span>
                   ) : null}
                 </div>

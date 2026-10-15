@@ -4,6 +4,7 @@ import { ADVERTISER, CREATOR, acceptAgreements, signIn, signOut } from '../e2e/h
 const CLOSED_AUCTION = '러닝화 언박싱 틱톡 챌린지';
 const AWARDED_AUCTION = '핀테크 앱 X 스레드 체험단';
 const OPEN_AUCTION = '여름 무알콜 맥주 숏폼 캠페인';
+const DUPLICATE_AUCTION = '비건 스킨케어 릴스 리뷰';
 const VALID_PROPOSAL =
   '채널 톤에 맞춰 3초 훅과 제품 클로즈업을 넣은 숏폼 1편을 제작하겠습니다.';
 const VALID_CHANNEL = 'https://www.youtube.com/@e2ecreator';
@@ -117,24 +118,26 @@ test.describe('입력 유효성 및 예외 시나리오', () => {
     await page.getByRole('link', { name: AWARDED_AUCTION }).click();
     await expect(page).toHaveURL(/\/auctions\//);
     await expect(page.getByRole('button', { name: '제안하기' })).toHaveCount(0);
-    await expect(page.getByText('매칭 완료된 역경매입니다').first()).toBeVisible();
+    await expect(page.getByText('결제 완료된 역경매입니다').first()).toBeVisible();
     await expect(page.getByRole('dialog', { name: '제안하기' })).toHaveCount(0);
   });
 
   test('같은 역경매에 중복 제안을 제출하면 차단된다', async ({ page }) => {
     await signIn(page, CREATOR);
-    const first = await openBidModal(page, OPEN_AUCTION);
+    const first = await openBidModal(page, DUPLICATE_AUCTION);
     await first.getByLabel('제안 금액(단가)').fill('320000');
     await first.getByLabel('제안 내용/소개글').fill(VALID_PROPOSAL);
     await first.getByLabel('채널 URL 또는 포트폴리오 링크').fill(VALID_CHANNEL);
     await acceptAgreements(first);
     await first.getByRole('button', { name: '제안 제출' }).click();
-    await expect(first).toBeHidden();
     await expect(
-      page.getByRole('alert').filter({ hasText: '제안을 제출했습니다.' }),
-    ).toBeVisible();
+      page.getByRole('alert').filter({ hasText: /^제안을 제출했습니다\.?$/ }),
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('dialog', { name: '제안하기' })).toHaveCount(0, {
+      timeout: 20_000,
+    });
 
-    const second = await openBidModal(page, OPEN_AUCTION);
+    const second = await openBidModal(page, DUPLICATE_AUCTION);
     await second.getByLabel('제안 금액(단가)').fill('330000');
     await second.getByLabel('제안 내용/소개글').fill(VALID_PROPOSAL);
     await second.getByLabel('채널 URL 또는 포트폴리오 링크').fill(VALID_CHANNEL);

@@ -36,6 +36,18 @@ export function getSupabaseEnv(): SupabaseEnv | null {
   return { url: url.replace(/\/$/, ''), anonKey };
 }
 
+/** 브라우저에 인라인된 공개 키. 서버가 env를 못 읽을 때 결제 API fallback용입니다. */
+export function publicSupabasePayload() {
+  const env = getSupabaseEnv();
+  if (!env) {
+    return {};
+  }
+  return {
+    supabaseUrl: env.url,
+    supabaseAnonKey: env.anonKey,
+  };
+}
+
 export function warnMockFallback() {
   if (hasWarnedMockFallback) {
     return;

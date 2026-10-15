@@ -18,6 +18,7 @@ import { BidModal } from '@/components/BidModal';
 import { showToast } from '@/components/Toast';
 import { ACCESS_REASON } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
+import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
 import { cn } from '@/lib/utils';
 import type { AuctionItem, AuctionStatus, PlatformType } from '@/types/auction';
 
@@ -59,24 +60,24 @@ const platformMeta: Record<
 
 const statusMeta: Record<AuctionStatus, { label: string; className: string }> = {
   active: {
-    label: '진행중',
+    label: AUCTION_STATUS_LABEL.active,
     className: 'bg-emerald-50 text-emerald-800 ring-emerald-200',
   },
   matched: {
-    label: '매칭됨',
+    label: AUCTION_STATUS_LABEL.matched,
     className: 'bg-sky-50 text-sky-800 ring-sky-200',
   },
   completed: {
-    label: '마감',
-    className: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+    label: AUCTION_STATUS_LABEL.completed,
+    className: 'bg-teal-50 text-teal-900 ring-teal-200',
   },
   cancelled: {
-    label: '취소',
+    label: AUCTION_STATUS_LABEL.cancelled,
     className: 'bg-rose-50 text-rose-700 ring-rose-200',
   },
   closed: {
-    label: '매칭 완료',
-    className: 'bg-teal-50 text-teal-800 ring-teal-200',
+    label: AUCTION_STATUS_LABEL.closed,
+    className: 'bg-zinc-100 text-zinc-700 ring-zinc-200',
   },
 };
 
@@ -105,7 +106,13 @@ function formatDeadline(deadline: string | undefined) {
   return `${dateFormatter.format(date)} 마감`;
 }
 
-export function AuctionCard({ auction }: { auction: AuctionCardData }) {
+export function AuctionCard({
+  auction,
+  hideBidAction = false,
+}: {
+  auction: AuctionCardData;
+  hideBidAction?: boolean;
+}) {
   const router = useRouter();
   const { user, ready, canPlaceBid } = useAuth();
   const [bidOpen, setBidOpen] = useState(false);
@@ -166,7 +173,7 @@ export function AuctionCard({ auction }: { auction: AuctionCardData }) {
         </span>
       </div>
 
-      {canBid ? (
+      {hideBidAction ? null : canBid ? (
         <button
           type="button"
           onClick={() => setBidOpen(true)}
