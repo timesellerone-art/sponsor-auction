@@ -503,3 +503,329 @@ export async function listPayoutsFromDatabase(
 
   return mergePayoutLists(existing, virtual);
 }
+
+export type MarkPayoutPaidInput = {
+  id?: string;
+  paymentOrderId?: string | null;
+  auctionId?: string | null;
+  bidId?: string | null;
+  amount?: number;
+  auctionTitle?: string;
+  creatorName?: string;
+  creatorEmail?: string;
+  creatorId?: string;
+};
+
+function formatSupabaseError(error: { message?: string; code?: string; details?: string; hint?: string }) {
+  return [error.message, error.code && `[${error.code}]`, error.details, error.hint]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function isSkippableWriteError(error: { message?: string; code?: string } | null) {
+  if (!error) {
+    return false;
+  }
+  return (
+    error.code === '22P02' ||
+    error.code === 'PGRST116' ||
+    /invalid input syntax for type uuid/i.test(error.message ?? '') ||
+    /cannot coerce the result to a single json object/i.test(error.message ?? '') ||
+    /0 rows/i.test(error.message ?? '')
+  );
+}
+
+async function fetchConfirmedPayment(
+  client: SponsorAuctionClient,
+  orderId: string,
+  auctionId: string,
+) {
+  const columns =
+    'order_id, auction_id, bid_id, amount, order_name, status, confirmed_at, created_at';
+  if (orderId) {
+    const byOrder = await client.from('payments').select(columns).eq('order_id', orderId).limit(1);
+    if (byOrder.data?.[0]) {
+      return byOrder.data[0];
+    }
+  }
+  if (auctionId) {
+    const byAuction = await client
+      .from('payments')
+      .select(columns)
+      .eq('auction_id', auctionId)
+      .eq('status', 'confirmed')
+      .limit(1);
+    if (byAuction.data?.[0]) {
+      return byAuction.data[0];
+    }
+  }
+  return null;
+}
+
+async function fetchSelectedBid(
+  client: SponsorAuctionClient,
+  auctionId: string,
+): Promise<BidLookup | undefined> {
+  if (!auctionId) {
+    return undefined;
+  }
+  const { data } = await client
+    .from('bids')
+    .select('id, auction_id, creator_id, creator_name, bid_amount, status')
+    .eq('auction_id', auctionId)
+    .eq('status', 'selected')
+    .limit(1);
+  return (data?.[0] as BidLookup | undefined) ?? undefined;
+}
+
+function mapWriteResult(data: unknown) {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+  return mapPayout(data as PayoutRow);
+}
+
+async function persistPaidPayout(
+  client: SponsorAuctionClient,
+  row: PayoutInsert,
+  rawId: string,
+): Promise<{ ok: true; data: PayoutItem } | { ok: false; message: string }> {
+  const errors: string[] = [];
+  const paidPatch = {
+    status: 'paid' as const,
+    paid_at: row.paid_at,
+    amount: row.amount,
+    creator_id: row.creator_id,
+    creator_name: row.creator_name,
+    creator_email: row.creator_email,
+    auction_title: row.auction_title,
+    requested_at: row.requested_at,
+    payment_order_id: row.payment_order_id,
+    auction_id: row.auction_id,
+    bid_id: row.bid_id,
+  };
+
+  const upsert = await client
+    .from('payouts')
+    .upsert(row, { onConflict: 'payment_order_id' })
+    .select(PAYOUT_COLUMNS)
+    .maybeSingle();
+  const upserted = mapWriteResult(upsert.data);
+  if (upserted) {
+    return { ok: true, data: upserted };
+  }
+  if (upsert.error) {
+    errors.push(`upsert: ${formatSupabaseError(upsert.error)}`);
+  }
+
+  const inserted = await client.from('payouts').insert(row).select(PAYOUT_COLUMNS).maybeSingle();
+  const insertedMapped = mapWriteResult(inserted.data);
+  if (insertedMapped) {
+    return { ok: true, data: insertedMapped };
+  }
+  if (inserted.error) {
+    errors.push(`insert: ${formatSupabaseError(inserted.error)}`);
+  }
+
+  if (row.payment_order_id) {
+    const byOrder = await client
+      .from('payouts')
+      .update(paidPatch)
+      .eq('payment_order_id', row.payment_order_id)
+      .select(PAYOUT_COLUMNS)
+      .maybeSingle();
+    const mapped = mapWriteResult(byOrder.data);
+    if (mapped) {
+      return { ok: true, data: mapped };
+    }
+    if (byOrder.error && !isSkippableWriteError(byOrder.error)) {
+      errors.push(`update(order): ${formatSupabaseError(byOrder.error)}`);
+    }
+  }
+
+  if (rawId && isUuid(rawId)) {
+    const byId = await client
+      .from('payouts')
+      .update(paidPatch)
+      .eq('id', rawId)
+      .select(PAYOUT_COLUMNS)
+      .maybeSingle();
+    const mapped = mapWriteResult(byId.data);
+    if (mapped) {
+      return { ok: true, data: mapped };
+    }
+    if (byId.error && !isSkippableWriteError(byId.error)) {
+      errors.push(`update(id): ${formatSupabaseError(byId.error)}`);
+    }
+  }
+
+  const core = {
+    creator_id: row.creator_id,
+    creator_name: row.creator_name,
+    creator_email: row.creator_email,
+    amount: row.amount,
+    status: 'paid' as const,
+    auction_title: row.auction_title,
+    requested_at: row.requested_at,
+  };
+  const coreInsert = await client.from('payouts').insert(core).select(PAYOUT_COLUMNS_CORE).maybeSingle();
+  const coreMapped = mapWriteResult({
+    ...(coreInsert.data as object | null),
+    paid_at: row.paid_at,
+    payment_order_id: row.payment_order_id,
+    auction_id: row.auction_id,
+    bid_id: row.bid_id,
+  });
+  if (coreInsert.data && coreMapped) {
+    return { ok: true, data: coreMapped };
+  }
+  if (coreInsert.error) {
+    errors.push(`insert(core): ${formatSupabaseError(coreInsert.error)}`);
+  }
+
+  if (rawId && isUuid(rawId)) {
+    const coreUpdate = await client
+      .from('payouts')
+      .update({ status: 'paid' })
+      .eq('id', rawId)
+      .select(PAYOUT_COLUMNS_CORE)
+      .maybeSingle();
+    const mapped = mapWriteResult({
+      ...(coreUpdate.data as object | null),
+      paid_at: row.paid_at,
+    });
+    if (coreUpdate.data && mapped) {
+      return { ok: true, data: mapped };
+    }
+    if (coreUpdate.error && !isSkippableWriteError(coreUpdate.error)) {
+      errors.push(`update(core): ${formatSupabaseError(coreUpdate.error)}`);
+    }
+  }
+
+  return {
+    ok: false,
+    message: errors.filter(Boolean).join(' | ') || 'payouts UPSERT/INSERT가 빈 결과를 반환했습니다.',
+  };
+}
+
+export async function markPayoutPaid(
+  client: SponsorAuctionClient,
+  input: MarkPayoutPaidInput,
+): Promise<{ ok: true; data: PayoutItem } | { ok: false; message: string }> {
+  const paidAt = new Date().toISOString();
+  const rawId = (input.id || '').trim();
+  let orderId = (input.paymentOrderId || '').trim();
+  let auctionId = (input.auctionId || '').trim();
+  let bidId = (input.bidId || '').trim();
+
+  if (rawId.startsWith('auction:') && !auctionId) {
+    auctionId = rawId.slice('auction:'.length);
+  }
+  if (rawId && !orderId && !isUuid(rawId) && !rawId.startsWith('auction:')) {
+    orderId = rawId;
+  }
+
+  const payment = await fetchConfirmedPayment(client, orderId, auctionId);
+  if (payment) {
+    orderId = String(payment.order_id || orderId);
+    auctionId = String(payment.auction_id || auctionId);
+    bidId = String(payment.bid_id || bidId);
+  }
+
+  const [auctions, bids] = await Promise.all([
+    auctionId
+      ? loadByIds<AuctionLookup>(
+          client,
+          'auctions',
+          'id, title, status, winner_bid_id, updated_at, created_at',
+          [auctionId],
+        )
+      : Promise.resolve([]),
+    bidId
+      ? loadByIds<BidLookup>(
+          client,
+          'bids',
+          'id, auction_id, creator_id, creator_name, bid_amount, status',
+          [bidId],
+        )
+      : Promise.resolve([]),
+  ]);
+
+  const auction = auctions[0];
+  let bid: BidLookup | undefined = bids[0];
+  if (!bid && auction?.winner_bid_id) {
+    const winners = await loadByIds<BidLookup>(
+      client,
+      'bids',
+      'id, auction_id, creator_id, creator_name, bid_amount, status',
+      [auction.winner_bid_id],
+    );
+    bid = winners[0];
+    bidId = bid?.id || bidId;
+  }
+  if (!bid && auctionId) {
+    bid = await fetchSelectedBid(client, auctionId);
+    bidId = bid?.id || bidId;
+  }
+
+  const creatorIdRaw = bid?.creator_id || input.creatorId || '';
+  const profiles = creatorIdRaw
+    ? await loadByIds<{ id: string; name: string; email: string }>(
+        client,
+        'profiles',
+        'id, name, email',
+        [creatorIdRaw],
+      )
+    : [];
+  const profile = profiles[0];
+
+  const amountFromBid = bid && bid.bid_amount > 0 ? creatorPayoutAmount(bid.bid_amount) : 0;
+  const amountFromPayment = payment?.amount ? creatorPayoutFromCharge(Number(payment.amount)) : 0;
+  const amount = Math.round(
+    amountFromBid ||
+      amountFromPayment ||
+      (input.amount && input.amount > 0 ? input.amount : 0),
+  );
+
+  if (amount <= 0) {
+    return {
+      ok: false,
+      message: '지급 금액이 없어 정산 행을 만들 수 없습니다. payments.amount 또는 bids.bid_amount를 확인하세요.',
+    };
+  }
+
+  const paymentOrderId =
+    orderId ||
+    (auctionId && bidId ? `payout-${auctionId}-${bidId}` : '') ||
+    (rawId && !isUuid(rawId) ? rawId : '') ||
+    `payout-${Date.now()}`;
+
+  const row: PayoutInsert = {
+    creator_id: profile && isUuid(creatorIdRaw) ? creatorIdRaw : null,
+    creator_name: (profile?.name || bid?.creator_name || input.creatorName || '이름 없음').trim(),
+    creator_email: (profile?.email || input.creatorEmail || '').trim(),
+    amount,
+    status: 'paid',
+    auction_title: (auction?.title || String(payment?.order_name || '') || input.auctionTitle || '캠페인').trim(),
+    requested_at:
+      (typeof payment?.confirmed_at === 'string' && payment.confirmed_at) ||
+      (typeof payment?.created_at === 'string' && payment.created_at) ||
+      paidAt,
+    paid_at: paidAt,
+    payment_order_id: paymentOrderId,
+    auction_id: auctionId || null,
+    bid_id: bidId || null,
+  };
+
+  const persisted = await persistPaidPayout(client, row, rawId);
+  if (!persisted.ok) {
+    console.error('[SponsorAuction] 정산 지급 저장 실패', {
+      message: persisted.message,
+      paymentOrderId,
+      auctionId,
+      bidId,
+      amount,
+    });
+  }
+  return persisted;
+}

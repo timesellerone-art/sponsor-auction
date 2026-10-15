@@ -5,7 +5,7 @@ import {
   updateProfileStatus as updateMockProfileStatus,
 } from '@/lib/mock-data';
 import { withExclusiveAction } from '@/lib/action-lock';
-import { listPayoutsFromDatabase, mapPayout, PAYOUT_COLUMNS } from '@/lib/payouts';
+import { listPayoutsFromDatabase, markPayoutPaid } from '@/lib/payouts';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { VALIDATION } from '@/lib/validation';
@@ -17,7 +17,6 @@ import type {
 } from '@/types/admin';
 import { isAuthProfileRole } from '@/types/auth';
 import type { DataResult } from '@/types/auction';
-import type { Database } from '@/types/database';
 
 export const ADMIN_UPDATE_FAIL_MESSAGE =
   '변경에 실패했습니다. 다시 시도해 주세요.';
@@ -32,8 +31,6 @@ type ProfileRow = {
   status: ProfileStatus;
   created_at: string;
 };
-
-type PayoutRow = Database['public']['Tables']['payouts']['Row'];
 
 function fail<T>(data: T, error: string): DataResult<T> {
   return { data, error };
@@ -110,6 +107,7 @@ async function parseAdminJson(response: Response) {
   return (await response.json().catch(() => null)) as {
     data?: unknown;
     error?: string;
+    errorMessage?: string;
     fallbackMock?: boolean;
   } | null;
 }
@@ -232,14 +230,30 @@ export async function getPayouts(): Promise<DataResult<PayoutItem[]>> {
 }
 
 export async function approvePayout(
-  id: string,
+  target: string | PayoutItem,
 ): Promise<DataResult<PayoutItem | null>> {
+  const payout = typeof target === 'string' ? null : target;
+  const id =
+    typeof target === 'string'
+      ? target.trim()
+      : (target.paymentOrderId || target.id).trim();
+
   return withExclusiveAction(`payout:${id}`, fail(null, VALIDATION.actionInFlight), async () => {
   try {
-    const response = await fetch('/api/admin/payouts/approve', {
+    const response = await fetch('/api/admin/payouts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
+      body: JSON.stringify({
+        id,
+        paymentOrderId: payout?.paymentOrderId ?? id,
+        auctionId: payout?.auctionId ?? null,
+        bidId: payout?.bidId ?? null,
+        amount: payout?.amount,
+        auctionTitle: payout?.auctionTitle,
+        creatorName: payout?.creatorName,
+        creatorEmail: payout?.creatorEmail,
+        creatorId: payout?.creatorId,
+      }),
     });
     const payload = await parseAdminJson(response);
     if (response.ok && payload?.data && typeof payload.data === 'object') {
@@ -248,8 +262,9 @@ export async function approvePayout(
         return ok(mapped);
       }
     }
-    if (!payload?.fallbackMock && response.status !== 409 && !response.ok) {
-      return fail(null, payload?.error ?? ADMIN_UPDATE_FAIL_MESSAGE);
+    const apiError = payload?.error || payload?.errorMessage || `HTTP ${response.status}`;
+    if (!payload?.fallbackMock || (response.status !== 409 && !response.ok)) {
+      return fail(null, apiError);
     }
   } catch (error) {
     console.warn('[SponsorAuction] 정산 API 호출 실패, Mock으로 저장합니다.', error);
@@ -262,47 +277,25 @@ export async function approvePayout(
 
   const started = Date.now();
   try {
-    const target = id.trim();
-    if (!target) {
-      return fail(null, '유효한 정산 ID가 필요합니다.');
+    const result = await markPayoutPaid(supabase, {
+      id,
+      paymentOrderId: payout?.paymentOrderId ?? id,
+      auctionId: payout?.auctionId ?? null,
+      bidId: payout?.bidId ?? null,
+      amount: payout?.amount,
+      auctionTitle: payout?.auctionTitle,
+      creatorName: payout?.creatorName,
+      creatorEmail: payout?.creatorEmail,
+      creatorId: payout?.creatorId,
+    });
+    if (!result.ok) {
+      return fail(null, result.message);
     }
-
-    const auctionId = target.startsWith('auction:') ? target.slice('auction:'.length) : target;
-    const attempts: Array<{ column: 'id' | 'payment_order_id' | 'auction_id'; value: string }> = [
-      { column: 'id', value: target },
-      { column: 'payment_order_id', value: target },
-      { column: 'auction_id', value: auctionId },
-    ];
-
-    for (const attempt of attempts) {
-      const { data, error } = await supabase
-        .from('payouts')
-        .update({ status: 'paid' })
-        .eq(attempt.column, attempt.value)
-        .eq('status', 'pending')
-        .select(PAYOUT_COLUMNS)
-        .maybeSingle();
-
-      if (error && isSchemaMismatch(error) && attempt.column !== 'id') {
-        continue;
-      }
-      if (error) {
-        console.error('[SponsorAuction] 정산 승인 실패:', error.message, error);
-        return fail(null, ADMIN_UPDATE_FAIL_MESSAGE);
-      }
-      if (data) {
-        const mapped = mapPayout(data as PayoutRow);
-        if (!mapped) {
-          return fail(null, ADMIN_UPDATE_FAIL_MESSAGE);
-        }
-        return ok(mapped);
-      }
-    }
-
-    return fail(null, VALIDATION.payoutAlready);
+    return ok(result.data);
   } catch (error) {
+    const message = error instanceof Error ? error.message : ADMIN_UPDATE_FAIL_MESSAGE;
     console.error('[SponsorAuction] 정산 승인 예외:', error);
-    return fail(null, ADMIN_UPDATE_FAIL_MESSAGE);
+    return fail(null, message);
   } finally {
     console.info(`[SponsorAuction] 정산 승인 종료 (${Date.now() - started}ms)`);
   }

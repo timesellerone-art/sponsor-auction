@@ -347,16 +347,21 @@ export function AdminDashboard() {
           return;
         }
 
-        const result = await approvePayout(payout.paymentOrderId || payout.id);
+        const result = await approvePayout(payout);
         if (result.error || !result.data) {
-          showToast(result.error ?? ADMIN_UPDATE_FAIL_MESSAGE);
+          const detail = result.error || '알 수 없는 오류';
+          console.error('[SponsorAuction] 지급 처리 실패', detail);
+          showToast(`지급 처리 실패: ${detail}`);
           return;
         }
 
         showToast('지급 처리했습니다.', 'success');
         await load();
-      } catch {
-        showToast(ADMIN_UPDATE_FAIL_MESSAGE);
+      } catch (error) {
+        const detail =
+          error instanceof Error ? error.message : '알 수 없는 오류';
+        console.error('[SponsorAuction] 지급 처리 예외', error);
+        showToast(`지급 처리 실패: ${detail}`);
       }
     });
   };

@@ -598,11 +598,12 @@ to authenticated
 using (public.is_admin() or creator_id = auth.uid());
 
 drop policy if exists "payouts_update_authenticated" on public.payouts;
-create policy "payouts_update_authenticated"
+drop policy if exists "payouts_update_admin" on public.payouts;
+create policy "payouts_update_admin"
 on public.payouts for update
-to authenticated
-using (public.is_admin())
-with check (public.is_admin());
+to authenticated, service_role
+using (public.is_admin() or auth.role() = 'service_role')
+with check (public.is_admin() or auth.role() = 'service_role');
 
 drop policy if exists "payouts_insert_admin" on public.payouts;
 create policy "payouts_insert_admin"
@@ -613,7 +614,7 @@ with check (public.is_admin());
 grant execute on function public.award_auction(uuid, uuid) to authenticated, service_role;
 grant execute on function public.is_admin() to authenticated, service_role;
 grant select on public.profiles to authenticated;
-grant select, insert on public.payouts to authenticated;
+grant select, insert, update on public.payouts to authenticated, service_role;
 
 revoke insert, update, delete on public.auctions from anon;
 revoke insert, update, delete on public.bids from anon;
