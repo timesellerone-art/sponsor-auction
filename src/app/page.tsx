@@ -82,8 +82,8 @@ export default function Home() {
             {isAdvertiser
               ? '지금 입찰이 열린 역경매와 내가 등록한 캠페인을 메인에서 바로 확인하세요. 제안이 들어오면 상세에서 낙찰할 수 있습니다.'
               : isCreator
-                ? '숏폼·릴스·틱톡 캠페인을 검색하고 필터로 골라, 예산과 마감에 맞는 제안에 입찰하세요.'
-                : '숏폼·릴스·틱톡 캠페인을 역경매로 매칭하세요. 원하는 플랫폼과 예산을 올리면, 크리에이터가 입찰가로 경쟁합니다.'}
+                ? 'Shorts·Reels·TikTok부터 YouTube, Threads, 블로그, X까지 플랫폼 필터로 골라, 예산과 마감에 맞는 제안에 입찰하세요.'
+                : '다양한 크리에이터 채널 캠페인을 역경매로 매칭하세요. 원하는 플랫폼과 예산을 올리면, 크리에이터가 입찰가로 경쟁합니다.'}
           </p>
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
             <button

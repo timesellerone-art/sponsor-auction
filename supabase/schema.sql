@@ -10,6 +10,9 @@ begin
       'youtube_shorts',
       'instagram_reels',
       'tiktok',
+      'youtube',
+      'threads',
+      'naver_blog',
       'x_twitter',
       'other'
     );
@@ -46,6 +49,12 @@ begin
   end if;
 end
 $$;
+
+alter type public.platform_type add value if not exists 'youtube';
+alter type public.platform_type add value if not exists 'threads';
+alter type public.platform_type add value if not exists 'naver_blog';
+alter type public.platform_type add value if not exists 'x_twitter';
+alter type public.platform_type add value if not exists 'other';
 
 create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),

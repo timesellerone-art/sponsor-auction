@@ -18,7 +18,12 @@ test.describe('역경매 검색·필터와 광고주 메인 노출', () => {
     await expect(page.getByRole('link', { name: ACTIVE_REELS })).toHaveCount(0);
 
     await page.getByPlaceholder('캠페인 제목 또는 설명 검색').fill('');
-    await page.getByRole('button', { name: 'Shorts' }).click();
+    await expect(page.getByRole('button', { name: 'YouTube Shorts' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'YouTube', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Threads' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Naver Blog' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'X (Twitter)' })).toBeVisible();
+    await page.getByRole('button', { name: 'YouTube Shorts' }).click();
     await expect(page.getByRole('link', { name: ACTIVE_SHORTS })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_REELS })).toHaveCount(0);
 

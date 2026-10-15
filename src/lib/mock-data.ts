@@ -73,7 +73,7 @@ export const mockAuctions: AuctionItem[] = [
   {
     id: 'auc-004',
     title: '핀테크 앱 X 스레드 체험단',
-    platform: 'x_twitter',
+    platform: 'threads',
     budget: 450_000,
     description:
       '해외송금 수수료 비교 스레드 1세트(5~8트윗). 스크린샷 실사용 인증 필요. 금융 고지 문구는 브랜드가 제공.',
@@ -89,7 +89,7 @@ export const mockAuctions: AuctionItem[] = [
   {
     id: 'auc-005',
     title: '로컬 카페 브이로그 스폰서십',
-    platform: 'other',
+    platform: 'naver_blog',
     budget: 300_000,
     description:
       '성수동 신규 카페 오프닝. 블로그/네이버 클립/유튜브 롱폼 중 택1. 메뉴 3종 시식과 인테리어 워크스루 포함.',

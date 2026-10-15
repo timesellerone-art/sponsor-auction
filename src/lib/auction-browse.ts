@@ -1,9 +1,6 @@
 import { isAuctionClosed, type AuctionItem, type PlatformType } from '@/types/auction';
 
-export type BrowsePlatformFilter = 'all' | Extract<
-  PlatformType,
-  'youtube_shorts' | 'instagram_reels' | 'tiktok'
->;
+export type BrowsePlatformFilter = 'all' | Exclude<PlatformType, 'other'>;
 
 export type BrowseSort = 'newest' | 'budget_desc' | 'deadline_asc';
 

@@ -4,19 +4,8 @@ import type {
   AiReport,
 } from '@/types/ai';
 import type { PlatformType } from '@/types/auction';
+import { isPlatformType, platformLabel } from '@/lib/platforms';
 import { formatWon } from '@/lib/utils';
-
-const PLATFORM_LABEL: Record<string, string> = {
-  youtube_shorts: 'YouTube Shorts',
-  instagram_reels: 'Instagram Reels',
-  tiktok: 'TikTok',
-  x_twitter: 'X (Twitter)',
-  other: '숏폼/브이로그',
-};
-
-function platformLabel(platform: string) {
-  return PLATFORM_LABEL[platform] ?? PLATFORM_LABEL.other;
-}
 
 function safeTitle(title: string) {
   const value = title.trim();
@@ -89,5 +78,5 @@ export function normalizeReport(value: unknown, fallback: AiReport): AiReport {
 }
 
 export function isSupportedPlatform(value: string): value is PlatformType {
-  return value in PLATFORM_LABEL;
+  return isPlatformType(value);
 }

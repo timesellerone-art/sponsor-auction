@@ -29,8 +29,8 @@ import type {
   CreateAuctionInput,
   CreateBidInput,
   DataResult,
-  PlatformType,
 } from '@/types/auction';
+import { isPlatformType } from '@/lib/platforms';
 import type { Database } from '@/types/database';
 
 export const INSERT_FAIL_MESSAGE = '등록에 실패했습니다. 다시 시도해 주세요.';
@@ -60,10 +60,11 @@ function ok<T>(data: T): DataResult<T> {
 }
 
 function mapAuction(row: Partial<AuctionRow> & Pick<AuctionRow, 'id'>): AuctionItem {
+  const platformRaw = String(row.platform ?? '');
   return {
     id: row.id,
     title: row.title ?? '제목 없음',
-    platform: (row.platform ?? 'other') as PlatformType,
+    platform: isPlatformType(platformRaw) ? platformRaw : 'other',
     budget: row.budget ?? 0,
     description: row.description ?? '',
     status: (row.status ?? 'active') as AuctionStatus,

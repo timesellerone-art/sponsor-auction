@@ -2,6 +2,9 @@ export type PlatformType =
   | 'youtube_shorts'
   | 'instagram_reels'
   | 'tiktok'
+  | 'youtube'
+  | 'threads'
+  | 'naver_blog'
   | 'x_twitter'
   | 'other';
 

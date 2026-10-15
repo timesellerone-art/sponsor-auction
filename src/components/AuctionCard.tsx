@@ -5,9 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AtSign,
+  BookOpen,
   Camera,
   Clock,
   Globe,
+  Hash,
+  MonitorPlay,
   Music2,
   Play,
   Users,
@@ -47,6 +50,21 @@ const platformMeta: Record<
     label: 'TikTok',
     icon: Music2,
     className: 'border-zinc-300 bg-zinc-900 text-cyan-300',
+  },
+  youtube: {
+    label: 'YouTube',
+    icon: MonitorPlay,
+    className: 'border-red-200 bg-red-50 text-red-800',
+  },
+  threads: {
+    label: 'Threads',
+    icon: Hash,
+    className: 'border-zinc-200 bg-zinc-100 text-zinc-800',
+  },
+  naver_blog: {
+    label: 'Naver Blog',
+    icon: BookOpen,
+    className: 'border-green-200 bg-green-50 text-green-800',
   },
   x_twitter: {
     label: 'X (Twitter)',
@@ -146,15 +164,15 @@ export function AuctionCard({
 
   return (
     <article className="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex min-w-0 items-start justify-between gap-2">
         <span
           className={cn(
-            'inline-flex max-w-[70%] items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold',
+            'inline-flex min-w-0 max-w-[calc(100%-5.5rem)] items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold sm:max-w-[70%] sm:px-2.5 sm:text-xs',
             platformInfo.className,
           )}
         >
           <PlatformIcon className="size-3.5 shrink-0" aria-hidden />
-          <span className="truncate">{platformInfo.label}</span>
+          <span className="min-w-0 truncate">{platformInfo.label}</span>
         </span>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {owned ? (

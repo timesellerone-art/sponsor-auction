@@ -3,12 +3,11 @@
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BrowsePlatformFilter, BrowseSort } from '@/lib/auction-browse';
+import { SELECTABLE_PLATFORMS } from '@/lib/platforms';
 
 const PLATFORMS: { id: BrowsePlatformFilter; label: string }[] = [
   { id: 'all', label: '전체' },
-  { id: 'youtube_shorts', label: 'Shorts' },
-  { id: 'instagram_reels', label: 'Reels' },
-  { id: 'tiktok', label: 'TikTok' },
+  ...SELECTABLE_PLATFORMS,
 ];
 
 const SORTS: { id: BrowseSort; label: string }[] = [
@@ -52,7 +51,7 @@ export function AuctionBrowseBar({
       </label>
 
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto whitespace-nowrap pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {PLATFORMS.map((item) => (
             <button
               key={item.id}
@@ -60,7 +59,7 @@ export function AuctionBrowseBar({
               aria-pressed={platform === item.id}
               onClick={() => onPlatformChange(item.id)}
               className={cn(
-                'inline-flex h-9 shrink-0 items-center rounded-full border px-3 text-xs font-semibold',
+                'inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-xs font-semibold',
                 platform === item.id
                   ? 'border-teal-700 bg-teal-700 text-white'
                   : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',

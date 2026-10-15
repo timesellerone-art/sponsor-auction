@@ -12,15 +12,8 @@ import { rememberMyAuction } from '@/lib/my-campaigns';
 import { rememberAuctionOwner } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
 import { validateAuctionForm, type AuctionFieldErrors } from '@/lib/validation';
+import { SELECTABLE_PLATFORMS } from '@/lib/platforms';
 import type { PlatformType } from '@/types/auction';
-
-const PLATFORMS: { value: PlatformType; label: string }[] = [
-  { value: 'youtube_shorts', label: 'YouTube Shorts' },
-  { value: 'instagram_reels', label: 'Instagram Reels' },
-  { value: 'tiktok', label: 'TikTok' },
-  { value: 'x_twitter', label: 'X (Twitter)' },
-  { value: 'other', label: '기타' },
-];
 
 type FieldErrors = AuctionFieldErrors;
 
@@ -202,8 +195,8 @@ export function CreateAuctionModal({
                 }
                 className={inputClass(false)}
               >
-                {PLATFORMS.map((item) => (
-                  <option key={item.value} value={item.value}>
+                {SELECTABLE_PLATFORMS.map((item) => (
+                  <option key={item.id} value={item.id}>
                     {item.label}
                   </option>
                 ))}
