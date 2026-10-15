@@ -6,7 +6,7 @@ import {
 } from '@/lib/mock-data';
 import { withExclusiveAction } from '@/lib/action-lock';
 import { mockGetSession } from '@/lib/auth-mock';
-import { listPayoutsFromDatabase, markPayoutPaid } from '@/lib/payouts';
+import { listPayoutsFromDatabase, markPayoutPaid, overlayDbPayoutStatus } from '@/lib/payouts';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { VALIDATION } from '@/lib/validation';
@@ -39,6 +39,15 @@ function fail<T>(data: T, error: string): DataResult<T> {
 
 function ok<T>(data: T): DataResult<T> {
   return { data, error: null };
+}
+
+function asPayoutItems(value: unknown): PayoutItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is PayoutItem => {
+    return Boolean(item && typeof item === 'object' && 'id' in item && 'status' in item);
+  });
 }
 
 function isProfileRole(value: string): value is ProfileRole {
@@ -200,14 +209,11 @@ export async function updateProfileStatus(
   });
 }
 
-export async function getPayouts(): Promise<DataResult<PayoutItem[]>> {
+export async function getPayouts(seedFromServer: PayoutItem[] = []): Promise<DataResult<PayoutItem[]>> {
   const started = Date.now();
-  try {
-    const mock = await mockGetSession();
-    if (mock.data) {
-      return getMockPayouts();
-    }
+  let fromDb: PayoutItem[] = asPayoutItems(seedFromServer);
 
+  try {
     const response = await fetch('/api/admin/payouts', {
       method: 'GET',
       cache: 'no-store',
@@ -215,32 +221,28 @@ export async function getPayouts(): Promise<DataResult<PayoutItem[]>> {
     });
     const payload = await parseAdminJson(response);
     if (response.ok && Array.isArray(payload?.data)) {
-      const payouts = (payload.data as PayoutItem[]).map((item) => ({
-        ...item,
-        status: item.status === 'paid' ? ('paid' as const) : item.status,
-      }));
-      if (payouts.length === 0) {
-        return fail([], '정산 요청이 없습니다.');
-      }
-      return ok(payouts);
-    }
-    if (payload?.fallbackMock || response.status === 409) {
-      return getMockPayouts();
-    }
-    if (!response.ok) {
+      fromDb = asPayoutItems(payload.data);
+    } else if (!payload?.fallbackMock && response.status !== 409 && !response.ok && fromDb.length === 0) {
       return fail([], payload?.error || payload?.errorMessage || '정산 목록을 불러오지 못했습니다.');
     }
   } catch (error) {
-    if (error && typeof error === 'object' && 'message' in error) {
-      const message = String((error as { message?: string }).message ?? '');
-      if (isSchemaMismatch({ message, code: (error as { code?: string }).code })) {
-        console.warn('[SponsorAuction] payouts 테이블이 없어 Mock으로 전환합니다.', message);
-        return getMockPayouts();
-      }
-    }
-    console.error('[SponsorAuction] 정산 목록 조회 예외:', error);
+    console.warn('[SponsorAuction] 정산 API 목록 조회 실패', error);
   } finally {
     console.info(`[SponsorAuction] 정산 목록 조회 종료 (${Date.now() - started}ms)`);
+  }
+
+  const mock = await mockGetSession();
+  if (mock.data) {
+    const mockResult = await getMockPayouts();
+    const merged = overlayDbPayoutStatus(fromDb, asPayoutItems(mockResult.data));
+    if (merged.length === 0) {
+      return fail([], '정산 요청이 없습니다.');
+    }
+    return ok(merged);
+  }
+
+  if (fromDb.length > 0) {
+    return ok(fromDb);
   }
 
   const supabase = await getDataClient();

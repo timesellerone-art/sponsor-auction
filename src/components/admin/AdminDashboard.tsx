@@ -73,24 +73,29 @@ function asPayoutList(value: unknown): PayoutItem[] {
   });
 }
 
-export function AdminDashboard() {
+export function AdminDashboard({
+  initialPayouts = [],
+}: {
+  initialPayouts?: PayoutItem[];
+}) {
   const router = useRouter();
   const [tab, setTab] = useState<TabId>('auctions');
   const [auctions, setAuctions] = useState<AuctionItem[]>([]);
   const [bids, setBids] = useState<BidItem[]>([]);
   const [profiles, setProfiles] = useState<ProfileItem[]>([]);
-  const [payouts, setPayouts] = useState<PayoutItem[]>([]);
+  const [payouts, setPayouts] = useState<PayoutItem[]>(() => asPayoutList(initialPayouts));
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { busyKey: busyId, isBusy, run } = useActionLock();
 
   const fetchPayouts = useCallback(async (keepPaid: PayoutItem[] = []) => {
     try {
-      const payoutResult = await getPayouts();
+      const payoutResult = await getPayouts(asPayoutList(initialPayouts));
       setPayouts((prev) => {
         const fresh = asPayoutList(payoutResult.data);
         const paid = [
           ...keepPaid,
+          ...asPayoutList(initialPayouts).filter((item) => item.status === 'paid'),
           ...prev.filter((item) => item.status === 'paid'),
         ];
         return paid.reduce((list, item) => applyPaidPayoutLocal(list, item), fresh);
@@ -101,7 +106,7 @@ export function AdminDashboard() {
     } catch (error) {
       console.warn('[SponsorAuction] 정산 목록 재조회 실패', error);
     }
-  }, []);
+  }, [initialPayouts]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,7 +116,7 @@ export function AdminDashboard() {
           getAuctions(),
           getBids(),
           getProfiles(),
-          getPayouts(),
+          getPayouts(asPayoutList(initialPayouts)),
         ]);
 
       setAuctions(asAuctionList(auctionResult.data));
@@ -136,7 +141,7 @@ export function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [initialPayouts]);
 
   useEffect(() => {
     void load();

@@ -1,12 +1,14 @@
 import { Suspense } from 'react';
 import { connection } from 'next/server';
 import { AdminDashboard } from '@/components/admin/AdminDashboard';
+import { getAdminPayoutsFromDatabase } from '@/lib/admin-payouts.server';
 
 export const instant = false;
 
 async function AdminDashboardGate() {
   await connection();
-  return <AdminDashboard />;
+  const initialPayouts = await getAdminPayoutsFromDatabase();
+  return <AdminDashboard initialPayouts={initialPayouts} />;
 }
 
 export default function AdminPage() {

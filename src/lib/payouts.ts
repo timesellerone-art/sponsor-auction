@@ -38,6 +38,38 @@ function isUuid(value: string) {
   );
 }
 
+function isEphemeralPayoutId(value: string) {
+  return /^payout-\d{10,}$/.test(value);
+}
+
+export function stablePayoutOrderId(input: {
+  paymentOrderId?: string | null;
+  auctionId?: string | null;
+  bidId?: string | null;
+  fallbackId?: string | null;
+}) {
+  const order = (input.paymentOrderId || '').trim();
+  if (order && !isEphemeralPayoutId(order)) {
+    return order;
+  }
+  const auctionId = (input.auctionId || '').replace(/^auction:/, '').trim();
+  const bidId = (input.bidId || '').trim();
+  if (auctionId && bidId) {
+    return `payout-${auctionId}-${bidId}`;
+  }
+  if (auctionId) {
+    return `payout-auction-${auctionId}`;
+  }
+  if (bidId) {
+    return `payout-bid-${bidId}`;
+  }
+  const fallback = (input.fallbackId || '').replace(/^auction:/, '').trim();
+  if (fallback && !isUuid(fallback) && !isEphemeralPayoutId(fallback)) {
+    return fallback;
+  }
+  return order || fallback;
+}
+
 export function mapPayout(row: Partial<PayoutRow> & Pick<PayoutRow, 'id' | 'status'>): PayoutItem | null {
   if (!isPayoutStatus(row.status)) {
     return null;
@@ -45,8 +77,14 @@ export function mapPayout(row: Partial<PayoutRow> & Pick<PayoutRow, 'id' | 'stat
 
   const amount = row.amount ?? 0;
   const bidAmount = bidAmountFromCreatorPayout(amount);
+  const paymentOrderId = stablePayoutOrderId({
+    paymentOrderId: row.payment_order_id,
+    auctionId: row.auction_id,
+    bidId: row.bid_id,
+    fallbackId: row.id,
+  });
   return {
-    id: row.id,
+    id: paymentOrderId || row.id,
     creatorId: row.creator_id ?? '',
     creatorName: row.creator_name ?? '이름 없음',
     creatorEmail: row.creator_email ?? '',
@@ -55,7 +93,7 @@ export function mapPayout(row: Partial<PayoutRow> & Pick<PayoutRow, 'id' | 'stat
     auctionTitle: row.auction_title ?? '',
     requestedAt: row.requested_at ?? '',
     paidAt: row.paid_at ?? null,
-    paymentOrderId: row.payment_order_id ?? null,
+    paymentOrderId: paymentOrderId || null,
     auctionId: row.auction_id ?? null,
     bidId: row.bid_id ?? null,
     bidAmount,
@@ -282,7 +320,11 @@ function buildInsert(input: {
     status: 'pending',
     auction_title: input.auctionTitle.trim(),
     requested_at: input.requestedAt || new Date().toISOString(),
-    payment_order_id: input.orderId?.trim() || null,
+    payment_order_id: stablePayoutOrderId({
+      paymentOrderId: input.orderId,
+      auctionId: input.auctionId,
+      bidId: input.bidId,
+    }) || null,
     auction_id: input.auctionId || null,
     bid_id: input.bidId || null,
   };
@@ -392,28 +434,34 @@ export async function upsertPaidPayout(
   }
 }
 
-function settlePaidStatus(existing: PayoutItem[], list: PayoutItem[]) {
-  const paid = existing.filter((item) => item.status === 'paid');
-  return list.map((item) => {
-    if (item.status === 'paid') {
-      return item;
-    }
-    const match = paid.find(
+export function overlayDbPayoutStatus(dbRows: PayoutItem[], list: PayoutItem[]): PayoutItem[] {
+  const merged = mergePayoutLists(dbRows, list);
+  return merged.map((item) => {
+    const db = dbRows.find(
       (row) =>
-        payoutsMatch(row, item) ||
         (row.paymentOrderId &&
           item.paymentOrderId &&
           row.paymentOrderId === item.paymentOrderId) ||
+        payoutsMatch(row, item) ||
         (row.auctionId && item.auctionId && row.auctionId === item.auctionId),
     );
-    if (!match) {
+    if (!db) {
       return item;
     }
+    const paymentOrderId = stablePayoutOrderId({
+      paymentOrderId: db.paymentOrderId || item.paymentOrderId,
+      auctionId: db.auctionId || item.auctionId,
+      bidId: db.bidId || item.bidId,
+      fallbackId: db.id || item.id,
+    });
+    const status: PayoutStatus = db.status === 'paid' ? 'paid' : db.status;
     return {
       ...item,
-      ...match,
-      status: 'paid' as const,
-      paidAt: match.paidAt ?? item.paidAt,
+      ...db,
+      id: paymentOrderId || db.id || item.id,
+      paymentOrderId: paymentOrderId || null,
+      status,
+      paidAt: status === 'paid' ? db.paidAt : item.paidAt,
     };
   });
 }
@@ -500,11 +548,12 @@ export async function listPayoutsFromDatabase(
     if (!insert) {
       return;
     }
-    const item = virtualFromInsert(insert, fallbackId);
+    const stableId = insert.payment_order_id || fallbackId;
+    const item = virtualFromInsert(insert, stableId);
     if (!item) {
       return;
     }
-    const keys = [...payoutKeys(item), `id:${fallbackId}`];
+    const keys = [...payoutKeys(item), `id:${fallbackId}`, `id:${stableId}`, `order:${stableId}`];
     if (keys.some((key) => seen.has(key)) || matchesPaid(item)) {
       return;
     }
@@ -583,13 +632,13 @@ export async function listPayoutsFromDatabase(
 
     try {
       const latest = await selectPayouts(client);
-      return settlePaidStatus(latest, mergePayoutLists(latest, virtual));
+      return overlayDbPayoutStatus(latest, mergePayoutLists(latest, virtual));
     } catch {
-      return settlePaidStatus(existing, mergePayoutLists(existing, virtual));
+      return overlayDbPayoutStatus(existing, mergePayoutLists(existing, virtual));
     }
   }
 
-  return settlePaidStatus(existing, mergePayoutLists(existing, virtual));
+  return overlayDbPayoutStatus(existing, mergePayoutLists(existing, virtual));
 }
 
 export type MarkPayoutPaidInput = {
@@ -882,11 +931,18 @@ export async function markPayoutPaid(
     };
   }
 
-  const paymentOrderId =
-    orderId ||
-    (auctionId && bidId ? `payout-${auctionId}-${bidId}` : '') ||
-    (rawId && !isUuid(rawId) ? rawId : '') ||
-    `payout-${Date.now()}`;
+  const paymentOrderId = stablePayoutOrderId({
+    paymentOrderId: orderId,
+    auctionId,
+    bidId,
+    fallbackId: rawId,
+  });
+  if (!paymentOrderId) {
+    return {
+      ok: false,
+      message: '정산 식별자(payment_order_id)를 만들 수 없습니다. auction_id 또는 결제 order_id를 확인하세요.',
+    };
+  }
 
   const row: PayoutInsert = {
     creator_id: profile && isUuid(creatorIdRaw) ? creatorIdRaw : null,

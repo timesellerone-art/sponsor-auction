@@ -256,7 +256,7 @@ export const mockProfiles: ProfileItem[] = [
 
 export const mockPayouts: PayoutItem[] = [
   {
-    id: 'pay-001',
+    id: 'payout-auction-auc-001',
     creatorId: 'usr-006',
     creatorName: '민지쇼츠',
     creatorEmail: 'minji@shorts.creator',
@@ -264,9 +264,11 @@ export const mockPayouts: PayoutItem[] = [
     status: 'pending',
     auctionTitle: '여름 무알콜 맥주 숏폼 캠페인',
     requestedAt: '2026-10-11T09:20:00+09:00',
+    paymentOrderId: 'payout-auction-auc-001',
+    auctionId: 'auc-001',
   },
   {
-    id: 'pay-002',
+    id: 'payout-auction-auc-002',
     creatorId: 'usr-007',
     creatorName: '피부일기 하연',
     creatorEmail: 'hayeon@skindiary.kr',
@@ -274,9 +276,11 @@ export const mockPayouts: PayoutItem[] = [
     status: 'pending',
     auctionTitle: '비건 스킨케어 릴스 리뷰',
     requestedAt: '2026-10-10T18:05:00+09:00',
+    paymentOrderId: 'payout-auction-auc-002',
+    auctionId: 'auc-002',
   },
   {
-    id: 'pay-003',
+    id: 'payout-auction-auc-003',
     creatorId: 'usr-008',
     creatorName: '나이트러너 준',
     creatorEmail: 'jun@nightrunner.kr',
@@ -284,9 +288,12 @@ export const mockPayouts: PayoutItem[] = [
     status: 'pending',
     auctionTitle: '러닝화 언박싱 틱톡 챌린지',
     requestedAt: '2026-10-08T12:44:00+09:00',
+    paymentOrderId: 'payout-auction-auc-003',
+    auctionId: 'auc-003',
+    bidId: 'bid-004',
   },
   {
-    id: 'pay-004',
+    id: 'payout-auction-auc-004',
     creatorId: 'usr-009',
     creatorName: '머니노트 세린',
     creatorEmail: 'serin@moneynote.x',
@@ -294,9 +301,12 @@ export const mockPayouts: PayoutItem[] = [
     status: 'paid',
     auctionTitle: '핀테크 앱 X 스레드 체험단',
     requestedAt: '2026-09-28T15:10:00+09:00',
+    paymentOrderId: 'payout-auction-auc-004',
+    auctionId: 'auc-004',
+    bidId: 'bid-005',
   },
   {
-    id: 'pay-005',
+    id: 'payout-auction-auc-005',
     creatorId: 'usr-006',
     creatorName: '민지쇼츠',
     creatorEmail: 'minji@shorts.creator',
@@ -304,6 +314,8 @@ export const mockPayouts: PayoutItem[] = [
     status: 'paid',
     auctionTitle: '로컬 카페 브이로그 스폰서십',
     requestedAt: '2026-09-22T11:36:00+09:00',
+    paymentOrderId: 'payout-auction-auc-005',
+    auctionId: 'auc-005',
   },
 ];
 
@@ -912,8 +924,9 @@ function payoutsFromClosedCampaigns(): PayoutItem[] {
       continue;
     }
 
+    const payoutId = `payout-auction-${auction.id}`;
     items.push({
-      id: `payout-auction-${auction.id}`,
+      id: payoutId,
       creatorId: bid.creatorId ?? bid.id,
       creatorName: bid.creatorName,
       creatorEmail: `${bid.creatorName.replace(/\s+/g, '').toLowerCase()}@creator.local`,
@@ -921,6 +934,7 @@ function payoutsFromClosedCampaigns(): PayoutItem[] {
       status: auction.status === 'completed' ? 'paid' : 'pending',
       auctionTitle: auction.title,
       requestedAt: auction.createdAt,
+      paymentOrderId: payoutId,
       auctionId: auction.id,
       bidId: bid.id,
     });
