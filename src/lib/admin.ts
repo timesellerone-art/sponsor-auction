@@ -6,7 +6,7 @@ import {
 } from '@/lib/mock-data';
 import { withExclusiveAction } from '@/lib/action-lock';
 import { mockGetSession } from '@/lib/auth-mock';
-import { listPayoutsFromDatabase, markPayoutPaid, overlayDbPayoutStatus } from '@/lib/payouts';
+import { markPayoutPaid, overlayDbPayoutStatus } from '@/lib/payouts';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { VALIDATION } from '@/lib/validation';
@@ -245,21 +245,7 @@ export async function getPayouts(seedFromServer: PayoutItem[] = []): Promise<Dat
     return ok(fromDb);
   }
 
-  const supabase = await getDataClient();
-  if (!supabase) {
-    return getMockPayouts();
-  }
-
-  try {
-    const payouts = await listPayoutsFromDatabase(supabase);
-    if (payouts.length === 0) {
-      return fail([], '정산 요청이 없습니다.');
-    }
-    return ok(payouts);
-  } catch (error) {
-    console.error('[SponsorAuction] 정산 목록 조회 예외:', error);
-    return fail([], '정산 목록을 불러오지 못했습니다.');
-  }
+  return getMockPayouts();
 }
 
 export async function approvePayout(

@@ -331,6 +331,9 @@ export function AdminDashboard({
           return;
         }
 
+        setProfiles((prev) =>
+          prev.map((item) => (item.id === result.data?.id ? result.data : item)),
+        );
         showToast(
           nextStatus === 'suspended'
             ? '회원을 정지했습니다.'

@@ -4,7 +4,7 @@ import {
   getPaymentActor,
   unauthorizedJson,
 } from '@/lib/payments/guard';
-import { createPaymentDbClient } from '@/lib/supabase/admin';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import type { ProfileStatus } from '@/types/admin';
 
@@ -44,8 +44,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ fallbackMock: true }, { status: 409 });
     }
 
-    const { client, usingServiceRole } = createPaymentDbClient();
-    if (!client || !usingServiceRole) {
+    const client = createAdminClient();
+    if (!client) {
       return NextResponse.json({ fallbackMock: true }, { status: 409 });
     }
 

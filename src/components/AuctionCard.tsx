@@ -24,6 +24,7 @@ import { isOpenForBid } from '@/lib/auction-browse';
 import { loginPath } from '@/lib/auth-guard';
 import { isOwnedAuction } from '@/lib/my-campaigns';
 import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
+import { PLATFORM_LABELS } from '@/lib/platforms';
 import { cn } from '@/lib/utils';
 import type { AuctionItem, AuctionStatus, PlatformType } from '@/types/auction';
 
@@ -37,42 +38,42 @@ const platformMeta: Record<
   { label: string; icon: LucideIcon; className: string }
 > = {
   youtube_shorts: {
-    label: 'YouTube Shorts',
+    label: PLATFORM_LABELS.youtube_shorts,
     icon: Play,
     className: 'border-red-200 bg-red-50 text-red-700',
   },
   instagram_reels: {
-    label: 'Instagram Reels',
+    label: PLATFORM_LABELS.instagram_reels,
     icon: Camera,
     className: 'border-pink-200 bg-pink-50 text-pink-700',
   },
   tiktok: {
-    label: 'TikTok',
+    label: PLATFORM_LABELS.tiktok,
     icon: Music2,
     className: 'border-zinc-300 bg-zinc-900 text-cyan-300',
   },
   youtube: {
-    label: 'YouTube',
+    label: PLATFORM_LABELS.youtube,
     icon: MonitorPlay,
     className: 'border-red-200 bg-red-50 text-red-800',
   },
   threads: {
-    label: 'Threads',
+    label: PLATFORM_LABELS.threads,
     icon: Hash,
     className: 'border-zinc-200 bg-zinc-100 text-zinc-800',
   },
   naver_blog: {
-    label: 'Naver Blog',
+    label: PLATFORM_LABELS.naver_blog,
     icon: BookOpen,
     className: 'border-green-200 bg-green-50 text-green-800',
   },
   x_twitter: {
-    label: 'X (Twitter)',
+    label: PLATFORM_LABELS.x_twitter,
     icon: AtSign,
     className: 'border-slate-200 bg-slate-100 text-slate-800',
   },
   other: {
-    label: '기타',
+    label: PLATFORM_LABELS.other,
     icon: Globe,
     className: 'border-amber-200 bg-amber-50 text-amber-800',
   },
