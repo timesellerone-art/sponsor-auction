@@ -4,6 +4,7 @@ import {
   isSupportedPlatform,
   normalizeReport,
 } from '@/lib/ai-report';
+import { getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
 import type { AiAnalyzeInput, AiAnalyzeResponse, AiReport } from '@/types/ai';
 
 const TIMEOUT_MS = 8_000;
@@ -136,6 +137,11 @@ async function analyzeWithClaude(input: AiAnalyzeInput, apiKey: string): Promise
 }
 
 export async function POST(request: Request) {
+  const actor = await getPaymentActor();
+  if (!actor) {
+    return unauthorizedJson('캠페인 분석을 사용하려면 로그인해 주세요.');
+  }
+
   let input: AiAnalyzeInput = {
     title: '',
     platform: 'other',

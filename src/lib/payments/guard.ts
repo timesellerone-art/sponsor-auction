@@ -19,23 +19,38 @@ function asRole(value: string): AuthProfileRole | null {
 export async function getPaymentActor(): Promise<PaymentActor | null> {
   const cookieStore = await cookies();
   const cookieRole = asRole(cookieStore.get(ROLE_COOKIE_NAME)?.value ?? '');
+
+  try {
+    const supabase = await createClient();
+    if (supabase) {
+      const { data, error } = await supabase.auth.getUser();
+      if (!error && data.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        const profileRole = asRole(
+          typeof profile?.role === 'string' ? profile.role : '',
+        );
+        if (profileRole) {
+          return { role: profileRole, userId: data.user.id };
+        }
+        if (cookieRole) {
+          return { role: cookieRole, userId: data.user.id };
+        }
+        return null;
+      }
+    }
+  } catch {
+    // 데모/로컬은 역할 쿠키만으로 API 가드를 통과시킨다.
+  }
+
   if (cookieRole) {
     return { role: cookieRole };
   }
 
-  try {
-    const supabase = await createClient();
-    if (!supabase) {
-      return null;
-    }
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
-      return null;
-    }
-    return { role: 'advertiser', userId: data.user.id };
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export function unauthorizedJson(message = '로그인이 필요합니다.') {

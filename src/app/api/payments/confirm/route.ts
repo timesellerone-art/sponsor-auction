@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     const auctionId = parsed.auctionId || intent?.auctionId || '';
     const bidId = parsed.bidId || intent?.bidId || '';
 
-    if (!intent && auctionId && bidId) {
+    if (!intent && auctionId && bidId && isDemoPaymentKey(parsed.paymentKey)) {
       intent = {
         orderId: parsed.orderId,
         auctionId,

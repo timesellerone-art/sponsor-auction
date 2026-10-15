@@ -260,6 +260,12 @@ begin
     raise exception 'active 상태가 아닌 역경매는 낙찰할 수 없습니다.';
   end if;
 
+  if new.status is distinct from old.status
+     and new.status = 'completed'
+     and auth.role() is distinct from 'service_role' then
+    raise exception '결제 완료 상태(completed)는 서버에서만 변경할 수 있습니다.';
+  end if;
+
   return new;
 end;
 $$;
@@ -269,6 +275,28 @@ create trigger auctions_guard_award
 before update of status, winner_bid_id on public.auctions
 for each row
 execute function public.guard_auction_award();
+
+create or replace function public.guard_bid_status()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.status is distinct from old.status
+     and new.status = 'selected'
+     and auth.role() is distinct from 'service_role'
+     and current_user not in ('postgres', 'supabase_admin') then
+    raise exception '입찰 낙찰 상태(selected)는 서버에서만 변경할 수 있습니다.';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists bids_guard_status on public.bids;
+create trigger bids_guard_status
+before update of status on public.bids
+for each row
+execute function public.guard_bid_status();
 
 create or replace function public.increment_auction_bids_count()
 returns trigger
@@ -437,10 +465,11 @@ grant select on public.payments to authenticated;
 grant select, insert, update, delete on public.payments to service_role;
 
 drop policy if exists "profiles_select_public" on public.profiles;
-create policy "profiles_select_public"
+drop policy if exists "profiles_select_own" on public.profiles;
+create policy "profiles_select_own"
 on public.profiles for select
-to anon, authenticated
-using (true);
+to authenticated
+using (auth.uid() = id or public.is_admin());
 
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own"
@@ -524,30 +553,31 @@ on public.bids for update
 to authenticated
 using (
   public.is_admin()
-  or creator_id = auth.uid()
   or exists (
     select 1
     from public.auctions a
     where a.id = bids.auction_id
       and a.author_id = auth.uid()
   )
+  or (creator_id = auth.uid() and status = 'pending')
 )
 with check (
   public.is_admin()
-  or creator_id = auth.uid()
   or exists (
     select 1
     from public.auctions a
     where a.id = bids.auction_id
       and a.author_id = auth.uid()
   )
+  or (creator_id = auth.uid() and status = 'pending')
 );
 
 drop policy if exists "payouts_select_public" on public.payouts;
-create policy "payouts_select_public"
+drop policy if exists "payouts_select_own" on public.payouts;
+create policy "payouts_select_own"
 on public.payouts for select
-to anon, authenticated
-using (true);
+to authenticated
+using (public.is_admin() or creator_id = auth.uid());
 
 drop policy if exists "payouts_update_authenticated" on public.payouts;
 create policy "payouts_update_authenticated"
@@ -558,9 +588,12 @@ with check (public.is_admin());
 
 grant execute on function public.award_auction(uuid, uuid) to authenticated, service_role;
 grant execute on function public.is_admin() to authenticated, service_role;
+grant select on public.profiles to authenticated;
+grant select on public.payouts to authenticated;
 
 revoke insert, update, delete on public.auctions from anon;
 revoke insert, update, delete on public.bids from anon;
+revoke select on public.profiles from anon;
 revoke update, delete on public.profiles from anon;
-revoke update, delete on public.payouts from anon;
+revoke select, update, delete on public.payouts from anon;
 revoke execute on function public.award_auction(uuid, uuid) from anon;
