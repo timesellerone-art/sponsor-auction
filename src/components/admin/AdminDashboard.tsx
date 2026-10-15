@@ -333,7 +333,7 @@ export function AdminDashboard() {
     }
 
     const confirmed = window.confirm(
-      `"${payout.creatorName || '크리에이터'}"의 정산을 승인할까요?`,
+      `"${payout.creatorName || '크리에이터'}"의 정산을 지급 처리할까요?`,
     );
     if (!confirmed) {
       return;
@@ -347,13 +347,13 @@ export function AdminDashboard() {
           return;
         }
 
-        const result = await approvePayout(payout.id);
+        const result = await approvePayout(payout.paymentOrderId || payout.id);
         if (result.error || !result.data) {
           showToast(result.error ?? ADMIN_UPDATE_FAIL_MESSAGE);
           return;
         }
 
-        showToast('정산을 승인했습니다.', 'success');
+        showToast('지급 처리했습니다.', 'success');
         await load();
       } catch {
         showToast(ADMIN_UPDATE_FAIL_MESSAGE);

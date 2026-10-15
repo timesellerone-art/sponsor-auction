@@ -17,7 +17,9 @@ import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
 import { showToast } from '@/components/Toast';
 import { ACCESS_REASON } from '@/lib/access';
+import { isOpenForBid } from '@/lib/auction-browse';
 import { loginPath } from '@/lib/auth-guard';
+import { isOwnedAuction } from '@/lib/my-campaigns';
 import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
 import { cn } from '@/lib/utils';
 import type { AuctionItem, AuctionStatus, PlatformType } from '@/types/auction';
@@ -114,7 +116,7 @@ export function AuctionCard({
   hideBidAction?: boolean;
 }) {
   const router = useRouter();
-  const { user, ready, canPlaceBid } = useAuth();
+  const { user, ready, canPlaceBid, canCreateAuction } = useAuth();
   const [bidOpen, setBidOpen] = useState(false);
   const title = auction.title || '제목 없음';
   const platform = auction.platform ?? 'other';
@@ -123,8 +125,24 @@ export function AuctionCard({
   const statusInfo = statusMeta[status] ?? statusMeta.active;
   const PlatformIcon = platformInfo.icon;
   const href = auction.id ? `/auctions/${auction.id}` : '/#auctions';
-  const auctionOpen = Boolean(auction.id) && status === 'active' && !auction.isBlind;
+  const auctionOpen = Boolean(auction.id) && isOpenForBid({
+    status,
+    isBlind: Boolean(auction.isBlind),
+  });
   const canBid = auctionOpen && canPlaceBid;
+  const owned = Boolean(
+    user &&
+      auction.id &&
+      isOwnedAuction(
+        {
+          id: auction.id,
+          authorId: auction.authorId ?? null,
+          authorName: auction.authorName ?? '',
+        },
+        user,
+      ),
+  );
+  const isAdvertiser = Boolean(ready && user && canCreateAuction);
 
   return (
     <article className="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
@@ -138,14 +156,21 @@ export function AuctionCard({
           <PlatformIcon className="size-3.5 shrink-0" aria-hidden />
           <span className="truncate">{platformInfo.label}</span>
         </span>
-        <span
-          className={cn(
-            'shrink-0 rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-inset',
-            statusInfo.className,
-          )}
-        >
-          {statusInfo.label}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {owned ? (
+            <span className="rounded-full bg-teal-700 px-2 py-1 text-[11px] font-semibold text-white">
+              내 캠페인
+            </span>
+          ) : null}
+          <span
+            className={cn(
+              'rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-inset',
+              statusInfo.className,
+            )}
+          >
+            {statusInfo.label}
+          </span>
+        </div>
       </div>
 
       <h3 className="mt-3 line-clamp-2 min-w-0 break-words text-base font-semibold text-zinc-950">
@@ -192,6 +217,19 @@ export function AuctionCard({
         >
           로그인하고 제안하기
         </button>
+      ) : isAdvertiser && auction.id ? (
+        <Link
+          href={owned ? `${href}#proposals` : href}
+          className="mt-4 inline-flex h-10 min-h-10 w-full min-w-0 items-center justify-center rounded-full bg-teal-50 px-3 text-sm font-semibold text-teal-900 hover:bg-teal-100"
+        >
+          {owned
+            ? auctionOpen
+              ? '내 캠페인 입찰 현황'
+              : '내 캠페인 보기'
+            : auctionOpen
+              ? '진행 중 · 상세 보기'
+              : '상세 보기'}
+        </Link>
       ) : (
         <p className="mt-4 rounded-xl bg-zinc-50 px-3 py-2 text-center text-xs text-zinc-500">
           {!auctionOpen

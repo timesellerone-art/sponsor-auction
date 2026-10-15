@@ -1,17 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
-import { useAuth } from '@/components/AuthProvider';
+import { AuctionBrowseBar } from '@/components/AuctionBrowseBar';
 import { AuctionCard, AuctionCardSkeleton } from '@/components/AuctionCard';
+import { useAuth } from '@/components/AuthProvider';
+import {
+  browseAuctions,
+  type BrowsePlatformFilter,
+  type BrowseSort,
+} from '@/lib/auction-browse';
 import { getAuctions } from '@/lib/auctions';
 import type { AuctionItem } from '@/types/auction';
 
 export default function Home() {
-  const { user, ready, canCreateAuction } = useAuth();
+  const { user, ready, canCreateAuction, canPlaceBid } = useAuth();
   const [auctions, setAuctions] = useState<AuctionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [platform, setPlatform] = useState<BrowsePlatformFilter>('all');
+  const [sort, setSort] = useState<BrowseSort>('newest');
 
   useEffect(() => {
     let cancelled = false;
@@ -50,7 +59,13 @@ export default function Home() {
     };
   }, []);
 
-  const isEmpty = !loading && auctions.length === 0;
+  const browsed = useMemo(
+    () => browseAuctions(auctions, { query, platform, sort }),
+    [auctions, platform, query, sort],
+  );
+  const isEmpty = !loading && browsed.open.length === 0 && browsed.closed.length === 0;
+  const isAdvertiser = Boolean(ready && canCreateAuction);
+  const isCreator = Boolean(ready && canPlaceBid);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
@@ -64,8 +79,11 @@ export default function Home() {
             <br className="hidden sm:block" /> 크리에이터가 제안합니다.
           </h1>
           <p className="max-w-2xl text-sm leading-6 text-zinc-600 sm:text-base">
-            숏폼·릴스·틱톡 캠페인을 역경매로 매칭하세요. 원하는 플랫폼과 예산을
-            올리면, 크리에이터가 입찰가로 경쟁합니다.
+            {isAdvertiser
+              ? '지금 입찰이 열린 역경매와 내가 등록한 캠페인을 메인에서 바로 확인하세요. 제안이 들어오면 상세에서 낙찰할 수 있습니다.'
+              : isCreator
+                ? '숏폼·릴스·틱톡 캠페인을 검색하고 필터로 골라, 예산과 마감에 맞는 제안에 입찰하세요.'
+                : '숏폼·릴스·틱톡 캠페인을 역경매로 매칭하세요. 원하는 플랫폼과 예산을 올리면, 크리에이터가 입찰가로 경쟁합니다.'}
           </p>
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
             <button
@@ -93,15 +111,26 @@ export default function Home() {
         id="auctions"
         className="mx-auto w-full max-w-6xl min-w-0 flex-1 px-4 py-10 sm:px-6 sm:py-14"
       >
-        <div className="mb-6 flex flex-col gap-1 sm:mb-8 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-xl font-bold text-zinc-950 sm:text-2xl">
-              진행 중인 역경매
-            </h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              예산 안에서 가장 맞는 크리에이터를 찾으세요.
-            </p>
-          </div>
+        <div className="mb-5 flex flex-col gap-1 sm:mb-6">
+          <h2 className="text-xl font-bold text-zinc-950 sm:text-2xl">
+            진행 중인 역경매
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            {isAdvertiser
+              ? '입찰이 열려 있는 캠페인입니다. 내 캠페인은 카드에서 바로 구분됩니다.'
+              : '제목·설명 검색과 플랫폼 필터로 맞는 캠페인을 찾으세요.'}
+          </p>
+        </div>
+
+        <div className="mb-6">
+          <AuctionBrowseBar
+            query={query}
+            platform={platform}
+            sort={sort}
+            onQueryChange={setQuery}
+            onPlatformChange={setPlatform}
+            onSortChange={setSort}
+          />
         </div>
 
         {loading ? (
@@ -118,17 +147,40 @@ export default function Home() {
         ) : isEmpty ? (
           <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-16 text-center">
             <p className="text-base font-medium text-zinc-800">
-              등록된 역경매가 없습니다
+              {query.trim() || platform !== 'all'
+                ? '조건에 맞는 역경매가 없습니다'
+                : '등록된 역경매가 없습니다'}
             </p>
             {error ? (
               <p className="mt-2 text-sm text-zinc-500">{error}</p>
             ) : null}
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {auctions.map((auction) => (
-              <AuctionCard key={auction.id} auction={auction} />
-            ))}
+          <div className="flex flex-col gap-10">
+            <div>
+              {browsed.open.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-10 text-center text-sm text-zinc-500">
+                  지금 입찰 가능한 역경매가 없습니다.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {browsed.open.map((auction) => (
+                    <AuctionCard key={auction.id} auction={auction} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {browsed.closed.length > 0 ? (
+              <div>
+                <h3 className="mb-4 text-lg font-bold text-zinc-950">마감·완료된 역경매</h3>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {browsed.closed.map((auction) => (
+                    <AuctionCard key={auction.id} auction={auction} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </section>

@@ -170,6 +170,22 @@ create table if not exists public.payouts (
   constraint payouts_amount_positive check (amount > 0)
 );
 
+alter table if exists public.payouts
+  add column if not exists payment_order_id text;
+alter table if exists public.payouts
+  add column if not exists auction_id text;
+alter table if exists public.payouts
+  add column if not exists bid_id text;
+
+do $$
+begin
+  alter table public.payouts
+    add constraint payouts_payment_order_id_key unique (payment_order_id);
+exception
+  when duplicate_object then null;
+end
+$$;
+
 do $$
 begin
   if not exists (
@@ -586,10 +602,16 @@ to authenticated
 using (public.is_admin())
 with check (public.is_admin());
 
+drop policy if exists "payouts_insert_admin" on public.payouts;
+create policy "payouts_insert_admin"
+on public.payouts for insert
+to authenticated
+with check (public.is_admin());
+
 grant execute on function public.award_auction(uuid, uuid) to authenticated, service_role;
 grant execute on function public.is_admin() to authenticated, service_role;
 grant select on public.profiles to authenticated;
-grant select on public.payouts to authenticated;
+grant select, insert on public.payouts to authenticated;
 
 revoke insert, update, delete on public.auctions from anon;
 revoke insert, update, delete on public.bids from anon;

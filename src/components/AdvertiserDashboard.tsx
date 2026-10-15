@@ -84,6 +84,9 @@ export function AdvertiserDashboard() {
   const paidDeals = deals.filter(
     (deal) => deal.auction.status === 'completed' || deal.payment?.status === 'confirmed',
   );
+  const openDeals = deals.filter(
+    (deal) => deal.auction.status === 'active' && !deal.auction.isBlind,
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10">
@@ -114,6 +117,39 @@ export function AdvertiserDashboard() {
         </div>
       ) : (
         <div className="mt-8 flex flex-col gap-10">
+          <section className="min-w-0">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-bold text-zinc-950">진행 중인 역경매</h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  입찰이 열려 있는 내 캠페인입니다. 제안을 확인하고 낙찰할 수 있습니다.
+                </p>
+              </div>
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                {openDeals.length}건
+              </span>
+            </div>
+            {openDeals.length === 0 ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-10 text-center text-sm text-zinc-500">
+                지금 진행 중인 내 역경매가 없습니다.
+              </div>
+            ) : (
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {openDeals.map((deal) => (
+                  <div key={`open-${deal.auction.id}`} className="min-w-0">
+                    <AuctionCard auction={deal.auction} hideBidAction />
+                    <Link
+                      href={`/auctions/${deal.auction.id}#proposals`}
+                      className="mt-2 inline-flex h-10 w-full items-center justify-center rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800"
+                    >
+                      입찰 현황 보기
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
           <section className="min-w-0">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>

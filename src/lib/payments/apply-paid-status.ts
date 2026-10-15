@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { upsertPaidPayout } from '@/lib/payouts';
 import type { PaymentSupabaseConfig } from '@/lib/supabase/payment-config';
 import type { Database } from '@/types/database';
 
@@ -27,6 +28,7 @@ export async function applyPaidAuctionStatus(
   auctionId: string,
   bidId: string,
   config: PaymentSupabaseConfig,
+  payment?: { orderId: string; amount: number; orderName: string },
 ) {
   try {
     if (!auctionId || !bidId) {
@@ -87,6 +89,16 @@ export async function applyPaidAuctionStatus(
       });
     } else {
       console.info('[SponsorAuction] 결제 후 auctions.status=completed 반영', { auctionId, bidId });
+    }
+
+    if (payment?.orderId) {
+      await upsertPaidPayout(supabaseAdmin, {
+        orderId: payment.orderId,
+        auctionId,
+        bidId,
+        chargeAmount: payment.amount,
+        orderName: payment.orderName,
+      });
     }
   } catch (error) {
     console.error('[SponsorAuction] 결제 후 경매/입찰 상태 업데이트 예외', {

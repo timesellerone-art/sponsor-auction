@@ -159,4 +159,18 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(page.getByText('민지쇼츠').first()).toBeVisible();
     await expect(page.getByText(ACTIVE_AUCTION).first()).toBeVisible();
   });
+
+  test('정산 관리에 시드 정산과 결제 완료 캠페인이 함께 표시된다', async ({ page }) => {
+    await unlockAdmin(page);
+    await page.getByRole('button', { name: '정산 관리' }).click();
+
+    const table = page.getByRole('table');
+    await expect(table.getByRole('columnheader', { name: '크리에이터' })).toBeVisible();
+    await expect(table.getByRole('columnheader', { name: '정산 금액' })).toBeVisible();
+    await expect(page.getByText('민지쇼츠').first()).toBeVisible();
+    await expect(page.getByText(CLOSED_AUCTION).first()).toBeVisible();
+    await expect(page.getByText('지급 대기').first()).toBeVisible();
+    await expect(page.getByText('지급 완료').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: '지급 처리' }).first()).toBeVisible();
+  });
 });

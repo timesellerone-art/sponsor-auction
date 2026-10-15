@@ -168,6 +168,9 @@ export type Database = {
           status: 'pending' | 'paid';
           auction_title: string;
           requested_at: string;
+          payment_order_id: string | null;
+          auction_id: string | null;
+          bid_id: string | null;
         };
         Insert: {
           id?: string;
@@ -178,6 +181,9 @@ export type Database = {
           status?: 'pending' | 'paid';
           auction_title?: string;
           requested_at?: string;
+          payment_order_id?: string | null;
+          auction_id?: string | null;
+          bid_id?: string | null;
         };
         Update: {
           creator_id?: string | null;
@@ -186,6 +192,10 @@ export type Database = {
           amount?: number;
           status?: 'pending' | 'paid';
           auction_title?: string;
+          requested_at?: string;
+          payment_order_id?: string | null;
+          auction_id?: string | null;
+          bid_id?: string | null;
         };
         Relationships: [];
       };

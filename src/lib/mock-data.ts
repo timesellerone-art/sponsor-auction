@@ -3,13 +3,16 @@ import type {
   ProfileItem,
   ProfileStatus,
 } from '@/types/admin';
-import type {
-  AuctionItem,
-  AuctionStatus,
-  BidItem,
-  CreateAuctionInput,
-  CreateBidInput,
-  DataResult,
+import { creatorPayoutAmount } from '@/lib/fees';
+import { mergePayoutLists } from '@/lib/payouts';
+import {
+  isAuctionClosed,
+  type AuctionItem,
+  type AuctionStatus,
+  type BidItem,
+  type CreateAuctionInput,
+  type CreateBidInput,
+  type DataResult,
 } from '@/types/auction';
 import {
   VALIDATION,
@@ -870,9 +873,52 @@ export async function updateProfileStatus(
   }
 }
 
+function payoutsFromClosedCampaigns(): PayoutItem[] {
+  const auctions = guardAuctionList(auctionsStore);
+  const bids = Array.isArray(bidsStore) ? bidsStore : [];
+
+  const items: PayoutItem[] = [];
+
+  for (const auction of auctions) {
+    if (!isAuctionClosed(auction.status)) {
+      continue;
+    }
+
+    const bid =
+      bids.find((item) => item.id === auction.winnerBidId && item.auctionId === auction.id) ??
+      bids.find((item) => item.auctionId === auction.id && item.status === 'selected');
+    if (!bid) {
+      continue;
+    }
+
+    const amount = creatorPayoutAmount(bid.bidAmount);
+    if (amount <= 0) {
+      continue;
+    }
+
+    items.push({
+      id: `payout-auction-${auction.id}`,
+      creatorId: bid.creatorId ?? bid.id,
+      creatorName: bid.creatorName,
+      creatorEmail: `${bid.creatorName.replace(/\s+/g, '').toLowerCase()}@creator.local`,
+      amount,
+      status: auction.status === 'completed' ? 'paid' : 'pending',
+      auctionTitle: auction.title,
+      requestedAt: auction.createdAt,
+      auctionId: auction.id,
+      bidId: bid.id,
+    });
+  }
+
+  return items;
+}
+
 export async function getPayouts(): Promise<DataResult<PayoutItem[]>> {
   try {
-    const payouts = guardPayoutList(payoutsStore);
+    const payouts = mergePayoutLists(
+      guardPayoutList(payoutsStore),
+      payoutsFromClosedCampaigns(),
+    );
     if (payouts.length === 0) {
       return fail([], '정산 요청이 없습니다.');
     }
@@ -893,7 +939,9 @@ export async function approvePayout(
       return fail(null, '유효한 정산 ID가 필요합니다.');
     }
 
-    const current = payoutsStore.find((item) => item.id === id);
+    const current =
+      payoutsStore.find((item) => item.id === id) ??
+      payoutsFromClosedCampaigns().find((item) => item.id === id);
     if (!current) {
       return fail(null, '해당 정산 요청을 찾을 수 없습니다.');
     }
@@ -903,9 +951,13 @@ export async function approvePayout(
     }
 
     const updated: PayoutItem = { ...current, status: 'paid' };
-    payoutsStore = payoutsStore.map((item) =>
-      item.id === id ? updated : item,
-    );
+    if (payoutsStore.some((item) => item.id === id)) {
+      payoutsStore = payoutsStore.map((item) =>
+        item.id === id ? updated : item,
+      );
+    } else {
+      payoutsStore = [...payoutsStore, updated];
+    }
     return ok(updated);
   } catch (error) {
     const message =

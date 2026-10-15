@@ -6,6 +6,7 @@ test.describe('마이페이지 대시보드', () => {
     await signIn(page, ADVERTISER);
     await page.goto('/my');
     await expect(page.getByRole('heading', { name: '내 역경매' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '진행 중인 역경매' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '결제 완료 목록' })).toBeVisible();
     await expect(page.getByRole('link', { name: '핀테크 앱 X 스레드 체험단' }).first()).toBeVisible();
     await expect(page.getByText('결제 완료').first()).toBeVisible();

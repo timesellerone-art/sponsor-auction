@@ -188,7 +188,11 @@ export async function POST(request: Request) {
       if (!replaySaved.ok) {
         console.error('[SponsorAuction] demo 결제 저장 실패, 낙찰은 계속 진행', replaySaved);
       }
-      await applyPaidAuctionStatus(intent.auctionId, intent.bidId, dbConfig);
+      await applyPaidAuctionStatus(intent.auctionId, intent.bidId, dbConfig, {
+        orderId: intent.orderId,
+        amount: intent.amount,
+        orderName: intent.orderName,
+      });
       const replay: ConfirmPaymentResult = {
         orderId: intent.orderId,
         auctionId: intent.auctionId,
@@ -261,7 +265,11 @@ export async function POST(request: Request) {
       console.error('[SponsorAuction] demo 결제 저장 실패, 낙찰은 계속 진행', saved);
     }
 
-    await applyPaidAuctionStatus(intent.auctionId, intent.bidId, dbConfig);
+    await applyPaidAuctionStatus(intent.auctionId, intent.bidId, dbConfig, {
+      orderId: intent.orderId,
+      amount: intent.amount,
+      orderName: intent.orderName,
+    });
 
     updateIntent(intent.orderId, {
       status: 'confirmed',

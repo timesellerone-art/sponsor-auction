@@ -22,6 +22,9 @@ export interface PayoutItem {
   status: PayoutStatus;
   auctionTitle: string;
   requestedAt: string;
+  paymentOrderId?: string | null;
+  auctionId?: string | null;
+  bidId?: string | null;
 }
 
 export type AuctionAdminFilter = 'all' | 'active' | 'closed' | 'blind';

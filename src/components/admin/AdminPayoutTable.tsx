@@ -6,7 +6,7 @@ import { formatDate, formatWon } from '@/lib/utils';
 import type { PayoutItem, PayoutStatus } from '@/types/admin';
 
 const STATUS_LABEL: Record<PayoutStatus, string> = {
-  pending: '대기 중',
+  pending: '지급 대기',
   paid: '지급 완료',
 };
 
@@ -34,7 +34,7 @@ export function AdminPayoutTable({
               <th className="px-4 py-3 font-medium">크리에이터</th>
               <th className="px-4 py-3 font-medium">캠페인</th>
               <th className="px-4 py-3 font-medium">정산 금액</th>
-              <th className="px-4 py-3 font-medium">요청일</th>
+              <th className="px-4 py-3 font-medium">결제/정산 일시</th>
               <th className="px-4 py-3 font-medium">상태</th>
               <th className="px-4 py-3 font-medium">관리</th>
             </tr>
@@ -87,7 +87,7 @@ export function AdminPayoutTable({
                         className="inline-flex items-center gap-1 rounded-full border border-teal-200 px-3 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-                        {busy ? '처리 중...' : '정산 승인'}
+                        {busy ? '처리 중...' : '지급 처리'}
                       </button>
                     ) : (
                       <span className="text-xs text-zinc-400">처리 완료</span>

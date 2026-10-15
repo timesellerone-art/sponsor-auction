@@ -16,3 +16,20 @@ export function advertiserPayableAmount(bidAmount: number) {
 
   return Math.round(bidAmount + bidAmount * ADVERTISER_FEE_RATE);
 }
+
+export function creatorPayoutAmount(bidAmount: number) {
+  if (typeof bidAmount !== 'number' || !Number.isFinite(bidAmount) || bidAmount <= 0) {
+    return 0;
+  }
+
+  return Math.round(bidAmount * (1 - CREATOR_FEE_RATE));
+}
+
+export function creatorPayoutFromCharge(chargeAmount: number) {
+  if (typeof chargeAmount !== 'number' || !Number.isFinite(chargeAmount) || chargeAmount <= 0) {
+    return 0;
+  }
+
+  const bidAmount = Math.round(chargeAmount / (1 + ADVERTISER_FEE_RATE));
+  return creatorPayoutAmount(bidAmount);
+}

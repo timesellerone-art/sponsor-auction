@@ -5,25 +5,24 @@ import {
   updateProfileStatus as updateMockProfileStatus,
 } from '@/lib/mock-data';
 import { withExclusiveAction } from '@/lib/action-lock';
+import { listPayoutsFromDatabase, mapPayout, PAYOUT_COLUMNS } from '@/lib/payouts';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { VALIDATION } from '@/lib/validation';
 import type {
   PayoutItem,
-  PayoutStatus,
   ProfileItem,
   ProfileRole,
   ProfileStatus,
 } from '@/types/admin';
 import { isAuthProfileRole } from '@/types/auth';
 import type { DataResult } from '@/types/auction';
+import type { Database } from '@/types/database';
 
 export const ADMIN_UPDATE_FAIL_MESSAGE =
   '변경에 실패했습니다. 다시 시도해 주세요.';
 
 const PROFILE_COLUMNS = 'id, name, email, role, status, created_at';
-const PAYOUT_COLUMNS =
-  'id, creator_id, creator_name, creator_email, amount, status, auction_title, requested_at';
 
 type ProfileRow = {
   id: string;
@@ -34,16 +33,7 @@ type ProfileRow = {
   created_at: string;
 };
 
-type PayoutRow = {
-  id: string;
-  creator_id: string | null;
-  creator_name: string;
-  creator_email: string | null;
-  amount: number;
-  status: PayoutStatus;
-  auction_title: string | null;
-  requested_at: string;
-};
+type PayoutRow = Database['public']['Tables']['payouts']['Row'];
 
 function fail<T>(data: T, error: string): DataResult<T> {
   return { data, error };
@@ -61,10 +51,6 @@ function isProfileStatus(value: string): value is ProfileStatus {
   return value === 'active' || value === 'suspended';
 }
 
-function isPayoutStatus(value: string): value is PayoutStatus {
-  return value === 'pending' || value === 'paid';
-}
-
 function mapProfile(row: ProfileRow): ProfileItem | null {
   if (!isProfileRole(row.role) || !isProfileStatus(row.status)) {
     return null;
@@ -77,23 +63,6 @@ function mapProfile(row: ProfileRow): ProfileItem | null {
     role: row.role,
     status: row.status,
     createdAt: row.created_at,
-  };
-}
-
-function mapPayout(row: PayoutRow): PayoutItem | null {
-  if (!isPayoutStatus(row.status)) {
-    return null;
-  }
-
-  return {
-    id: row.id,
-    creatorId: row.creator_id ?? '',
-    creatorName: row.creator_name,
-    creatorEmail: row.creator_email ?? '',
-    amount: row.amount,
-    status: row.status,
-    auctionTitle: row.auction_title ?? '',
-    requestedAt: row.requested_at,
   };
 }
 
@@ -212,24 +181,7 @@ export async function getPayouts(): Promise<DataResult<PayoutItem[]>> {
 
   const started = Date.now();
   try {
-    const { data, error } = await supabase
-      .from('payouts')
-      .select(PAYOUT_COLUMNS)
-      .order('requested_at', { ascending: false });
-
-    if (error && isSchemaMismatch(error)) {
-      console.warn('[SponsorAuction] payouts 테이블이 없어 Mock으로 전환합니다.', error.message);
-      return getMockPayouts();
-    }
-
-    if (error) {
-      console.error('[SponsorAuction] 정산 목록 조회 실패:', error.message, error);
-      return fail([], '정산 목록을 불러오지 못했습니다.');
-    }
-
-    const payouts = (data ?? [])
-      .map((row) => mapPayout(row as PayoutRow))
-      .filter((item): item is PayoutItem => item !== null);
+    const payouts = await listPayoutsFromDatabase(supabase);
 
     if (payouts.length === 0) {
       return fail([], '정산 요청이 없습니다.');
@@ -237,6 +189,13 @@ export async function getPayouts(): Promise<DataResult<PayoutItem[]>> {
 
     return ok(payouts);
   } catch (error) {
+    if (error && typeof error === 'object' && 'message' in error) {
+      const message = String((error as { message?: string }).message ?? '');
+      if (isSchemaMismatch({ message, code: (error as { code?: string }).code })) {
+        console.warn('[SponsorAuction] payouts 테이블이 없어 Mock으로 전환합니다.', message);
+        return getMockPayouts();
+      }
+    }
     console.error('[SponsorAuction] 정산 목록 조회 예외:', error);
     return fail([], '정산 목록을 불러오지 못했습니다.');
   } finally {
@@ -255,33 +214,44 @@ export async function approvePayout(
 
   const started = Date.now();
   try {
-    if (!id.trim()) {
+    const target = id.trim();
+    if (!target) {
       return fail(null, '유효한 정산 ID가 필요합니다.');
     }
 
-    const { data, error } = await supabase
-      .from('payouts')
-      .update({ status: 'paid' })
-      .eq('id', id)
-      .eq('status', 'pending')
-      .select(PAYOUT_COLUMNS)
-      .maybeSingle();
+    const auctionId = target.startsWith('auction:') ? target.slice('auction:'.length) : target;
+    const attempts: Array<{ column: 'id' | 'payment_order_id' | 'auction_id'; value: string }> = [
+      { column: 'id', value: target },
+      { column: 'payment_order_id', value: target },
+      { column: 'auction_id', value: auctionId },
+    ];
 
-    if (!error && !data) {
-      return fail(null, VALIDATION.payoutAlready);
+    for (const attempt of attempts) {
+      const { data, error } = await supabase
+        .from('payouts')
+        .update({ status: 'paid' })
+        .eq(attempt.column, attempt.value)
+        .eq('status', 'pending')
+        .select(PAYOUT_COLUMNS)
+        .maybeSingle();
+
+      if (error && isSchemaMismatch(error) && attempt.column !== 'id') {
+        continue;
+      }
+      if (error) {
+        console.error('[SponsorAuction] 정산 승인 실패:', error.message, error);
+        return fail(null, ADMIN_UPDATE_FAIL_MESSAGE);
+      }
+      if (data) {
+        const mapped = mapPayout(data as PayoutRow);
+        if (!mapped) {
+          return fail(null, ADMIN_UPDATE_FAIL_MESSAGE);
+        }
+        return ok(mapped);
+      }
     }
 
-    if (error || !data) {
-      console.error('[SponsorAuction] 정산 승인 실패:', error?.message, error);
-      return fail(null, ADMIN_UPDATE_FAIL_MESSAGE);
-    }
-
-    const mapped = mapPayout(data as PayoutRow);
-    if (!mapped) {
-      return fail(null, ADMIN_UPDATE_FAIL_MESSAGE);
-    }
-
-    return ok(mapped);
+    return fail(null, VALIDATION.payoutAlready);
   } catch (error) {
     console.error('[SponsorAuction] 정산 승인 예외:', error);
     return fail(null, ADMIN_UPDATE_FAIL_MESSAGE);
