@@ -5,6 +5,7 @@ import {
   updateProfileStatus as updateMockProfileStatus,
 } from '@/lib/mock-data';
 import { withExclusiveAction } from '@/lib/action-lock';
+import { mockGetSession } from '@/lib/auth-mock';
 import { listPayoutsFromDatabase, markPayoutPaid } from '@/lib/payouts';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
@@ -200,20 +201,35 @@ export async function updateProfileStatus(
 }
 
 export async function getPayouts(): Promise<DataResult<PayoutItem[]>> {
-  const supabase = await getDataClient();
-  if (!supabase) {
-    return getMockPayouts();
-  }
-
   const started = Date.now();
   try {
-    const payouts = await listPayoutsFromDatabase(supabase);
-
-    if (payouts.length === 0) {
-      return fail([], '정산 요청이 없습니다.');
+    const mock = await mockGetSession();
+    if (mock.data) {
+      return getMockPayouts();
     }
 
-    return ok(payouts);
+    const response = await fetch('/api/admin/payouts', {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-store' },
+    });
+    const payload = await parseAdminJson(response);
+    if (response.ok && Array.isArray(payload?.data)) {
+      const payouts = (payload.data as PayoutItem[]).map((item) => ({
+        ...item,
+        status: item.status === 'paid' ? ('paid' as const) : item.status,
+      }));
+      if (payouts.length === 0) {
+        return fail([], '정산 요청이 없습니다.');
+      }
+      return ok(payouts);
+    }
+    if (payload?.fallbackMock || response.status === 409) {
+      return getMockPayouts();
+    }
+    if (!response.ok) {
+      return fail([], payload?.error || payload?.errorMessage || '정산 목록을 불러오지 못했습니다.');
+    }
   } catch (error) {
     if (error && typeof error === 'object' && 'message' in error) {
       const message = String((error as { message?: string }).message ?? '');
@@ -223,9 +239,24 @@ export async function getPayouts(): Promise<DataResult<PayoutItem[]>> {
       }
     }
     console.error('[SponsorAuction] 정산 목록 조회 예외:', error);
-    return fail([], '정산 목록을 불러오지 못했습니다.');
   } finally {
     console.info(`[SponsorAuction] 정산 목록 조회 종료 (${Date.now() - started}ms)`);
+  }
+
+  const supabase = await getDataClient();
+  if (!supabase) {
+    return getMockPayouts();
+  }
+
+  try {
+    const payouts = await listPayoutsFromDatabase(supabase);
+    if (payouts.length === 0) {
+      return fail([], '정산 요청이 없습니다.');
+    }
+    return ok(payouts);
+  } catch (error) {
+    console.error('[SponsorAuction] 정산 목록 조회 예외:', error);
+    return fail([], '정산 목록을 불러오지 못했습니다.');
   }
 }
 

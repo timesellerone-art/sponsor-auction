@@ -1,11 +1,17 @@
+import { revalidatePath, revalidateTag } from 'next/cache';
+import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
   forbiddenJson,
   getPaymentActor,
   unauthorizedJson,
 } from '@/lib/payments/guard';
-import { markPayoutPaid, type MarkPayoutPaidInput } from '@/lib/payouts';
+import { listPayoutsFromDatabase, markPayoutPaid, type MarkPayoutPaidInput } from '@/lib/payouts';
 import { createAdminClient } from '@/lib/supabase/admin';
+
+const NO_STORE = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate',
+} as const;
 
 function asText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
@@ -37,8 +43,52 @@ function parseInput(value: unknown): MarkPayoutPaidInput | null {
   };
 }
 
+export async function GET() {
+  try {
+    await connection();
+    const actor = await getPaymentActor();
+    if (!actor) {
+      return unauthorizedJson('정산을 조회하려면 로그인해 주세요.');
+    }
+    if (actor.role !== 'admin') {
+      return forbiddenJson('정산 목록은 관리자만 볼 수 있습니다.');
+    }
+
+    const client = createAdminClient();
+    if (!client) {
+      return NextResponse.json(
+        {
+          error: 'SUPABASE_SERVICE_ROLE_KEY가 없어 정산 목록을 DB에서 읽을 수 없습니다.',
+          errorMessage: 'SUPABASE_SERVICE_ROLE_KEY가 없어 정산 목록을 DB에서 읽을 수 없습니다.',
+          fallbackMock: true,
+        },
+        { status: 409, headers: NO_STORE },
+      );
+    }
+
+    const payouts = await listPayoutsFromDatabase(client);
+    return NextResponse.json(
+      { data: payouts },
+      { headers: NO_STORE },
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+          ? error
+          : '알 수 없는 오류';
+    console.error('[SponsorAuction] 관리자 정산 목록 API 예외', error);
+    return NextResponse.json(
+      { error: message, errorMessage: message },
+      { status: 500, headers: NO_STORE },
+    );
+  }
+}
+
 export async function POST(request: Request) {
   try {
+    await connection();
     const actor = await getPaymentActor();
     if (!actor) {
       return unauthorizedJson('정산을 처리하려면 로그인해 주세요.');
@@ -85,10 +135,16 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
-      data: result.data,
-      status: result.data.status,
-    });
+    revalidatePath('/admin');
+    revalidateTag('payouts', { expire: 0 });
+
+    return NextResponse.json(
+      {
+        data: result.data,
+        status: result.data.status,
+      },
+      { headers: NO_STORE },
+    );
   } catch (error) {
     const message =
       error instanceof Error

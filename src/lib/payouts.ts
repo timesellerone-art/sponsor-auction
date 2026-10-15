@@ -392,6 +392,32 @@ export async function upsertPaidPayout(
   }
 }
 
+function settlePaidStatus(existing: PayoutItem[], list: PayoutItem[]) {
+  const paid = existing.filter((item) => item.status === 'paid');
+  return list.map((item) => {
+    if (item.status === 'paid') {
+      return item;
+    }
+    const match = paid.find(
+      (row) =>
+        payoutsMatch(row, item) ||
+        (row.paymentOrderId &&
+          item.paymentOrderId &&
+          row.paymentOrderId === item.paymentOrderId) ||
+        (row.auctionId && item.auctionId && row.auctionId === item.auctionId),
+    );
+    if (!match) {
+      return item;
+    }
+    return {
+      ...item,
+      ...match,
+      status: 'paid' as const,
+      paidAt: match.paidAt ?? item.paidAt,
+    };
+  });
+}
+
 export async function listPayoutsFromDatabase(
   client: SponsorAuctionClient,
 ): Promise<PayoutItem[]> {
@@ -458,6 +484,17 @@ export async function listPayoutsFromDatabase(
   const pendingInserts: PayoutInsert[] = [];
   const virtual: PayoutItem[] = [];
   const seen = new Set(existing.flatMap((row) => payoutKeys(row)));
+  const paidExisting = existing.filter((row) => row.status === 'paid');
+
+  const matchesPaid = (item: PayoutItem) =>
+    paidExisting.some(
+      (row) =>
+        payoutsMatch(row, item) ||
+        (row.paymentOrderId &&
+          item.paymentOrderId &&
+          row.paymentOrderId === item.paymentOrderId) ||
+        (row.auctionId && item.auctionId && row.auctionId === item.auctionId),
+    );
 
   const consider = (insert: PayoutInsert | null, fallbackId: string) => {
     if (!insert) {
@@ -468,7 +505,7 @@ export async function listPayoutsFromDatabase(
       return;
     }
     const keys = [...payoutKeys(item), `id:${fallbackId}`];
-    if (keys.some((key) => seen.has(key))) {
+    if (keys.some((key) => seen.has(key)) || matchesPaid(item)) {
       return;
     }
     keys.forEach((key) => seen.add(key));
@@ -545,13 +582,14 @@ export async function listPayoutsFromDatabase(
     }
 
     try {
-      return mergePayoutLists(await selectPayouts(client), virtual);
+      const latest = await selectPayouts(client);
+      return settlePaidStatus(latest, mergePayoutLists(latest, virtual));
     } catch {
-      return mergePayoutLists(existing, virtual);
+      return settlePaidStatus(existing, mergePayoutLists(existing, virtual));
     }
   }
 
-  return mergePayoutLists(existing, virtual);
+  return settlePaidStatus(existing, mergePayoutLists(existing, virtual));
 }
 
 export type MarkPayoutPaidInput = {
@@ -876,6 +914,19 @@ export async function markPayoutPaid(
       bidId,
       amount,
     });
+    return persisted;
   }
+
+  if (paymentOrderId) {
+    const paymentSync = await client
+      .from('payments')
+      .update({ status: 'confirmed' })
+      .eq('order_id', paymentOrderId)
+      .neq('status', 'confirmed');
+    if (paymentSync.error && !isSchemaMismatch(paymentSync.error)) {
+      console.warn('[SponsorAuction] payments 상태 동기화 실패', paymentSync.error.message);
+    }
+  }
+
   return persisted;
 }
