@@ -176,6 +176,8 @@ alter table if exists public.payouts
   add column if not exists auction_id text;
 alter table if exists public.payouts
   add column if not exists bid_id text;
+alter table if exists public.payouts
+  add column if not exists paid_at timestamptz;
 
 do $$
 begin

@@ -458,6 +458,7 @@ export function AdminDashboard() {
           <AdminBidTable
             bids={asBidList(bids)}
             auctions={asAuctionList(auctions)}
+            payouts={asPayoutList(payouts)}
           />
         )}
       </div>

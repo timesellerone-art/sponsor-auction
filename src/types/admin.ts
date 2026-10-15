@@ -22,9 +22,15 @@ export interface PayoutItem {
   status: PayoutStatus;
   auctionTitle: string;
   requestedAt: string;
+  paidAt?: string | null;
   paymentOrderId?: string | null;
   auctionId?: string | null;
   bidId?: string | null;
+  bidAmount?: number;
+  platformFee?: number;
+  advertiserCharge?: number;
 }
+
+export type PayoutPeriodFilter = 'all' | 'today' | '7d' | 'month' | 'range';
 
 export type AuctionAdminFilter = 'all' | 'active' | 'closed' | 'blind';

@@ -106,11 +106,39 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
   }
 }
 
+async function parseAdminJson(response: Response) {
+  return (await response.json().catch(() => null)) as {
+    data?: unknown;
+    error?: string;
+    fallbackMock?: boolean;
+  } | null;
+}
+
 export async function updateProfileStatus(
   id: string,
   status: ProfileStatus,
 ): Promise<DataResult<ProfileItem | null>> {
   return withExclusiveAction(`profile:${id}`, fail(null, VALIDATION.actionInFlight), async () => {
+  try {
+    const response = await fetch('/api/admin/profiles/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status }),
+    });
+    const payload = await parseAdminJson(response);
+    if (response.ok && payload?.data && typeof payload.data === 'object') {
+      const row = payload.data as ProfileItem;
+      if (row.id && row.status) {
+        return ok(row);
+      }
+    }
+    if (!payload?.fallbackMock && response.status !== 409 && !response.ok) {
+      return fail(null, payload?.error ?? ADMIN_UPDATE_FAIL_MESSAGE);
+    }
+  } catch (error) {
+    console.warn('[SponsorAuction] 회원 상태 API 호출 실패, Mock으로 저장합니다.', error);
+  }
+
   const supabase = await getDataClient();
   if (!supabase) {
     return updateMockProfileStatus(id, status);
@@ -207,6 +235,26 @@ export async function approvePayout(
   id: string,
 ): Promise<DataResult<PayoutItem | null>> {
   return withExclusiveAction(`payout:${id}`, fail(null, VALIDATION.actionInFlight), async () => {
+  try {
+    const response = await fetch('/api/admin/payouts/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    const payload = await parseAdminJson(response);
+    if (response.ok && payload?.data && typeof payload.data === 'object') {
+      const mapped = payload.data as PayoutItem;
+      if (mapped.id) {
+        return ok(mapped);
+      }
+    }
+    if (!payload?.fallbackMock && response.status !== 409 && !response.ok) {
+      return fail(null, payload?.error ?? ADMIN_UPDATE_FAIL_MESSAGE);
+    }
+  } catch (error) {
+    console.warn('[SponsorAuction] 정산 API 호출 실패, Mock으로 저장합니다.', error);
+  }
+
   const supabase = await getDataClient();
   if (!supabase) {
     return approveMockPayout(id);

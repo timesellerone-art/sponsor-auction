@@ -309,6 +309,8 @@ export const mockPayouts: PayoutItem[] = [
 
 const AUCTIONS_STORAGE_KEY = 'sponsor-auction-mock-auctions';
 const BIDS_STORAGE_KEY = 'sponsor-auction-mock-bids';
+const PROFILES_STORAGE_KEY = 'sponsor-auction-mock-profiles';
+const PAYOUTS_STORAGE_KEY = 'sponsor-auction-mock-payouts';
 
 function readPersistedList<T>(key: string, fallback: T[]): T[] {
   if (typeof window === 'undefined') {
@@ -341,10 +343,23 @@ function persistCampaignStores() {
   }
 }
 
+function persistAdminStores() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(PROFILES_STORAGE_KEY, JSON.stringify(profilesStore));
+    window.localStorage.setItem(PAYOUTS_STORAGE_KEY, JSON.stringify(payoutsStore));
+  } catch {
+    // 저장 실패해도 이번 세션 메모리 값은 유지합니다.
+  }
+}
+
 let auctionsStore: AuctionItem[] = readPersistedList(AUCTIONS_STORAGE_KEY, mockAuctions);
 let bidsStore: BidItem[] = readPersistedList(BIDS_STORAGE_KEY, mockBids);
-let profilesStore: ProfileItem[] = [...mockProfiles];
-let payoutsStore: PayoutItem[] = [...mockPayouts];
+let profilesStore: ProfileItem[] = readPersistedList(PROFILES_STORAGE_KEY, mockProfiles);
+let payoutsStore: PayoutItem[] = readPersistedList(PAYOUTS_STORAGE_KEY, mockPayouts);
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
@@ -865,6 +880,7 @@ export async function updateProfileStatus(
     profilesStore = profilesStore.map((item) =>
       item.id === id ? updated : item,
     );
+    persistAdminStores();
     return ok(updated);
   } catch (error) {
     const message =
@@ -950,7 +966,11 @@ export async function approvePayout(
       return fail(null, VALIDATION.payoutAlready);
     }
 
-    const updated: PayoutItem = { ...current, status: 'paid' };
+    const updated: PayoutItem = {
+      ...current,
+      status: 'paid',
+      paidAt: new Date().toISOString(),
+    };
     if (payoutsStore.some((item) => item.id === id)) {
       payoutsStore = payoutsStore.map((item) =>
         item.id === id ? updated : item,
@@ -958,6 +978,7 @@ export async function approvePayout(
     } else {
       payoutsStore = [...payoutsStore, updated];
     }
+    persistAdminStores();
     return ok(updated);
   } catch (error) {
     const message =

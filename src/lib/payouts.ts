@@ -1,11 +1,17 @@
-import { creatorPayoutAmount, creatorPayoutFromCharge } from '@/lib/fees';
+import {
+  advertiserPayableAmount,
+  bidAmountFromCreatorPayout,
+  creatorPayoutAmount,
+  creatorPayoutFromCharge,
+  platformFeeFromAmount,
+} from '@/lib/fees';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import type { PayoutItem, PayoutStatus } from '@/types/admin';
 import type { Database } from '@/types/database';
 import type { SponsorAuctionClient } from '@/lib/supabase';
 
 export const PAYOUT_COLUMNS =
-  'id, creator_id, creator_name, creator_email, amount, status, auction_title, requested_at, payment_order_id, auction_id, bid_id';
+  'id, creator_id, creator_name, creator_email, amount, status, auction_title, requested_at, paid_at, payment_order_id, auction_id, bid_id';
 
 export const PAYOUT_COLUMNS_CORE =
   'id, creator_id, creator_name, creator_email, amount, status, auction_title, requested_at';
@@ -37,18 +43,24 @@ export function mapPayout(row: Partial<PayoutRow> & Pick<PayoutRow, 'id' | 'stat
     return null;
   }
 
+  const amount = row.amount ?? 0;
+  const bidAmount = bidAmountFromCreatorPayout(amount);
   return {
     id: row.id,
     creatorId: row.creator_id ?? '',
     creatorName: row.creator_name ?? '이름 없음',
     creatorEmail: row.creator_email ?? '',
-    amount: row.amount ?? 0,
+    amount,
     status: row.status,
     auctionTitle: row.auction_title ?? '',
     requestedAt: row.requested_at ?? '',
+    paidAt: row.paid_at ?? null,
     paymentOrderId: row.payment_order_id ?? null,
     auctionId: row.auction_id ?? null,
     bidId: row.bid_id ?? null,
+    bidAmount,
+    platformFee: platformFeeFromAmount(bidAmount),
+    advertiserCharge: advertiserPayableAmount(bidAmount),
   };
 }
 
@@ -236,6 +248,7 @@ function virtualFromInsert(row: PayoutInsert, fallbackId: string): PayoutItem | 
     status: row.status ?? 'pending',
     auction_title: row.auction_title ?? '',
     requested_at: row.requested_at ?? new Date().toISOString(),
+    paid_at: row.paid_at ?? null,
     payment_order_id: row.payment_order_id ?? null,
     auction_id: row.auction_id ?? null,
     bid_id: row.bid_id ?? null,
