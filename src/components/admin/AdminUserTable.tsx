@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
-import { formatDate } from '@/lib/utils';
+import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
+import { formatAdminTimestamp } from '@/lib/utils';
 import type { ProfileAdminFilter, ProfileItem, ProfileRole, ProfileStatus } from '@/types/admin';
 
 const ROLE_LABEL: Record<ProfileRole, string> = {
@@ -37,13 +38,14 @@ export function AdminUserTable({
 }: AdminUserTableProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ProfileAdminFilter>('all');
+  const [sort, setSort] = useState<AdminListSort>('newest');
 
   const filtered = useMemo(() => {
     if (!Array.isArray(profiles)) {
       return [];
     }
     const keyword = query.trim().toLowerCase();
-    return profiles.filter((profile) => {
+    const matched = profiles.filter((profile) => {
       if (filter !== 'all' && profile.status !== filter) {
         return false;
       }
@@ -54,7 +56,13 @@ export function AdminUserTable({
       const email = (profile.email || '').toLowerCase();
       return name.includes(keyword) || email.includes(keyword);
     });
-  }, [filter, profiles, query]);
+    return sortByAdminList(
+      matched,
+      sort,
+      (profile) => profile.createdAt,
+      () => 0,
+    );
+  }, [filter, profiles, query, sort]);
 
   if (!Array.isArray(profiles) || profiles.length === 0) {
     return <AdminEmptyState message="등록된 회원이 없습니다." />;
@@ -70,6 +78,30 @@ export function AdminUserTable({
         filters={FILTERS}
         filter={filter}
         onFilterChange={setFilter}
+        sort={sort}
+        onSortChange={setSort}
+        actions={
+          <button
+            type="button"
+            onClick={() => {
+              downloadCsv(
+                `users-${new Date().toISOString().slice(0, 10)}.csv`,
+                ['이름', '이메일', '역할', '상태', '가입일시'],
+                filtered.map((profile) => [
+                  profile.name,
+                  profile.email,
+                  ROLE_LABEL[profile.role] ?? profile.role,
+                  STATUS_LABEL[profile.status] ?? profile.status,
+                  formatAdminTimestamp(profile.createdAt),
+                ]),
+              );
+            }}
+            className="inline-flex h-10 shrink-0 items-center gap-1 rounded-xl border border-zinc-200 px-3 text-xs font-semibold whitespace-nowrap text-zinc-700 hover:bg-zinc-50"
+          >
+            <Download className="size-3.5" aria-hidden />
+            엑셀/CSV 다운로드
+          </button>
+        }
       />
       {filtered.length === 0 ? (
         <div className="p-4">
@@ -124,7 +156,7 @@ export function AdminUserTable({
                       {ROLE_LABEL[role] ?? role}
                     </td>
                     <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
-                      {formatDate(profile.createdAt)}
+                      {formatAdminTimestamp(profile.createdAt)}
                     </td>
                     <td className="min-w-0 px-4 py-3 align-top">
                       <span

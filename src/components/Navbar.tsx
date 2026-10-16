@@ -182,7 +182,7 @@ export function Navbar() {
       {open ? (
         <button
           type="button"
-          className="fixed inset-0 top-14 z-40 bg-zinc-950/30 md:hidden"
+          className="fixed inset-0 top-14 z-40 bg-zinc-950/30 sm:top-16 md:hidden"
           aria-label="메뉴 닫기"
           onClick={() => setOpen(false)}
         />

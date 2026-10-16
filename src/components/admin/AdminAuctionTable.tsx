@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Loader2 } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
+import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
 import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
-import { formatDate, formatWon } from '@/lib/utils';
+import { formatAdminTimestamp, formatWon } from '@/lib/utils';
 import type { AuctionAdminFilter, ProfileItem } from '@/types/admin';
 import type { AuctionItem } from '@/types/auction';
 
@@ -59,6 +60,7 @@ export function AdminAuctionTable({
 }: AdminAuctionTableProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<AuctionAdminFilter>('all');
+  const [sort, setSort] = useState<AdminListSort>('newest');
   const emailByAuthor = useMemo(() => {
     const map = new Map<string, string>();
     for (const profile of profiles) {
@@ -74,7 +76,7 @@ export function AdminAuctionTable({
     }
 
     const keyword = query.trim().toLowerCase();
-    return auctions.filter((auction) => {
+    const matched = auctions.filter((auction) => {
       if (!matchesFilter(auction, filter)) {
         return false;
       }
@@ -97,7 +99,13 @@ export function AdminAuctionTable({
         email.includes(keyword)
       );
     });
-  }, [auctions, emailByAuthor, filter, query]);
+    return sortByAdminList(
+      matched,
+      sort,
+      (auction) => auction.createdAt,
+      (auction) => auction.budget,
+    );
+  }, [auctions, emailByAuthor, filter, query, sort]);
 
   return (
     <div className="w-full min-w-0 rounded-2xl border border-zinc-200 bg-white">
@@ -109,6 +117,30 @@ export function AdminAuctionTable({
         filters={FILTERS}
         filter={filter}
         onFilterChange={setFilter}
+        sort={sort}
+        onSortChange={setSort}
+        actions={
+          <button
+            type="button"
+            onClick={() => {
+              downloadCsv(
+                `auctions-${new Date().toISOString().slice(0, 10)}.csv`,
+                ['제목', '작성자', '예산', '상태', '생성일시'],
+                filtered.map((auction) => [
+                  auction.title,
+                  auction.authorName,
+                  auction.budget,
+                  isBlinded(auction) ? '블라인드' : (STATUS_LABEL[auction.status] ?? auction.status),
+                  formatAdminTimestamp(auction.createdAt),
+                ]),
+              );
+            }}
+            className="inline-flex h-10 shrink-0 items-center gap-1 rounded-xl border border-zinc-200 px-3 text-xs font-semibold whitespace-nowrap text-zinc-700 hover:bg-zinc-50"
+          >
+            <Download className="size-3.5" aria-hidden />
+            엑셀/CSV 다운로드
+          </button>
+        }
       />
 
       {filtered.length === 0 ? (
@@ -170,7 +202,7 @@ export function AdminAuctionTable({
                       {blinded ? '블라인드' : (STATUS_LABEL[status] ?? status)}
                     </td>
                     <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
-                      {formatDate(auction.createdAt)}
+                      {formatAdminTimestamp(auction.createdAt)}
                     </td>
                     <td className="min-w-0 px-4 py-3 align-top">
                       <div className="flex flex-wrap gap-2">

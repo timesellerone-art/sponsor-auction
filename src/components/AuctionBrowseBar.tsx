@@ -34,7 +34,7 @@ export function AuctionBrowseBar({
   onSortChange,
 }: AuctionBrowseBarProps) {
   return (
-    <div className="flex min-w-0 flex-col gap-3 overflow-x-clip" role="search">
+    <div className="flex min-w-0 flex-col gap-3" role="search">
       <label className="relative block min-w-0">
         <span className="sr-only">캠페인 제목 또는 설명 검색</span>
         <Search
@@ -50,8 +50,8 @@ export function AuctionBrowseBar({
         />
       </label>
 
-      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto whitespace-nowrap pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto overscroll-x-contain whitespace-nowrap pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {PLATFORMS.map((item) => (
             <button
               key={item.id}

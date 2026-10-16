@@ -165,17 +165,17 @@ export function AuctionCard({
 
   return (
     <article className="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
-      <div className="flex min-w-0 items-start justify-between gap-2">
+      <div className="flex min-w-0 items-start gap-2">
         <span
           className={cn(
-            'inline-flex min-w-0 max-w-[calc(100%-5.5rem)] items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold sm:max-w-[70%] sm:px-2.5 sm:text-xs',
+            'inline-flex min-w-0 flex-1 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold sm:px-2.5 sm:text-xs',
             platformInfo.className,
           )}
         >
           <PlatformIcon className="size-3.5 shrink-0" aria-hidden />
           <span className="min-w-0 truncate">{platformInfo.label}</span>
         </span>
-        <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="flex max-w-[48%] shrink-0 flex-col items-end gap-1">
           {owned ? (
             <span className="rounded-full bg-teal-700 px-2 py-1 text-[11px] font-semibold text-white">
               내 캠페인

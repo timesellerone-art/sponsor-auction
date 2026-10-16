@@ -291,55 +291,56 @@ export function AdminPayoutTable({
               </button>
             </>
           }
+          extra={
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="flex min-w-0 gap-1 overflow-x-auto rounded-full bg-zinc-100 p-1">
+                {PERIODS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setPeriod(item.id)}
+                    className={
+                      period === item.id
+                        ? 'h-8 shrink-0 rounded-full bg-white px-3 text-xs font-semibold text-zinc-950 shadow-sm'
+                        : 'h-8 shrink-0 rounded-full px-3 text-xs font-semibold text-zinc-500'
+                    }
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              {period === 'range' ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <label className="flex min-w-0 items-center gap-2 text-xs text-zinc-500">
+                    시작
+                    <input
+                      type="date"
+                      value={rangeFrom}
+                      onChange={(event) => setRangeFrom(event.target.value)}
+                      className="h-9 rounded-xl border border-zinc-200 px-2 text-sm text-zinc-900"
+                    />
+                  </label>
+                  <label className="flex min-w-0 items-center gap-2 text-xs text-zinc-500">
+                    종료
+                    <input
+                      type="date"
+                      value={rangeTo}
+                      onChange={(event) => setRangeTo(event.target.value)}
+                      className="h-9 rounded-xl border border-zinc-200 px-2 text-sm text-zinc-900"
+                    />
+                  </label>
+                </div>
+              ) : null}
+            </div>
+          }
         />
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="flex min-w-0 gap-1 overflow-x-auto rounded-full bg-zinc-100 p-1">
-          {PERIODS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setPeriod(item.id)}
-              className={
-                period === item.id
-                  ? 'h-8 shrink-0 rounded-full bg-white px-3 text-xs font-semibold text-zinc-950 shadow-sm'
-                  : 'h-8 shrink-0 rounded-full px-3 text-xs font-semibold text-zinc-500'
-              }
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        {period === 'range' ? (
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <label className="flex min-w-0 items-center gap-2 text-xs text-zinc-500">
-              시작
-              <input
-                type="date"
-                value={rangeFrom}
-                onChange={(event) => setRangeFrom(event.target.value)}
-                className="h-9 rounded-xl border border-zinc-200 px-2 text-sm text-zinc-900"
-              />
-            </label>
-            <label className="flex min-w-0 items-center gap-2 text-xs text-zinc-500">
-              종료
-              <input
-                type="date"
-                value={rangeTo}
-                onChange={(event) => setRangeTo(event.target.value)}
-                className="h-9 rounded-xl border border-zinc-200 px-2 text-sm text-zinc-900"
-              />
-            </label>
-          </div>
-        ) : null}
-      </div>
 
       {filtered.length === 0 ? (
-        <AdminEmptyState message="선택한 기간의 정산 내역이 없습니다." />
+        <div className="p-4">
+          <AdminEmptyState message="선택한 기간의 정산 내역이 없습니다." />
+        </div>
       ) : (
-        <div className="w-full min-w-0 rounded-2xl border border-zinc-200 bg-white">
-          <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto">
+        <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto">
             <table className="w-full min-w-[1560px] table-fixed text-left text-sm">
               <colgroup>
                 <col className="w-[3%]" />
@@ -530,8 +531,8 @@ export function AdminPayoutTable({
               </tbody>
             </table>
           </div>
-        </div>
       )}
+      </div>
       {taxPayout ? (
         <AdminPayoutTaxModal payout={taxPayout} onClose={() => setTaxPayout(null)} />
       ) : null}
