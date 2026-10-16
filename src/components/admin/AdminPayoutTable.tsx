@@ -6,6 +6,7 @@ import { Download, Loader2 } from 'lucide-react';
 import { AdminCopyText } from '@/components/admin/AdminCopyText';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
+import { AdminPayoutTaxModal } from '@/components/admin/AdminPayoutTaxModal';
 import { showToast } from '@/components/Toast';
 import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
 import {
@@ -69,6 +70,7 @@ export function AdminPayoutTable({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({});
   const [memoBusyId, setMemoBusyId] = useState<string | null>(null);
+  const [taxPayout, setTaxPayout] = useState<PayoutItem | null>(null);
   const [rows, setRows] = useState<PayoutItem[]>(() =>
     Array.isArray(payouts) ? payouts : [],
   );
@@ -172,13 +174,35 @@ export function AdminPayoutTable({
   const handleExport = () => {
     downloadCsv(
       `payouts-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['크리에이터', '이메일', '계좌', '캠페인', '처리일시', '실지급액', '입찰금액', '상태', '메모'],
+      [
+        '크리에이터',
+        '이메일',
+        '계좌',
+        '캠페인',
+        '처리일시',
+        '공급가액',
+        '부가세',
+        '원천징수액',
+        '3.3% 공제액',
+        '플랫폼수수료',
+        '최종정산액',
+        '실지급액',
+        '입찰금액',
+        '상태',
+        '메모',
+      ],
       filtered.map((item) => [
         item.creatorName,
         item.creatorEmail,
         item.bankAccount || '',
         item.auctionTitle,
         formatAdminTimestamp(item.paidAt || item.requestedAt),
+        item.supplyAmount ?? '',
+        item.vatAmount ?? '',
+        item.withholdingAmount ?? '',
+        item.withholdingAmount ?? '',
+        item.platformFee ?? '',
+        item.netPayoutAmount ?? item.amount,
         item.amount,
         item.bidAmount ?? '',
         STATUS_LABEL[item.status],
@@ -316,17 +340,21 @@ export function AdminPayoutTable({
       ) : (
         <div className="w-full min-w-0 rounded-2xl border border-zinc-200 bg-white">
           <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto">
-            <table className="w-full min-w-[1280px] table-fixed text-left text-sm">
+            <table className="w-full min-w-[1560px] table-fixed text-left text-sm">
               <colgroup>
-                <col className="w-[4%]" />
-                <col className="w-[14%]" />
-                <col className="w-[14%]" />
+                <col className="w-[3%]" />
                 <col className="w-[12%]" />
-                <col className="w-[10%]" />
-                <col className="w-[10%]" />
+                <col className="w-[12%]" />
+                <col className="w-[9%]" />
+                <col className="w-[8%]" />
+                <col className="w-[7%]" />
                 <col className="w-[8%]" />
                 <col className="w-[8%]" />
-                <col className="w-[20%]" />
+                <col className="w-[7%]" />
+                <col className="w-[7%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+                <col className="w-[12%]" />
               </colgroup>
               <thead className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
                 <tr>
@@ -347,6 +375,10 @@ export function AdminPayoutTable({
                   <th className="px-4 py-3 font-medium">크리에이터</th>
                   <th className="px-4 py-3 font-medium">캠페인</th>
                   <th className="px-4 py-3 font-medium">처리 일시</th>
+                  <th className="px-4 py-3 font-medium">공급가액</th>
+                  <th className="px-4 py-3 font-medium">부가세</th>
+                  <th className="px-4 py-3 font-medium">3.3% 공제액</th>
+                  <th className="px-4 py-3 font-medium">최종 정산액</th>
                   <th className="px-4 py-3 font-medium">수수료(공제액)</th>
                   <th className="px-4 py-3 font-medium">실지급액</th>
                   <th className="px-4 py-3 font-medium">상태</th>
@@ -415,6 +447,18 @@ export function AdminPayoutTable({
                         {formatAdminTimestamp(row.paidAt || row.requestedAt)}
                       </td>
                       <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                        {formatWon(row.supplyAmount ?? 0)}
+                      </td>
+                      <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                        {formatWon(row.vatAmount ?? 0)}
+                      </td>
+                      <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                        {formatWon(row.withholdingAmount ?? 0)}
+                      </td>
+                      <td className="min-w-0 px-4 py-3 align-top font-medium whitespace-nowrap text-zinc-950">
+                        {formatWon(row.netPayoutAmount ?? row.amount)}
+                      </td>
+                      <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
                         {formatWon(row.platformFee ?? 0)}
                       </td>
                       <td className="min-w-0 px-4 py-3 align-top font-medium whitespace-nowrap text-zinc-950">
@@ -432,21 +476,30 @@ export function AdminPayoutTable({
                         </span>
                       </td>
                       <td className="min-w-0 px-4 py-3 align-top">
-                        {pending ? (
+                        <div className="flex flex-col gap-1">
+                          {pending ? (
+                            <button
+                              type="button"
+                              disabled={anyBusy}
+                              onClick={() => {
+                                void handleApprove(payout);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-full border border-teal-200 px-3 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+                              {busy ? '처리 중...' : '지급 처리'}
+                            </button>
+                          ) : (
+                            <span className="text-xs font-semibold text-zinc-400">지급 완료</span>
+                          )}
                           <button
                             type="button"
-                            disabled={anyBusy}
-                            onClick={() => {
-                              void handleApprove(payout);
-                            }}
-                            className="inline-flex items-center gap-1 rounded-full border border-teal-200 px-3 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => setTaxPayout(row)}
+                            className="inline-flex items-center rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
                           >
-                            {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-                            {busy ? '처리 중...' : '지급 처리'}
+                            세무 상세
                           </button>
-                        ) : (
-                          <span className="text-xs font-semibold text-zinc-400">지급 완료</span>
-                        )}
+                        </div>
                       </td>
                       <td className="min-w-0 px-4 py-3 align-top">
                         <div className="flex min-w-0 flex-col gap-1">
@@ -479,6 +532,9 @@ export function AdminPayoutTable({
           </div>
         </div>
       )}
+      {taxPayout ? (
+        <AdminPayoutTaxModal payout={taxPayout} onClose={() => setTaxPayout(null)} />
+      ) : null}
     </div>
   );
 }

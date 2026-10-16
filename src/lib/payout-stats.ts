@@ -3,6 +3,7 @@ import {
   bidAmountFromCreatorPayout,
   platformFeeFromAmount,
 } from '@/lib/fees';
+import { describeSettlementTax } from '@/lib/tax';
 import type { PayoutItem, PayoutPeriodFilter } from '@/types/admin';
 
 function startOfLocalDay(date: Date) {
@@ -20,11 +21,16 @@ export function enrichPayout(item: PayoutItem): PayoutItem {
     item.bidAmount && item.bidAmount > 0
       ? item.bidAmount
       : bidAmountFromCreatorPayout(item.amount);
+  const tax = describeSettlementTax(bidAmount);
   return {
     ...item,
     bidAmount,
     platformFee: item.platformFee ?? platformFeeFromAmount(bidAmount),
     advertiserCharge: item.advertiserCharge ?? advertiserPayableAmount(bidAmount),
+    supplyAmount: item.supplyAmount ?? tax.advertiser.supplyAmount,
+    vatAmount: item.vatAmount ?? tax.advertiser.vatAmount,
+    withholdingAmount: item.withholdingAmount ?? tax.creator.withholdingAmount,
+    netPayoutAmount: item.netPayoutAmount ?? tax.creator.netPayout,
   };
 }
 

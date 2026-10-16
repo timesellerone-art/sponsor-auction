@@ -31,6 +31,10 @@ export interface PayoutItem {
   advertiserCharge?: number;
   adminMemo?: string;
   bankAccount?: string;
+  supplyAmount?: number;
+  vatAmount?: number;
+  withholdingAmount?: number;
+  netPayoutAmount?: number;
 }
 
 export type PayoutPeriodFilter = 'all' | 'today' | '7d' | 'month' | 'range';

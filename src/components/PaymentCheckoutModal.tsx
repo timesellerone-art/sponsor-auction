@@ -15,6 +15,7 @@ import {
   serializePaymentError,
   type PaymentErrorInfo,
 } from '@/lib/payments/errors';
+import { splitAdvertiserInvoiceFromTotal } from '@/lib/tax';
 import { cn, formatWon } from '@/lib/utils';
 import type { TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
 import type { PaymentMethod, PreparePaymentResult } from '@/types/payment';
@@ -147,6 +148,7 @@ export function PaymentCheckoutModal({
   const clientKey = resolveClientKey(checkout);
   const isDemoCheckout = !clientKey;
   const useToss = Boolean(widgetsRef.current) && !isDemoCheckout && !loadError;
+  const advertiserInvoice = splitAdvertiserInvoiceFromTotal(checkout.amount);
 
   const handlePay = async () => {
     if (busy || !ready) {
@@ -269,7 +271,8 @@ export function PaymentCheckoutModal({
               {formatWon(checkout.amount)}
             </p>
             <p className="mt-1 text-xs text-zinc-500">
-              제안 금액 + 10% 안전결제 수수료. 결제 완료 후에만 낙찰이 확정됩니다.
+              공급가액 {formatWon(advertiserInvoice.supplyAmount)} + 부가세 10%{' '}
+              {formatWon(advertiserInvoice.vatAmount)}. 결제 완료 후에만 낙찰이 확정됩니다.
             </p>
           </div>
 

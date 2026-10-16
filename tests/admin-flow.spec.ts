@@ -190,6 +190,18 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(table.getByRole('columnheader', { name: '크리에이터' })).toBeVisible();
     await expect(table.getByRole('columnheader', { name: '실지급액' })).toBeVisible();
     await expect(table.getByRole('columnheader', { name: '수수료(공제액)' })).toBeVisible();
+    await expect(table.getByRole('columnheader', { name: '공급가액' })).toBeVisible();
+    await expect(table.getByRole('columnheader', { name: '부가세' })).toBeVisible();
+    await expect(table.getByRole('columnheader', { name: '3.3% 공제액' })).toBeVisible();
+    await expect(table.getByRole('columnheader', { name: '최종 정산액' })).toBeVisible();
+    await page.getByRole('button', { name: '세무 상세' }).first().click();
+    const taxDialog = page.getByRole('dialog', { name: '세무 내역' });
+    await expect(taxDialog).toBeVisible();
+    await expect(taxDialog.getByText('공급가액')).toBeVisible();
+    await expect(taxDialog.getByText('부가세(10%)')).toBeVisible();
+    await expect(taxDialog.getByText('3.3% 공제액')).toBeVisible();
+    await expect(taxDialog.getByText('최종 실지급액')).toBeVisible();
+    await taxDialog.getByRole('button', { name: '닫기' }).click();
     await expect(page.getByText('민지쇼츠').first()).toBeVisible();
     await expect(page.getByText(CLOSED_AUCTION).first()).toBeVisible();
     await expect(page.getByText('지급 대기').first()).toBeVisible();

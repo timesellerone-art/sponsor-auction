@@ -217,6 +217,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      tax_invoice_logs: {
+        Row: {
+          id: string;
+          payout_id: string | null;
+          payment_order_id: string | null;
+          auction_id: string | null;
+          bid_id: string | null;
+          supply_amount: number;
+          vat_amount: number;
+          withholding_amount: number;
+          net_payout: number;
+          status: string;
+          provider: string;
+          mgt_key: string | null;
+          payload: Record<string, string | number | boolean | null> | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          payout_id?: string | null;
+          payment_order_id?: string | null;
+          auction_id?: string | null;
+          bid_id?: string | null;
+          supply_amount: number;
+          vat_amount: number;
+          withholding_amount: number;
+          net_payout: number;
+          status?: string;
+          provider?: string;
+          mgt_key?: string | null;
+          payload?: Record<string, string | number | boolean | null> | null;
+          created_at?: string;
+        };
+        Update: {
+          status?: string;
+          mgt_key?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

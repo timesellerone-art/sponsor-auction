@@ -629,6 +629,32 @@ grant execute on function public.is_admin() to authenticated, service_role;
 grant select on public.profiles to authenticated;
 grant select, insert, update on public.payouts to authenticated, service_role;
 
+create table if not exists public.tax_invoice_logs (
+  id uuid primary key default gen_random_uuid(),
+  payout_id text,
+  payment_order_id text,
+  auction_id text,
+  bid_id text,
+  supply_amount integer not null default 0,
+  vat_amount integer not null default 0,
+  withholding_amount integer not null default 0,
+  net_payout integer not null default 0,
+  status text not null default 'fallback',
+  provider text not null default 'popbill',
+  mgt_key text,
+  payload jsonb,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.tax_invoice_logs enable row level security;
+drop policy if exists "tax_invoice_logs_admin" on public.tax_invoice_logs;
+create policy "tax_invoice_logs_admin"
+on public.tax_invoice_logs for all
+to authenticated, service_role
+using (public.is_admin() or auth.role() = 'service_role')
+with check (public.is_admin() or auth.role() = 'service_role');
+grant select, insert on public.tax_invoice_logs to authenticated, service_role;
+
 revoke insert, update, delete on public.auctions from anon;
 revoke insert, update, delete on public.bids from anon;
 revoke select on public.profiles from anon;
