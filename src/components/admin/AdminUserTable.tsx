@@ -109,7 +109,7 @@ export function AdminUserTable({
         </div>
       ) : (
         <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto">
-          <table className="w-full min-w-[760px] table-fixed text-left text-sm">
+          <table className="w-full min-w-[640px] table-fixed text-left text-xs sm:text-sm lg:min-w-0">
             <colgroup>
               <col className="w-1/3" />
               <col className="w-[14%]" />
@@ -119,11 +119,11 @@ export function AdminUserTable({
             </colgroup>
             <thead className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
               <tr>
-                <th className="px-4 py-3 font-medium">이름/이메일</th>
-                <th className="px-4 py-3 font-medium">역할</th>
-                <th className="px-4 py-3 font-medium">가입일</th>
-                <th className="px-4 py-3 font-medium">상태</th>
-                <th className="px-4 py-3 font-medium">관리</th>
+                <th className="px-2 py-2 sm:px-3 font-medium">이름/이메일</th>
+                <th className="px-2 py-2 sm:px-3 font-medium">역할</th>
+                <th className="px-2 py-2 sm:px-3 font-medium">가입일</th>
+                <th className="px-2 py-2 sm:px-3 font-medium">상태</th>
+                <th className="px-2 py-2 sm:px-3 font-medium">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -138,7 +138,7 @@ export function AdminUserTable({
                     key={profile.id}
                     className="border-b border-zinc-100 last:border-0"
                   >
-                    <td className="min-w-0 max-w-[300px] overflow-hidden px-4 py-3 align-top">
+                    <td className="min-w-0 max-w-[300px] overflow-hidden px-2 py-2 sm:px-3 align-top">
                       <p
                         className="min-w-0 overflow-hidden font-medium text-ellipsis whitespace-nowrap text-zinc-950"
                         title={profile.name || '이름 없음'}
@@ -152,13 +152,13 @@ export function AdminUserTable({
                         {profile.email || '이메일 없음'}
                       </p>
                     </td>
-                    <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
                       {ROLE_LABEL[role] ?? role}
                     </td>
-                    <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
                       {formatAdminTimestamp(profile.createdAt)}
                     </td>
-                    <td className="min-w-0 px-4 py-3 align-top">
+                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top">
                       <span
                         className={
                           suspended
@@ -169,7 +169,7 @@ export function AdminUserTable({
                         {STATUS_LABEL[profile.status] ?? profile.status}
                       </span>
                     </td>
-                    <td className="min-w-0 px-4 py-3 align-top">
+                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top">
                       {role === 'admin' ? (
                         <span className="text-xs text-zinc-400">권한 고정</span>
                       ) : (

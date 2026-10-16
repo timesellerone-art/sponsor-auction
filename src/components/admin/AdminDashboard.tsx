@@ -453,7 +453,7 @@ export function AdminDashboard({
 
   return (
     <AccessGuard allow="admin">
-      <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
+      <div className="mx-auto flex w-full max-w-[1920px] min-w-0 flex-1 flex-col gap-6 px-4 py-6 sm:px-8 sm:py-8">
         <div>
           <p className="text-sm font-semibold tracking-wide text-teal-800">Admin</p>
           <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">

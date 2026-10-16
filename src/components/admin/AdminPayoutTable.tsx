@@ -341,7 +341,7 @@ export function AdminPayoutTable({
         </div>
       ) : (
         <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto">
-            <table className="w-full min-w-[1560px] table-fixed text-left text-sm">
+            <table className="w-full min-w-[960px] table-fixed text-left text-xs sm:text-sm lg:min-w-0">
               <colgroup>
                 <col className="w-[3%]" />
                 <col className="w-[12%]" />
@@ -355,11 +355,11 @@ export function AdminPayoutTable({
                 <col className="w-[7%]" />
                 <col className="w-[8%]" />
                 <col className="w-[8%]" />
-                <col className="w-[12%]" />
+                <col className="w-[10%]" />
               </colgroup>
               <thead className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
                 <tr>
-                  <th className="px-3 py-3 font-medium">
+                  <th className="px-2 py-2 font-medium sm:px-3">
                     <input
                       type="checkbox"
                       aria-label="지급 대기 전체 선택"
@@ -373,18 +373,18 @@ export function AdminPayoutTable({
                       }}
                     />
                   </th>
-                  <th className="px-4 py-3 font-medium">크리에이터</th>
-                  <th className="px-4 py-3 font-medium">캠페인</th>
-                  <th className="px-4 py-3 font-medium">처리 일시</th>
-                  <th className="px-4 py-3 font-medium">공급가액</th>
-                  <th className="px-4 py-3 font-medium">부가세</th>
-                  <th className="px-4 py-3 font-medium">3.3% 공제액</th>
-                  <th className="px-4 py-3 font-medium">최종 정산액</th>
-                  <th className="px-4 py-3 font-medium">수수료(공제액)</th>
-                  <th className="px-4 py-3 font-medium">실지급액</th>
-                  <th className="px-4 py-3 font-medium">상태</th>
-                  <th className="px-4 py-3 font-medium">관리</th>
-                  <th className="px-4 py-3 font-medium">관리자 메모</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">크리에이터</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">캠페인</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">처리 일시</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">공급가액</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">부가세</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">3.3% 공제액</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">최종 정산액</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">수수료(공제액)</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">실지급액</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">상태</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">관리</th>
+                  <th className="px-2 py-2 sm:px-3 font-medium">관리자 메모</th>
                 </tr>
               </thead>
               <tbody>
@@ -399,7 +399,7 @@ export function AdminPayoutTable({
                       key={payout.id}
                       className="border-b border-zinc-100 last:border-0"
                     >
-                      <td className="px-3 py-3 align-top">
+                      <td className="px-2 py-2 align-top sm:px-3">
                         {pending ? (
                           <input
                             type="checkbox"
@@ -415,7 +415,7 @@ export function AdminPayoutTable({
                           />
                         ) : null}
                       </td>
-                      <td className="min-w-0 max-w-[220px] overflow-hidden px-4 py-3 align-top">
+                      <td className="min-w-0 max-w-[220px] overflow-hidden px-2 py-2 sm:px-3 align-top">
                         <p
                           className="min-w-0 overflow-hidden font-medium text-ellipsis whitespace-nowrap text-zinc-950"
                           title={row.creatorName || '이름 없음'}
@@ -435,7 +435,7 @@ export function AdminPayoutTable({
                       </td>
                       <td
                         data-col="campaign"
-                        className="min-w-0 max-w-[300px] overflow-hidden px-4 py-3 align-top text-zinc-600 text-ellipsis whitespace-nowrap"
+                        className="min-w-0 max-w-[300px] overflow-hidden px-2 py-2 sm:px-3 align-top text-zinc-600 text-ellipsis whitespace-nowrap"
                       >
                         <span
                           className="block min-w-0 truncate"
@@ -444,28 +444,28 @@ export function AdminPayoutTable({
                           {row.auctionTitle || '연결된 캠페인 없음'}
                         </span>
                       </td>
-                      <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                      <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
                         {formatAdminTimestamp(row.paidAt || row.requestedAt)}
                       </td>
-                      <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                      <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
                         {formatWon(row.supplyAmount ?? 0)}
                       </td>
-                      <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                      <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
                         {formatWon(row.vatAmount ?? 0)}
                       </td>
-                      <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                      <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
                         {formatWon(row.withholdingAmount ?? 0)}
                       </td>
-                      <td className="min-w-0 px-4 py-3 align-top font-medium whitespace-nowrap text-zinc-950">
+                      <td className="min-w-0 px-2 py-2 sm:px-3 align-top font-medium whitespace-nowrap text-zinc-950">
                         {formatWon(row.netPayoutAmount ?? row.amount)}
                       </td>
-                      <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                      <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
                         {formatWon(row.platformFee ?? 0)}
                       </td>
-                      <td className="min-w-0 px-4 py-3 align-top font-medium whitespace-nowrap text-zinc-950">
+                      <td className="min-w-0 px-2 py-2 sm:px-3 align-top font-medium whitespace-nowrap text-zinc-950">
                         {formatWon(row.amount)}
                       </td>
-                      <td className="min-w-0 px-4 py-3 align-top">
+                      <td className="min-w-0 px-2 py-2 sm:px-3 align-top">
                         <span
                           className={
                             pending
@@ -476,7 +476,7 @@ export function AdminPayoutTable({
                           {STATUS_LABEL[row.status] ?? row.status}
                         </span>
                       </td>
-                      <td className="min-w-0 px-4 py-3 align-top">
+                      <td className="min-w-0 px-2 py-2 sm:px-3 align-top">
                         <div className="flex flex-col gap-1">
                           {pending ? (
                             <button
@@ -502,16 +502,16 @@ export function AdminPayoutTable({
                           </button>
                         </div>
                       </td>
-                      <td className="min-w-0 px-4 py-3 align-top">
+                      <td className="min-w-0 px-2 py-2 sm:px-3 align-top">
                         <div className="flex min-w-0 flex-col gap-1">
                           <textarea
                             value={memoDrafts[payout.id] ?? row.adminMemo ?? ''}
                             onChange={(event) =>
                               setMemoDrafts((prev) => ({ ...prev, [payout.id]: event.target.value }))
                             }
-                            rows={2}
+                            rows={1}
                             placeholder="내부 메모"
-                            className="max-h-24 w-full resize-none rounded-lg border border-zinc-200 px-2 py-1 text-xs outline-none focus:border-teal-600"
+                            className="h-8 max-h-16 w-full resize-none rounded-md border border-zinc-200 px-1.5 py-1 text-[11px] outline-none focus:border-teal-600"
                           />
                           <button
                             type="button"
@@ -519,7 +519,7 @@ export function AdminPayoutTable({
                             onClick={() => {
                               void handleSaveMemo(payout);
                             }}
-                            className="self-end rounded-full border border-zinc-200 px-2 py-0.5 text-[11px] font-semibold text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+                            className="h-7 self-end rounded-md border border-zinc-200 px-2 text-[11px] font-semibold text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
                           >
                             {memoBusyId === payout.id ? '저장 중...' : '메모 저장'}
                           </button>

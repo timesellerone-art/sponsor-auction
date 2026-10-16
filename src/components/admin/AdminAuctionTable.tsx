@@ -149,7 +149,7 @@ export function AdminAuctionTable({
         </div>
       ) : (
         <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto">
-          <table className="w-full min-w-[880px] table-fixed text-left text-sm">
+          <table className="w-full min-w-[720px] table-fixed text-left text-xs sm:text-sm lg:min-w-0">
             <colgroup>
               <col className="w-[28%]" />
               <col className="w-[16%]" />
@@ -160,12 +160,12 @@ export function AdminAuctionTable({
             </colgroup>
             <thead className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
               <tr>
-                <th className="px-4 py-3 font-medium">제목</th>
-                <th className="px-4 py-3 font-medium">작성자</th>
-                <th className="px-4 py-3 font-medium">예산</th>
-                <th className="px-4 py-3 font-medium">상태</th>
-                <th className="px-4 py-3 font-medium">생성일자</th>
-                <th className="px-4 py-3 font-medium">관리</th>
+                <th className="px-2 py-2 sm:px-3 font-medium">제목</th>
+                <th className="px-2 py-2 sm:px-3 font-medium">작성자</th>
+                <th className="px-2 py-2 sm:px-3 font-medium">예산</th>
+                <th className="px-2 py-2 sm:px-3 font-medium">상태</th>
+                <th className="px-2 py-2 sm:px-3 font-medium">생성일자</th>
+                <th className="px-2 py-2 sm:px-3 font-medium">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -181,7 +181,7 @@ export function AdminAuctionTable({
                     key={auction.id}
                     className="border-b border-zinc-100 last:border-0"
                   >
-                    <td className="min-w-0 max-w-[300px] overflow-hidden px-4 py-3 align-top whitespace-nowrap text-ellipsis">
+                    <td className="min-w-0 max-w-[300px] overflow-hidden px-2 py-2 sm:px-3 align-top whitespace-nowrap text-ellipsis">
                       <Link
                         href={`/auctions/${auction.id}`}
                         title={title}
@@ -190,21 +190,21 @@ export function AdminAuctionTable({
                         {title}
                       </Link>
                     </td>
-                    <td className="min-w-0 max-w-[200px] overflow-hidden px-4 py-3 align-top text-zinc-600 text-ellipsis whitespace-nowrap">
+                    <td className="min-w-0 max-w-[200px] overflow-hidden px-2 py-2 sm:px-3 align-top text-zinc-600 text-ellipsis whitespace-nowrap">
                       <span className="block min-w-0 truncate" title={auction.authorName || '미상'}>
                         {auction.authorName || '미상'}
                       </span>
                     </td>
-                    <td className="min-w-0 px-4 py-3 align-top font-medium whitespace-nowrap text-zinc-950">
+                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top font-medium whitespace-nowrap text-zinc-950">
                       {formatWon(auction.budget)}
                     </td>
-                    <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
                       {blinded ? '블라인드' : (STATUS_LABEL[status] ?? status)}
                     </td>
-                    <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
                       {formatAdminTimestamp(auction.createdAt)}
                     </td>
-                    <td className="min-w-0 px-4 py-3 align-top">
+                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top">
                       <div className="flex flex-wrap gap-2">
                         {blinded ? (
                           <button
