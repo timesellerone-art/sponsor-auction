@@ -108,8 +108,8 @@ export function AdminUserTable({
           <AdminEmptyState message="조건에 맞는 회원이 없습니다." />
         </div>
       ) : (
-        <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto lg:overflow-x-hidden">
-          <table className="w-full min-w-[560px] table-fixed text-left text-xs sm:text-sm lg:min-w-0">
+        <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto xl:overflow-x-hidden">
+          <table className="w-full min-w-0 table-fixed text-left text-xs sm:text-sm">
             <colgroup>
               <col className="w-1/3" />
               <col className="w-[14%]" />

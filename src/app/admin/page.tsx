@@ -15,7 +15,7 @@ export default function AdminPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-w-0 w-full flex-1 flex-col gap-4 px-2 sm:px-3">
+        <div className="flex min-w-0 w-full max-w-none flex-1 flex-col gap-4">
           <div className="h-16 animate-pulse rounded-2xl bg-white" />
           <div className="h-64 animate-pulse rounded-2xl bg-white" />
         </div>

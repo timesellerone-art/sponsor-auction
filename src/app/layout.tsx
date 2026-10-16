@@ -28,10 +28,10 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       lang="ko"
       className={`${geistSans.variable} ${geistMono.variable} h-full w-full antialiased`}
     >
-      <body className="flex min-h-full w-full flex-col overflow-x-clip bg-background font-sans text-foreground">
+      <body className="flex min-h-full w-full min-w-0 flex-col overflow-x-clip bg-background font-sans text-foreground">
         <AuthProvider>
           <Navbar />
-          <main className="flex min-h-screen w-full min-w-0 flex-1 flex-col">
+          <main className="flex min-h-screen w-full min-w-0 max-w-none flex-1 flex-col overflow-x-clip">
             {children}
           </main>
           <SiteFooter />

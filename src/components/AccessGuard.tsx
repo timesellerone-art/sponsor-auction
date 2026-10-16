@@ -66,5 +66,7 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
     );
   }
 
-  return children;
+  return (
+    <div className="flex w-full min-w-0 max-w-none flex-1 flex-col">{children}</div>
+  );
 }

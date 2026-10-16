@@ -33,7 +33,7 @@ export function AdminCopyText({ value, emptyLabel, className }: AdminCopyTextPro
       }}
       title={`${text} (클릭하여 복사)`}
       className={cn(
-        'block max-w-full truncate text-left text-xs text-teal-800 underline-offset-2 hover:underline',
+        'block min-w-0 max-w-full truncate text-left text-xs text-teal-800 underline-offset-2 hover:underline',
         className,
       )}
     >

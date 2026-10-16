@@ -12,7 +12,7 @@ export function SiteFooter() {
   }, []);
 
   return (
-    <footer className="mt-auto border-t border-zinc-200 bg-white">
+    <footer className="mt-auto w-full min-w-0 border-t border-zinc-200 bg-white">
       <div className="flex w-full min-w-0 flex-col gap-4 px-4 py-5 text-xs text-zinc-500 sm:px-6">
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1 leading-5">

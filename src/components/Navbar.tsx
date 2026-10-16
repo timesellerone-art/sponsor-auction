@@ -85,7 +85,7 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full min-w-0 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
       <div className="flex h-14 w-full min-w-0 items-center justify-between gap-2 px-4 sm:h-16 sm:px-6">
         <Link
           href="/"
