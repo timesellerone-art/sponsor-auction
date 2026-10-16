@@ -5,7 +5,11 @@ export function sanitizeNextPath(value: string | null | undefined) {
     return null;
   }
 
-  if (value.startsWith('/login') || value.startsWith('/auth/callback')) {
+  if (
+    value.startsWith('/login') ||
+    value.startsWith('/auth/callback') ||
+    value.startsWith('/auth/oauth')
+  ) {
     return null;
   }
 

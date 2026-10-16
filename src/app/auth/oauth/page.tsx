@@ -8,7 +8,7 @@ import { notifyAuthChanged } from '@/lib/auth';
 import { sanitizeNextPath } from '@/lib/auth-guard';
 import { getSupabaseClient } from '@/lib/supabase';
 
-export default function AuthCallbackPage() {
+export default function AuthOAuthCompletePage() {
   const router = useRouter();
 
   useEffect(() => {

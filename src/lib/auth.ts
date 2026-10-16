@@ -109,6 +109,8 @@ export function subscribeAuthState(listener: () => void) {
   };
 }
 
+export type SocialOAuthProvider = 'google' | 'kakao' | 'naver' | 'apple';
+
 function oauthRedirectTo(nextPath?: string | null) {
   const origin = window.location.origin;
   const next = sanitizeNextPath(nextPath) ?? '/';
@@ -116,7 +118,7 @@ function oauthRedirectTo(nextPath?: string | null) {
 }
 
 export async function signInWithOAuth(
-  provider: 'google' | 'kakao',
+  provider: SocialOAuthProvider,
   nextPath?: string | null,
 ): Promise<DataResult<boolean>> {
   const supabase = createClient();
@@ -126,7 +128,7 @@ export async function signInWithOAuth(
 
   try {
     const { error } = await supabase.auth.signInWithOAuth({
-      provider,
+      provider: provider as 'apple',
       options: {
         redirectTo: oauthRedirectTo(nextPath),
         queryParams:
@@ -154,6 +156,14 @@ export async function signInWithGoogle(nextPath?: string | null) {
 
 export async function signInWithKakao(nextPath?: string | null) {
   return signInWithOAuth('kakao', nextPath);
+}
+
+export async function signInWithNaver(nextPath?: string | null) {
+  return signInWithOAuth('naver', nextPath);
+}
+
+export async function signInWithApple(nextPath?: string | null) {
+  return signInWithOAuth('apple', nextPath);
 }
 
 async function loadProfile(
