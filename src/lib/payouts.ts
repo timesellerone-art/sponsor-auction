@@ -11,7 +11,7 @@ import type { Database } from '@/types/database';
 import type { SponsorAuctionClient } from '@/lib/supabase';
 
 export const PAYOUT_COLUMNS =
-  'id, creator_id, creator_name, creator_email, amount, status, auction_title, requested_at, paid_at, payment_order_id, auction_id, bid_id';
+  'id, creator_id, creator_name, creator_email, amount, status, auction_title, requested_at, paid_at, payment_order_id, auction_id, bid_id, admin_memo, bank_account';
 
 export const PAYOUT_COLUMNS_CORE =
   'id, creator_id, creator_name, creator_email, amount, status, auction_title, requested_at';
@@ -99,6 +99,8 @@ export function mapPayout(row: Partial<PayoutRow> & Pick<PayoutRow, 'id' | 'stat
     bidAmount,
     platformFee: platformFeeFromAmount(bidAmount),
     advertiserCharge: advertiserPayableAmount(bidAmount),
+    adminMemo: row.admin_memo ?? '',
+    bankAccount: row.bank_account ?? '',
   };
 }
 
@@ -208,7 +210,19 @@ async function selectPayouts(client: SponsorAuctionClient): Promise<PayoutItem[]
       .filter((item): item is PayoutItem => item !== null);
   }
 
-  if (!isSchemaMismatch(full.error)) {
+  const legacy = await client
+    .from('payouts')
+    .select(
+      'id, creator_id, creator_name, creator_email, amount, status, auction_title, requested_at, paid_at, payment_order_id, auction_id, bid_id',
+    )
+    .order('requested_at', { ascending: false });
+  if (!legacy.error) {
+    return (legacy.data ?? [])
+      .map((row) => mapPayout(row as PayoutRow))
+      .filter((item): item is PayoutItem => item !== null);
+  }
+
+  if (!isSchemaMismatch(full.error) || isSchemaMismatch(legacy.error)) {
     const core = await client
       .from('payouts')
       .select(PAYOUT_COLUMNS_CORE)
@@ -985,4 +999,57 @@ export async function markPayoutPaid(
   }
 
   return persisted;
+}
+
+export async function updatePayoutMemo(
+  client: SponsorAuctionClient,
+  input: MarkPayoutPaidInput & { adminMemo: string },
+): Promise<{ ok: true; data: PayoutItem } | { ok: false; message: string }> {
+  const memo = (input.adminMemo || '').trim();
+  const orderId = stablePayoutOrderId({
+    paymentOrderId: input.paymentOrderId,
+    auctionId: input.auctionId,
+    bidId: input.bidId,
+    fallbackId: input.id,
+  });
+  const errors: string[] = [];
+
+  const attempts: Array<{ column: 'payment_order_id' | 'auction_id' | 'bid_id' | 'id'; value: string }> = [];
+  if (orderId) {
+    attempts.push({ column: 'payment_order_id', value: orderId });
+  }
+  if (input.auctionId) {
+    attempts.push({ column: 'auction_id', value: input.auctionId });
+  }
+  if (input.bidId) {
+    attempts.push({ column: 'bid_id', value: input.bidId });
+  }
+  if (input.id && isUuid(input.id)) {
+    attempts.push({ column: 'id', value: input.id });
+  }
+
+  for (const attempt of attempts) {
+    const result = await client
+      .from('payouts')
+      .update({ admin_memo: memo })
+      .eq(attempt.column, attempt.value)
+      .select(PAYOUT_COLUMNS)
+      .maybeSingle();
+    if (result.error && isSchemaMismatch(result.error)) {
+      return { ok: false, message: 'payouts.admin_memo 컬럼이 없습니다. schema.sql을 적용해 주세요.' };
+    }
+    if (result.error && !isSkippableWriteError(result.error)) {
+      errors.push(formatSupabaseError(result.error));
+      continue;
+    }
+    const mapped = mapWriteResult(result.data);
+    if (mapped) {
+      return { ok: true, data: { ...mapped, adminMemo: memo } };
+    }
+  }
+
+  return {
+    ok: false,
+    message: errors.filter(Boolean).join(' | ') || '정산 메모를 저장할 행을 찾지 못했습니다.',
+  };
 }

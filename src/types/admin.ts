@@ -29,6 +29,8 @@ export interface PayoutItem {
   bidAmount?: number;
   platformFee?: number;
   advertiserCharge?: number;
+  adminMemo?: string;
+  bankAccount?: string;
 }
 
 export type PayoutPeriodFilter = 'all' | 'today' | '7d' | 'month' | 'range';

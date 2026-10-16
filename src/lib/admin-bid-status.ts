@@ -3,14 +3,11 @@ import type { AuctionItem, BidItem } from '@/types/auction';
 
 export type AdminBidLifecycle = 'pending' | 'awarded' | 'paid' | 'rejected';
 
-export function payoutMatchesBid(
+export function payoutLinkedToBid(
   payout: PayoutItem,
   bid: BidItem,
   auction?: AuctionItem,
 ) {
-  if (payout.status !== 'paid') {
-    return false;
-  }
   if (payout.bidId && payout.bidId === bid.id) {
     return true;
   }
@@ -30,6 +27,14 @@ export function payoutMatchesBid(
     return true;
   }
   return false;
+}
+
+export function payoutMatchesBid(
+  payout: PayoutItem,
+  bid: BidItem,
+  auction?: AuctionItem,
+) {
+  return payout.status === 'paid' && payoutLinkedToBid(payout, bid, auction);
 }
 
 export function resolveAdminBidStatus(

@@ -1,16 +1,20 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { Download } from 'lucide-react';
+import { AdminCopyText } from '@/components/admin/AdminCopyText';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
 import {
   ADMIN_BID_STATUS_CLASS,
   ADMIN_BID_STATUS_LABEL,
+  payoutLinkedToBid,
   resolveAdminBidStatus,
   type AdminBidLifecycle,
 } from '@/lib/admin-bid-status';
+import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
 import { platformFeeFromAmount } from '@/lib/fees';
-import { cn, formatWon } from '@/lib/utils';
+import { cn, formatAdminTimestamp, formatWon } from '@/lib/utils';
 import type { BidAdminFilter, PayoutItem, ProfileItem } from '@/types/admin';
 import type { AuctionItem, BidItem } from '@/types/auction';
 
@@ -37,6 +41,7 @@ export function AdminBidTable({
 }: AdminBidTableProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<BidAdminFilter>('all');
+  const [sort, setSort] = useState<AdminListSort>('newest');
 
   const auctionById = useMemo(
     () =>
@@ -45,11 +50,11 @@ export function AdminBidTable({
       ),
     [auctions],
   );
-  const emailByCreator = useMemo(() => {
-    const map = new Map<string, string>();
+  const profileByKey = useMemo(() => {
+    const map = new Map<string, ProfileItem>();
     for (const profile of profiles) {
-      map.set(profile.id, (profile.email || '').toLowerCase());
-      map.set(profile.name, (profile.email || '').toLowerCase());
+      map.set(profile.id, profile);
+      map.set(profile.name, profile);
     }
     return map;
   }, [profiles]);
@@ -59,24 +64,61 @@ export function AdminBidTable({
       return [];
     }
     const keyword = query.trim().toLowerCase();
-    return bids.filter((bid) => {
+    const matched = bids.filter((bid) => {
       const auction = auctionById.get(bid.auctionId);
       const lifecycle = resolveAdminBidStatus(bid, auction, payouts);
       if (filter !== 'all' && lifecycle !== (filter as AdminBidLifecycle)) {
         return false;
       }
+      const profile =
+        (bid.creatorId ? profileByKey.get(bid.creatorId) : undefined) ||
+        profileByKey.get(bid.creatorName || '');
+      const payout = payouts.find((item) => payoutLinkedToBid(item, bid, auction));
+      const email = (profile?.email || payout?.creatorEmail || '').toLowerCase();
       if (!keyword) {
         return true;
       }
       const name = (bid.creatorName || '').toLowerCase();
       const campaign = (auction?.title || '').toLowerCase();
-      const email =
-        (bid.creatorId ? emailByCreator.get(bid.creatorId) : '') ||
-        emailByCreator.get(bid.creatorName || '') ||
-        '';
       return name.includes(keyword) || email.includes(keyword) || campaign.includes(keyword);
     });
-  }, [auctionById, bids, emailByCreator, filter, payouts, query]);
+
+    return sortByAdminList(
+      matched,
+      sort,
+      (bid) => {
+        const auction = auctionById.get(bid.auctionId);
+        const payout = payouts.find((item) => payoutLinkedToBid(item, bid, auction));
+        return payout?.paidAt || payout?.requestedAt || bid.createdAt;
+      },
+      (bid) => bid.bidAmount,
+    );
+  }, [auctionById, bids, filter, payouts, profileByKey, query, sort]);
+
+  const handleExport = () => {
+    downloadCsv(
+      `bids-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['크리에이터', '이메일', '계좌', '캠페인', '광고주', '상태', '입찰가', '처리일시'],
+      filtered.map((bid) => {
+        const auction = auctionById.get(bid.auctionId);
+        const lifecycle = resolveAdminBidStatus(bid, auction, payouts);
+        const payout = payouts.find((item) => payoutLinkedToBid(item, bid, auction));
+        const profile =
+          (bid.creatorId ? profileByKey.get(bid.creatorId) : undefined) ||
+          profileByKey.get(bid.creatorName || '');
+        return [
+          bid.creatorName,
+          profile?.email || payout?.creatorEmail || '',
+          payout?.bankAccount || '',
+          auction?.title || '',
+          auction?.authorName || '',
+          ADMIN_BID_STATUS_LABEL[lifecycle],
+          bid.bidAmount,
+          formatAdminTimestamp(payout?.paidAt || payout?.requestedAt || bid.createdAt),
+        ];
+      }),
+    );
+  };
 
   if (!Array.isArray(bids) || bids.length === 0) {
     return <AdminEmptyState />;
@@ -92,6 +134,18 @@ export function AdminBidTable({
         filters={FILTERS}
         filter={filter}
         onFilterChange={setFilter}
+        sort={sort}
+        onSortChange={setSort}
+        actions={
+          <button
+            type="button"
+            onClick={handleExport}
+            className="inline-flex h-10 shrink-0 items-center gap-1 rounded-xl border border-zinc-200 px-3 text-xs font-semibold whitespace-nowrap text-zinc-700 hover:bg-zinc-50"
+          >
+            <Download className="size-3.5" aria-hidden />
+            엑셀/CSV 다운로드
+          </button>
+        }
       />
       {filtered.length === 0 ? (
         <div className="p-4">
@@ -99,15 +153,16 @@ export function AdminBidTable({
         </div>
       ) : (
         <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto">
-          <table className="w-full min-w-[960px] table-fixed text-left text-sm">
+          <table className="w-full min-w-[1100px] table-fixed text-left text-sm">
             <colgroup>
               <col className="w-[16%]" />
-              <col className="w-[18%]" />
-              <col className="w-[14%]" />
-              <col className="w-[14%]" />
+              <col className="w-[16%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
               <col className="w-[10%]" />
               <col className="w-[10%]" />
-              <col className="w-[18%]" />
+              <col className="w-[12%]" />
             </colgroup>
             <thead className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
               <tr>
@@ -115,6 +170,7 @@ export function AdminBidTable({
                 <th className="px-4 py-3 font-medium">캠페인</th>
                 <th className="px-4 py-3 font-medium">광고주</th>
                 <th className="px-4 py-3 font-medium">입찰 상태</th>
+                <th className="px-4 py-3 font-medium">처리 일시</th>
                 <th className="px-4 py-3 font-medium">입찰가</th>
                 <th className="px-4 py-3 font-medium">예상 수수료</th>
                 <th className="px-4 py-3 font-medium">채널</th>
@@ -126,6 +182,12 @@ export function AdminBidTable({
                 const lifecycle = resolveAdminBidStatus(bid, auction, payouts);
                 const campaign = auction?.title || '연결된 캠페인 없음';
                 const advertiser = auction?.authorName || '미상';
+                const payout = payouts.find((item) => payoutLinkedToBid(item, bid, auction));
+                const profile =
+                  (bid.creatorId ? profileByKey.get(bid.creatorId) : undefined) ||
+                  profileByKey.get(bid.creatorName || '');
+                const email = profile?.email || payout?.creatorEmail || '';
+                const account = payout?.bankAccount || '';
 
                 return (
                   <tr key={bid.id} className="border-b border-zinc-100 last:border-0">
@@ -136,12 +198,8 @@ export function AdminBidTable({
                       >
                         {bid.creatorName || '이름 없음'}
                       </p>
-                      <p
-                        className="mt-1 min-w-0 overflow-hidden text-xs text-ellipsis whitespace-nowrap text-zinc-500"
-                        title={bid.proposalText || '제안 내용 없음'}
-                      >
-                        {bid.proposalText || '제안 내용 없음'}
-                      </p>
+                      <AdminCopyText value={email} emptyLabel="이메일 없음" className="mt-1" />
+                      <AdminCopyText value={account} emptyLabel="계좌 미등록" className="mt-0.5" />
                     </td>
                     <td className="min-w-0 max-w-[300px] overflow-hidden px-4 py-3 align-top text-zinc-600 text-ellipsis whitespace-nowrap">
                       <span className="block min-w-0 truncate" title={campaign}>
@@ -162,6 +220,9 @@ export function AdminBidTable({
                       >
                         {ADMIN_BID_STATUS_LABEL[lifecycle]}
                       </span>
+                    </td>
+                    <td className="min-w-0 px-4 py-3 align-top whitespace-nowrap text-zinc-600">
+                      {formatAdminTimestamp(payout?.paidAt || payout?.requestedAt || bid.createdAt)}
                     </td>
                     <td className="min-w-0 px-4 py-3 align-top font-medium whitespace-nowrap text-zinc-950">
                       {formatWon(bid.bidAmount)}

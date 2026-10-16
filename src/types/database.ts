@@ -181,6 +181,8 @@ export type Database = {
           payment_order_id: string | null;
           auction_id: string | null;
           bid_id: string | null;
+          admin_memo: string;
+          bank_account: string;
         };
         Insert: {
           id?: string;
@@ -195,6 +197,8 @@ export type Database = {
           payment_order_id?: string | null;
           auction_id?: string | null;
           bid_id?: string | null;
+          admin_memo?: string;
+          bank_account?: string;
         };
         Update: {
           creator_id?: string | null;
@@ -208,6 +212,8 @@ export type Database = {
           payment_order_id?: string | null;
           auction_id?: string | null;
           bid_id?: string | null;
+          admin_memo?: string;
+          bank_account?: string;
         };
         Relationships: [];
       };

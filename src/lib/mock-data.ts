@@ -262,6 +262,8 @@ export const mockPayouts: PayoutItem[] = [
     creatorEmail: 'minji@shorts.creator',
     amount: 833_000,
     status: 'pending',
+    bankAccount: '카카오뱅크 3333-01-1234567',
+    adminMemo: '',
     auctionTitle: '여름 무알콜 맥주 숏폼 캠페인',
     requestedAt: '2026-10-11T09:20:00+09:00',
     paymentOrderId: 'payout-auction-auc-001',
@@ -274,6 +276,8 @@ export const mockPayouts: PayoutItem[] = [
     creatorEmail: 'hayeon@skindiary.kr',
     amount: 612_000,
     status: 'pending',
+    bankAccount: '토스뱅크 1000-0001-2345',
+    adminMemo: '',
     auctionTitle: '비건 스킨케어 릴스 리뷰',
     requestedAt: '2026-10-10T18:05:00+09:00',
     paymentOrderId: 'payout-auction-auc-002',
@@ -286,6 +290,8 @@ export const mockPayouts: PayoutItem[] = [
     creatorEmail: 'jun@nightrunner.kr',
     amount: 1_785_000,
     status: 'pending',
+    bankAccount: '국민 123456-01-234567',
+    adminMemo: '',
     auctionTitle: '러닝화 언박싱 틱톡 챌린지',
     requestedAt: '2026-10-08T12:44:00+09:00',
     paymentOrderId: 'payout-auction-auc-003',
@@ -299,6 +305,8 @@ export const mockPayouts: PayoutItem[] = [
     creatorEmail: 'serin@moneynote.x',
     amount: 331_500,
     status: 'paid',
+    bankAccount: '신한 110-234-567890',
+    adminMemo: '1차 정산 완료',
     auctionTitle: '핀테크 앱 X 스레드 체험단',
     requestedAt: '2026-09-28T15:10:00+09:00',
     paymentOrderId: 'payout-auction-auc-004',
@@ -312,6 +320,8 @@ export const mockPayouts: PayoutItem[] = [
     creatorEmail: 'minji@shorts.creator',
     amount: 255_000,
     status: 'paid',
+    bankAccount: '카카오뱅크 3333-01-1234567',
+    adminMemo: '',
     auctionTitle: '로컬 카페 브이로그 스폰서십',
     requestedAt: '2026-09-22T11:36:00+09:00',
     paymentOrderId: 'payout-auction-auc-005',
@@ -997,6 +1007,37 @@ export async function approvePayout(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : '정산 승인을 처리하지 못했습니다.';
+    return fail(null, message);
+  }
+}
+
+export async function updatePayoutMemo(
+  id: string,
+  adminMemo: string,
+): Promise<DataResult<PayoutItem | null>> {
+  try {
+    if (!isNonEmptyString(id)) {
+      return fail(null, '유효한 정산 ID가 필요합니다.');
+    }
+    const current =
+      payoutsStore.find((item) => item.id === id) ??
+      payoutsFromClosedCampaigns().find((item) => item.id === id);
+    if (!current) {
+      return fail(null, '해당 정산 요청을 찾을 수 없습니다.');
+    }
+    const updated: PayoutItem = {
+      ...current,
+      adminMemo,
+    };
+    if (payoutsStore.some((item) => item.id === id)) {
+      payoutsStore = payoutsStore.map((item) => (item.id === id ? updated : item));
+    } else {
+      payoutsStore = [...payoutsStore, updated];
+    }
+    persistAdminStores();
+    return ok(updated);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '메모를 저장하지 못했습니다.';
     return fail(null, message);
   }
 }

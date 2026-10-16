@@ -187,6 +187,10 @@ alter table if exists public.payouts
   add column if not exists bid_id text;
 alter table if exists public.payouts
   add column if not exists paid_at timestamptz;
+alter table if exists public.payouts
+  add column if not exists admin_memo text not null default '';
+alter table if exists public.payouts
+  add column if not exists bank_account text not null default '';
 
 do $$
 begin

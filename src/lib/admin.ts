@@ -3,11 +3,12 @@ import {
   getBids as getMockBids,
   getPayouts as getMockPayouts,
   getProfiles as getMockProfiles,
+  updatePayoutMemo as updateMockPayoutMemo,
   updateProfileStatus as updateMockProfileStatus,
 } from '@/lib/mock-data';
 import { withExclusiveAction } from '@/lib/action-lock';
 import { mockGetSession } from '@/lib/auth-mock';
-import { markPayoutPaid, overlayDbPayoutStatus } from '@/lib/payouts';
+import { markPayoutPaid, overlayDbPayoutStatus, updatePayoutMemo as persistPayoutMemo } from '@/lib/payouts';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { VALIDATION } from '@/lib/validation';
@@ -374,5 +375,66 @@ export async function approvePayout(
   } finally {
     console.info(`[SponsorAuction] 정산 승인 종료 (${Date.now() - started}ms)`);
   }
+  });
+}
+
+export async function savePayoutMemo(
+  payout: PayoutItem,
+  adminMemo: string,
+): Promise<DataResult<PayoutItem | null>> {
+  const id = (payout.paymentOrderId || payout.id).trim();
+  return withExclusiveAction(`payout-memo:${id}`, fail(null, VALIDATION.actionInFlight), async () => {
+    try {
+      const response = await fetch('/api/admin/payouts/memo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          paymentOrderId: payout.paymentOrderId ?? id,
+          auctionId: payout.auctionId ?? null,
+          bidId: payout.bidId ?? null,
+          adminMemo,
+        }),
+      });
+      const payload = await parseAdminJson(response);
+      if (response.ok && payload?.data && typeof payload.data === 'object') {
+        const mapped = payload.data as PayoutItem;
+        if (mapped.id) {
+          return ok({ ...payout, ...mapped, adminMemo });
+        }
+      }
+      const apiError = payload?.error || payload?.errorMessage || `HTTP ${response.status}`;
+      if (!payload?.fallbackMock && response.status !== 409 && !response.ok) {
+        return fail(null, apiError);
+      }
+    } catch (error) {
+      console.warn('[SponsorAuction] 정산 메모 API 호출 실패, Mock으로 저장합니다.', error);
+    }
+
+    const supabase = await getDataClient();
+    if (!supabase) {
+      return updateMockPayoutMemo(payout.id, adminMemo);
+    }
+
+    try {
+      const result = await persistPayoutMemo(supabase, {
+        id,
+        paymentOrderId: payout.paymentOrderId ?? id,
+        auctionId: payout.auctionId ?? null,
+        bidId: payout.bidId ?? null,
+        adminMemo,
+      });
+      if (!result.ok) {
+        const mock = await updateMockPayoutMemo(payout.id, adminMemo);
+        if (mock.data) {
+          return ok(mock.data);
+        }
+        return fail(null, result.message);
+      }
+      return ok({ ...payout, ...result.data, adminMemo });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ADMIN_UPDATE_FAIL_MESSAGE;
+      return fail(null, message);
+    }
   });
 }

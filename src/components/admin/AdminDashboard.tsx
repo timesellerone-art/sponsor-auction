@@ -17,6 +17,7 @@ import {
   getAdminBids,
   getPayouts,
   getProfiles,
+  savePayoutMemo,
   updateProfileStatus,
 } from '@/lib/admin';
 import { applyPaidPayoutLocal } from '@/lib/payouts';
@@ -349,26 +350,35 @@ export function AdminDashboard({
     });
   };
 
-  const handleApprovePayout = async (payout: PayoutItem): Promise<PayoutItem | null> => {
+  const handleApprovePayout = async (
+    payout: PayoutItem,
+    options?: { silent?: boolean },
+  ): Promise<PayoutItem | null> => {
     if (!payout?.id) {
       return null;
     }
     if (isBusy) {
-      showToast(VALIDATION.actionInFlight);
+      if (!options?.silent) {
+        showToast(VALIDATION.actionInFlight);
+      }
       return null;
     }
 
     const latest = payouts.find((item) => item.id === payout.id) ?? payout;
     if (latest.status !== 'pending') {
-      showToast(VALIDATION.payoutAlready);
+      if (!options?.silent) {
+        showToast(VALIDATION.payoutAlready);
+      }
       return null;
     }
 
-    const confirmed = window.confirm(
-      `"${payout.creatorName || '크리에이터'}"의 정산을 지급 처리할까요?`,
-    );
-    if (!confirmed) {
-      return null;
+    if (!options?.silent) {
+      const confirmed = window.confirm(
+        `"${payout.creatorName || '크리에이터'}"의 정산을 지급 처리할까요?`,
+      );
+      if (!confirmed) {
+        return null;
+      }
     }
 
     let paidItem: PayoutItem | null = null;
@@ -397,7 +407,9 @@ export function AdminDashboard({
         };
         paidItem = paid;
         setPayouts((prev) => applyPaidPayoutLocal(prev, paid));
-        showToast('지급 처리했습니다.', 'success');
+        if (!options?.silent) {
+          showToast('지급 처리했습니다.', 'success');
+        }
         router.refresh();
         await fetchPayouts([paid]);
       } catch (error) {
@@ -408,6 +420,28 @@ export function AdminDashboard({
       }
     });
     return paidItem;
+  };
+
+  const handleSavePayoutMemo = async (payout: PayoutItem, memo: string) => {
+    try {
+      const result = await savePayoutMemo(payout, memo);
+      if (result.error || !result.data) {
+        showToast(`메모 저장 실패: ${result.error || '알 수 없는 오류'}`);
+        return null;
+      }
+      const saved = result.data;
+      setPayouts((prev) =>
+        prev.map((item) =>
+          item.id === payout.id ? { ...item, ...saved, adminMemo: memo } : item,
+        ),
+      );
+      showToast('메모를 저장했습니다.', 'success');
+      return result.data;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : '알 수 없는 오류';
+      showToast(`메모 저장 실패: ${detail}`);
+      return null;
+    }
   };
 
   const tabs: { id: TabId; label: string }[] = [
@@ -500,6 +534,7 @@ export function AdminDashboard({
               payouts={asPayoutList(payouts)}
               busyId={busyId}
               onApprove={handleApprovePayout}
+              onSaveMemo={handleSavePayoutMemo}
               onRefresh={() => fetchPayouts()}
             />
           )

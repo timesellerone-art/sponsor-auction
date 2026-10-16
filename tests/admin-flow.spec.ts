@@ -182,6 +182,11 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(page.getByPlaceholder('크리에이터 이름, 이메일, 캠페인 제목 검색')).toBeVisible();
     await expect(page.getByRole('button', { name: '지급 대기' })).toBeVisible();
     await expect(page.getByRole('button', { name: '최근 7일' })).toBeVisible();
+    await expect(page.getByRole('combobox')).toBeVisible();
+    await expect(page.getByRole('button', { name: '엑셀/CSV 다운로드' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '선택 항목 일괄 지급 처리' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '메모 저장' }).first()).toBeVisible();
+    await expect(page.getByText(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/).first()).toBeVisible();
     await expect(table.getByRole('columnheader', { name: '크리에이터' })).toBeVisible();
     await expect(table.getByRole('columnheader', { name: '실지급액' })).toBeVisible();
     await expect(table.getByRole('columnheader', { name: '수수료(공제액)' })).toBeVisible();
@@ -203,7 +208,7 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(pendingRow).toBeVisible();
     await expect(pendingRow.getByText('지급 대기')).toBeVisible();
 
-    const campaign = (await pendingRow.locator('td').nth(1).innerText()).trim();
+    const campaign = (await pendingRow.locator('[data-col="campaign"]').innerText()).trim();
     const pinnedRow = page
       .locator('tbody tr')
       .filter({ hasText: campaign })
@@ -226,5 +231,40 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await page.getByRole('button', { name: '지급 완료', exact: true }).click();
     await expect(page.getByText(campaign).first()).toBeVisible();
     await expect(page.getByText('낙찰 / 지급 완료').first()).toBeVisible();
+  });
+
+  test('정산 일괄 지급, 메모 저장, CSV 다운로드가 동작한다', async ({ page }) => {
+    await unlockAdmin(page);
+    await page.getByRole('button', { name: '정산 관리' }).click();
+
+    const pendingRow = page
+      .locator('tbody tr')
+      .filter({ has: page.getByRole('button', { name: '지급 처리' }) })
+      .first();
+    await pendingRow.getByRole('checkbox').check();
+    await acceptNextConfirm(page);
+    await page.getByRole('button', { name: '선택 항목 일괄 지급 처리' }).click();
+    await expect(
+      page.getByRole('alert').filter({ hasText: /건 지급 처리했습니다/ }),
+    ).toBeVisible();
+
+    const memoBox = page.getByPlaceholder('내부 메모').first();
+    await memoBox.fill('운영 확인 메모');
+    await page.getByRole('button', { name: '메모 저장' }).first().click();
+    await expect(page.getByRole('alert').filter({ hasText: '메모를 저장했습니다.' })).toBeVisible();
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: '엑셀/CSV 다운로드' }).click(),
+    ]);
+    expect(download.suggestedFilename()).toMatch(/payouts-.*\.csv$/);
+
+    await page.getByRole('button', { name: '입찰 관리' }).click();
+    await expect(page.getByRole('combobox')).toBeVisible();
+    const [bidDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: '엑셀/CSV 다운로드' }).click(),
+    ]);
+    expect(bidDownload.suggestedFilename()).toMatch(/bids-.*\.csv$/);
   });
 });
