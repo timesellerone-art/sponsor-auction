@@ -12,6 +12,7 @@ import { applyPaidAuctionStatus } from '@/lib/payments/apply-paid-status';
 import { canPreparePayment, getPaymentActor } from '@/lib/payments/guard';
 import { persistPayment } from '@/lib/payments/persist';
 import { confirmTossPayment, isDemoPaymentKey } from '@/lib/payments/toss';
+import { captureException } from '@/lib/monitoring';
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
 import type { ConfirmPaymentInput, ConfirmPaymentResult } from '@/types/payment';
 
@@ -181,6 +182,11 @@ export async function POST(request: Request) {
       const replayKey = existing.paymentKey ?? parsed.paymentKey;
       const replaySaved = await persistPayment(intent, 'confirmed', replayKey, dbConfig);
       if (!replaySaved.ok && !isDemoPaymentKey(parsed.paymentKey)) {
+        captureException(new Error(replaySaved.errorMessage), {
+          area: 'payment_confirm',
+          errorCode: replaySaved.errorCode,
+          orderId: parsed.orderId,
+        });
         return jsonError(500, replaySaved.errorCode, replaySaved.errorMessage, {
           supabaseError: replaySaved.supabaseError,
         });
@@ -244,6 +250,11 @@ export async function POST(request: Request) {
           errorCode,
           errorMessage,
         });
+        captureException(new Error(errorMessage), {
+          area: 'payment_confirm',
+          errorCode,
+          orderId: parsed.orderId,
+        });
         return jsonError(402, errorCode, errorMessage, {
           httpStatus: toss.httpStatus,
         });
@@ -257,6 +268,11 @@ export async function POST(request: Request) {
       dbConfig,
     );
     if (!saved.ok && !isDemoPaymentKey(parsed.paymentKey)) {
+      captureException(new Error(saved.errorMessage), {
+        area: 'payment_confirm',
+        errorCode: saved.errorCode,
+        orderId: parsed.orderId,
+      });
       return jsonError(500, saved.errorCode, saved.errorMessage, {
         supabaseError: saved.supabaseError,
       });
@@ -297,6 +313,7 @@ export async function POST(request: Request) {
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
     console.error('[SponsorAuction] 결제 승인 중 예외가 발생했습니다.', error);
+    captureException(error, { area: 'payment_confirm' });
     const errorMessage =
       error instanceof Error ? error.message : '결제 승인에 실패했습니다. 낙찰은 진행되지 않았습니다.';
     return jsonError(500, 'CONFIRM_EXCEPTION', errorMessage);

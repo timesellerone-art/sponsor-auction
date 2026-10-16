@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { captureException } from '@/lib/monitoring';
 
 export default function GlobalError({
   error,
@@ -11,6 +12,7 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error('[SponsorAuction] 앱 오류', error);
+    captureException(error, { area: 'global_error', digest: error.digest });
   }, [error]);
 
   return (

@@ -1,3 +1,4 @@
+import { showToast } from '@/components/Toast';
 import {
   approvePayout as approveMockPayout,
   getBids as getMockBids,
@@ -11,6 +12,7 @@ import { mockGetSession } from '@/lib/auth-mock';
 import { markPayoutPaid, overlayDbPayoutStatus, updatePayoutMemo as persistPayoutMemo } from '@/lib/payouts';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
+import { RATE_LIMIT_MESSAGE } from '@/lib/rate-limit';
 import { VALIDATION } from '@/lib/validation';
 import type {
   PayoutItem,
@@ -124,13 +126,17 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
   }
 }
 
-async function parseAdminJson(response: Response) {
-  return (await response.json().catch(() => null)) as {
+async function parseAdminJson(response: Response, method: 'GET' | 'POST') {
+  const payload = (await response.json().catch(() => null)) as {
     data?: unknown;
     error?: string;
     errorMessage?: string;
     fallbackMock?: boolean;
   } | null;
+  if (response.status === 429 && method === 'GET') {
+    showToast(payload?.errorMessage || payload?.error || RATE_LIMIT_MESSAGE);
+  }
+  return payload;
 }
 
 export async function updateProfileStatus(
@@ -144,7 +150,7 @@ export async function updateProfileStatus(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, status }),
     });
-    const payload = await parseAdminJson(response);
+    const payload = await parseAdminJson(response, 'POST');
     if (response.ok && payload?.data && typeof payload.data === 'object') {
       const row = payload.data as ProfileItem;
       if (row.id && row.status) {
@@ -230,7 +236,7 @@ export async function getAdminBids(seedFromServer: BidItem[] = []): Promise<Data
       cache: 'no-store',
       headers: { 'Cache-Control': 'no-store' },
     });
-    const payload = await parseAdminJson(response);
+    const payload = await parseAdminJson(response, 'GET');
     if (response.ok && Array.isArray(payload?.data)) {
       fromDb = asBidItems(payload.data);
     } else if (!payload?.fallbackMock && response.status !== 409 && !response.ok && fromDb.length === 0) {
@@ -276,7 +282,7 @@ export async function getPayouts(seedFromServer: PayoutItem[] = []): Promise<Dat
       cache: 'no-store',
       headers: { 'Cache-Control': 'no-store' },
     });
-    const payload = await parseAdminJson(response);
+    const payload = await parseAdminJson(response, 'GET');
     if (response.ok && Array.isArray(payload?.data)) {
       fromDb = asPayoutItems(payload.data);
     } else if (!payload?.fallbackMock && response.status !== 409 && !response.ok && fromDb.length === 0) {
@@ -331,7 +337,7 @@ export async function approvePayout(
         creatorId: payout?.creatorId,
       }),
     });
-    const payload = await parseAdminJson(response);
+    const payload = await parseAdminJson(response, 'POST');
     if (response.ok && payload?.data && typeof payload.data === 'object') {
       const mapped = payload.data as PayoutItem;
       if (mapped.id) {
@@ -396,7 +402,7 @@ export async function savePayoutMemo(
           adminMemo,
         }),
       });
-      const payload = await parseAdminJson(response);
+      const payload = await parseAdminJson(response, 'POST');
       if (response.ok && payload?.data && typeof payload.data === 'object') {
         const mapped = payload.data as PayoutItem;
         if (mapped.id) {

@@ -55,6 +55,7 @@ const HINTS: Record<string, string> = {
   INTENT_NOT_FOUND: '결제 세션이 만료되었거나 서버가 주문을 찾지 못했습니다.',
   AMOUNT_MISMATCH: '승인 금액이 주문 금액과 다릅니다.',
   INVALID_SUCCESS_PARAMS: '결제 성공 URL 파라미터가 올바르지 않습니다.',
+  RATE_LIMITED: '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.',
 };
 
 function asRecord(value: unknown): Record<string, unknown> {

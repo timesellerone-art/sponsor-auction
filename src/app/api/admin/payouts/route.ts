@@ -10,6 +10,7 @@ import { listPayoutsFromDatabase, markPayoutPaid, type MarkPayoutPaidInput } fro
 import { deliverLifecycleNotification } from '@/lib/notification';
 import { issueTaxInvoice } from '@/lib/popbill';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { captureException } from '@/lib/monitoring';
 import { bidAmountFromCreatorPayout } from '@/lib/fees';
 
 const NO_STORE = {
@@ -129,6 +130,11 @@ export async function POST(request: Request) {
     const result = await markPayoutPaid(client, parsed);
     if (!result.ok) {
       console.error('[SponsorAuction] 관리자 정산 DB 저장 실패', result.message);
+      captureException(new Error(result.message), {
+        area: 'payout_save',
+        payoutId: parsed.id,
+        auctionId: parsed.auctionId,
+      });
       return NextResponse.json(
         {
           error: result.message,
@@ -190,6 +196,7 @@ export async function POST(request: Request) {
           ? error
           : '알 수 없는 오류';
     console.error('[SponsorAuction] 관리자 정산 API 예외', error);
+    captureException(error, { area: 'payout_save' });
     return NextResponse.json(
       { error: message, errorMessage: message },
       { status: 500 },

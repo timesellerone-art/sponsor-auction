@@ -12,6 +12,7 @@ import { UPDATE_FAIL_MESSAGE, awardBid, getAuctionById, getBidsByAuctionId } fro
 import { advertiserPayableAmount } from '@/lib/fees';
 import { readCheckoutContext, recoverAuctionHref } from '@/lib/payments/client';
 import { formatPaymentToast, parsePaymentError } from '@/lib/payments/errors';
+import { RATE_LIMIT_MESSAGE } from '@/lib/rate-limit';
 import { publicSupabasePayload } from '@/lib/supabase/env';
 import { formatWon } from '@/lib/utils';
 import { VALIDATION } from '@/lib/validation';
@@ -112,9 +113,11 @@ function PaymentSuccessContent() {
           const info = parsePaymentError({
             code: confirmPayload?.errorCode || `HTTP_${confirmResponse.status}`,
             message:
-              confirmPayload?.errorMessage ||
-              confirmPayload?.error ||
-              '결제 승인에 실패했습니다. 낙찰은 진행되지 않았습니다.',
+              confirmResponse.status === 429
+                ? RATE_LIMIT_MESSAGE
+                : confirmPayload?.errorMessage ||
+                  confirmPayload?.error ||
+                  '결제 승인에 실패했습니다. 낙찰은 진행되지 않았습니다.',
           });
           const feedback = formatPaymentToast(info);
           console.error('[SponsorAuction] 결제 승인 실패', {
