@@ -13,7 +13,7 @@ export function SiteFooter() {
 
   return (
     <footer className="mt-auto border-t border-zinc-200 bg-white">
-      <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-4 px-4 py-5 text-xs text-zinc-500 sm:px-6">
+      <div className="flex w-full max-w-none min-w-0 flex-col gap-4 px-4 py-5 text-xs text-zinc-500 sm:px-6">
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1 leading-5">
             <p className="font-semibold text-zinc-700">
