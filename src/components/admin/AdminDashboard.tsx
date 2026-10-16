@@ -14,6 +14,7 @@ import { useActionLock } from '@/hooks/useActionLock';
 import {
   ADMIN_UPDATE_FAIL_MESSAGE,
   approvePayout,
+  getAdminBids,
   getPayouts,
   getProfiles,
   updateProfileStatus,
@@ -24,7 +25,6 @@ import {
   UPDATE_FAIL_MESSAGE,
   deleteAuction,
   getAuctions,
-  getBids,
   updateAuctionBlind,
 } from '@/lib/auctions';
 import { cn } from '@/lib/utils';
@@ -75,13 +75,15 @@ function asPayoutList(value: unknown): PayoutItem[] {
 
 export function AdminDashboard({
   initialPayouts = [],
+  initialBids = [],
 }: {
   initialPayouts?: PayoutItem[];
+  initialBids?: BidItem[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabId>('auctions');
   const [auctions, setAuctions] = useState<AuctionItem[]>([]);
-  const [bids, setBids] = useState<BidItem[]>([]);
+  const [bids, setBids] = useState<BidItem[]>(() => asBidList(initialBids));
   const [profiles, setProfiles] = useState<ProfileItem[]>([]);
   const [payouts, setPayouts] = useState<PayoutItem[]>(() => asPayoutList(initialPayouts));
   const [loading, setLoading] = useState(true);
@@ -114,7 +116,7 @@ export function AdminDashboard({
       const [auctionResult, bidResult, profileResult, payoutResult] =
         await Promise.all([
           getAuctions(),
-          getBids(),
+          getAdminBids(asBidList(initialBids)),
           getProfiles(),
           getPayouts(asPayoutList(initialPayouts)),
         ]);
@@ -141,7 +143,7 @@ export function AdminDashboard({
     } finally {
       setLoading(false);
     }
-  }, [initialPayouts]);
+  }, [initialBids, initialPayouts]);
 
   useEffect(() => {
     void load();
@@ -473,6 +475,7 @@ export function AdminDashboard({
           ) : (
             <AdminAuctionTable
               auctions={asAuctionList(auctions)}
+              profiles={asProfileList(profiles)}
               busyId={busyId}
               onBlind={handleBlind}
               onUnblind={handleUnblind}
@@ -507,6 +510,7 @@ export function AdminDashboard({
             bids={asBidList(bids)}
             auctions={asAuctionList(auctions)}
             payouts={asPayoutList(payouts)}
+            profiles={asProfileList(profiles)}
           />
         )}
       </div>

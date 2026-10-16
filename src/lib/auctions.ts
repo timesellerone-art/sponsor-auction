@@ -460,6 +460,31 @@ export async function getBidsByCreator(
   }
 }
 
+export async function listBidsFromDatabase(
+  client: SponsorAuctionClient,
+): Promise<BidItem[]> {
+  let { data, error } = await client
+    .from('bids')
+    .select(BID_COLUMNS)
+    .order('created_at', { ascending: false });
+
+  if (error && isSchemaMismatch(error)) {
+    const fallback = await client
+      .from('bids')
+      .select(BID_COLUMNS_CORE)
+      .order('created_at', { ascending: false });
+    data = fallback.data as typeof data;
+    error = fallback.error;
+  }
+
+  if (error) {
+    logDbError('관리자 입찰 목록 조회', error);
+    return [];
+  }
+
+  return (data ?? []).map((row) => mapBid(row));
+}
+
 export async function getBids(): Promise<DataResult<BidItem[]>> {
   const supabase = await getDataClient();
   if (!supabase) {

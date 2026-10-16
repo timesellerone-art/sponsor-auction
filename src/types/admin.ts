@@ -33,4 +33,10 @@ export interface PayoutItem {
 
 export type PayoutPeriodFilter = 'all' | 'today' | '7d' | 'month' | 'range';
 
-export type AuctionAdminFilter = 'all' | 'active' | 'closed' | 'blind';
+export type AuctionAdminFilter = 'all' | 'active' | 'awarded' | 'ended';
+
+export type ProfileAdminFilter = 'all' | 'active' | 'suspended';
+
+export type PayoutAdminFilter = 'all' | 'pending' | 'paid';
+
+export type BidAdminFilter = 'all' | 'pending' | 'awarded' | 'paid' | 'rejected';

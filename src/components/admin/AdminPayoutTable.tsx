@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
+import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
 import {
   enrichPayout,
   filterPayoutsByPeriod,
@@ -11,12 +12,23 @@ import {
 } from '@/lib/payout-stats';
 import { applyPaidPayoutLocal } from '@/lib/payouts';
 import { formatDate, formatWon } from '@/lib/utils';
-import type { PayoutItem, PayoutPeriodFilter, PayoutStatus } from '@/types/admin';
+import type {
+  PayoutAdminFilter,
+  PayoutItem,
+  PayoutPeriodFilter,
+  PayoutStatus,
+} from '@/types/admin';
 
 const STATUS_LABEL: Record<PayoutStatus, string> = {
   pending: '지급 대기',
   paid: '지급 완료',
 };
+
+const STATUS_FILTERS: { id: PayoutAdminFilter; label: string }[] = [
+  { id: 'all', label: '전체' },
+  { id: 'pending', label: '지급 대기' },
+  { id: 'paid', label: '지급 완료' },
+];
 
 const PERIODS: { id: PayoutPeriodFilter; label: string }[] = [
   { id: 'all', label: '전체' },
@@ -41,6 +53,8 @@ export function AdminPayoutTable({
 }: AdminPayoutTableProps) {
   const router = useRouter();
   const [period, setPeriod] = useState<PayoutPeriodFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<PayoutAdminFilter>('all');
+  const [query, setQuery] = useState('');
   const [rangeFrom, setRangeFrom] = useState('');
   const [rangeTo, setRangeTo] = useState('');
   const [rows, setRows] = useState<PayoutItem[]>(() =>
@@ -56,9 +70,21 @@ export function AdminPayoutTable({
   }, [payouts]);
 
   const filtered = useMemo(() => {
-    const list = rows.map(enrichPayout);
+    const keyword = query.trim().toLowerCase();
+    const list = rows.map(enrichPayout).filter((item) => {
+      if (statusFilter !== 'all' && item.status !== statusFilter) {
+        return false;
+      }
+      if (!keyword) {
+        return true;
+      }
+      const name = (item.creatorName || '').toLowerCase();
+      const email = (item.creatorEmail || '').toLowerCase();
+      const campaign = (item.auctionTitle || '').toLowerCase();
+      return name.includes(keyword) || email.includes(keyword) || campaign.includes(keyword);
+    });
     return filterPayoutsByPeriod(list, period, rangeFrom, rangeTo);
-  }, [rows, period, rangeFrom, rangeTo]);
+  }, [period, query, rangeFrom, rangeTo, rows, statusFilter]);
 
   const stats = useMemo(() => summarizePayouts(filtered), [filtered]);
 
@@ -105,6 +131,18 @@ export function AdminPayoutTable({
           <p className="text-xs font-medium text-zinc-500">크리에이터 지급 대기액</p>
           <p className="mt-2 truncate text-lg font-bold text-amber-800">{formatWon(stats.pending)}</p>
         </article>
+      </div>
+
+      <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+        <AdminFilterBar
+          query={query}
+          onQueryChange={setQuery}
+          placeholder="크리에이터 이름, 이메일, 캠페인 제목 검색"
+          searchLabel="정산 검색"
+          filters={STATUS_FILTERS}
+          filter={statusFilter}
+          onFilterChange={setStatusFilter}
+        />
       </div>
 
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">

@@ -65,20 +65,20 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(page.getByRole('link', { name: CLOSED_AUCTION })).toBeVisible();
     await expect(page.getByRole('link', { name: BLINDED_AUCTION })).toBeVisible();
 
-    await page.getByPlaceholder('제목 또는 작성자 검색').fill(SEARCH_AUTHOR);
+    await page.getByPlaceholder('캠페인 제목, 설명, 광고주 이름/이메일 검색').fill(SEARCH_AUTHOR);
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toBeVisible();
     await expect(page.getByRole('link', { name: CLOSED_AUCTION })).toHaveCount(0);
 
-    await page.getByPlaceholder('제목 또는 작성자 검색').fill('');
-    await page.getByRole('button', { name: '진행중', exact: true }).click();
+    await page.getByPlaceholder('캠페인 제목, 설명, 광고주 이름/이메일 검색').fill('');
+    await page.getByRole('button', { name: '진행 중', exact: true }).click();
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toBeVisible();
     await expect(page.getByRole('link', { name: CLOSED_AUCTION })).toHaveCount(0);
 
-    await page.getByRole('button', { name: '마감', exact: true }).click();
+    await page.getByRole('button', { name: '마감/낙찰', exact: true }).click();
     await expect(page.getByRole('link', { name: CLOSED_AUCTION })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toHaveCount(0);
 
-    await page.getByRole('button', { name: '블라인드', exact: true }).click();
+    await page.getByRole('button', { name: '종료/취소', exact: true }).click();
     await expect(page.getByRole('link', { name: BLINDED_AUCTION })).toBeVisible();
     await expect(
       page.getByRole('row', { name: new RegExp(BLINDED_AUCTION) }).getByText('블라인드', { exact: true }),
@@ -106,7 +106,7 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(targetRow.getByText('블라인드', { exact: true })).toBeVisible();
     await expect(targetRow.getByRole('button', { name: '블라인드 해제' })).toBeVisible();
 
-    await page.getByRole('button', { name: '블라인드', exact: true }).click();
+    await page.getByRole('button', { name: '진행 중', exact: true }).click();
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toBeVisible();
 
     await acceptNextConfirm(page);
@@ -131,6 +131,8 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(table.getByRole('columnheader', { name: '역할' })).toBeVisible();
     await expect(table.getByRole('columnheader', { name: '상태' })).toBeVisible();
 
+    await expect(page.getByPlaceholder('회원 이름, 이메일 검색')).toBeVisible();
+    await expect(page.getByRole('button', { name: '정상 회원' })).toBeVisible();
     await expect(page.getByText('한강브루어리')).toBeVisible();
     await expect(page.getByText('민지쇼츠')).toBeVisible();
     await expect(page.getByText('광고주').first()).toBeVisible();
@@ -156,11 +158,17 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(memberRow.getByText('정상')).toBeVisible();
 
     await page.getByRole('button', { name: '입찰 관리' }).click();
+    await expect(page.getByPlaceholder('크리에이터 이름, 이메일, 캠페인 제목 검색').first()).toBeVisible();
     await expect(page.getByText('민지쇼츠').first()).toBeVisible();
     await expect(page.getByText(ACTIVE_AUCTION).first()).toBeVisible();
     await expect(page.getByRole('columnheader', { name: '입찰 상태' })).toBeVisible();
-    await expect(page.getByText('입찰 중').first()).toBeVisible();
-    await expect(page.getByText('결제 및 정산 완료').first()).toBeVisible();
+    await expect(page.locator('tbody').getByText('제안/대기').first()).toBeVisible();
+    await expect(page.getByText('낙찰 / 지급 완료').first()).toBeVisible();
+
+    await page.getByRole('button', { name: '지급 완료', exact: true }).click();
+    await expect(page.getByText(CLOSED_AUCTION).first()).toBeVisible();
+    await expect(page.getByText('낙찰 / 지급 완료').first()).toBeVisible();
+    await expect(page.getByText(ACTIVE_AUCTION)).toHaveCount(0);
   });
 
   test('정산 관리에 시드 정산과 결제 완료 캠페인이 함께 표시된다', async ({ page }) => {
@@ -171,6 +179,8 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(page.getByText('총 결제/입찰 금액')).toBeVisible();
     await expect(page.getByText('플랫폼 총 수수료 수익')).toBeVisible();
     await expect(page.getByText('크리에이터 지급 완료액')).toBeVisible();
+    await expect(page.getByPlaceholder('크리에이터 이름, 이메일, 캠페인 제목 검색')).toBeVisible();
+    await expect(page.getByRole('button', { name: '지급 대기' })).toBeVisible();
     await expect(page.getByRole('button', { name: '최근 7일' })).toBeVisible();
     await expect(table.getByRole('columnheader', { name: '크리에이터' })).toBeVisible();
     await expect(table.getByRole('columnheader', { name: '실지급액' })).toBeVisible();
@@ -211,5 +221,10 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(updatedRow.getByRole('button', { name: '지급 처리' })).toHaveCount(0);
     await expect(updatedRow.getByText('지급 완료').first()).toBeVisible();
     await expect(pinnedRow).toHaveCount(0);
+
+    await page.getByRole('button', { name: '입찰 관리' }).click();
+    await page.getByRole('button', { name: '지급 완료', exact: true }).click();
+    await expect(page.getByText(campaign).first()).toBeVisible();
+    await expect(page.getByText('낙찰 / 지급 완료').first()).toBeVisible();
   });
 });

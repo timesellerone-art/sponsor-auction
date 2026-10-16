@@ -4,22 +4,24 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
+import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
 import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
-import { cn, formatDate, formatWon } from '@/lib/utils';
-import type { AuctionAdminFilter } from '@/types/admin';
+import { formatDate, formatWon } from '@/lib/utils';
+import type { AuctionAdminFilter, ProfileItem } from '@/types/admin';
 import type { AuctionItem } from '@/types/auction';
 
 const STATUS_LABEL = AUCTION_STATUS_LABEL;
 
 const FILTERS: { id: AuctionAdminFilter; label: string }[] = [
   { id: 'all', label: '전체' },
-  { id: 'active', label: '진행중' },
-  { id: 'closed', label: '마감' },
-  { id: 'blind', label: '블라인드' },
+  { id: 'active', label: '진행 중' },
+  { id: 'awarded', label: '마감/낙찰' },
+  { id: 'ended', label: '종료/취소' },
 ];
 
 type AdminAuctionTableProps = {
   auctions: AuctionItem[];
+  profiles?: ProfileItem[];
   busyId: string | null;
   onBlind: (auction: AuctionItem) => void;
   onUnblind: (auction: AuctionItem) => void;
@@ -31,21 +33,25 @@ function isBlinded(auction: AuctionItem) {
 }
 
 function matchesFilter(auction: AuctionItem, filter: AuctionAdminFilter) {
-  const blinded = isBlinded(auction);
-  if (filter === 'blind') {
-    return blinded;
-  }
   if (filter === 'active') {
-    return !blinded && auction.status === 'active';
+    return auction.status === 'active';
   }
-  if (filter === 'closed') {
-    return !blinded && auction.status !== 'active';
+  if (filter === 'awarded') {
+    return (
+      auction.status === 'closed' ||
+      auction.status === 'matched' ||
+      auction.status === 'completed'
+    );
+  }
+  if (filter === 'ended') {
+    return auction.status === 'cancelled';
   }
   return true;
 }
 
 export function AdminAuctionTable({
   auctions,
+  profiles = [],
   busyId,
   onBlind,
   onUnblind,
@@ -53,6 +59,14 @@ export function AdminAuctionTable({
 }: AdminAuctionTableProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<AuctionAdminFilter>('all');
+  const emailByAuthor = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const profile of profiles) {
+      map.set(profile.id, (profile.email || '').toLowerCase());
+      map.set(profile.name, (profile.email || '').toLowerCase());
+    }
+    return map;
+  }, [profiles]);
 
   const filtered = useMemo(() => {
     if (!Array.isArray(auctions)) {
@@ -70,42 +84,32 @@ export function AdminAuctionTable({
       }
 
       const title = (auction.title || '').toLowerCase();
+      const description = (auction.description || '').toLowerCase();
       const author = (auction.authorName || '').toLowerCase();
-      return title.includes(keyword) || author.includes(keyword);
+      const email =
+        (auction.authorId ? emailByAuthor.get(auction.authorId) : '') ||
+        emailByAuthor.get(auction.authorName || '') ||
+        '';
+      return (
+        title.includes(keyword) ||
+        description.includes(keyword) ||
+        author.includes(keyword) ||
+        email.includes(keyword)
+      );
     });
-  }, [auctions, filter, query]);
+  }, [auctions, emailByAuthor, filter, query]);
 
   return (
     <div className="w-full min-w-0 rounded-2xl border border-zinc-200 bg-white">
-      <div className="flex min-w-0 flex-col gap-3 border-b border-zinc-200 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-        <label className="min-w-0 flex-1">
-          <span className="sr-only">역경매 검색</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="제목 또는 작성자 검색"
-            className="h-10 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-          />
-        </label>
-        <div className="flex max-w-full gap-1 overflow-x-auto rounded-full bg-zinc-100 p-1">
-          {FILTERS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setFilter(item.id)}
-              className={cn(
-                'h-8 shrink-0 rounded-full px-3 text-xs font-semibold',
-                filter === item.id
-                  ? 'bg-white text-zinc-950 shadow-sm'
-                  : 'text-zinc-500',
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <AdminFilterBar
+        query={query}
+        onQueryChange={setQuery}
+        placeholder="캠페인 제목, 설명, 광고주 이름/이메일 검색"
+        searchLabel="역경매 검색"
+        filters={FILTERS}
+        filter={filter}
+        onFilterChange={setFilter}
+      />
 
       {filtered.length === 0 ? (
         <div className="p-4">

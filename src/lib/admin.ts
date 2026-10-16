@@ -1,5 +1,6 @@
 import {
   approvePayout as approveMockPayout,
+  getBids as getMockBids,
   getPayouts as getMockPayouts,
   getProfiles as getMockProfiles,
   updateProfileStatus as updateMockProfileStatus,
@@ -17,7 +18,7 @@ import type {
   ProfileStatus,
 } from '@/types/admin';
 import { isAuthProfileRole } from '@/types/auth';
-import type { DataResult } from '@/types/auction';
+import type { BidItem, DataResult } from '@/types/auction';
 
 export const ADMIN_UPDATE_FAIL_MESSAGE =
   '변경에 실패했습니다. 다시 시도해 주세요.';
@@ -39,6 +40,15 @@ function fail<T>(data: T, error: string): DataResult<T> {
 
 function ok<T>(data: T): DataResult<T> {
   return { data, error: null };
+}
+
+function asBidItems(value: unknown): BidItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is BidItem => {
+    return Boolean(item && typeof item === 'object' && 'id' in item && 'auctionId' in item);
+  });
 }
 
 function asPayoutItems(value: unknown): PayoutItem[] {
@@ -207,6 +217,52 @@ export async function updateProfileStatus(
     console.info(`[SponsorAuction] 회원 상태 변경 종료 (${Date.now() - started}ms)`);
   }
   });
+}
+
+export async function getAdminBids(seedFromServer: BidItem[] = []): Promise<DataResult<BidItem[]>> {
+  const started = Date.now();
+  let fromDb: BidItem[] = asBidItems(seedFromServer);
+
+  try {
+    const response = await fetch('/api/admin/bids', {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-store' },
+    });
+    const payload = await parseAdminJson(response);
+    if (response.ok && Array.isArray(payload?.data)) {
+      fromDb = asBidItems(payload.data);
+    } else if (!payload?.fallbackMock && response.status !== 409 && !response.ok && fromDb.length === 0) {
+      return fail([], payload?.error || payload?.errorMessage || '입찰 목록을 불러오지 못했습니다.');
+    }
+  } catch (error) {
+    console.warn('[SponsorAuction] 입찰 API 목록 조회 실패', error);
+  } finally {
+    console.info(`[SponsorAuction] 관리자 입찰 목록 조회 종료 (${Date.now() - started}ms)`);
+  }
+
+  const mock = await mockGetSession();
+  if (mock.data) {
+    const mockResult = await getMockBids();
+    const merged = new Map<string, BidItem>();
+    for (const bid of asBidItems(mockResult.data)) {
+      merged.set(bid.id, bid);
+    }
+    for (const bid of fromDb) {
+      merged.set(bid.id, bid);
+    }
+    const list = Array.from(merged.values());
+    if (list.length === 0) {
+      return fail([], '등록된 입찰이 없습니다.');
+    }
+    return ok(list);
+  }
+
+  if (fromDb.length > 0) {
+    return ok(fromDb);
+  }
+
+  return getMockBids();
 }
 
 export async function getPayouts(seedFromServer: PayoutItem[] = []): Promise<DataResult<PayoutItem[]>> {

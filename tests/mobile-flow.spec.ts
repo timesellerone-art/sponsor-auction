@@ -112,7 +112,7 @@ test.describe('모바일 반응형 UI', () => {
     await expect(page.getByRole('columnheader', { name: '이름/이메일' })).toBeVisible();
 
     await page.getByRole('button', { name: '역경매 관리' }).click();
-    await page.getByPlaceholder('제목 또는 작성자 검색').fill(ACTIVE_AUCTION);
+    await page.getByPlaceholder('캠페인 제목, 설명, 광고주 이름/이메일 검색').fill(ACTIVE_AUCTION);
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toBeVisible();
     await expectNoPageHorizontalOverflow(page);
   });
