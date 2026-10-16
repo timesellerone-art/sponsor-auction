@@ -60,7 +60,7 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
 
   if (!ready || !allowed) {
     return (
-      <div className="flex w-full max-w-none flex-1 items-center justify-center px-4 py-16">
+      <div className="flex w-full flex-1 items-center justify-center px-4 py-16">
         <div className="h-40 w-full max-w-md animate-pulse rounded-2xl bg-white" />
       </div>
     );

@@ -9,6 +9,7 @@ import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { INSERT_FAIL_MESSAGE, createBid, getAuctionById } from '@/lib/auctions';
+import { advertiserPayableAmount, creatorPayoutAmount } from '@/lib/fees';
 import { rememberMyBid } from '@/lib/my-bids';
 import { getAuctionOwnerId, pushNotification } from '@/lib/notifications';
 import { cn, formatWon } from '@/lib/utils';
@@ -19,9 +20,6 @@ import {
   type BidFieldErrors,
 } from '@/lib/validation';
 import type { AuctionItem } from '@/types/auction';
-
-const ADVERTISER_FEE_RATE = 0.1;
-const CREATOR_FEE_RATE = 0.15;
 
 type FieldErrors = BidFieldErrors;
 
@@ -34,7 +32,7 @@ type BidModalProps = {
 
 export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
   const titleId = useId();
-  const { user, canPlaceBid } = useAuth();
+  const { user } = useAuth();
   const { requireCreator } = useRequireAuth();
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const [creatorChannelUrl, setCreatorChannelUrl] = useState('');
@@ -53,8 +51,8 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
     }
 
     return {
-      advertiserPays: Math.round(bidValue + bidValue * ADVERTISER_FEE_RATE),
-      creatorPayout: Math.round(bidValue - bidValue * CREATOR_FEE_RATE),
+      advertiserPays: advertiserPayableAmount(bidValue),
+      creatorPayout: creatorPayoutAmount(bidValue),
     };
   }, [bidAmount]);
 

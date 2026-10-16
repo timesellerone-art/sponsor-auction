@@ -26,12 +26,12 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html
       lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} h-full w-full max-w-none antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full w-full antialiased`}
     >
-      <body className="flex min-h-full w-full max-w-none flex-col overflow-x-clip bg-background font-sans text-foreground">
+      <body className="flex min-h-full w-full flex-col overflow-x-clip bg-background font-sans text-foreground">
         <AuthProvider>
           <Navbar />
-          <main className="flex w-full max-w-none min-w-0 flex-1 flex-col">{children}</main>
+          <main className="flex min-w-0 w-full flex-1 flex-col">{children}</main>
           <SiteFooter />
           <ToastHost />
           <AccessReasonToast />

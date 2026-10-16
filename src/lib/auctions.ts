@@ -639,7 +639,7 @@ export async function updateAuctionBlind(
         );
       }
 
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from('auctions')
         .update({ is_blind: isBlind })
         .eq('id', id)

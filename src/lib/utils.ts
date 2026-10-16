@@ -12,25 +12,6 @@ export function formatWon(value: number) {
   return `${wonFormatter.format(amount)}원`;
 }
 
-const dateTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
-export function formatDate(value: string | undefined) {
-  if (!value) {
-    return '날짜 없음';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return '날짜 없음';
-  }
-
-  return dateTimeFormatter.format(date);
-}
-
 const dateTimeLongFormatter = new Intl.DateTimeFormat('ko-KR', {
   dateStyle: 'medium',
   timeStyle: 'short',

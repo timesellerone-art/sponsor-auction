@@ -6,7 +6,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { showToast } from '@/components/Toast';
 import { formatDateTime, formatWon } from '@/lib/utils';
 import { ACCESS_REASON } from '@/lib/access';
-import { VALIDATION, getAwardBlockReason } from '@/lib/validation';
+import { getAwardBlockReason } from '@/lib/validation';
 import { BID_STATUS_LABEL } from '@/lib/status-labels';
 import {
   isAuctionClosed,

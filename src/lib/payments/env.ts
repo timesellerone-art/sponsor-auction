@@ -8,7 +8,7 @@ export function getTossClientKey() {
 }
 
 function normalizeTossSecret(raw: string) {
-  let key = raw.replace(/^["']+|["']+$/g, '').trim();
+  const key = raw.replace(/^["']+|["']+$/g, '').trim();
   if (/^basic\s+/i.test(key)) {
     const encoded = key.replace(/^basic\s+/i, '').trim();
     try {
@@ -44,11 +44,6 @@ export function isTossClientConfigured() {
 
 export function isTossSecretConfigured() {
   return Boolean(getTossSecretKey());
-}
-
-/** 위젯 표시 여부. 시크릿 키 유무와 무관하게 공개 클라이언트 키만 봅니다. */
-export function isTossConfigured() {
-  return isTossClientConfigured();
 }
 
 export function getPaymentSigningSecret() {

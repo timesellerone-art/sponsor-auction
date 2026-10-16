@@ -86,7 +86,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
-      <div className="flex h-14 w-full max-w-none min-w-0 items-center justify-between gap-2 px-4 sm:h-16 sm:px-6">
+      <div className="flex h-14 w-full min-w-0 items-center justify-between gap-2 px-4 sm:h-16 sm:px-6">
         <Link
           href="/"
           className="flex min-w-0 items-center gap-2 font-semibold tracking-tight text-zinc-950"
@@ -196,7 +196,7 @@ export function Navbar() {
         )}
       >
         <nav
-          className="flex w-full max-w-none flex-col gap-1 px-4 py-3"
+          className="flex w-full flex-col gap-1 px-4 py-3"
           aria-label="모바일"
         >
           <Link
