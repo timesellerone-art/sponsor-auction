@@ -82,15 +82,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
-      {needsOnboarding ? (
-        <RoleOnboarding
-          name={user?.name || '회원'}
-          onCompleted={() => {
-            void refresh();
-          }}
-        />
-      ) : null}
+      <div className="flex min-h-full w-full max-w-none flex-1 flex-col">
+        {children}
+        {needsOnboarding ? (
+          <RoleOnboarding
+            name={user?.name || '회원'}
+            onCompleted={() => {
+              void refresh();
+            }}
+          />
+        ) : null}
+      </div>
     </AuthContext.Provider>
   );
 }

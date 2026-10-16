@@ -152,8 +152,8 @@ export function AdminBidTable({
           <AdminEmptyState message="조건에 맞는 입찰이 없습니다." />
         </div>
       ) : (
-        <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto">
-          <table className="w-full min-w-[800px] table-fixed text-left text-xs sm:text-sm lg:min-w-0">
+        <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto lg:overflow-x-hidden">
+          <table className="w-full min-w-[640px] table-fixed text-left text-xs sm:text-sm lg:min-w-0">
             <colgroup>
               <col className="w-[16%]" />
               <col className="w-[16%]" />
