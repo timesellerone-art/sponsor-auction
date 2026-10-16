@@ -148,8 +148,8 @@ export function AdminAuctionTable({
           <AdminEmptyState message="조건에 맞는 역경매가 없습니다." />
         </div>
       ) : (
-        <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto xl:overflow-x-hidden">
-          <table className="w-full min-w-0 table-fixed text-left text-xs sm:text-sm">
+        <div className="max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto">
+          <table className="w-full min-w-0 table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[28%]" />
               <col className="w-[16%]" />
@@ -160,12 +160,12 @@ export function AdminAuctionTable({
             </colgroup>
             <thead className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
               <tr>
-                <th className="px-2 py-2 sm:px-3 font-medium">제목</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">작성자</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">예산</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">상태</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">생성일자</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">관리</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">제목</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">작성자</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">예산</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">상태</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">생성일자</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -181,37 +181,37 @@ export function AdminAuctionTable({
                     key={auction.id}
                     className="border-b border-zinc-100 last:border-0"
                   >
-                    <td className="min-w-0 max-w-[300px] overflow-hidden px-2 py-2 sm:px-3 align-top whitespace-nowrap text-ellipsis">
+                    <td className="min-w-0 max-w-[120px] overflow-hidden px-1 py-1.5 align-top text-ellipsis whitespace-nowrap sm:px-2">
                       <Link
                         href={`/auctions/${auction.id}`}
                         title={title}
-                        className="block min-w-0 max-w-full overflow-hidden font-medium text-ellipsis whitespace-nowrap text-zinc-950 hover:underline"
+                        className="block min-w-0 max-w-[120px] truncate font-medium text-zinc-950 hover:underline"
                       >
                         {title}
                       </Link>
                     </td>
-                    <td className="min-w-0 max-w-[200px] overflow-hidden px-2 py-2 sm:px-3 align-top text-zinc-600 text-ellipsis whitespace-nowrap">
-                      <span className="block min-w-0 truncate" title={auction.authorName || '미상'}>
+                    <td className="min-w-0 max-w-[120px] overflow-hidden px-1 py-1.5 align-top text-ellipsis whitespace-nowrap text-zinc-600 sm:px-2">
+                      <span className="block min-w-0 max-w-[120px] truncate" title={auction.authorName || '미상'}>
                         {auction.authorName || '미상'}
                       </span>
                     </td>
-                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top font-medium whitespace-nowrap text-zinc-950">
+                    <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top font-medium whitespace-nowrap text-zinc-950">
                       {formatWon(auction.budget)}
                     </td>
-                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
+                    <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
                       {blinded ? '블라인드' : (STATUS_LABEL[status] ?? status)}
                     </td>
-                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
+                    <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
                       {formatAdminTimestamp(auction.createdAt)}
                     </td>
-                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top">
+                    <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top">
                       <div className="flex flex-wrap gap-2">
                         {blinded ? (
                           <button
                             type="button"
                             disabled={anyBusy}
                             onClick={() => onUnblind(auction)}
-                            className="inline-flex items-center gap-1 rounded-full border border-teal-200 px-3 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-md border border-teal-200 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
                             {busy ? '처리 중...' : '블라인드 해제'}
@@ -221,7 +221,7 @@ export function AdminAuctionTable({
                             type="button"
                             disabled={anyBusy}
                             onClick={() => onBlind(auction)}
-                            className="inline-flex items-center gap-1 rounded-full border border-zinc-200 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
                             {busy ? '처리 중...' : '블라인드 처리'}
@@ -231,7 +231,7 @@ export function AdminAuctionTable({
                           type="button"
                           disabled={anyBusy}
                           onClick={() => onDelete(auction)}
-                          className="inline-flex items-center gap-1 rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex items-center gap-1 rounded-md border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
                           {busy ? '처리 중...' : '삭제'}

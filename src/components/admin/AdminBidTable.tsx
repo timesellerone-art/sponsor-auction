@@ -152,8 +152,8 @@ export function AdminBidTable({
           <AdminEmptyState message="조건에 맞는 입찰이 없습니다." />
         </div>
       ) : (
-        <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto xl:overflow-x-hidden">
-          <table className="w-full min-w-0 table-fixed text-left text-xs sm:text-sm">
+        <div className="max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto">
+          <table className="w-full min-w-0 table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[16%]" />
               <col className="w-[16%]" />
@@ -166,14 +166,14 @@ export function AdminBidTable({
             </colgroup>
             <thead className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
               <tr>
-                <th className="px-2 py-2 sm:px-3 font-medium">크리에이터</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">캠페인</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">광고주</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">입찰 상태</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">처리 일시</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">입찰가</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">예상 수수료</th>
-                <th className="px-2 py-2 sm:px-3 font-medium">채널</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">크리에이터</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">캠페인</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">광고주</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">입찰 상태</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">처리 일시</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">입찰가</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">예상 수수료</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">채널</th>
               </tr>
             </thead>
             <tbody>
@@ -191,27 +191,27 @@ export function AdminBidTable({
 
                 return (
                   <tr key={bid.id} className="border-b border-zinc-100 last:border-0">
-                    <td className="min-w-0 max-w-[220px] overflow-hidden px-2 py-2 sm:px-3 align-top">
+                    <td className="min-w-0 max-w-[120px] overflow-hidden px-1 py-1.5 align-top sm:px-2">
                       <p
-                        className="min-w-0 overflow-hidden font-medium text-ellipsis whitespace-nowrap text-zinc-950"
+                        className="min-w-0 max-w-[120px] truncate font-medium text-zinc-950"
                         title={bid.creatorName || '이름 없음'}
                       >
                         {bid.creatorName || '이름 없음'}
                       </p>
-                      <AdminCopyText value={email} emptyLabel="이메일 없음" className="mt-1" />
-                      <AdminCopyText value={account} emptyLabel="계좌 미등록" className="mt-0.5" />
+                      <AdminCopyText value={email} emptyLabel="이메일 없음" className="mt-1 max-w-[120px]" />
+                      <AdminCopyText value={account} emptyLabel="계좌 미등록" className="mt-0.5 max-w-[120px]" />
                     </td>
-                    <td className="min-w-0 max-w-[300px] overflow-hidden px-2 py-2 sm:px-3 align-top text-zinc-600 text-ellipsis whitespace-nowrap">
-                      <span className="block min-w-0 truncate" title={campaign}>
+                    <td className="min-w-0 max-w-[120px] overflow-hidden px-1 py-1.5 align-top text-ellipsis whitespace-nowrap text-zinc-600 sm:px-2">
+                      <span className="block min-w-0 max-w-[120px] truncate" title={campaign}>
                         {campaign}
                       </span>
                     </td>
-                    <td className="min-w-0 max-w-[200px] overflow-hidden px-2 py-2 sm:px-3 align-top text-zinc-600 text-ellipsis whitespace-nowrap">
+                    <td className="min-w-0 max-w-[120px] overflow-hidden px-1 py-1.5 align-top text-ellipsis whitespace-nowrap text-zinc-600 sm:px-2">
                       <span className="block min-w-0 truncate" title={advertiser}>
                         {advertiser}
                       </span>
                     </td>
-                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top">
+                    <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top">
                       <span
                         className={cn(
                           'inline-flex rounded-full px-2 py-1 text-xs font-semibold',
@@ -221,16 +221,16 @@ export function AdminBidTable({
                         {ADMIN_BID_STATUS_LABEL[lifecycle]}
                       </span>
                     </td>
-                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
+                    <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
                       {formatAdminTimestamp(payout?.paidAt || payout?.requestedAt || bid.createdAt)}
                     </td>
-                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top font-medium whitespace-nowrap text-zinc-950">
+                    <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top font-medium whitespace-nowrap text-zinc-950">
                       {formatWon(bid.bidAmount)}
                     </td>
-                    <td className="min-w-0 px-2 py-2 sm:px-3 align-top whitespace-nowrap text-zinc-600">
+                    <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
                       {formatWon(platformFeeFromAmount(bid.bidAmount))}
                     </td>
-                    <td className="min-w-0 max-w-[200px] overflow-hidden px-2 py-2 sm:px-3 align-top">
+                    <td className="min-w-0 max-w-[120px] overflow-hidden px-1 py-1.5 align-top sm:px-2">
                       {bid.creatorChannelUrl ? (
                         <a
                           href={bid.creatorChannelUrl}

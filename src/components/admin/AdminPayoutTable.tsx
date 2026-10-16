@@ -340,7 +340,7 @@ export function AdminPayoutTable({
           <AdminEmptyState message="선택한 기간의 정산 내역이 없습니다." />
         </div>
       ) : (
-        <div className="max-h-[70vh] w-full min-w-0 overflow-y-auto overflow-x-auto xl:overflow-x-hidden">
+        <div className="max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto">
             <table className="w-full min-w-0 table-fixed text-left text-xs leading-tight">
               <colgroup>
                 <col className="w-[3%]" />
@@ -359,7 +359,7 @@ export function AdminPayoutTable({
               </colgroup>
               <thead className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
                 <tr>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">
                     <input
                       type="checkbox"
                       aria-label="지급 대기 전체 선택"
@@ -373,18 +373,18 @@ export function AdminPayoutTable({
                       }}
                     />
                   </th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">크리에이터</th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">캠페인</th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">처리 일시</th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">공급가액</th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">부가세</th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">3.3% 공제액</th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">최종 정산액</th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">수수료(공제액)</th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">실지급액</th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">상태</th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">관리</th>
-                  <th className="overflow-hidden px-2 py-1.5 font-medium">관리자 메모</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">크리에이터</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">캠페인</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">처리 일시</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">공급가액</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">부가세</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">3.3% 공제액</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">최종 정산액</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">수수료(공제액)</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">실지급액</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">상태</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">관리</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">관리자 메모</th>
                 </tr>
               </thead>
               <tbody>
@@ -399,7 +399,7 @@ export function AdminPayoutTable({
                       key={payout.id}
                       className="border-b border-zinc-100 last:border-0"
                     >
-                      <td className="overflow-hidden px-2 py-1.5 align-top">
+                      <td className="overflow-hidden px-1 py-1.5 align-top sm:px-2">
                         {pending ? (
                           <input
                             type="checkbox"
@@ -415,9 +415,9 @@ export function AdminPayoutTable({
                           />
                         ) : null}
                       </td>
-                      <td className="min-w-0 max-w-[150px] overflow-hidden px-2 py-1.5 align-top">
+                      <td className="min-w-0 max-w-[120px] overflow-hidden px-1 py-1.5 sm:px-2 align-top">
                         <p
-                          className="min-w-0 max-w-[150px] truncate font-medium text-zinc-950"
+                          className="min-w-0 max-w-[120px] truncate font-medium text-zinc-950"
                           title={row.creatorName || '이름 없음'}
                         >
                           {row.creatorName || '이름 없음'}
@@ -425,47 +425,47 @@ export function AdminPayoutTable({
                         <AdminCopyText
                           value={row.creatorEmail || ''}
                           emptyLabel="이메일 없음"
-                          className="mt-0.5 max-w-[150px]"
+                          className="mt-0.5 max-w-[120px]"
                         />
                         <AdminCopyText
                           value={row.bankAccount || ''}
                           emptyLabel="계좌 미등록"
-                          className="mt-0.5 max-w-[150px]"
+                          className="mt-0.5 max-w-[120px]"
                         />
                       </td>
                       <td
                         data-col="campaign"
-                        className="min-w-0 max-w-[150px] overflow-hidden px-2 py-1.5 align-top text-zinc-600"
+                        className="min-w-0 max-w-[120px] overflow-hidden px-1 py-1.5 sm:px-2 align-top text-zinc-600"
                       >
                         <span
-                          className="block min-w-0 max-w-[150px] truncate"
+                          className="block min-w-0 max-w-[120px] truncate"
                           title={row.auctionTitle || '연결된 캠페인 없음'}
                         >
                           {row.auctionTitle || '연결된 캠페인 없음'}
                         </span>
                       </td>
-                      <td className="min-w-0 overflow-hidden px-2 py-1.5 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
+                      <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
                         {formatAdminTimestamp(row.paidAt || row.requestedAt)}
                       </td>
-                      <td className="min-w-0 overflow-hidden px-2 py-1.5 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
+                      <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
                         {formatWon(row.supplyAmount ?? 0)}
                       </td>
-                      <td className="min-w-0 overflow-hidden px-2 py-1.5 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
+                      <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
                         {formatWon(row.vatAmount ?? 0)}
                       </td>
-                      <td className="min-w-0 overflow-hidden px-2 py-1.5 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
+                      <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
                         {formatWon(row.withholdingAmount ?? 0)}
                       </td>
-                      <td className="min-w-0 overflow-hidden px-2 py-1.5 align-top font-medium tabular-nums text-ellipsis whitespace-nowrap text-zinc-950">
+                      <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top font-medium tabular-nums text-ellipsis whitespace-nowrap text-zinc-950">
                         {formatWon(row.netPayoutAmount ?? row.amount)}
                       </td>
-                      <td className="min-w-0 overflow-hidden px-2 py-1.5 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
+                      <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
                         {formatWon(row.platformFee ?? 0)}
                       </td>
-                      <td className="min-w-0 overflow-hidden px-2 py-1.5 align-top font-medium tabular-nums text-ellipsis whitespace-nowrap text-zinc-950">
+                      <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top font-medium tabular-nums text-ellipsis whitespace-nowrap text-zinc-950">
                         {formatWon(row.amount)}
                       </td>
-                      <td className="min-w-0 overflow-hidden px-2 py-1.5 align-top">
+                      <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top">
                         <span
                           className={
                             pending
@@ -476,7 +476,7 @@ export function AdminPayoutTable({
                           {STATUS_LABEL[row.status] ?? row.status}
                         </span>
                       </td>
-                      <td className="min-w-0 overflow-hidden px-2 py-1.5 align-top">
+                      <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top">
                         <div className="flex min-w-0 flex-col gap-1">
                           {pending ? (
                             <button
@@ -485,7 +485,7 @@ export function AdminPayoutTable({
                               onClick={() => {
                                 void handleApprove(payout);
                               }}
-                              className="inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-md border border-teal-200 px-1 py-0.5 text-[10px] font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-md border border-teal-200 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
                               {busy ? '처리 중...' : '지급 처리'}
@@ -496,13 +496,13 @@ export function AdminPayoutTable({
                           <button
                             type="button"
                             onClick={() => setTaxPayout(row)}
-                            className="inline-flex w-full min-w-0 items-center justify-center rounded-md border border-zinc-200 px-1 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50"
+                            className="inline-flex w-full min-w-0 items-center justify-center rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50"
                           >
                             세무 상세
                           </button>
                         </div>
                       </td>
-                      <td className="min-w-0 overflow-hidden px-2 py-1.5 align-top">
+                      <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top">
                         <div className="flex min-w-0 flex-col gap-1">
                           <input
                             value={memoDrafts[payout.id] ?? row.adminMemo ?? ''}
@@ -510,7 +510,7 @@ export function AdminPayoutTable({
                               setMemoDrafts((prev) => ({ ...prev, [payout.id]: event.target.value }))
                             }
                             placeholder="내부 메모"
-                            className="h-7 w-full min-w-0 truncate rounded-md border border-zinc-200 px-2 text-xs outline-none focus:border-teal-600"
+                            className="h-7 w-24 min-w-0 truncate rounded-md border border-zinc-200 px-1.5 text-xs outline-none focus:border-teal-600"
                           />
                           <button
                             type="button"
@@ -518,7 +518,7 @@ export function AdminPayoutTable({
                             onClick={() => {
                               void handleSaveMemo(payout);
                             }}
-                            className="h-6 w-full min-w-0 rounded-md border border-zinc-200 px-1 text-[10px] font-semibold text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+                            className="h-6 w-24 min-w-0 rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
                           >
                             {memoBusyId === payout.id ? '저장 중...' : '메모 저장'}
                           </button>
