@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react';
 import { AuctionBrowseBar } from '@/components/AuctionBrowseBar';
 import { AuctionCard, AuctionCardSkeleton } from '@/components/AuctionCard';
 import { useAuth } from '@/components/AuthProvider';
+import { PageContainer } from '@/components/PageContainer';
 import {
   browseAuctions,
   type BrowsePlatformFilter,
@@ -70,7 +71,7 @@ export default function Home() {
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <section className="border-b border-zinc-200 bg-gradient-to-b from-teal-50 to-background">
-        <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-5 px-4 py-10 sm:gap-6 sm:px-6 sm:py-16 lg:py-20">
+        <PageContainer className="flex flex-col gap-5 py-10 sm:gap-6 sm:py-16 lg:py-20">
           <p className="text-sm font-semibold tracking-wide text-teal-800">
             마이크로 스폰서십 역경매
           </p>
@@ -104,12 +105,12 @@ export default function Home() {
               진행 중인 역경매 보기
             </a>
           </div>
-        </div>
+        </PageContainer>
       </section>
 
-      <section
+      <PageContainer
         id="auctions"
-        className="mx-auto w-full max-w-6xl min-w-0 flex-1 px-4 py-10 sm:px-6 sm:py-14"
+        className="flex-1 py-10 sm:py-14"
       >
         <div className="mb-5 flex flex-col gap-1 sm:mb-6">
           <h2 className="text-xl font-bold text-zinc-950 sm:text-2xl">
@@ -183,7 +184,7 @@ export default function Home() {
             ) : null}
           </div>
         )}
-      </section>
+      </PageContainer>
     </div>
   );
 }

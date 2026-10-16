@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AuctionCard, AuctionCardSkeleton } from '@/components/AuctionCard';
+import { PageContainer } from '@/components/PageContainer';
 import { BidProposalList } from '@/components/BidProposalList';
 import { PaymentCheckoutModal } from '@/components/PaymentCheckoutModal';
 import { useActionLock } from '@/hooks/useActionLock';
@@ -89,7 +90,7 @@ export function AdvertiserDashboard() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10">
+    <PageContainer className="flex min-w-0 flex-1 flex-col py-6 sm:py-10">
       <p className="text-sm font-semibold tracking-wide text-teal-800">광고주</p>
       <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">내 역경매</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
@@ -247,6 +248,6 @@ export function AdvertiserDashboard() {
         checkout={checkout}
         onClose={closeCheckout}
       />
-    </div>
+    </PageContainer>
   );
 }

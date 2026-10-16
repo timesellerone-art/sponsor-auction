@@ -31,7 +31,9 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       <body className="flex min-h-full w-full flex-col overflow-x-clip bg-background font-sans text-foreground">
         <AuthProvider>
           <Navbar />
-          <main className="flex min-w-0 w-full flex-1 flex-col">{children}</main>
+          <main className="flex min-h-screen w-full min-w-0 flex-1 flex-col">
+            {children}
+          </main>
           <SiteFooter />
           <ToastHost />
           <AccessReasonToast />

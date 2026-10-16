@@ -340,8 +340,8 @@ export function AdminPayoutTable({
           <AdminEmptyState message="선택한 기간의 정산 내역이 없습니다." />
         </div>
       ) : (
-        <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto lg:overflow-x-hidden">
-            <table className="w-full min-w-[640px] table-fixed text-left text-[11px] leading-tight sm:text-xs lg:min-w-0">
+        <div className="max-h-[70vh] w-full min-w-0 overflow-x-auto overflow-y-auto xl:overflow-x-hidden">
+            <table className="w-full min-w-0 table-fixed text-left text-[11px] leading-tight sm:text-xs">
               <colgroup>
                 <col className="w-[2%]" />
                 <col className="w-[12%]" />
@@ -444,7 +444,7 @@ export function AdminPayoutTable({
                           {row.auctionTitle || '연결된 캠페인 없음'}
                         </span>
                       </td>
-                      <td className="min-w-0 overflow-hidden px-1 py-1.5 align-top tabular-nums text-zinc-600">
+                      <td className="min-w-0 overflow-hidden px-1 py-1.5 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
                         {formatAdminTimestamp(row.paidAt || row.requestedAt)}
                       </td>
                       <td className="min-w-0 overflow-hidden px-1 py-1.5 align-top tabular-nums text-zinc-600">

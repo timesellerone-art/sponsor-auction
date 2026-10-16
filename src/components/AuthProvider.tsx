@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={value}>
-      <div className="flex min-h-full w-full flex-1 flex-col">
+      <div className="flex min-h-screen w-full min-w-0 flex-1 flex-col">
         {children}
         {needsOnboarding ? (
           <RoleOnboarding

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AuctionCardSkeleton } from '@/components/AuctionCard';
+import { PageContainer } from '@/components/PageContainer';
 import { useAuth } from '@/components/AuthProvider';
 import { getCreatorDashboard } from '@/lib/dashboard';
 import { CREATOR_FEE_RATE } from '@/lib/fees';
@@ -64,7 +65,7 @@ export function CreatorDashboard() {
   const pendingDeals = deals.filter((deal) => deal.bid.status !== 'selected');
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10">
+    <PageContainer className="flex min-w-0 flex-1 flex-col py-6 sm:py-10">
       <p className="text-sm font-semibold tracking-wide text-teal-800">크리에이터</p>
       <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">내 제안</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
@@ -142,7 +143,7 @@ export function CreatorDashboard() {
           </section>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
 
