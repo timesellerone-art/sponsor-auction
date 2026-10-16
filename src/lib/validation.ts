@@ -37,6 +37,7 @@ export const VALIDATION = {
   payoutAlready: '이미 승인된 정산입니다.',
   termsRequired: '서비스 이용약관에 동의해 주세요.',
   privacyRequired: '개인정보처리방침에 동의해 주세요.',
+  refundRequired: '구매 조건 확인 및 환불 규정에 동의해 주세요.',
 } as const;
 
 const CHANNEL_URL_PATTERN =

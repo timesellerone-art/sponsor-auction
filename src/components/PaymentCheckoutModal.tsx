@@ -2,8 +2,10 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import { Loader2, X } from 'lucide-react';
 import { showToast } from '@/components/Toast';
+import { REFUND_REQUIRED } from '@/lib/legal';
 import { rememberCheckoutContext } from '@/lib/payments/client';
 import { getTossClientKey } from '@/lib/payments/env';
 import {
@@ -45,6 +47,8 @@ export function PaymentCheckoutModal({
   const [method, setMethod] = useState<PaymentMethod>('CARD');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [payError, setPayError] = useState<PaymentErrorInfo | null>(null);
+  const [agreeRefund, setAgreeRefund] = useState(false);
+  const [refundError, setRefundError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -71,6 +75,8 @@ export function PaymentCheckoutModal({
       setReady(false);
       setLoadError(null);
       setPayError(null);
+      setAgreeRefund(false);
+      setRefundError(null);
       return;
     }
 
@@ -144,6 +150,12 @@ export function PaymentCheckoutModal({
 
   const handlePay = async () => {
     if (busy || !ready) {
+      return;
+    }
+
+    if (!agreeRefund) {
+      setRefundError(REFUND_REQUIRED);
+      showToast(REFUND_REQUIRED);
       return;
     }
 
@@ -322,6 +334,38 @@ export function PaymentCheckoutModal({
               <div id="toss-agreement" className="min-w-0" />
             </>
           )}
+
+          <label className="flex items-start gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3 text-sm text-zinc-800">
+            <input
+              type="checkbox"
+              checked={agreeRefund}
+              onChange={(event) => {
+                setAgreeRefund(event.target.checked);
+                if (event.target.checked) {
+                  setRefundError(null);
+                }
+              }}
+              className="mt-0.5 size-4 shrink-0 accent-teal-700"
+              aria-label="구매 조건 확인 및 환불 규정에 동의합니다"
+            />
+            <span>
+              구매 조건 확인 및{' '}
+              <Link
+                href="/refund"
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-teal-800 hover:underline"
+              >
+                환불 규정
+              </Link>
+              에 동의합니다 (필수)
+            </span>
+          </label>
+          {refundError ? (
+            <p className="text-xs text-rose-600" role="alert">
+              {refundError}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 gap-2 border-t border-zinc-200 px-4 py-3 sm:px-5">
@@ -335,7 +379,7 @@ export function PaymentCheckoutModal({
           </button>
           <button
             type="button"
-            disabled={busy || !ready}
+            disabled={busy || !ready || !agreeRefund}
             onClick={() => {
               void handlePay();
             }}

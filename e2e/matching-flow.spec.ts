@@ -84,6 +84,9 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
 
     const paymentDialog = page.getByRole('dialog', { name: '안전결제' });
     await expect(paymentDialog).toBeVisible();
+    await paymentDialog
+      .getByRole('checkbox', { name: '구매 조건 확인 및 환불 규정에 동의합니다' })
+      .check();
     await paymentDialog.getByRole('button', { name: '결제하기' }).click();
     await expect(page).toHaveURL(/\/payments\/success/);
     await expect(

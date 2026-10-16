@@ -16,7 +16,7 @@ export function LegalDocument({
       <p className="text-sm font-semibold tracking-wide text-teal-800">{kicker}</p>
       <h1 className="mt-1 text-2xl font-bold break-keep text-zinc-950 sm:text-3xl">{title}</h1>
       <p className="mt-2 text-sm text-zinc-500">시행일 {updated}</p>
-      <div className="mt-8 max-h-[70vh] space-y-6 overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-5 text-sm leading-6 text-zinc-700 sm:p-8">
+      <div className="mt-8 space-y-6 rounded-2xl border border-zinc-200 bg-white p-5 text-sm leading-6 text-zinc-700 sm:p-8">
         {children}
       </div>
     </article>

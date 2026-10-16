@@ -23,7 +23,7 @@ test.describe('모바일 반응형 UI', () => {
     await expect(page.getByRole('heading', { name: '진행 중인 역경매' })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toBeVisible();
 
-    await expectInViewportHorizontally(page.getByRole('link', { name: 'SponsorAuction' }));
+    await expectInViewportHorizontally(page.getByRole('link', { name: 'SponsorAuction', exact: true }));
     await expectInViewportHorizontally(page.getByRole('button', { name: '역경매 등록' }).first());
     await expectInViewportHorizontally(page.getByRole('button', { name: '메뉴 열기' }));
     await expectNoPageHorizontalOverflow(page);

@@ -7,7 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { AgreementFields } from '@/components/AgreementFields';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
-import { validateAgreements } from '@/lib/legal';
+import { SIGNUP_AGREEMENT_REQUIRED, validateSignupAgreement } from '@/lib/legal';
 import {
   AUTH_FAIL_MESSAGE,
   signIn,
@@ -64,11 +64,10 @@ export default function LoginPage() {
     if (mode !== 'signup') {
       return true;
     }
-    const nextErrors = validateAgreements({ agreeTerms, agreePrivacy });
+    const nextErrors = validateSignupAgreement(agreeTerms && agreePrivacy);
     setAgreementErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
-      const message = nextErrors.agreeTerms ?? nextErrors.agreePrivacy ?? '약관에 동의해 주세요.';
-      setError(message);
+      const message = nextErrors.agreeTerms ?? SIGNUP_AGREEMENT_REQUIRED;
       showToast(message);
       return false;
     }
@@ -231,6 +230,7 @@ export default function LoginPage() {
         {mode === 'signup' ? (
           <div className="mt-4">
             <AgreementFields
+              variant="combined"
               agreeTerms={agreeTerms}
               agreePrivacy={agreePrivacy}
               onTermsChange={setAgreeTerms}
