@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
+import { notifyLifecycleEvent } from '@/lib/notification';
 import { pushNotification } from '@/lib/notifications';
 import { UPDATE_FAIL_MESSAGE, awardBid, getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
 import { advertiserPayableAmount } from '@/lib/fees';
@@ -206,6 +207,13 @@ function PaymentSuccessContent() {
             toast: false,
           });
         }
+        void notifyLifecycleEvent({
+          event: 'award_paid',
+          auctionId: auction.id,
+          auctionTitle: auction.title,
+          toUserId: bid.creatorId,
+          toName: bid.creatorName,
+        });
         window.dispatchEvent(new Event('auctions:changed'));
       } catch (caught) {
         const info = parsePaymentError({

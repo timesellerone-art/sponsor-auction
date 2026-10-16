@@ -12,6 +12,7 @@ import {
   updateAuctionStatus as updateMockAuctionStatus,
 } from '@/lib/mock-data';
 import { withExclusiveAction } from '@/lib/action-lock';
+import { notifyLifecycleEvent } from '@/lib/notification';
 import { type SponsorAuctionClient } from '@/lib/supabase';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
@@ -290,7 +291,17 @@ export async function createBid(
     }
 
     if (!supabase) {
-      return createMockBid(input);
+      const mocked = await createMockBid(input);
+      if (mocked.data) {
+        void notifyLifecycleEvent({
+          event: 'bid_received',
+          auctionId: auction.id,
+          auctionTitle: auction.title,
+          toName: auction.authorName,
+          toUserId: auction.authorId,
+        });
+      }
+      return mocked;
     }
 
     const started = Date.now();
@@ -365,7 +376,15 @@ export async function createBid(
         return fail(null, INSERT_FAIL_MESSAGE);
       }
 
-      return ok(mapBid(data));
+      const created = mapBid(data);
+      void notifyLifecycleEvent({
+        event: 'bid_received',
+        auctionId: auction.id,
+        auctionTitle: auction.title,
+        toName: auction.authorName,
+        toUserId: auction.authorId,
+      });
+      return ok(created);
     } catch (error) {
       logDbError('입찰 등록 예외', error);
       return fail(null, INSERT_FAIL_MESSAGE);

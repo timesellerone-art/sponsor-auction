@@ -7,6 +7,7 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { listPayoutsFromDatabase, markPayoutPaid, type MarkPayoutPaidInput } from '@/lib/payouts';
+import { deliverLifecycleNotification } from '@/lib/notification';
 import { issueTaxInvoice } from '@/lib/popbill';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { bidAmountFromCreatorPayout } from '@/lib/fees';
@@ -158,6 +159,20 @@ export async function POST(request: Request) {
       console.info('[SponsorAuction] 정산 세금계산서 처리', tax);
     } catch (error) {
       console.warn('[SponsorAuction] 세금계산서 연동 우회', error);
+    }
+
+    try {
+      await deliverLifecycleNotification({
+        event: 'payout_paid',
+        toName: result.data.creatorName,
+        toEmail: result.data.creatorEmail,
+        toUserId: result.data.creatorId,
+        auctionId: result.data.auctionId,
+        auctionTitle: result.data.auctionTitle,
+        extra: `${result.data.amount}원`,
+      });
+    } catch (error) {
+      console.info('[Notification Mock] 정산 알림 우회', error);
     }
 
     return NextResponse.json(

@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { listBidsFromDatabase } from '@/lib/auctions';
+import { notifyUpcomingDeadlines } from '@/lib/notification-deadline';
 import { listPayoutsFromDatabase } from '@/lib/payouts';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { PayoutItem } from '@/types/admin';
@@ -26,6 +27,7 @@ export async function getAdminBoardFromDatabase(): Promise<{
       listPayoutsFromDatabase(client),
       listBidsFromDatabase(client),
     ]);
+    void notifyUpcomingDeadlines();
     return { payouts, bids };
   } catch (error) {
     console.error('[SponsorAuction] 관리자 정산/입찰 서버 조회 실패', error);
