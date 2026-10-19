@@ -1,4 +1,4 @@
-import { CREATOR_FEE_RATE } from '@/lib/fees';
+import { CREATOR_FEE_RATE } from './fees';
 
 export const VAT_RATE = 0.1;
 export const WITHHOLDING_RATE = 0.033;

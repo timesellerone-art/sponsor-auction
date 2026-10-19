@@ -121,6 +121,10 @@ export async function signInWithOAuth(
   provider: SocialOAuthProvider,
   nextPath?: string | null,
 ): Promise<DataResult<boolean>> {
+  if (provider === 'naver') {
+    return signInWithNaver(nextPath);
+  }
+
   const supabase = createClient();
   if (!supabase) {
     return fail(false, 'Supabase가 설정되지 않아 소셜 로그인을 사용할 수 없습니다.');
@@ -159,7 +163,12 @@ export async function signInWithKakao(nextPath?: string | null) {
 }
 
 export async function signInWithNaver(nextPath?: string | null) {
-  return signInWithOAuth('naver', nextPath);
+  if (typeof window === 'undefined') {
+    return fail(false, AUTH_FAIL_MESSAGE);
+  }
+  const next = sanitizeNextPath(nextPath) ?? '/';
+  window.location.assign(`/api/auth/naver?next=${encodeURIComponent(next)}`);
+  return ok(true);
 }
 
 export async function signInWithApple(nextPath?: string | null) {

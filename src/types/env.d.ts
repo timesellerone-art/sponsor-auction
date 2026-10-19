@@ -15,5 +15,7 @@ declare namespace NodeJS {
     SUPABASE_SERVICE_ROLE?: string;
     NEXT_PUBLIC_TOSS_CLIENT_KEY?: string;
     TOSS_SECRET_KEY?: string;
+    NAVER_CLIENT_ID?: string;
+    NAVER_CLIENT_SECRET?: string;
   }
 }

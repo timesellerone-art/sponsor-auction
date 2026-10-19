@@ -85,5 +85,7 @@ export const config = {
     '/api/admin/:path*',
     '/api/ai-analyze',
     '/api/notifications/:path*',
+    '/api/auth/naver',
+    '/api/auth/naver/:path*',
   ],
 };

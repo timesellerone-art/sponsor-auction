@@ -1,28 +1,39 @@
 export const ADVERTISER_FEE_RATE = 0.1;
 export const CREATOR_FEE_RATE = 0.15;
 
-export function platformFeeFromAmount(amount: number) {
-  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+function asWon(value: number) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
     return 0;
   }
 
-  return Math.round(amount * ADVERTISER_FEE_RATE + amount * CREATOR_FEE_RATE);
+  return Math.round(value);
+}
+
+export function platformFeeFromAmount(amount: number) {
+  const won = asWon(amount);
+  if (won <= 0) {
+    return 0;
+  }
+
+  return Math.round(won * ADVERTISER_FEE_RATE) + Math.round(won * CREATOR_FEE_RATE);
 }
 
 export function advertiserPayableAmount(bidAmount: number) {
-  if (typeof bidAmount !== 'number' || !Number.isFinite(bidAmount) || bidAmount <= 0) {
+  const won = asWon(bidAmount);
+  if (won <= 0) {
     return 0;
   }
 
-  return Math.round(bidAmount + bidAmount * ADVERTISER_FEE_RATE);
+  return won + Math.round(won * ADVERTISER_FEE_RATE);
 }
 
 export function creatorPayoutAmount(bidAmount: number) {
-  if (typeof bidAmount !== 'number' || !Number.isFinite(bidAmount) || bidAmount <= 0) {
+  const won = asWon(bidAmount);
+  if (won <= 0) {
     return 0;
   }
 
-  return Math.round(bidAmount * (1 - CREATOR_FEE_RATE));
+  return Math.max(0, won - Math.round(won * CREATOR_FEE_RATE));
 }
 
 export function bidAmountFromCreatorPayout(payoutAmount: number) {

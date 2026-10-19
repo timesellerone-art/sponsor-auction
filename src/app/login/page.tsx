@@ -54,6 +54,13 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
+    const oauthError = new URLSearchParams(window.location.search).get('oauth_error');
+    if (oauthError) {
+      showToast(oauthError);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!ready || !user) {
       return;
     }

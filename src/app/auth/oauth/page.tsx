@@ -31,9 +31,22 @@ export default function AuthOAuthCompletePage() {
 
       const supabase = getSupabaseClient();
       const code = params.get('code');
+      const tokenHash = params.get('token_hash');
+      const otpType = params.get('type') === 'magiclink' ? 'magiclink' : 'email';
 
       try {
-        if (supabase && code) {
+        if (supabase && tokenHash) {
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: otpType,
+          });
+          if (error) {
+            console.warn('[SponsorAuction] 매직링크 세션 교환에 실패했습니다.', error.message);
+            showToast(error.message || '소셜 로그인에 실패했습니다.');
+            router.replace('/login?reason=auth-required');
+            return;
+          }
+        } else if (supabase && code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) {
             console.warn('[SponsorAuction] OAuth 세션 교환에 실패했습니다.', error.message);
