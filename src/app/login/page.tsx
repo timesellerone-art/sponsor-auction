@@ -310,17 +310,12 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
-            disabled={submitting || Boolean(oauthBusy)}
-            onClick={() => {
-              void handleOAuth('apple');
-            }}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-zinc-950 text-sm font-semibold text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+            disabled
+            aria-disabled="true"
+            title="Apple 로그인은 잠시 비활성화되어 있습니다."
+            className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-full bg-zinc-950 text-sm font-semibold text-white opacity-50"
           >
-            {oauthBusy === 'apple' ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <AppleMark />
-            )}
+            <AppleMark />
             Apple로 계속하기
           </button>
         </div>
