@@ -10,11 +10,18 @@ import {
   type ReactNode,
 } from 'react';
 import { getSessionUser, onKnownSession, subscribeAuthState } from '@/lib/auth';
-import { syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import {
-  canCreateAuction,
-  canPlaceBid,
+  readActiveRoleCookie,
+  syncActiveRoleCookie,
+  syncAuthPresentCookie,
+  syncRoleCookie,
+} from '@/lib/access';
+import {
+  isMemberRole,
   needsRoleOnboarding,
+  resolveActiveMemberRole,
+  switchableMemberRoles,
+  type MemberRole,
   type SessionUser,
 } from '@/types/auth';
 
@@ -22,8 +29,12 @@ type AuthContextValue = {
   user: SessionUser | null;
   ready: boolean;
   needsOnboarding: boolean;
+  activeRole: MemberRole | null;
+  switchableRoles: MemberRole[];
+  canSwitchRole: boolean;
   canCreateAuction: boolean;
   canPlaceBid: boolean;
+  setActiveRole: (role: MemberRole) => boolean;
   refresh: () => Promise<void>;
 };
 
@@ -31,14 +42,21 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   ready: false,
   needsOnboarding: false,
+  activeRole: null,
+  switchableRoles: [],
+  canSwitchRole: false,
   canCreateAuction: false,
   canPlaceBid: false,
+  setActiveRole: () => false,
   refresh: async () => undefined,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
+  const [activeRole, setActiveRoleState] = useState<MemberRole | null>(() =>
+    readActiveRoleCookie(),
+  );
 
   const refresh = useCallback(async () => {
     let settled = false;
@@ -85,18 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh]);
 
-  const needsOnboarding = needsRoleOnboarding(user);
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user,
-      ready,
-      needsOnboarding,
-      canCreateAuction: canCreateAuction(user),
-      canPlaceBid: canPlaceBid(user),
-      refresh,
-    }),
-    [needsOnboarding, ready, refresh, user],
-  );
+  const switchableRoles = useMemo(() => switchableMemberRoles(user), [user]);
 
   useEffect(() => {
     if (!ready) {
@@ -104,7 +111,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     syncRoleCookie(user?.role ?? null, user?.roles);
     syncAuthPresentCookie(Boolean(user));
+    if (!user) {
+      setActiveRoleState(null);
+      syncActiveRoleCookie(null);
+      return;
+    }
+    setActiveRoleState((current) =>
+      resolveActiveMemberRole(user, current ?? readActiveRoleCookie()),
+    );
   }, [ready, user]);
+
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
+    syncActiveRoleCookie(user ? activeRole : null);
+  }, [activeRole, ready, user]);
+
+  const setActiveRole = useCallback(
+    (role: MemberRole) => {
+      if (!isMemberRole(role) || !switchableRoles.includes(role)) {
+        return false;
+      }
+      setActiveRoleState(role);
+      syncActiveRoleCookie(role);
+      return true;
+    },
+    [switchableRoles],
+  );
+
+  const needsOnboarding = needsRoleOnboarding(user);
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      user,
+      ready,
+      needsOnboarding,
+      activeRole,
+      switchableRoles,
+      canSwitchRole: switchableRoles.length > 1,
+      canCreateAuction: activeRole === 'advertiser',
+      canPlaceBid: activeRole === 'creator',
+      setActiveRole,
+      refresh,
+    }),
+    [activeRole, needsOnboarding, ready, refresh, setActiveRole, switchableRoles, user],
+  );
 
   return (
     <AuthContext.Provider value={value}>

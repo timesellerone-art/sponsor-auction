@@ -42,6 +42,7 @@ export async function POST(request: Request) {
     applyAuthCookies(response.cookies, {
       present: true,
       roles: synced.roles,
+      activeRole: selectedRoles[0],
     });
     return response;
   } catch (error) {

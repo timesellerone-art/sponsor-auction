@@ -12,13 +12,14 @@ import { ACCESS_REASON } from '@/lib/access';
 import { signOut } from '@/lib/auth';
 import { loginPath } from '@/lib/auth-guard';
 import { cn } from '@/lib/utils';
-import { isAdmin, memberRolesLabel } from '@/types/auth';
+import { RoleSwitcher } from '@/components/RoleSwitcher';
+import { hasAuthRole, isAdmin, memberRolesLabel } from '@/types/auth';
 
 export function Navbar() {
   const router = useRouter();
-  const { user, ready, canCreateAuction, canPlaceBid } = useAuth();
+  const { user, ready, canCreateAuction, canPlaceBid, switchableRoles } = useAuth();
   const showAdmin = Boolean(ready && isAdmin(user));
-  const showDashboard = Boolean(ready && (canCreateAuction || canPlaceBid));
+  const showDashboard = Boolean(ready && switchableRoles.length > 0);
   const dashboardLabel = canPlaceBid ? '내 제안' : '내 역경매';
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -35,7 +36,11 @@ export function Navbar() {
       return;
     }
     if (!canCreateAuction) {
-      showToast(ACCESS_REASON['advertiser-forbidden']);
+      showToast(
+        hasAuthRole(user, 'advertiser')
+          ? '광고주 모드로 전환하면 역경매를 등록할 수 있습니다.'
+          : ACCESS_REASON['advertiser-forbidden'],
+      );
       return;
     }
     setCreateOpen(true);
@@ -122,10 +127,11 @@ export function Navbar() {
             </Link>
           ) : null}
           {ready && user ? (
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <RoleSwitcher />
               <NotificationBell />
-              <span className="max-w-[140px] truncate text-xs text-zinc-500">
-                {user.name} · {memberRolesLabel(user)}
+              <span className="max-w-[120px] truncate text-xs text-zinc-500">
+                {user.name}
               </span>
               <button
                 type="button"
@@ -156,7 +162,8 @@ export function Navbar() {
           </button>
         </nav>
 
-        <div className="flex shrink-0 items-center gap-1.5 md:hidden">
+        <div className="flex min-w-0 shrink-0 items-center gap-1.5 md:hidden">
+          <RoleSwitcher />
           <NotificationBell />
           <button
             type="button"
@@ -225,15 +232,20 @@ export function Navbar() {
             </Link>
           ) : null}
           {ready && user ? (
-            <button
-              type="button"
-              className="rounded-lg px-3 py-3 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-50"
-              onClick={() => {
-                void handleSignOut();
-              }}
-            >
-              로그아웃 ({memberRolesLabel(user)})
-            </button>
+            <>
+              <div className="px-3 py-2">
+                <RoleSwitcher />
+              </div>
+              <button
+                type="button"
+                className="rounded-lg px-3 py-3 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+                onClick={() => {
+                  void handleSignOut();
+                }}
+              >
+                로그아웃 ({memberRolesLabel(user)})
+              </button>
+            </>
           ) : (
             <Link
               href="/login"

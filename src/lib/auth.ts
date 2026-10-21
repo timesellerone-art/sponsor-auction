@@ -5,7 +5,7 @@ import {
   mockSignOut,
   mockSignUp,
 } from '@/lib/auth-mock';
-import { syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
+import { syncActiveRoleCookie, syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseOAuthCallbackUrl } from '@/lib/supabase/env';
 import { ROLE_SELECT_PATH, sanitizeNextPath } from '@/lib/auth-guard';
@@ -61,6 +61,9 @@ function publicAuthErrorMessage(error: unknown) {
 function persistClientAuth(user: SessionUser | null) {
   syncRoleCookie(user?.role ?? null, user?.roles);
   syncAuthPresentCookie(Boolean(user));
+  if (!user) {
+    syncActiveRoleCookie(null);
+  }
 }
 
 const AUTH_CHANGED_EVENT = 'auth:changed';

@@ -1,4 +1,4 @@
-import { syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
+import { syncActiveRoleCookie, syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import {
   isAuthProfileRole,
   isMemberRole,
@@ -28,7 +28,7 @@ const accounts = new Map<string, MockAccount>([
         email: 'brand@demo.com',
         name: '데모 광고주',
         role: 'advertiser',
-        roles: ['advertiser'],
+        roles: ['advertiser', 'creator'],
       },
     },
   ],
@@ -82,6 +82,7 @@ function persistSession(user: SessionUser | null) {
       window.localStorage.removeItem(STORAGE_KEY);
       syncRoleCookie(null);
       syncAuthPresentCookie(false);
+      syncActiveRoleCookie(null);
       return;
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user));

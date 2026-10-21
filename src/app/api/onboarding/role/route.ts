@@ -56,7 +56,11 @@ export async function POST(request: Request) {
         roles: synced.roles,
       },
     });
-    applyAuthCookies(response.cookies, { present: true, roles: synced.roles });
+    applyAuthCookies(response.cookies, {
+      present: true,
+      roles: synced.roles,
+      activeRole: selectedRoles[0],
+    });
     return response;
   } catch (error) {
     console.warn('[SponsorAuction] 온보딩 역할 저장 예외', error);

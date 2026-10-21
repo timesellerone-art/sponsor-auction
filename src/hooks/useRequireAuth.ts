@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import type { AccessReason } from '@/lib/access';
 import { authGuardMessage, loginPath } from '@/lib/auth-guard';
+import { hasAuthRole } from '@/types/auth';
 
 export function useRequireAuth() {
   const router = useRouter();
@@ -40,7 +41,11 @@ export function useRequireAuth() {
         return false;
       }
       if (!canPlaceBid) {
-        showToast(authGuardMessage('creator-forbidden'));
+        showToast(
+          hasAuthRole(user, 'creator')
+            ? '크리에이터 모드로 전환하면 입찰할 수 있습니다.'
+            : authGuardMessage('creator-forbidden'),
+        );
         return false;
       }
       return true;
@@ -54,7 +59,11 @@ export function useRequireAuth() {
         return false;
       }
       if (!canCreateAuction) {
-        showToast(authGuardMessage('advertiser-forbidden'));
+        showToast(
+          hasAuthRole(user, 'advertiser')
+            ? '광고주 모드로 전환하면 역경매를 등록할 수 있습니다.'
+            : authGuardMessage('advertiser-forbidden'),
+        );
         return false;
       }
       return true;

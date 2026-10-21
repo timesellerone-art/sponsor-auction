@@ -101,6 +101,8 @@ export async function GET(request: NextRequest) {
         applyAuthCookies(redirect.cookies, {
           present: true,
           roles: destination === ROLE_SELECT_PATH ? [] : sessionLike?.roles,
+          activeRole:
+            destination === ROLE_SELECT_PATH ? null : sessionLike?.roles,
         });
         return redirect;
       }

@@ -125,12 +125,38 @@ export function needsRoleOnboarding(user: SessionUser | null | undefined): boole
   return isFirstAuthSignIn(user);
 }
 
+export function switchableMemberRoles(source: unknown): MemberRole[] {
+  const owned = new Set(parseAuthRoles(source).filter(isMemberRole));
+  return MEMBER_ROLES.filter((role) => owned.has(role));
+}
+
+export function resolveActiveMemberRole(
+  owned: unknown,
+  preferred?: unknown,
+): MemberRole | null {
+  const ownedRoles = switchableMemberRoles(owned);
+  if (isMemberRole(preferred) && ownedRoles.includes(preferred)) {
+    return preferred;
+  }
+  return ownedRoles[0] ?? null;
+}
+
 export function canCreateAuction(source: unknown): boolean {
   return isAdvertiser(source);
 }
 
 export function canPlaceBid(source: unknown): boolean {
   return isCreator(source);
+}
+
+export function memberModeLabel(role: MemberRole | null | undefined): string {
+  if (role === 'creator') {
+    return '크리에이터 모드';
+  }
+  if (role === 'advertiser') {
+    return '광고주 모드';
+  }
+  return '역할 미설정';
 }
 
 export function memberRoleLabel(role: AuthProfileRole | null | undefined): string {

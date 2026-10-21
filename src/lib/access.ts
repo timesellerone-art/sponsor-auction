@@ -1,6 +1,12 @@
-import { parseAuthRoles } from '@/types/auth';
+import {
+  isMemberRole,
+  parseAuthRoles,
+  resolveActiveMemberRole,
+  type MemberRole,
+} from '@/types/auth';
 
 export const ROLE_COOKIE_NAME = 'sponsor-auction-role';
+export const ACTIVE_ROLE_COOKIE_NAME = 'sponsor-auction-active-role';
 export const AUTH_PRESENT_COOKIE_NAME = 'sponsor-auction-auth';
 
 export const ACCESS_REASON = {
@@ -45,12 +51,20 @@ type CookieWriter = {
 
 export function applyAuthCookies(
   store: CookieWriter,
-  options: { present: boolean; roles?: unknown },
+  options: { present: boolean; roles?: unknown; activeRole?: unknown },
 ) {
   const value = roleCookieValue(options.roles);
+  const active = options.present
+    ? resolveActiveMemberRole(options.roles, options.activeRole)
+    : null;
   store.set(ROLE_COOKIE_NAME, value, {
     path: '/',
     maxAge: value ? AUTH_COOKIE_MAX_AGE : 0,
+    sameSite: 'lax',
+  });
+  store.set(ACTIVE_ROLE_COOKIE_NAME, active ?? '', {
+    path: '/',
+    maxAge: active ? AUTH_COOKIE_MAX_AGE : 0,
     sameSite: 'lax',
   });
   store.set(AUTH_PRESENT_COOKIE_NAME, options.present ? '1' : '', {
@@ -58,6 +72,29 @@ export function applyAuthCookies(
     maxAge: options.present ? AUTH_COOKIE_MAX_AGE : 0,
     sameSite: 'lax',
   });
+}
+
+export function readActiveRoleCookie(): MemberRole | null {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  const raw = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${ACTIVE_ROLE_COOKIE_NAME}=`));
+  const value = raw?.slice(`${ACTIVE_ROLE_COOKIE_NAME}=`.length) ?? '';
+  return isMemberRole(value) ? value : null;
+}
+
+export function syncActiveRoleCookie(role: MemberRole | null | undefined) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const value = isMemberRole(role) ? role : '';
+  const maxAge = value ? AUTH_COOKIE_MAX_AGE : 0;
+  document.cookie = `${ACTIVE_ROLE_COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
 }
 
 export function syncRoleCookie(role: string | null | undefined, roles?: unknown) {
@@ -68,6 +105,9 @@ export function syncRoleCookie(role: string | null | undefined, roles?: unknown)
   const value = roleCookieValue(roles, role);
   const maxAge = value ? AUTH_COOKIE_MAX_AGE : 0;
   document.cookie = `${ROLE_COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+  if (!value) {
+    syncActiveRoleCookie(null);
+  }
 }
 
 export function syncAuthPresentCookie(present: boolean) {
