@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { AUTH_PRESENT_COOKIE_NAME, ROLE_COOKIE_NAME } from '@/lib/access';
 import { ROLE_SELECT_PATH } from '@/lib/auth-guard';
+import { updateSession, withSessionCookies } from '@/lib/supabase/middleware';
 import {
   clientIp,
   consumeRateLimit,
@@ -34,7 +35,8 @@ function isOnboardingOpenPath(pathname: string) {
   );
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
+  const sessionResponse = await updateSession(request);
   const role = request.cookies.get(ROLE_COOKIE_NAME)?.value ?? '';
   const loggedIn = request.cookies.get(AUTH_PRESENT_COOKIE_NAME)?.value === '1';
   const pathname = request.nextUrl.pathname;
@@ -52,29 +54,38 @@ export function middleware(request: NextRequest) {
   const needsRole = loggedIn && role !== 'admin' && role !== 'advertiser' && role !== 'creator';
 
   if (needsRole && (pathname.startsWith('/login') || !isOnboardingOpenPath(pathname))) {
-    return redirectTo(request, ROLE_SELECT_PATH);
+    return withSessionCookies(sessionResponse, redirectTo(request, ROLE_SELECT_PATH));
   }
 
   if (pathname.startsWith('/onboarding') && role) {
-    return redirectTo(request, role === 'admin' ? '/admin' : '/my');
+    return withSessionCookies(
+      sessionResponse,
+      redirectTo(request, role === 'admin' ? '/admin' : '/my'),
+    );
   }
 
   if (isAdminPath && role !== 'admin') {
-    return redirectTo(
-      request,
-      role ? '/' : '/login',
-      role ? 'admin-forbidden' : 'admin-auth',
+    return withSessionCookies(
+      sessionResponse,
+      redirectTo(
+        request,
+        role ? '/' : '/login',
+        role ? 'admin-forbidden' : 'admin-auth',
+      ),
     );
   }
 
   if (isDashboardPath && role !== 'advertiser' && role !== 'creator') {
     if (loggedIn && !role) {
-      return redirectTo(request, ROLE_SELECT_PATH);
+      return withSessionCookies(sessionResponse, redirectTo(request, ROLE_SELECT_PATH));
     }
-    return redirectTo(
-      request,
-      role ? '/' : '/login',
-      role ? 'advertiser-forbidden' : 'advertiser-auth',
+    return withSessionCookies(
+      sessionResponse,
+      redirectTo(
+        request,
+        role ? '/' : '/login',
+        role ? 'advertiser-forbidden' : 'advertiser-auth',
+      ),
     );
   }
 
@@ -85,22 +96,27 @@ export function middleware(request: NextRequest) {
     role !== 'admin'
   ) {
     if (loggedIn && !role) {
-      return redirectTo(request, ROLE_SELECT_PATH);
+      return withSessionCookies(sessionResponse, redirectTo(request, ROLE_SELECT_PATH));
     }
-    return redirectTo(
-      request,
-      role ? '/' : '/login',
-      role ? 'advertiser-forbidden' : 'payment-auth',
+    return withSessionCookies(
+      sessionResponse,
+      redirectTo(
+        request,
+        role ? '/' : '/login',
+        role ? 'advertiser-forbidden' : 'payment-auth',
+      ),
     );
   }
 
-  return NextResponse.next();
+  return sessionResponse;
 }
 
 export const config = {
   matcher: [
     '/',
     '/login',
+    '/auth/callback',
+    '/auth/oauth',
     '/onboarding',
     '/onboarding/:path*',
     '/auctions/:path*',

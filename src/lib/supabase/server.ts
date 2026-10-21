@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { getSupabaseEnv, warnMockFallback } from '@/lib/supabase/env';
+import type { Database } from '@/types/database';
 
 export async function createClient() {
   const env = getSupabaseEnv();
@@ -13,7 +14,7 @@ export async function createClient() {
   try {
     const cookieStore = await cookies();
 
-    return createServerClient(env.url, env.anonKey, {
+    return createServerClient<Database>(env.url, env.anonKey, {
       cookies: {
         getAll() {
           return cookieStore.getAll();

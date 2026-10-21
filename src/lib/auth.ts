@@ -202,10 +202,11 @@ export async function signInWithOAuth(
   }
 
   try {
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: provider as 'apple',
       options: {
         redirectTo: oauthRedirectTo(nextPath),
+        skipBrowserRedirect: true,
         queryParams:
           provider === 'google'
             ? { access_type: 'offline', prompt: 'consent' }
@@ -218,6 +219,11 @@ export async function signInWithOAuth(
       return fail(false, error.message || AUTH_FAIL_MESSAGE);
     }
 
+    if (!data.url) {
+      return fail(false, AUTH_FAIL_MESSAGE);
+    }
+
+    window.location.assign(data.url);
     return ok(true);
   } catch (error) {
     console.warn('[SponsorAuction] 소셜 로그인 중 예외가 발생했습니다.', error);
