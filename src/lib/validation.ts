@@ -1,4 +1,5 @@
 import { isAuctionClosed, type AuctionStatus } from '@/types/auction';
+import { hasOffPlatformContact } from '@/utils/filter';
 
 export const MIN_TITLE_LENGTH = 5;
 export const MIN_DESCRIPTION_LENGTH = 10;
@@ -25,6 +26,8 @@ export const VALIDATION = {
   proposalTooShort: `제안 내용/소개글은 ${MIN_PROPOSAL_LENGTH}자 이상 입력해 주세요.`,
   channelRequired: '채널 URL 또는 포트폴리오 링크를 입력해 주세요.',
   channelInvalid: 'https:// 또는 http://로 시작하는 올바른 URL을 입력해 주세요.',
+  offPlatformContact:
+    '전화번호, 이메일, 카카오 ID, 외부 링크 등 플랫폼 우회 연락처는 사용할 수 없습니다.',
   auctionClosed: '마감된 역경매에는 제안할 수 없습니다.',
   duplicateBid: '이미 이 역경매에 제안을 제출했습니다.',
   alreadyAwarded: '이미 낙찰 완료된 역경매입니다.',
@@ -179,6 +182,8 @@ export function validateBidForm(values: {
     errors.proposalText = VALIDATION.proposalRequired;
   } else if (proposal.length < MIN_PROPOSAL_LENGTH) {
     errors.proposalText = VALIDATION.proposalTooShort;
+  } else if (hasOffPlatformContact(proposal)) {
+    errors.proposalText = VALIDATION.offPlatformContact;
   }
 
   if (!values.creatorChannelUrl.trim()) {
@@ -270,6 +275,9 @@ export function validateBidPayload(input: {
   }
   if (proposal.length < MIN_PROPOSAL_LENGTH) {
     return VALIDATION.proposalTooShort;
+  }
+  if (hasOffPlatformContact(proposal)) {
+    return VALIDATION.offPlatformContact;
   }
   if (!input.creatorChannelUrl.trim()) {
     return VALIDATION.channelRequired;

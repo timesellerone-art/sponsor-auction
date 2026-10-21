@@ -74,6 +74,31 @@ export type Database = {
         };
         Relationships: [];
       };
+      chat_messages: {
+        Row: {
+          id: string;
+          auction_id: string;
+          sender_id: string | null;
+          sender_name: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          auction_id: string;
+          sender_id?: string | null;
+          sender_name?: string;
+          body: string;
+          created_at?: string;
+        };
+        Update: {
+          auction_id?: string;
+          sender_id?: string | null;
+          sender_name?: string;
+          body?: string;
+        };
+        Relationships: [];
+      };
       bids: {
         Row: {
           id: string;

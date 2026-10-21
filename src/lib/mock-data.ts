@@ -20,6 +20,7 @@ import {
   validateAuctionPayload,
   validateBidPayload,
 } from '@/lib/validation';
+import { maskOffPlatformContact, sanitizeUserText } from '@/utils/filter';
 
 export const mockAuctions: AuctionItem[] = [
   {
@@ -565,7 +566,7 @@ export async function createBid(
       creatorName: data.creatorName.trim(),
       creatorChannelUrl: data.creatorChannelUrl.trim(),
       bidAmount: data.bidAmount,
-      proposalText: data.proposalText.trim(),
+      proposalText: sanitizeUserText(data.proposalText, 'reject'),
       status: data.status ?? 'pending',
       createdAt: new Date().toISOString(),
     };
@@ -592,25 +593,30 @@ function guardBidList(items: unknown): BidItem[] {
     return [];
   }
 
-  return items.filter((item): item is BidItem => {
-    if (!item || typeof item !== 'object') {
-      return false;
-    }
+  return items
+    .filter((item): item is BidItem => {
+      if (!item || typeof item !== 'object') {
+        return false;
+      }
 
-    const bid = item as Partial<BidItem>;
-    return (
-      isNonEmptyString(bid.id) &&
-      isNonEmptyString(bid.auctionId) &&
-      isNonEmptyString(bid.creatorName) &&
-      isNonEmptyString(bid.creatorChannelUrl) &&
-      isFiniteNumber(bid.bidAmount) &&
-      isNonEmptyString(bid.proposalText) &&
-      isNonEmptyString(bid.createdAt) &&
-      (bid.status === undefined ||
-        bid.status === 'pending' ||
-        bid.status === 'selected')
-    );
-  });
+      const bid = item as Partial<BidItem>;
+      return (
+        isNonEmptyString(bid.id) &&
+        isNonEmptyString(bid.auctionId) &&
+        isNonEmptyString(bid.creatorName) &&
+        isNonEmptyString(bid.creatorChannelUrl) &&
+        isFiniteNumber(bid.bidAmount) &&
+        isNonEmptyString(bid.proposalText) &&
+        isNonEmptyString(bid.createdAt) &&
+        (bid.status === undefined ||
+          bid.status === 'pending' ||
+          bid.status === 'selected')
+      );
+    })
+    .map((item) => ({
+      ...item,
+      proposalText: maskOffPlatformContact(item.proposalText),
+    }));
 }
 
 export async function getBidsByCreator(

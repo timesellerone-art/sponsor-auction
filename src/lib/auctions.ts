@@ -35,6 +35,11 @@ import type {
 } from '@/types/auction';
 import { isPlatformType } from '@/lib/platforms';
 import type { Database } from '@/types/database';
+import {
+  OffPlatformContactError,
+  maskOffPlatformContact,
+  sanitizeUserText,
+} from '@/utils/filter';
 
 export const INSERT_FAIL_MESSAGE = '등록에 실패했습니다. 다시 시도해 주세요.';
 export const UPDATE_FAIL_MESSAGE = '변경에 실패했습니다. 다시 시도해 주세요.';
@@ -89,7 +94,7 @@ function mapBid(row: Partial<BidRow> & Pick<BidRow, 'id'>): BidItem {
     creatorName: row.creator_name ?? '이름 없음',
     creatorChannelUrl: row.creator_channel_url ?? '',
     bidAmount: row.bid_amount ?? 0,
-    proposalText: row.proposal_text ?? '',
+    proposalText: maskOffPlatformContact(row.proposal_text ?? ''),
     status: (row.status === 'selected' ? 'selected' : 'pending') as BidStatus,
     createdAt: row.created_at ?? '',
   };
@@ -408,7 +413,7 @@ export async function createBid(
           creator_name: input.creatorName.trim(),
           creator_channel_url: input.creatorChannelUrl.trim(),
           bid_amount: input.bidAmount,
-          proposal_text: input.proposalText.trim(),
+          proposal_text: sanitizeUserText(input.proposalText, 'reject'),
           status: 'pending',
         })
         .select(BID_COLUMNS)
@@ -423,7 +428,7 @@ export async function createBid(
             creator_name: input.creatorName.trim(),
             creator_channel_url: input.creatorChannelUrl.trim(),
             bid_amount: input.bidAmount,
-            proposal_text: input.proposalText.trim(),
+            proposal_text: sanitizeUserText(input.proposalText, 'reject'),
             status: 'pending',
           })
           .select(BID_COLUMNS_CORE)
@@ -450,6 +455,9 @@ export async function createBid(
       });
       return ok(created);
     } catch (error) {
+      if (error instanceof OffPlatformContactError) {
+        return fail(null, error.message);
+      }
       logDbError('입찰 등록 예외', error);
       return fail(null, INSERT_FAIL_MESSAGE);
     }

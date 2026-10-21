@@ -139,6 +139,8 @@ export const config = {
     '/api/auctions/:path*',
     '/api/bids',
     '/api/bids/:path*',
+    '/api/chat',
+    '/api/chat/:path*',
     '/api/payments/:path*',
     '/api/admin/:path*',
     '/api/ai-analyze',

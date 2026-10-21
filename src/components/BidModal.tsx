@@ -143,14 +143,38 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
           return;
         }
 
-        const result = await createBid({
+        const payload = {
           auctionId: auction.id,
           creatorId: user.id,
           creatorName: user.name.trim() || '크리에이터',
           creatorChannelUrl: creatorChannelUrl.trim(),
           bidAmount: Number(bidAmount),
           proposalText: proposalText.trim(),
-        });
+        };
+
+        let result: Awaited<ReturnType<typeof createBid>>;
+        try {
+          const response = await fetch('/api/bids', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const json = (await response.json().catch(() => null)) as {
+            data?: Awaited<ReturnType<typeof createBid>>['data'];
+            error?: string;
+            errorMessage?: string;
+          } | null;
+          if (response.ok && json?.data) {
+            result = { data: json.data, error: null };
+          } else {
+            result = {
+              data: null,
+              error: json?.errorMessage ?? json?.error ?? INSERT_FAIL_MESSAGE,
+            };
+          }
+        } catch {
+          result = await createBid(payload);
+        }
 
         if (result.error || !result.data) {
           const message = result.error ?? INSERT_FAIL_MESSAGE;
