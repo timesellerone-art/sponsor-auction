@@ -1,6 +1,5 @@
-import { getAuctions, getBids, getBidsByCreator } from '@/lib/auctions';
+import { getAuctions, getAuctionsByAuthor, getBids, getBidsByCreator } from '@/lib/auctions';
 import { advertiserPayableAmount } from '@/lib/fees';
-import { getMyAuctionIds, getStoredAuctionIds } from '@/lib/my-campaigns';
 import { getMyBidIds } from '@/lib/my-bids';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
@@ -121,18 +120,6 @@ function displayAuction(auction: AuctionItem, paid: boolean): AuctionItem {
   return auction;
 }
 
-function pickAdvertiserAuctions(all: AuctionItem[], user: SessionUser, mockMode: boolean) {
-  const byAuthorId = all.filter((item) => item.authorId && item.authorId === user.id);
-  if (byAuthorId.length > 0) {
-    return uniqueById(byAuthorId);
-  }
-
-  const byName = all.filter((item) => item.authorName && item.authorName === user.name);
-  const stored = new Set(mockMode ? getMyAuctionIds() : getStoredAuctionIds());
-  const byStored = all.filter((item) => stored.has(item.id));
-  return uniqueById([...byName, ...byStored]);
-}
-
 function pickCreatorBids(all: BidItem[], user: SessionUser) {
   const mine = new Set(getMyBidIds());
   return all.filter(
@@ -148,15 +135,14 @@ export async function getAdvertiserDashboard(
 ): Promise<DataResult<AdvertiserDeal[]>> {
   try {
     const [auctionResult, bidResult, livePayments] = await Promise.all([
-      getAuctions(),
+      getAuctionsByAuthor(user.id),
       getBids(),
       loadConfirmedPayments(),
     ]);
 
     const auctions = Array.isArray(auctionResult.data) ? auctionResult.data : [];
     const bids = Array.isArray(bidResult.data) ? bidResult.data : [];
-    const mockMode = !(await getDataClient());
-    const mine = pickAdvertiserAuctions(auctions, user, mockMode);
+    const mine = uniqueById(auctions);
     const payments = livePayments.length > 0 ? livePayments : mockPaymentsFromDeals(mine, bids);
     const paymentByAuction = new Map(payments.map((item) => [item.auctionId, item]));
 
@@ -184,6 +170,10 @@ export async function getAdvertiserDashboard(
       }
       return (right.auction.createdAt || '').localeCompare(left.auction.createdAt || '');
     });
+
+    if (mine.length === 0 && auctionResult.error) {
+      return fail([], auctionResult.error);
+    }
 
     return ok(deals);
   } catch (error) {

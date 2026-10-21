@@ -14,13 +14,15 @@ type MockAccount = {
 
 const STORAGE_KEY = 'sponsor-auction-auth-session';
 
+export const DEMO_ADVERTISER_ID = 'usr-demo-advertiser';
+
 const accounts = new Map<string, MockAccount>([
   [
     'brand@demo.com',
     {
       password: 'demo1234',
       user: {
-        id: 'usr-demo-advertiser',
+        id: DEMO_ADVERTISER_ID,
         email: 'brand@demo.com',
         name: '데모 광고주',
         role: 'advertiser',

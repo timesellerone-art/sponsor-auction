@@ -1,3 +1,4 @@
+import { DEMO_ADVERTISER_ID } from '@/lib/auth-mock';
 import type { AuctionItem } from '@/types/auction';
 import type { SessionUser } from '@/types/auth';
 
@@ -30,20 +31,20 @@ export function getStoredAuctionIds(): string[] {
   }
 }
 
-export function getMyAuctionIds(): string[] {
+export function getMyAuctionIds(userId?: string | null): string[] {
   const stored = getStoredAuctionIds();
-  if (stored.length > 0) {
-    return stored;
+  if (userId === DEMO_ADVERTISER_ID) {
+    return Array.from(new Set([...stored, ...DEMO_CAMPAIGN_IDS]));
   }
-  return [...DEMO_CAMPAIGN_IDS];
+  return stored;
 }
 
-export function isMyAuction(id: string) {
+export function isMyAuction(id: string, userId?: string | null) {
   if (!id.trim()) {
     return false;
   }
 
-  return getMyAuctionIds().includes(id.trim());
+  return getMyAuctionIds(userId).includes(id.trim());
 }
 
 export function isOwnedAuction(
@@ -56,10 +57,7 @@ export function isOwnedAuction(
   if (auction.authorId && auction.authorId === user.id) {
     return true;
   }
-  if (auction.authorName && user.name && auction.authorName === user.name) {
-    return true;
-  }
-  return isMyAuction(auction.id);
+  return isMyAuction(auction.id, user.id);
 }
 
 export function rememberMyAuction(id: string) {
@@ -68,7 +66,7 @@ export function rememberMyAuction(id: string) {
   }
 
   try {
-    const next = Array.from(new Set([id.trim(), ...getMyAuctionIds()]));
+    const next = Array.from(new Set([id.trim(), ...getStoredAuctionIds()]));
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
     // localStorage를 쓸 수 없어도 상세 페이지에서 낙찰은 가능합니다.

@@ -12,6 +12,7 @@ import {
   updateAuctionStatus as updateMockAuctionStatus,
 } from '@/lib/mock-data';
 import { withExclusiveAction } from '@/lib/action-lock';
+import { DEMO_ADVERTISER_ID } from '@/lib/auth-mock';
 import { notifyLifecycleEvent } from '@/lib/notification';
 import { type SponsorAuctionClient } from '@/lib/supabase';
 import { getDataClient } from '@/lib/supabase/data-client';
@@ -151,6 +152,67 @@ export async function getAuctions(): Promise<DataResult<AuctionItem[]>> {
     return getMockAuctions();
   } finally {
     console.info(`[SponsorAuction] 경매 목록 조회 종료 (${Date.now() - started}ms)`);
+  }
+}
+
+const DEMO_ADVERTISER_CAMPAIGN_IDS = new Set(['auc-001', 'auc-002', 'auc-004']);
+
+async function getMockAuctionsByAuthor(userId: string): Promise<DataResult<AuctionItem[]>> {
+  const result = await getMockAuctions();
+  const owned = result.data.filter((item) => item.authorId && item.authorId === userId);
+  if (owned.length > 0) {
+    return ok(owned);
+  }
+  if (userId === DEMO_ADVERTISER_ID) {
+    return ok(result.data.filter((item) => DEMO_ADVERTISER_CAMPAIGN_IDS.has(item.id)));
+  }
+  return ok([]);
+}
+
+/** 로그인한 광고주가 등록한 캠페인만 조회합니다. 샘플/타 계정 데이터는 포함하지 않습니다. */
+export async function getAuctionsByAuthor(
+  userId: string,
+): Promise<DataResult<AuctionItem[]>> {
+  const authorId = userId.trim();
+  if (!authorId) {
+    return fail([], '유효한 광고주 ID가 필요합니다.');
+  }
+
+  const supabase = await getDataClient();
+  if (!supabase || !isUuid(authorId)) {
+    return getMockAuctionsByAuthor(authorId);
+  }
+
+  const started = Date.now();
+  try {
+    let { data, error } = await supabase
+      .from('auctions')
+      .select(AUCTION_COLUMNS)
+      .eq('author_id', authorId)
+      .order('created_at', { ascending: false });
+
+    if (error && isSchemaMismatch(error)) {
+      logDbError('광고주 경매 목록 조회 컬럼 폴백', error);
+      const fallback = await supabase
+        .from('auctions')
+        .select(AUCTION_COLUMNS_CORE)
+        .eq('author_id', authorId)
+        .order('created_at', { ascending: false });
+      data = fallback.data as typeof data;
+      error = fallback.error;
+    }
+
+    if (error) {
+      logDbError('광고주 경매 목록 조회', error);
+      return fail([], '캠페인 목록을 불러오지 못했습니다.');
+    }
+
+    return ok((data ?? []).map((row) => mapAuction(row)));
+  } catch (error) {
+    logDbError('광고주 경매 목록 조회 예외', error);
+    return fail([], '캠페인 목록을 불러오지 못했습니다.');
+  } finally {
+    console.info(`[SponsorAuction] 광고주 경매 목록 조회 종료 (${Date.now() - started}ms)`);
   }
 }
 
