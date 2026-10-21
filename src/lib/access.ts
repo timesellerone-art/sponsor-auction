@@ -29,13 +29,44 @@ export function accessReasonMessage(reason: string | null | undefined) {
   return ACCESS_REASON[reason];
 }
 
+const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+
+export function roleCookieValue(...sources: unknown[]) {
+  return parseAuthRoles(...sources).join(',');
+}
+
+type CookieWriter = {
+  set: (
+    name: string,
+    value: string,
+    options: { path: string; maxAge: number; sameSite: 'lax' },
+  ) => void;
+};
+
+export function applyAuthCookies(
+  store: CookieWriter,
+  options: { present: boolean; roles?: unknown },
+) {
+  const value = roleCookieValue(options.roles);
+  store.set(ROLE_COOKIE_NAME, value, {
+    path: '/',
+    maxAge: value ? AUTH_COOKIE_MAX_AGE : 0,
+    sameSite: 'lax',
+  });
+  store.set(AUTH_PRESENT_COOKIE_NAME, options.present ? '1' : '', {
+    path: '/',
+    maxAge: options.present ? AUTH_COOKIE_MAX_AGE : 0,
+    sameSite: 'lax',
+  });
+}
+
 export function syncRoleCookie(role: string | null | undefined, roles?: unknown) {
   if (typeof document === 'undefined') {
     return;
   }
 
-  const value = parseAuthRoles(roles, role).join(',');
-  const maxAge = value ? 60 * 60 * 24 * 7 : 0;
+  const value = roleCookieValue(roles, role);
+  const maxAge = value ? AUTH_COOKIE_MAX_AGE : 0;
   document.cookie = `${ROLE_COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
 }
 

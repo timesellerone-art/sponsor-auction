@@ -19,6 +19,10 @@ export function isMemberRole(value: unknown): value is MemberRole {
   return value === 'advertiser' || value === 'creator';
 }
 
+export function memberRolesFromInput(role?: unknown, roles?: unknown): MemberRole[] {
+  return parseAuthRoles(roles, role).filter(isMemberRole);
+}
+
 export function isAuthProfileRole(value: unknown): value is AuthProfileRole {
   return isMemberRole(value) || value === 'admin';
 }

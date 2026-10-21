@@ -463,11 +463,12 @@ export async function signUp(input: {
     if (accessToken) {
       await fetch('/api/onboarding/profile', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ name, email }),
+        body: JSON.stringify({ name, email, roles: [] }),
       }).catch(() => null);
     } else {
       await supabase
@@ -674,7 +675,7 @@ async function saveRoleViaApi(
     method: 'POST',
     credentials: 'include',
     headers,
-    body: JSON.stringify({ role, name, email }),
+    body: JSON.stringify({ role, roles: [role], name, email }),
   });
   const payload = (await response.json().catch(() => null)) as {
     data?: { id?: string; email?: string; name?: string; role?: string | null; roles?: unknown };
@@ -734,9 +735,9 @@ export async function saveMemberRole(
       return fail(null, '로그인이 필요합니다.');
     }
 
-    const email =
-      authUser.email?.trim() ||
-      `user.${authUser.id.replace(/-/g, '').slice(0, 12)}@oauth.sponsor-auction.local`;
+    const email = authUser.email?.includes('@')
+      ? authUser.email.trim()
+      : `user.${authUser.id.replace(/-/g, '').slice(0, 12)}@oauth.sponsor-auction.local`;
     const name =
       (typeof authUser.user_metadata?.name === 'string'
         ? authUser.user_metadata.name.trim()
@@ -748,7 +749,11 @@ export async function saveMemberRole(
       applyKnownSession(completed);
       void supabase.auth
         .updateUser({
-          data: { onboarding_complete: true, role },
+          data: {
+            onboarding_complete: true,
+            role: completed.role,
+            roles: completed.roles ?? [role],
+          },
         })
         .catch(() => null);
       return ok(completed);

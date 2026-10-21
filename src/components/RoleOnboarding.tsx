@@ -9,7 +9,7 @@ import { isMemberRole, type MemberRole } from '@/types/auth';
 
 type RoleOnboardingProps = {
   name: string;
-  onCompleted: (role: MemberRole) => void;
+  onCompleted: (roles: MemberRole[]) => void;
 };
 
 const ROLE_OPTIONS: {
@@ -51,7 +51,8 @@ export function RoleOnboarding({ name, onCompleted }: RoleOnboardingProps) {
         role === 'advertiser' ? '광고주로 시작합니다.' : '크리에이터로 시작합니다.',
         'success',
       );
-      onCompleted(role);
+      const savedRoles = (result.data.roles ?? []).filter(isMemberRole);
+      onCompleted(savedRoles.length > 0 ? savedRoles : [role]);
     } catch {
       showToast(AUTH_FAIL_MESSAGE);
     } finally {

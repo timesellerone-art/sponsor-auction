@@ -136,8 +136,8 @@ export default function RoleSelectPage() {
     <PageContainer className="flex flex-1 flex-col justify-center py-10 sm:py-16">
       <RoleOnboarding
         name={user?.name || '회원'}
-        onCompleted={(role) => {
-          const path = postAuthPath(role);
+        onCompleted={(roles) => {
+          const path = postAuthPath(roles);
           router.replace(path);
           goDashboard(path);
         }}

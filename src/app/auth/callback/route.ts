@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { AUTH_PRESENT_COOKIE_NAME, ROLE_COOKIE_NAME } from '@/lib/access';
+import { applyAuthCookies } from '@/lib/access';
 import { ROLE_SELECT_PATH, postSocialAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import {
@@ -68,7 +68,9 @@ export async function GET(request: NextRequest) {
           const roles = parseAuthRoles(profile.data?.roles, profile.data?.role);
           sessionLike = {
             id: authUser.id,
-            email: authUser.email ?? '',
+            email: authUser.email?.includes('@')
+              ? authUser.email
+              : `user.${authUser.id.replace(/-/g, '').slice(0, 12)}@oauth.sponsor-auction.local`,
             name: '',
             role: primaryAuthRole(roles),
             roles,
@@ -96,14 +98,10 @@ export async function GET(request: NextRequest) {
         successRedirect.cookies.getAll().forEach((cookie) => {
           redirect.cookies.set(cookie.name, cookie.value);
         });
-        if (destination === ROLE_SELECT_PATH) {
-          redirect.cookies.set(ROLE_COOKIE_NAME, '', { path: '/', maxAge: 0 });
-          redirect.cookies.set(AUTH_PRESENT_COOKIE_NAME, '1', {
-            path: '/',
-            sameSite: 'lax',
-            maxAge: 60 * 60 * 24 * 7,
-          });
-        }
+        applyAuthCookies(redirect.cookies, {
+          present: true,
+          roles: destination === ROLE_SELECT_PATH ? [] : sessionLike?.roles,
+        });
         return redirect;
       }
       console.warn('[SponsorAuction] OAuth 코드 교환에 실패했습니다.', error.message);

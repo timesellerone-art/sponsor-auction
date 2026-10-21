@@ -16,8 +16,21 @@ export type SyncedProfile = {
   createdAt: string;
 };
 
-function fallbackEmail(userId: string) {
+export function fallbackProfileEmail(userId: string) {
   return `user.${userId.replace(/-/g, '').slice(0, 12)}@oauth.sponsor-auction.local`;
+}
+
+export function resolveProfileEmail(
+  userId: string,
+  ...candidates: Array<string | null | undefined>
+) {
+  for (const candidate of candidates) {
+    const value = candidate?.trim() || '';
+    if (value.includes('@')) {
+      return value;
+    }
+  }
+  return fallbackProfileEmail(userId);
 }
 
 export function profileNameFromUser(user: User, fallback = '회원') {
@@ -37,7 +50,7 @@ export async function upsertAppProfile(
     roles?: Array<MemberRole | 'admin'> | null;
   },
 ): Promise<SyncedProfile | null> {
-  const email = input.email?.trim() || fallbackEmail(input.id);
+  const email = resolveProfileEmail(input.id, input.email);
   const name = input.name?.trim() || email.split('@')[0] || '회원';
   const current = await admin
     .from('profiles')
@@ -45,13 +58,14 @@ export async function upsertAppProfile(
     .eq('id', input.id)
     .maybeSingle();
   const nextRoles = parseAuthRoles(current.data?.roles, current.data?.role, input.roles, input.role);
-  const nextRole = primaryAuthRole(nextRoles) ?? (input.role || null);
+  const nextRole = primaryAuthRole(nextRoles);
   const payload = {
     id: input.id,
     name,
     email,
     status: 'active' as const,
-    ...(nextRole ? { role: nextRole, roles: nextRoles } : {}),
+    role: nextRole,
+    roles: nextRoles,
   };
 
   const upserted = await admin
@@ -64,17 +78,13 @@ export async function upsertAppProfile(
     return toSynced(upserted.data);
   }
 
-  const patch: {
-    name: string;
-    email: string;
-    status: 'active';
-    role?: MemberRole | 'admin';
-    roles?: Array<MemberRole | 'admin'>;
-  } = { name, email, status: 'active' };
-  if (nextRole) {
-    patch.role = nextRole;
-    patch.roles = nextRoles;
-  }
+  const patch = {
+    name,
+    email,
+    status: 'active' as const,
+    role: nextRole,
+    roles: nextRoles,
+  };
 
   const updated = await admin
     .from('profiles')
@@ -87,15 +97,13 @@ export async function upsertAppProfile(
     return toSynced(updated.data);
   }
 
-  const roleOnly = nextRole
-    ? await admin
-        .from('profiles')
-        .update({ role: nextRole, roles: nextRoles })
-        .eq('id', input.id)
-        .select(PROFILE_COLUMNS)
-        .maybeSingle()
-    : null;
-  if (roleOnly && !roleOnly.error && roleOnly.data) {
+  const roleOnly = await admin
+    .from('profiles')
+    .update({ role: nextRole, roles: nextRoles })
+    .eq('id', input.id)
+    .select(PROFILE_COLUMNS)
+    .maybeSingle();
+  if (!roleOnly.error && roleOnly.data) {
     return toSynced(roleOnly.data);
   }
 
@@ -112,7 +120,7 @@ export async function upsertAppProfile(
 
   console.warn(
     '[SponsorAuction] 프로필 upsert 실패',
-    upserted.error?.message || updated.error?.message || roleOnly?.error?.message,
+    upserted.error?.message || updated.error?.message || roleOnly.error?.message,
     upserted.error?.code || updated.error?.code,
   );
   return null;
