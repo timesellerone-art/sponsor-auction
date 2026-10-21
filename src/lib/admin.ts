@@ -152,38 +152,7 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
     return ok(list);
   }
 
-  if (fromDb.length > 0) {
-    return ok(fromDb);
-  }
-
-  const supabase = await getDataClient();
-  if (!supabase) {
-    return getMockProfiles();
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select(PROFILE_COLUMNS)
-      .order('created_at', { ascending: false });
-
-    if (error && isSchemaMismatch(error)) {
-      return getMockProfiles();
-    }
-    if (error) {
-      return fail([], '회원 목록을 불러오지 못했습니다.');
-    }
-
-    const profiles = (data ?? [])
-      .map((row) => mapProfile(row as ProfileRow))
-      .filter((item): item is ProfileItem => item !== null);
-    if (profiles.length === 0) {
-      return fail([], '등록된 회원이 없습니다.');
-    }
-    return ok(profiles);
-  } catch {
-    return fail([], '회원 목록을 불러오지 못했습니다.');
-  }
+  return ok(fromDb);
 }
 
 async function parseAdminJson(response: Response, method: 'GET' | 'POST') {
@@ -224,65 +193,7 @@ export async function updateProfileStatus(
     console.warn('[SponsorAuction] 회원 상태 API 호출 실패, Mock으로 저장합니다.', error);
   }
 
-  const supabase = await getDataClient();
-  if (!supabase) {
-    return updateMockProfileStatus(id, status);
-  }
-
-  const started = Date.now();
-  try {
-    if (!id.trim()) {
-      return fail(null, '유효한 회원 ID가 필요합니다.');
-    }
-
-    const current = await supabase
-      .from('profiles')
-      .select(PROFILE_COLUMNS)
-      .eq('id', id)
-      .maybeSingle();
-    if (current.error && isSchemaMismatch(current.error)) {
-      return updateMockProfileStatus(id, status);
-    }
-    if (current.error || !current.data) {
-      return fail(null, '해당 회원을 찾을 수 없습니다.');
-    }
-    const currentMapped = mapProfile(current.data as ProfileRow);
-    if (currentMapped?.role === 'admin') {
-      return fail(null, '관리자 계정은 제재할 수 없습니다.');
-    }
-    if (currentMapped?.status === status) {
-      return fail(null, VALIDATION.sanctionAlready);
-    }
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ status })
-      .eq('id', id)
-      .neq('status', status)
-      .select(PROFILE_COLUMNS)
-      .maybeSingle();
-
-    if (!error && !data) {
-      return fail(null, VALIDATION.sanctionAlready);
-    }
-
-    if (error || !data) {
-      console.error('[SponsorAuction] 회원 상태 변경 실패:', error?.message, error);
-      return fail(null, ADMIN_UPDATE_FAIL_MESSAGE);
-    }
-
-    const mapped = mapProfile(data as ProfileRow);
-    if (!mapped) {
-      return fail(null, ADMIN_UPDATE_FAIL_MESSAGE);
-    }
-
-    return ok(mapped);
-  } catch (error) {
-    console.error('[SponsorAuction] 회원 상태 변경 예외:', error);
-    return fail(null, ADMIN_UPDATE_FAIL_MESSAGE);
-  } finally {
-    console.info(`[SponsorAuction] 회원 상태 변경 종료 (${Date.now() - started}ms)`);
-  }
+  return updateMockProfileStatus(id, status);
   });
 }
 

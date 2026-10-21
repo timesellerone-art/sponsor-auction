@@ -77,15 +77,19 @@ function asPayoutList(value: unknown): PayoutItem[] {
 export function AdminDashboard({
   initialPayouts = [],
   initialBids = [],
+  initialProfiles = [],
 }: {
   initialPayouts?: PayoutItem[];
   initialBids?: BidItem[];
+  initialProfiles?: ProfileItem[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabId>('auctions');
   const [auctions, setAuctions] = useState<AuctionItem[]>([]);
   const [bids, setBids] = useState<BidItem[]>(() => asBidList(initialBids));
-  const [profiles, setProfiles] = useState<ProfileItem[]>([]);
+  const [profiles, setProfiles] = useState<ProfileItem[]>(() =>
+    asProfileList(initialProfiles),
+  );
   const [payouts, setPayouts] = useState<PayoutItem[]>(() => asPayoutList(initialPayouts));
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -124,7 +128,10 @@ export function AdminDashboard({
 
       setAuctions(asAuctionList(auctionResult.data));
       setBids(asBidList(bidResult.data));
-      setProfiles(asProfileList(profileResult.data));
+      const nextProfiles = asProfileList(profileResult.data);
+      setProfiles(
+        nextProfiles.length > 0 ? nextProfiles : asProfileList(initialProfiles),
+      );
       setPayouts(asPayoutList(payoutResult.data));
 
       const firstError =
@@ -136,15 +143,15 @@ export function AdminDashboard({
     } catch (error) {
       console.warn('[SponsorAuction] 관리자 데이터를 불러오지 못했습니다.', error);
       setAuctions([]);
-      setBids([]);
-      setProfiles([]);
-      setPayouts([]);
+      setBids(asBidList(initialBids));
+      setProfiles(asProfileList(initialProfiles));
+      setPayouts(asPayoutList(initialPayouts));
       setLoadError('데이터를 불러오지 못했습니다.');
       showToast('데이터를 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
-  }, [initialBids, initialPayouts]);
+  }, [initialBids, initialPayouts, initialProfiles]);
 
   useEffect(() => {
     void load();
