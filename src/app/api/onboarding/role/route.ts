@@ -2,6 +2,7 @@ import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { isMemberRole } from '@/types/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createServerSupabase } from '@/lib/supabase/server';
 import { profileNameFromUser, upsertAppProfile } from '@/lib/supabase/profile-sync';
 
 function bearerToken(request: Request) {
@@ -12,10 +13,10 @@ function bearerToken(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await connection();
-    const token = bearerToken(request);
-    if (!token) {
-      return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+    try {
+      await connection();
+    } catch {
+      // 동적 렌더 힌트가 실패해도 역할 저장은 계속합니다.
     }
 
     const body = (await request.json().catch(() => null)) as {
@@ -31,29 +32,51 @@ export async function POST(request: Request) {
       );
     }
 
+    const token = bearerToken(request);
     const admin = createAdminClient();
     if (!admin) {
       return NextResponse.json({ error: '프로필을 저장할 수 없습니다.' }, { status: 503 });
     }
 
-    const { data: authData, error: authError } = await admin.auth.getUser(token);
-    const user = authData.user;
-    if (authError || !user) {
+    let userId = '';
+    let email = body?.email?.trim() || '';
+    let name = body?.name?.trim() || '';
+
+    if (token) {
+      const { data: authData, error: authError } = await admin.auth.getUser(token);
+      if (!authError && authData.user) {
+        userId = authData.user.id;
+        email = email || authData.user.email?.trim() || '';
+        name = name || profileNameFromUser(authData.user);
+      }
+    }
+
+    if (!userId) {
+      const serverClient = await createServerSupabase();
+      const { data } = (await serverClient?.auth.getUser()) ?? { data: { user: null } };
+      if (data.user) {
+        userId = data.user.id;
+        email = email || data.user.email?.trim() || '';
+        name = name || profileNameFromUser(data.user);
+      }
+    }
+
+    if (!userId) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
     }
 
     const synced = await upsertAppProfile(admin, {
-      id: user.id,
-      email: body?.email?.trim() || user.email,
-      name: body?.name?.trim() || profileNameFromUser(user),
+      id: userId,
+      email,
+      name,
       role,
     });
     await admin.auth.admin
-      .updateUserById(user.id, {
+      .updateUserById(userId, {
         user_metadata: {
-          ...(user.user_metadata ?? {}),
           onboarding_complete: true,
           role,
+          name: name || undefined,
         },
       })
       .catch(() => null);

@@ -610,7 +610,7 @@ async function upsertProfileRow(
     4000,
     '프로필 저장',
   );
-  if (!upserted.error) {
+  if (!upserted.error && upserted.data) {
     return upserted;
   }
 
@@ -633,7 +633,21 @@ async function upsertProfileRow(
     return updated;
   }
 
-  return upserted;
+  const roleOnly = await withTimeout(
+    supabase
+      .from('profiles')
+      .update({ role: payload.role })
+      .eq('id', payload.id)
+      .select(PROFILE_COLUMNS)
+      .maybeSingle(),
+    4000,
+    '역할 수정',
+  );
+  if (!roleOnly.error && roleOnly.data) {
+    return roleOnly;
+  }
+
+  return updated.error ? updated : upserted;
 }
 
 async function saveRoleViaApi(
@@ -641,13 +655,17 @@ async function saveRoleViaApi(
   role: MemberRole,
   name: string,
   email: string,
-): Promise<SessionUser | null> {
+): Promise<{ user: SessionUser | null; error: string | null }> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
   const response = await fetch('/api/onboarding/role', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
+    credentials: 'include',
+    headers,
     body: JSON.stringify({ role, name, email }),
   });
   const payload = (await response.json().catch(() => null)) as {
@@ -655,14 +673,20 @@ async function saveRoleViaApi(
     error?: string;
   } | null;
   if (!response.ok || !payload?.data?.id) {
-    return null;
+    return {
+      user: null,
+      error: payload?.error || `역할 저장에 실패했습니다. (${response.status})`,
+    };
   }
-  return mapSessionUser(
-    payload.data.id,
-    payload.data.email?.trim() || email,
-    payload.data.name?.trim() || name,
-    payload.data.role,
-  );
+  return {
+    user: mapSessionUser(
+      payload.data.id,
+      payload.data.email?.trim() || email,
+      payload.data.name?.trim() || name,
+      payload.data.role,
+    ),
+    error: null,
+  };
 }
 
 export async function saveMemberRole(
@@ -682,9 +706,15 @@ export async function saveMemberRole(
   }
 
   try {
-    const sessionResult = await withTimeout(supabase.auth.getSession(), 2500, '세션 조회');
-    const authUser = sessionResult.data.session?.user ?? (await readBrowserAuthUser(supabase));
-    const accessToken = sessionResult.data.session?.access_token ?? '';
+    let sessionResult: Awaited<ReturnType<typeof supabase.auth.getSession>> | null = null;
+    try {
+      sessionResult = await withTimeout(supabase.auth.getSession(), 4000, '세션 조회');
+    } catch (error) {
+      console.warn('[SponsorAuction] 역할 저장 세션 조회 지연', error);
+    }
+    const authUser =
+      sessionResult?.data.session?.user ?? (await readBrowserAuthUser(supabase));
+    const accessToken = sessionResult?.data.session?.access_token ?? '';
     if (!authUser) {
       const mock = await mockSaveMemberRole(role);
       if (!mock.error) {
@@ -694,23 +724,24 @@ export async function saveMemberRole(
       return fail(null, '로그인이 필요합니다.');
     }
 
-    const email = authUser.email?.trim() || '';
+    const email =
+      authUser.email?.trim() ||
+      `user.${authUser.id.replace(/-/g, '').slice(0, 12)}@oauth.sponsor-auction.local`;
     const name =
       (typeof authUser.user_metadata?.name === 'string'
-        ? authUser.user_metadata.name
+        ? authUser.user_metadata.name.trim()
         : '') || email.split('@')[0] || '회원';
 
-    void supabase.auth.updateUser({
-      data: { onboarding_complete: true, role },
-    }).catch(() => null);
-
-    if (accessToken) {
-      const fromApi = await saveRoleViaApi(accessToken, role, name, email);
-      if (fromApi) {
-        const completed = { ...fromApi, onboardingComplete: true as const };
-        applyKnownSession(completed);
-        return ok(completed);
-      }
+    const fromApi = await saveRoleViaApi(accessToken, role, name, email);
+    if (fromApi.user) {
+      const completed = { ...fromApi.user, onboardingComplete: true as const };
+      applyKnownSession(completed);
+      void supabase.auth
+        .updateUser({
+          data: { onboarding_complete: true, role },
+        })
+        .catch(() => null);
+      return ok(completed);
     }
 
     const payload = {
@@ -723,8 +754,8 @@ export async function saveMemberRole(
 
     const { data, error } = await upsertProfileRow(supabase, payload);
     if (error || !data) {
-      console.warn('[SponsorAuction] 역할 저장에 실패했습니다.', error?.message);
-      return fail(null, AUTH_FAIL_MESSAGE);
+      console.warn('[SponsorAuction] 역할 저장에 실패했습니다.', error?.message, fromApi.error);
+      return fail(null, fromApi.error || error?.message || AUTH_FAIL_MESSAGE);
     }
 
     const row = data as ProfileRow;

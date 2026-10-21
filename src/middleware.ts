@@ -27,6 +27,7 @@ function isOnboardingOpenPath(pathname: string) {
   return (
     pathname === ROLE_SELECT_PATH ||
     pathname.startsWith('/onboarding') ||
+    pathname.startsWith('/api/onboarding') ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/auth/') ||
     pathname === '/privacy' ||

@@ -630,7 +630,7 @@ with check (public.is_admin());
 
 grant execute on function public.award_auction(uuid, uuid) to authenticated, service_role;
 grant execute on function public.is_admin() to authenticated, service_role;
-grant select on public.profiles to authenticated;
+grant select, insert, update on public.profiles to authenticated;
 grant select, insert, update on public.payouts to authenticated, service_role;
 
 create table if not exists public.tax_invoice_logs (

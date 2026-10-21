@@ -76,9 +76,33 @@ export async function upsertAppProfile(
     return toSynced(updated.data);
   }
 
+  const roleOnly = input.role
+    ? await admin
+        .from('profiles')
+        .update({ role: input.role })
+        .eq('id', input.id)
+        .select(PROFILE_COLUMNS)
+        .maybeSingle()
+    : null;
+  if (roleOnly && !roleOnly.error && roleOnly.data) {
+    return toSynced(roleOnly.data);
+  }
+
+  const existing = await admin
+    .from('profiles')
+    .select(PROFILE_COLUMNS)
+    .eq('id', input.id)
+    .maybeSingle();
+  if (!existing.error && existing.data) {
+    if (input.role && existing.data.role === input.role) {
+      return toSynced(existing.data);
+    }
+  }
+
   console.warn(
     '[SponsorAuction] 프로필 upsert 실패',
-    upserted.error?.message || updated.error?.message,
+    upserted.error?.message || updated.error?.message || roleOnly?.error?.message,
+    upserted.error?.code || updated.error?.code,
   );
   return null;
 }
