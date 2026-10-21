@@ -53,7 +53,15 @@ export async function middleware(request: NextRequest) {
   const isPaymentPath = pathname === '/payments' || pathname.startsWith('/payments/');
   const needsRole = loggedIn && role !== 'admin' && role !== 'advertiser' && role !== 'creator';
 
-  if (needsRole && (pathname.startsWith('/login') || !isOnboardingOpenPath(pathname))) {
+  const loginAuthRequired =
+    pathname.startsWith('/login') &&
+    request.nextUrl.searchParams.get('reason') === 'auth-required';
+
+  if (
+    needsRole &&
+    !loginAuthRequired &&
+    (pathname.startsWith('/login') || !isOnboardingOpenPath(pathname))
+  ) {
     return withSessionCookies(sessionResponse, redirectTo(request, ROLE_SELECT_PATH));
   }
 

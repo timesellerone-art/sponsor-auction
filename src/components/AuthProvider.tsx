@@ -41,13 +41,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   const refresh = useCallback(async () => {
+    let settled = false;
+    const failSafe = window.setTimeout(() => {
+      if (!settled) {
+        setReady(true);
+      }
+    }, 2500);
     try {
       const result = await getSessionUser();
+      settled = true;
       setUser(result.data);
     } catch (error) {
+      settled = true;
       console.warn('[SponsorAuction] 인증 상태를 갱신하지 못했습니다.', error);
       setUser(null);
     } finally {
+      window.clearTimeout(failSafe);
       setReady(true);
     }
   }, []);

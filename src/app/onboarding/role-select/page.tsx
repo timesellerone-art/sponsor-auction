@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { PageContainer } from '@/components/PageContainer';
 import { RoleOnboarding } from '@/components/RoleOnboarding';
+import { AUTH_PRESENT_COOKIE_NAME, syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import { getSessionUser } from '@/lib/auth';
 import { loginPath, postAuthPath, ROLE_SELECT_PATH } from '@/lib/auth-guard';
 import { needsRoleOnboarding } from '@/types/auth';
@@ -21,27 +22,44 @@ function goDashboard(path: string) {
   }, 1500);
 }
 
+function hasAuthPresentCookie() {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+  return document.cookie.split(';').some((part) => part.trim() === `${AUTH_PRESENT_COOKIE_NAME}=1`);
+}
+
 export default function RoleSelectPage() {
   const router = useRouter();
   const { user, ready, needsOnboarding, refresh } = useAuth();
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
-    if (!ready) {
-      return;
-    }
+    const timer = window.setTimeout(() => {
+      setTimedOut(true);
+    }, 1500);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, []);
 
-    let cancelled = false;
-
+  useEffect(() => {
     if (user && !needsOnboarding) {
       const path = postAuthPath(user.role);
       router.replace(path);
       goDashboard(path);
-      return;
     }
+  }, [needsOnboarding, router, user]);
 
+  useEffect(() => {
     if (user && needsOnboarding) {
       return;
     }
+    if (user && !needsOnboarding) {
+      return;
+    }
+
+    let cancelled = false;
 
     const settle = window.setTimeout(() => {
       void (async () => {
@@ -60,32 +78,56 @@ export default function RoleSelectPage() {
             await refresh();
             return;
           }
+          if (hasAuthPresentCookie() || timedOut) {
+            return;
+          }
+          syncAuthPresentCookie(false);
+          syncRoleCookie(null);
           router.replace(loginPath('auth-required', ROLE_SELECT_PATH));
         } catch {
-          if (!cancelled) {
+          if (!cancelled && timedOut && !hasAuthPresentCookie()) {
+            syncAuthPresentCookie(false);
+            syncRoleCookie(null);
             router.replace(loginPath('auth-required', ROLE_SELECT_PATH));
           }
         }
       })();
-    }, 250);
-
-    const failSafe = window.setTimeout(() => {
-      if (!cancelled && !user) {
-        router.replace(loginPath('auth-required', ROLE_SELECT_PATH));
-      }
-    }, 4000);
+    }, ready ? 200 : 400);
 
     return () => {
       cancelled = true;
       window.clearTimeout(settle);
-      window.clearTimeout(failSafe);
     };
-  }, [needsOnboarding, ready, refresh, router, user]);
+  }, [needsOnboarding, ready, refresh, router, timedOut, user]);
 
-  if (!ready || !user || !needsOnboarding) {
+  useEffect(() => {
+    if (!timedOut || user) {
+      return;
+    }
+    if (hasAuthPresentCookie()) {
+      return;
+    }
+    syncAuthPresentCookie(false);
+    syncRoleCookie(null);
+    router.replace(loginPath('auth-required', ROLE_SELECT_PATH));
+  }, [router, timedOut, user]);
+
+  if (user && !needsOnboarding) {
     return (
       <div className="flex flex-1 items-center justify-center px-4 py-16">
         <Loader2 className="size-6 animate-spin text-teal-700" aria-hidden />
+        <span className="sr-only">이동 중</span>
+      </div>
+    );
+  }
+
+  const showForm = Boolean(user && needsOnboarding) || timedOut;
+
+  if (!showForm) {
+    return (
+      <div className="flex flex-1 items-center justify-center px-4 py-16">
+        <Loader2 className="size-6 animate-spin text-teal-700" aria-hidden />
+        <span className="sr-only">역할을 불러오는 중</span>
       </div>
     );
   }
@@ -93,7 +135,7 @@ export default function RoleSelectPage() {
   return (
     <PageContainer className="flex flex-1 flex-col justify-center py-10 sm:py-16">
       <RoleOnboarding
-        name={user.name || '회원'}
+        name={user?.name || '회원'}
         onCompleted={(role) => {
           const path = postAuthPath(role);
           router.replace(path);
