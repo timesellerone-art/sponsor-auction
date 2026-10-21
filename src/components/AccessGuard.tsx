@@ -22,7 +22,11 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
   const router = useRouter();
   const { user, ready } = useAuth();
   const [allowed, setAllowed] = useState(false);
-  const allowKey = allowedRoles(allow).join('|');
+  const roles = allowedRoles(allow);
+  const allowKey = roles.join('|');
+  const hasAccess = Boolean(
+    ready && user?.role && roles.includes(user.role as AccessRole),
+  );
 
   useEffect(() => {
     if (!ready) {
@@ -30,9 +34,7 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
     }
 
     syncRoleCookie(user?.role);
-    const roles = allowKey.split('|').filter(Boolean) as AccessRole[];
-    const ok = Boolean(user?.role && roles.includes(user.role as AccessRole));
-    if (ok) {
+    if (hasAccess) {
       setAllowed(true);
       return;
     }
@@ -56,17 +58,17 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
     router.replace(
       `/?reason=${wantsAdmin ? 'admin-forbidden' : roles.includes('advertiser') && !roles.includes('creator') ? 'advertiser-forbidden' : 'creator-forbidden'}`,
     );
-  }, [allowKey, ready, router, user]);
+  }, [allowKey, hasAccess, ready, router, user]);
 
-  if (!ready || !allowed) {
+  if (hasAccess || allowed) {
     return (
-      <div className="flex w-full flex-1 items-center justify-center px-4 py-16">
-        <div className="h-40 w-full max-w-md animate-pulse rounded-2xl bg-white" />
-      </div>
+      <div className="flex w-full min-w-0 max-w-none flex-1 flex-col">{children}</div>
     );
   }
 
   return (
-    <div className="flex w-full min-w-0 max-w-none flex-1 flex-col">{children}</div>
+    <div className="flex w-full flex-1 items-center justify-center px-4 py-16">
+      <div className="h-40 w-full max-w-md animate-pulse rounded-2xl bg-white" />
+    </div>
   );
 }

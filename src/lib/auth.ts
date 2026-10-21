@@ -63,6 +63,7 @@ function persistClientAuth(user: SessionUser | null) {
 }
 
 const AUTH_CHANGED_EVENT = 'auth:changed';
+const AUTH_SESSION_EVENT = 'auth:session';
 
 const PROFILE_COLUMNS = 'id, name, email, role, status';
 
@@ -121,6 +122,28 @@ export function notifyAuthChanged() {
   }
 
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+}
+
+export function applyKnownSession(user: SessionUser | null) {
+  persistClientAuth(user);
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent<SessionUser | null>(AUTH_SESSION_EVENT, { detail: user }));
+}
+
+export function onKnownSession(listener: (user: SessionUser | null) => void) {
+  if (typeof window === 'undefined') {
+    return () => undefined;
+  }
+
+  const handler = (event: Event) => {
+    listener((event as CustomEvent<SessionUser | null>).detail ?? null);
+  };
+  window.addEventListener(AUTH_SESSION_EVENT, handler);
+  return () => {
+    window.removeEventListener(AUTH_SESSION_EVENT, handler);
+  };
 }
 
 export function onAuthChanged(listener: () => void) {
@@ -229,11 +252,11 @@ async function loadProfile(
   fallbackEmail: string,
   fallbackName: string,
 ): Promise<SessionUser> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(PROFILE_COLUMNS)
-    .eq('id', userId)
-    .maybeSingle();
+  const { data, error } = await withTimeout(
+    supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle(),
+    2500,
+    '프로필 조회',
+  );
 
   if (error) {
     console.warn('[SponsorAuction] 프로필 조회에 실패했습니다.', error.message);
@@ -333,7 +356,7 @@ export async function signUp(input: {
   if (!supabase) {
     const result = await mockSignUp(input);
     if (!result.error) {
-      persistClientAuth(result.data);
+      applyKnownSession(result.data);
       notifyAuthChanged();
     }
     return result;
@@ -366,7 +389,7 @@ export async function signUp(input: {
       console.warn('[SponsorAuction] 회원가입에 실패했습니다.', error.message);
       const mock = await mockSignUp(input);
       if (!mock.error) {
-        persistClientAuth(mock.data);
+        applyKnownSession(mock.data);
         notifyAuthChanged();
         return mock;
       }
@@ -384,14 +407,14 @@ export async function signUp(input: {
       user.email?.trim() || email,
       name,
     );
-    persistClientAuth(session);
+    applyKnownSession(session);
     notifyAuthChanged();
     return ok(session);
   } catch (error) {
     console.warn('[SponsorAuction] 회원가입 중 예외가 발생했습니다.', error);
     const mock = await mockSignUp(input);
     if (!mock.error) {
-      persistClientAuth(mock.data);
+      applyKnownSession(mock.data);
       notifyAuthChanged();
       return mock;
     }
@@ -407,7 +430,7 @@ export async function signIn(input: {
   if (!supabase) {
     const result = await mockSignIn(input);
     if (!result.error) {
-      persistClientAuth(result.data);
+      applyKnownSession(result.data);
       notifyAuthChanged();
     }
     return result;
@@ -426,7 +449,7 @@ export async function signIn(input: {
     if (error || !data.user) {
       const mock = await mockSignIn(input);
       if (!mock.error) {
-        persistClientAuth(mock.data);
+        applyKnownSession(mock.data);
         notifyAuthChanged();
         return mock;
       }
@@ -440,13 +463,13 @@ export async function signIn(input: {
         ? user.user_metadata.name
         : '') || email.split('@')[0] || '회원';
     const session = await loadProfile(supabase, user.id, email, name);
-    persistClientAuth(session);
+    applyKnownSession(session);
     notifyAuthChanged();
     return ok(session);
   } catch (error) {
     const mock = await mockSignIn(input);
     if (!mock.error) {
-      persistClientAuth(mock.data);
+      applyKnownSession(mock.data);
       notifyAuthChanged();
       return mock;
     }
@@ -457,7 +480,7 @@ export async function signIn(input: {
 export async function signOut(): Promise<DataResult<boolean>> {
   const supabase = createClient();
   if (!supabase) {
-    persistClientAuth(null);
+    applyKnownSession(null);
     const result = await mockSignOut();
     if (!result.error) {
       notifyAuthChanged();
@@ -471,7 +494,7 @@ export async function signOut(): Promise<DataResult<boolean>> {
       console.warn('[SponsorAuction] 로그아웃에 실패했습니다.', error.message);
     }
 
-    persistClientAuth(null);
+    applyKnownSession(null);
     const mock = await mockSignOut();
     if (!mock.error) {
       notifyAuthChanged();
@@ -490,6 +513,47 @@ export async function signOut(): Promise<DataResult<boolean>> {
   }
 }
 
+async function upsertProfileRow(
+  supabase: NonNullable<ReturnType<typeof createClient>>,
+  payload: {
+    id: string;
+    name: string;
+    email: string;
+    role: MemberRole;
+    status: 'active';
+  },
+) {
+  const upserted = await withTimeout(
+    supabase.from('profiles').upsert(payload, { onConflict: 'id' }).select(PROFILE_COLUMNS).maybeSingle(),
+    4000,
+    '프로필 저장',
+  );
+  if (!upserted.error) {
+    return upserted;
+  }
+
+  const updated = await withTimeout(
+    supabase
+      .from('profiles')
+      .update({
+        name: payload.name,
+        email: payload.email,
+        role: payload.role,
+        status: payload.status,
+      })
+      .eq('id', payload.id)
+      .select(PROFILE_COLUMNS)
+      .maybeSingle(),
+    4000,
+    '프로필 수정',
+  );
+  if (!updated.error && updated.data) {
+    return updated;
+  }
+
+  return upserted;
+}
+
 export async function saveMemberRole(
   role: MemberRole,
 ): Promise<DataResult<SessionUser | null>> {
@@ -501,59 +565,44 @@ export async function saveMemberRole(
   if (!supabase) {
     const result = await mockSaveMemberRole(role);
     if (!result.error) {
-      persistClientAuth(result.data);
-      notifyAuthChanged();
+      applyKnownSession(result.data);
     }
     return result;
   }
 
   try {
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError) {
-      if (isAuthSessionMissing(authError)) {
-        console.warn('[SponsorAuction] 인증 세션이 없습니다.', authError.message);
-      } else {
-        console.warn('[SponsorAuction] 사용자 조회에 실패했습니다.', authError.message);
-      }
-    }
-    if (authError || !authData.user) {
+    const authUser = await readBrowserAuthUser(supabase);
+    if (!authUser) {
       const mock = await mockSaveMemberRole(role);
       if (!mock.error) {
-        persistClientAuth(mock.data);
-        notifyAuthChanged();
+        applyKnownSession(mock.data);
         return mock;
       }
       return fail(null, '로그인이 필요합니다.');
     }
 
-    const user = authData.user;
-    const email = user.email?.trim() || '';
+    const email = authUser.email?.trim() || '';
     const name =
-      (typeof user.user_metadata?.name === 'string'
-        ? user.user_metadata.name
+      (typeof authUser.user_metadata?.name === 'string'
+        ? authUser.user_metadata.name
         : '') || email.split('@')[0] || '회원';
 
     const payload = {
-      id: user.id,
+      id: authUser.id,
       name,
       email,
       role,
       status: 'active' as const,
     };
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .upsert(payload, { onConflict: 'id' })
-      .select(PROFILE_COLUMNS)
-      .maybeSingle();
+    const { data, error } = await upsertProfileRow(supabase, payload);
 
     if (error) {
       console.warn('[SponsorAuction] 역할 저장에 실패했습니다.', error.message);
       if (isSchemaMismatch(error)) {
         const mock = await mockSaveMemberRole(role);
         if (!mock.error) {
-          persistClientAuth(mock.data);
-          notifyAuthChanged();
+          applyKnownSession(mock.data);
           return mock;
         }
       }
@@ -562,16 +611,24 @@ export async function saveMemberRole(
 
     const row = (data ?? payload) as ProfileRow;
     const session = mapSessionUser(
-      user.id,
+      authUser.id,
       row.email?.trim() || email,
       row.name?.trim() || name,
       row.role,
     );
-    persistClientAuth(session);
-    notifyAuthChanged();
+    applyKnownSession(session);
     return ok(session);
   } catch (error) {
     console.warn('[SponsorAuction] 역할 저장 중 예외가 발생했습니다.', error);
+    try {
+      const mock = await mockSaveMemberRole(role);
+      if (!mock.error) {
+        applyKnownSession(mock.data);
+        return mock;
+      }
+    } catch {
+      // 목 저장도 실패하면 아래 메시지를 반환합니다.
+    }
     return fail(null, AUTH_FAIL_MESSAGE);
   }
 }

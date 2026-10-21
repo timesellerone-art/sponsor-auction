@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { getSessionUser, subscribeAuthState } from '@/lib/auth';
+import { getSessionUser, onKnownSession, subscribeAuthState } from '@/lib/auth';
 import { syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import {
   canCreateAuction,
@@ -57,11 +57,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const failSafe = window.setTimeout(() => {
       setReady(true);
     }, 4000);
+    let skipRefreshUntil = 0;
+    const unsubKnown = onKnownSession((session) => {
+      skipRefreshUntil = Date.now() + 1500;
+      setUser(session);
+      setReady(true);
+    });
     const unsubscribe = subscribeAuthState(() => {
+      if (Date.now() < skipRefreshUntil) {
+        return;
+      }
       void refresh();
     });
     return () => {
       window.clearTimeout(failSafe);
+      unsubKnown();
       unsubscribe();
     };
   }, [refresh]);
