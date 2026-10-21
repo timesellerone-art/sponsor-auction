@@ -61,6 +61,7 @@ create table if not exists public.profiles (
   name text not null,
   email text not null unique,
   role public.profile_role,
+  roles public.profile_role[] not null default '{}'::public.profile_role[],
   status public.profile_status not null default 'active',
   created_at timestamptz not null default timezone('utc', now()),
   constraint profiles_email_not_empty check (char_length(trim(email)) > 3),
@@ -69,6 +70,8 @@ create table if not exists public.profiles (
 
 alter table public.profiles alter column role drop not null;
 alter table public.profiles alter column role drop default;
+alter table public.profiles
+  add column if not exists roles public.profile_role[] not null default '{}'::public.profile_role[];
 
 create table if not exists public.auctions (
   id uuid primary key default gen_random_uuid(),
@@ -425,7 +428,7 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, name, email, role, status)
+  insert into public.profiles (id, name, email, role, roles, status)
   values (
     new.id,
     coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''), split_part(coalesce(new.email, ''), '@', 1), '회원'),
@@ -434,6 +437,7 @@ begin
       'user.' || replace(new.id::text, '-', '') || '@oauth.sponsor-auction.local'
     ),
     null,
+    '{}'::public.profile_role[],
     'active'
   )
   on conflict (id) do update
@@ -466,7 +470,10 @@ as $$
     select 1
     from public.profiles
     where id = auth.uid()
-      and role = 'admin'
+      and (
+        role = 'admin'
+        or 'admin' = any(roles)
+      )
   );
 $$;
 

@@ -1,5 +1,5 @@
 import { ACCESS_REASON, type AccessReason } from '@/lib/access';
-import { isAuthProfileRole } from '@/types/auth';
+import { parseAuthRoles } from '@/types/auth';
 
 export const ROLE_SELECT_PATH = '/onboarding/role-select';
 
@@ -33,22 +33,23 @@ export function authGuardMessage(reason: AccessReason) {
   return ACCESS_REASON[reason];
 }
 
-export function postAuthPath(role: string | null | undefined, nextPath?: string | null) {
+export function postAuthPath(role: unknown, nextPath?: string | null) {
   const next = sanitizeNextPath(nextPath);
-  if (!isAuthProfileRole(role)) {
+  const roles = parseAuthRoles(role);
+  if (roles.length === 0) {
     return ROLE_SELECT_PATH;
   }
   if (next && next !== ROLE_SELECT_PATH && !next.startsWith('/onboarding')) {
     return next;
   }
-  if (role === 'admin') {
+  if (roles.includes('admin')) {
     return '/admin';
   }
   return '/my';
 }
 
 export function postSocialAuthPath(
-  role: string | null | undefined,
+  role: unknown,
   nextPath?: string | null,
   options?: { needsOnboarding?: boolean },
 ) {

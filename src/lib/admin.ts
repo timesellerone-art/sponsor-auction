@@ -20,19 +20,20 @@ import type {
   ProfileRole,
   ProfileStatus,
 } from '@/types/admin';
-import { isAuthProfileRole } from '@/types/auth';
+import { isAuthProfileRole, parseAuthRoles, primaryAuthRole } from '@/types/auth';
 import type { BidItem, DataResult } from '@/types/auction';
 
 export const ADMIN_UPDATE_FAIL_MESSAGE =
   '변경에 실패했습니다. 다시 시도해 주세요.';
 
-const PROFILE_COLUMNS = 'id, name, email, role, status, created_at';
+const PROFILE_COLUMNS = 'id, name, email, role, roles, status, created_at';
 
 type ProfileRow = {
   id: string;
   name: string;
   email: string;
   role: ProfileRole | null;
+  roles?: unknown;
   status: ProfileStatus;
   created_at: string;
 };
@@ -79,11 +80,13 @@ function mapProfile(row: ProfileRow): ProfileItem | null {
     return null;
   }
 
+  const roles = parseAuthRoles(row.roles, row.role);
   return {
     id: row.id,
     name: row.name,
     email: row.email,
-    role: row.role,
+    role: primaryAuthRole(roles) ?? row.role,
+    roles,
     status: row.status,
     createdAt: row.created_at,
   };
@@ -130,6 +133,7 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
             name: item.name || item.email,
             email: item.email,
             role: item.role ?? null,
+            roles: item.roles,
             status: item.status,
             created_at: item.createdAt || item.created_at || '',
           });

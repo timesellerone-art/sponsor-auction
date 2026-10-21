@@ -91,8 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       ready,
       needsOnboarding,
-      canCreateAuction: canCreateAuction(user?.role),
-      canPlaceBid: canPlaceBid(user?.role),
+      canCreateAuction: canCreateAuction(user),
+      canPlaceBid: canPlaceBid(user),
       refresh,
     }),
     [needsOnboarding, ready, refresh, user],
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!ready) {
       return;
     }
-    syncRoleCookie(user?.role ?? null);
+    syncRoleCookie(user?.role ?? null, user?.roles);
     syncAuthPresentCookie(Boolean(user));
   }, [ready, user]);
 

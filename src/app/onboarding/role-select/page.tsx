@@ -45,7 +45,7 @@ export default function RoleSelectPage() {
 
   useEffect(() => {
     if (user && !needsOnboarding) {
-      const path = postAuthPath(user.role);
+      const path = postAuthPath(user);
       router.replace(path);
       goDashboard(path);
     }
@@ -70,7 +70,7 @@ export default function RoleSelectPage() {
           }
           if (result.data) {
             if (!needsRoleOnboarding(result.data)) {
-              const path = postAuthPath(result.data.role);
+              const path = postAuthPath(result.data);
               router.replace(path);
               goDashboard(path);
               return;

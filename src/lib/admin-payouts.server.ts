@@ -39,6 +39,7 @@ export async function getAdminBoardFromDatabase(): Promise<{
         name: row.name,
         email: row.email,
         role: row.role,
+        roles: row.roles,
         status: row.status,
         createdAt: row.createdAt,
       })),

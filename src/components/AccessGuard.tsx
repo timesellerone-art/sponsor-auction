@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { ACCESS_REASON, syncRoleCookie } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
+import { hasAuthRole, type AuthProfileRole } from '@/types/auth';
 
 type AccessRole = 'admin' | 'advertiser' | 'creator';
 
@@ -25,7 +26,7 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
   const roles = allowedRoles(allow);
   const allowKey = roles.join('|');
   const hasAccess = Boolean(
-    ready && user?.role && roles.includes(user.role as AccessRole),
+    ready && user && roles.some((role) => hasAuthRole(user, role as AuthProfileRole)),
   );
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
       return;
     }
 
-    syncRoleCookie(user?.role);
+    syncRoleCookie(user?.role, user?.roles);
     if (hasAccess) {
       setAllowed(true);
       return;

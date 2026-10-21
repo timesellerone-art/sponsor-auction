@@ -114,6 +114,7 @@ export type Database = {
           name: string;
           email: string;
           role: 'advertiser' | 'creator' | 'admin' | null;
+          roles: Array<'advertiser' | 'creator' | 'admin'>;
           status: 'active' | 'suspended';
           created_at: string;
         };
@@ -122,6 +123,7 @@ export type Database = {
           name: string;
           email: string;
           role?: 'advertiser' | 'creator' | 'admin' | null;
+          roles?: Array<'advertiser' | 'creator' | 'admin'>;
           status?: 'active' | 'suspended';
           created_at?: string;
         };
@@ -129,6 +131,7 @@ export type Database = {
           name?: string;
           email?: string;
           role?: 'advertiser' | 'creator' | 'admin' | null;
+          roles?: Array<'advertiser' | 'creator' | 'admin'>;
           status?: 'active' | 'suspended';
         };
         Relationships: [];

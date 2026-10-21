@@ -59,7 +59,7 @@ export default function AuthOAuthCompletePage() {
 
         notifyAuthChanged();
         const session = await getSessionUser();
-        const destination = postSocialAuthPath(session.data?.role ?? null, next, {
+        const destination = postSocialAuthPath(session.data, next, {
           needsOnboarding: needsRoleOnboarding(session.data),
         });
         if (!cancelled) {

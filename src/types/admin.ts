@@ -9,6 +9,7 @@ export interface ProfileItem {
   name: string;
   email: string;
   role: ProfileRole | null;
+  roles?: ProfileRole[];
   status: ProfileStatus;
   createdAt: string;
 }

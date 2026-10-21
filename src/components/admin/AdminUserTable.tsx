@@ -6,20 +6,8 @@ import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
 import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
 import { formatAdminTimestamp } from '@/lib/utils';
-import type { ProfileAdminFilter, ProfileItem, ProfileRole, ProfileStatus } from '@/types/admin';
-
-const ROLE_LABEL: Record<ProfileRole, string> = {
-  advertiser: '광고주',
-  creator: '크리에이터',
-  admin: '관리자',
-};
-
-function roleLabel(role: ProfileRole | null | undefined) {
-  if (!role) {
-    return '미설정';
-  }
-  return ROLE_LABEL[role] ?? role;
-}
+import type { ProfileAdminFilter, ProfileItem, ProfileStatus } from '@/types/admin';
+import { isAdmin, memberRolesLabel } from '@/types/auth';
 
 const STATUS_LABEL: Record<ProfileStatus, string> = {
   active: '정상',
@@ -97,7 +85,7 @@ export function AdminUserTable({
                 filtered.map((profile) => [
                   profile.name,
                   profile.email,
-                  roleLabel(profile.role),
+                  memberRolesLabel(profile),
                   STATUS_LABEL[profile.status] ?? profile.status,
                   formatAdminTimestamp(profile.createdAt),
                 ]),
@@ -138,8 +126,6 @@ export function AdminUserTable({
                 const suspended = profile.status === 'suspended';
                 const busy = busyId === profile.id;
                 const anyBusy = Boolean(busyId);
-                const role = profile.role;
-
                 return (
                   <tr
                     key={profile.id}
@@ -160,7 +146,7 @@ export function AdminUserTable({
                       </p>
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
-                      {roleLabel(role)}
+                      {memberRolesLabel(profile)}
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
                       {formatAdminTimestamp(profile.createdAt)}
@@ -177,7 +163,7 @@ export function AdminUserTable({
                       </span>
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top">
-                      {role === 'admin' ? (
+                      {isAdmin(profile) ? (
                         <span className="text-xs text-zinc-400">권한 고정</span>
                       ) : (
                         <button

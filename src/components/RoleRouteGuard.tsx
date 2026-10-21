@@ -37,7 +37,7 @@ function RoleRouteGuardInner({ children }: { children: ReactNode }) {
     }
 
     if (user && !needsOnboarding && pathname.startsWith('/onboarding')) {
-      router.replace(user.role === 'admin' ? '/admin' : '/my');
+      router.replace(user.role === 'admin' || user.roles?.includes('admin') ? '/admin' : '/my');
     }
   }, [needsOnboarding, pathname, ready, router, user]);
 

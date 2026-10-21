@@ -2,6 +2,8 @@ import { syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import {
   isAuthProfileRole,
   isMemberRole,
+  parseAuthRoles,
+  primaryAuthRole,
   type MemberRole,
   type SessionUser,
 } from '@/types/auth';
@@ -26,6 +28,7 @@ const accounts = new Map<string, MockAccount>([
         email: 'brand@demo.com',
         name: '데모 광고주',
         role: 'advertiser',
+        roles: ['advertiser'],
       },
     },
   ],
@@ -38,6 +41,7 @@ const accounts = new Map<string, MockAccount>([
         email: 'creator@demo.com',
         name: '데모 크리에이터',
         role: 'creator',
+        roles: ['creator'],
       },
     },
   ],
@@ -50,6 +54,7 @@ const accounts = new Map<string, MockAccount>([
         email: 'admin@demo.com',
         name: '데모 관리자',
         role: 'admin',
+        roles: ['admin'],
       },
     },
   ],
@@ -80,7 +85,7 @@ function persistSession(user: SessionUser | null) {
       return;
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    syncRoleCookie(user.role);
+    syncRoleCookie(user.role, user.roles);
     syncAuthPresentCookie(true);
   } catch {
     // 저장 실패해도 이번 세션 메모리 값은 유지합니다.
@@ -107,13 +112,15 @@ export function readMockSession(): SessionUser | null {
       return null;
     }
 
-    const session = {
+    const roles = parseAuthRoles(parsed.roles, parsed.role);
+    const session: SessionUser = {
       id: parsed.id,
       email: parsed.email,
       name: parsed.name,
-      role: isAuthProfileRole(parsed.role) ? parsed.role : null,
+      role: primaryAuthRole(roles) ?? (isAuthProfileRole(parsed.role) ? parsed.role : null),
+      roles,
     };
-    syncRoleCookie(session.role);
+    syncRoleCookie(session.role, session.roles);
     return session;
   } catch {
     return null;
@@ -158,6 +165,7 @@ export async function mockSignUp(input: {
       email,
       name,
       role: null,
+      roles: [],
     };
     accounts.set(email, { password, user });
     persistSession(user);
@@ -213,7 +221,12 @@ export async function mockSaveMemberRole(
       return fail(null, '로그인이 필요합니다.');
     }
 
-    const updated: SessionUser = { ...current, role };
+    const roles = parseAuthRoles(current.roles, current.role, role);
+    const updated: SessionUser = {
+      ...current,
+      role: primaryAuthRole(roles),
+      roles,
+    };
     const account = accounts.get(normalizeEmail(current.email));
     if (account) {
       accounts.set(normalizeEmail(current.email), {

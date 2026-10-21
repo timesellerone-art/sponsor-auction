@@ -12,12 +12,12 @@ import { ACCESS_REASON } from '@/lib/access';
 import { signOut } from '@/lib/auth';
 import { loginPath } from '@/lib/auth-guard';
 import { cn } from '@/lib/utils';
-import { isAdmin, memberRoleLabel } from '@/types/auth';
+import { isAdmin, memberRolesLabel } from '@/types/auth';
 
 export function Navbar() {
   const router = useRouter();
   const { user, ready, canCreateAuction, canPlaceBid } = useAuth();
-  const showAdmin = Boolean(ready && isAdmin(user?.role));
+  const showAdmin = Boolean(ready && isAdmin(user));
   const showDashboard = Boolean(ready && (canCreateAuction || canPlaceBid));
   const dashboardLabel = canPlaceBid ? '내 제안' : '내 역경매';
   const [open, setOpen] = useState(false);
@@ -125,7 +125,7 @@ export function Navbar() {
             <div className="flex items-center gap-2">
               <NotificationBell />
               <span className="max-w-[140px] truncate text-xs text-zinc-500">
-                {user.name} · {memberRoleLabel(user.role)}
+                {user.name} · {memberRolesLabel(user)}
               </span>
               <button
                 type="button"
@@ -232,7 +232,7 @@ export function Navbar() {
                 void handleSignOut();
               }}
             >
-              로그아웃 ({memberRoleLabel(user.role)})
+              로그아웃 ({memberRolesLabel(user)})
             </button>
           ) : (
             <Link

@@ -890,7 +890,7 @@ export async function updateProfileStatus(
       return fail(null, '해당 회원을 찾을 수 없습니다.');
     }
 
-    if (current.role === 'admin') {
+    if (current.role === 'admin' || current.roles?.includes('admin')) {
       return fail(null, '관리자 계정은 제재할 수 없습니다.');
     }
 

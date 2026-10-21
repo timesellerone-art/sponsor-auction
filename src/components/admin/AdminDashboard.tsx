@@ -30,6 +30,7 @@ import {
 } from '@/lib/auctions';
 import { cn } from '@/lib/utils';
 import type { PayoutItem, ProfileItem } from '@/types/admin';
+import { isAdmin, isAdvertiser, isCreator } from '@/types/auth';
 import type { AuctionItem, BidItem } from '@/types/auction';
 
 type TabId = 'auctions' | 'users' | 'payouts' | 'bids';
@@ -160,16 +161,15 @@ export function AdminDashboard({
   const stats = useMemo(() => {
     const safeAuctions = asAuctionList(auctions);
     const safeProfiles = asProfileList(profiles);
-    const members = safeProfiles.filter((item) => item.role !== 'admin');
+    const members = safeProfiles.filter((item) => !isAdmin(item));
 
     return {
       auctionCount: safeAuctions.length,
       activeAuctionCount: safeAuctions.filter(
         (item) => item.status === 'active' && !item.isBlind,
       ).length,
-      advertiserCount: members.filter((item) => item.role === 'advertiser')
-        .length,
-      creatorCount: members.filter((item) => item.role === 'creator').length,
+      advertiserCount: members.filter((item) => isAdvertiser(item)).length,
+      creatorCount: members.filter((item) => isCreator(item)).length,
       blindedCount: safeAuctions.filter((item) => item.isBlind).length,
     };
   }, [auctions, profiles]);
@@ -304,7 +304,7 @@ export function AdminDashboard({
   };
 
   const handleToggleProfileStatus = async (profile: ProfileItem) => {
-    if (!profile?.id || profile.role === 'admin') {
+    if (!profile?.id || isAdmin(profile)) {
       return;
     }
     if (isBusy) {
@@ -326,7 +326,7 @@ export function AdminDashboard({
     await run(profile.id, async () => {
       try {
         const current = profiles.find((item) => item.id === profile.id) ?? latest;
-        if (current.role === 'admin') {
+        if (isAdmin(current)) {
           showToast('관리자 계정은 제재할 수 없습니다.');
           return;
         }

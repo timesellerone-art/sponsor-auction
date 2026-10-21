@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { AUTH_PRESENT_COOKIE_NAME, ROLE_COOKIE_NAME } from '@/lib/access';
 import { ROLE_SELECT_PATH } from '@/lib/auth-guard';
+import { parseAuthRoles } from '@/types/auth';
 import { updateSession, withSessionCookies } from '@/lib/supabase/middleware';
 import {
   clientIp,
@@ -38,7 +39,11 @@ function isOnboardingOpenPath(pathname: string) {
 
 export async function middleware(request: NextRequest) {
   const sessionResponse = await updateSession(request);
-  const role = request.cookies.get(ROLE_COOKIE_NAME)?.value ?? '';
+  const cookieRoles = parseAuthRoles(request.cookies.get(ROLE_COOKIE_NAME)?.value ?? '');
+  const hasAdmin = cookieRoles.includes('admin');
+  const hasAdvertiser = cookieRoles.includes('advertiser');
+  const hasCreator = cookieRoles.includes('creator');
+  const hasMemberRole = hasAdmin || hasAdvertiser || hasCreator;
   const loggedIn = request.cookies.get(AUTH_PRESENT_COOKIE_NAME)?.value === '1';
   const pathname = request.nextUrl.pathname;
 
@@ -52,7 +57,7 @@ export async function middleware(request: NextRequest) {
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
   const isDashboardPath = pathname === '/my' || pathname.startsWith('/my/');
   const isPaymentPath = pathname === '/payments' || pathname.startsWith('/payments/');
-  const needsRole = loggedIn && role !== 'admin' && role !== 'advertiser' && role !== 'creator';
+  const needsRole = loggedIn && !hasMemberRole;
 
   const loginAuthRequired =
     pathname.startsWith('/login') &&
@@ -66,53 +71,48 @@ export async function middleware(request: NextRequest) {
     return withSessionCookies(sessionResponse, redirectTo(request, ROLE_SELECT_PATH));
   }
 
-  if (pathname.startsWith('/onboarding') && role) {
+  if (pathname.startsWith('/onboarding') && hasMemberRole) {
     return withSessionCookies(
       sessionResponse,
-      redirectTo(request, role === 'admin' ? '/admin' : '/my'),
+      redirectTo(request, hasAdmin ? '/admin' : '/my'),
     );
   }
 
-  if (isAdminPath && role !== 'admin') {
+  if (isAdminPath && !hasAdmin) {
     return withSessionCookies(
       sessionResponse,
       redirectTo(
         request,
-        role ? '/' : '/login',
-        role ? 'admin-forbidden' : 'admin-auth',
+        hasMemberRole ? '/' : '/login',
+        hasMemberRole ? 'admin-forbidden' : 'admin-auth',
       ),
     );
   }
 
-  if (isDashboardPath && role !== 'advertiser' && role !== 'creator') {
-    if (loggedIn && !role) {
+  if (isDashboardPath && !hasAdvertiser && !hasCreator) {
+    if (loggedIn && !hasMemberRole) {
       return withSessionCookies(sessionResponse, redirectTo(request, ROLE_SELECT_PATH));
     }
     return withSessionCookies(
       sessionResponse,
       redirectTo(
         request,
-        role ? '/' : '/login',
-        role ? 'advertiser-forbidden' : 'advertiser-auth',
+        hasMemberRole ? '/' : '/login',
+        hasMemberRole ? 'advertiser-forbidden' : 'advertiser-auth',
       ),
     );
   }
 
-  if (
-    isPaymentPath &&
-    role !== 'advertiser' &&
-    role !== 'creator' &&
-    role !== 'admin'
-  ) {
-    if (loggedIn && !role) {
+  if (isPaymentPath && !hasAdvertiser && !hasCreator && !hasAdmin) {
+    if (loggedIn && !hasMemberRole) {
       return withSessionCookies(sessionResponse, redirectTo(request, ROLE_SELECT_PATH));
     }
     return withSessionCookies(
       sessionResponse,
       redirectTo(
         request,
-        role ? '/' : '/login',
-        role ? 'advertiser-forbidden' : 'payment-auth',
+        hasMemberRole ? '/' : '/login',
+        hasMemberRole ? 'advertiser-forbidden' : 'payment-auth',
       ),
     );
   }

@@ -2,15 +2,16 @@ import 'server-only';
 
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
-import type { MemberRole } from '@/types/auth';
+import { parseAuthRoles, primaryAuthRole, type MemberRole } from '@/types/auth';
 
-const PROFILE_COLUMNS = 'id, name, email, role, status, created_at';
+const PROFILE_COLUMNS = 'id, name, email, role, roles, status, created_at';
 
 export type SyncedProfile = {
   id: string;
   name: string;
   email: string;
   role: 'advertiser' | 'creator' | 'admin' | null;
+  roles: Array<'advertiser' | 'creator' | 'admin'>;
   status: 'active' | 'suspended';
   createdAt: string;
 };
@@ -33,16 +34,24 @@ export async function upsertAppProfile(
     email?: string | null;
     name?: string | null;
     role?: MemberRole | 'admin' | null;
+    roles?: Array<MemberRole | 'admin'> | null;
   },
 ): Promise<SyncedProfile | null> {
   const email = input.email?.trim() || fallbackEmail(input.id);
   const name = input.name?.trim() || email.split('@')[0] || '회원';
+  const current = await admin
+    .from('profiles')
+    .select('role, roles')
+    .eq('id', input.id)
+    .maybeSingle();
+  const nextRoles = parseAuthRoles(current.data?.roles, current.data?.role, input.roles, input.role);
+  const nextRole = primaryAuthRole(nextRoles) ?? (input.role || null);
   const payload = {
     id: input.id,
     name,
     email,
     status: 'active' as const,
-    ...(input.role ? { role: input.role } : {}),
+    ...(nextRole ? { role: nextRole, roles: nextRoles } : {}),
   };
 
   const upserted = await admin
@@ -60,9 +69,11 @@ export async function upsertAppProfile(
     email: string;
     status: 'active';
     role?: MemberRole | 'admin';
+    roles?: Array<MemberRole | 'admin'>;
   } = { name, email, status: 'active' };
-  if (input.role) {
-    patch.role = input.role;
+  if (nextRole) {
+    patch.role = nextRole;
+    patch.roles = nextRoles;
   }
 
   const updated = await admin
@@ -76,10 +87,10 @@ export async function upsertAppProfile(
     return toSynced(updated.data);
   }
 
-  const roleOnly = input.role
+  const roleOnly = nextRole
     ? await admin
         .from('profiles')
-        .update({ role: input.role })
+        .update({ role: nextRole, roles: nextRoles })
         .eq('id', input.id)
         .select(PROFILE_COLUMNS)
         .maybeSingle()
@@ -94,7 +105,7 @@ export async function upsertAppProfile(
     .eq('id', input.id)
     .maybeSingle();
   if (!existing.error && existing.data) {
-    if (input.role && existing.data.role === input.role) {
+    if (nextRole && parseAuthRoles(existing.data).includes(nextRole)) {
       return toSynced(existing.data);
     }
   }
@@ -112,14 +123,17 @@ function toSynced(row: {
   name: string;
   email: string;
   role: 'advertiser' | 'creator' | 'admin' | null;
+  roles?: Array<'advertiser' | 'creator' | 'admin'> | null;
   status: 'active' | 'suspended';
   created_at: string;
 }): SyncedProfile {
+  const roles = parseAuthRoles(row.roles, row.role);
   return {
     id: row.id,
     name: row.name,
     email: row.email,
-    role: row.role,
+    role: primaryAuthRole(roles) ?? row.role,
+    roles,
     status: row.status,
     createdAt: row.created_at,
   };
@@ -160,6 +174,7 @@ export async function listAndBackfillProfiles(admin: SupabaseClient<Database>) {
             name: synced.name,
             email: synced.email,
             role: synced.role,
+            roles: synced.roles,
             status: synced.status,
             created_at: synced.createdAt,
           });

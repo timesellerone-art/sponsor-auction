@@ -1,3 +1,5 @@
+import { parseAuthRoles } from '@/types/auth';
+
 export const ROLE_COOKIE_NAME = 'sponsor-auction-role';
 export const AUTH_PRESENT_COOKIE_NAME = 'sponsor-auction-auth';
 
@@ -27,13 +29,12 @@ export function accessReasonMessage(reason: string | null | undefined) {
   return ACCESS_REASON[reason];
 }
 
-export function syncRoleCookie(role: string | null | undefined) {
+export function syncRoleCookie(role: string | null | undefined, roles?: unknown) {
   if (typeof document === 'undefined') {
     return;
   }
 
-  const value =
-    role === 'admin' || role === 'advertiser' || role === 'creator' ? role : '';
+  const value = parseAuthRoles(roles, role).join(',');
   const maxAge = value ? 60 * 60 * 24 * 7 : 0;
   document.cookie = `${ROLE_COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
 }

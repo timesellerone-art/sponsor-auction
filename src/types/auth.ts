@@ -9,6 +9,7 @@ export interface SessionUser {
   email: string;
   name: string;
   role: AuthProfileRole | null;
+  roles?: AuthProfileRole[];
   createdAt?: string;
   lastSignInAt?: string | null;
   onboardingComplete?: boolean;
@@ -22,16 +23,65 @@ export function isAuthProfileRole(value: unknown): value is AuthProfileRole {
   return isMemberRole(value) || value === 'admin';
 }
 
-export function isAdmin(role: string | null | undefined): boolean {
-  return role === 'admin';
+export function parseAuthRoles(...sources: unknown[]): AuthProfileRole[] {
+  const found: AuthProfileRole[] = [];
+  const seen = new Set<AuthProfileRole>();
+
+  const push = (value: unknown) => {
+    if (isAuthProfileRole(value) && !seen.has(value)) {
+      seen.add(value);
+      found.push(value);
+    }
+  };
+
+  for (const source of sources) {
+    if (!source) {
+      continue;
+    }
+    if (typeof source === 'string') {
+      for (const part of source.split(/[,\s]+/)) {
+        push(part.trim());
+      }
+      continue;
+    }
+    if (Array.isArray(source)) {
+      source.forEach(push);
+      continue;
+    }
+    if (typeof source === 'object') {
+      const holder = source as { role?: unknown; roles?: unknown };
+      if (Array.isArray(holder.roles) || typeof holder.roles === 'string') {
+        parseAuthRoles(holder.roles).forEach(push);
+      }
+      push(holder.role);
+    }
+  }
+
+  return found;
 }
 
-export function isAdvertiser(role: string | null | undefined): boolean {
-  return role === 'advertiser';
+export function primaryAuthRole(...sources: unknown[]): AuthProfileRole | null {
+  const roles = parseAuthRoles(...sources);
+  if (roles.includes('admin')) {
+    return 'admin';
+  }
+  return roles[0] ?? null;
 }
 
-export function isCreator(role: string | null | undefined): boolean {
-  return role === 'creator';
+export function hasAuthRole(source: unknown, role: AuthProfileRole): boolean {
+  return parseAuthRoles(source).includes(role);
+}
+
+export function isAdmin(source: unknown): boolean {
+  return hasAuthRole(source, 'admin');
+}
+
+export function isAdvertiser(source: unknown): boolean {
+  return hasAuthRole(source, 'advertiser');
+}
+
+export function isCreator(source: unknown): boolean {
+  return hasAuthRole(source, 'creator');
 }
 
 const FIRST_SIGNIN_WINDOW_MS = 15 * 60 * 1000;
@@ -58,24 +108,25 @@ export function needsRoleOnboarding(user: SessionUser | null | undefined): boole
   if (!user) {
     return false;
   }
-  if (user.role === 'admin') {
+  const roles = parseAuthRoles(user);
+  if (roles.includes('admin')) {
     return false;
   }
-  if (user.onboardingComplete && isAuthProfileRole(user.role)) {
+  if (user.onboardingComplete && roles.some(isMemberRole)) {
     return false;
   }
-  if (!isAuthProfileRole(user.role)) {
+  if (!roles.some(isMemberRole)) {
     return true;
   }
   return isFirstAuthSignIn(user);
 }
 
-export function canCreateAuction(role: string | null | undefined): boolean {
-  return isAdvertiser(role);
+export function canCreateAuction(source: unknown): boolean {
+  return isAdvertiser(source);
 }
 
-export function canPlaceBid(role: string | null | undefined): boolean {
-  return isCreator(role);
+export function canPlaceBid(source: unknown): boolean {
+  return isCreator(source);
 }
 
 export function memberRoleLabel(role: AuthProfileRole | null | undefined): string {
@@ -89,4 +140,12 @@ export function memberRoleLabel(role: AuthProfileRole | null | undefined): strin
     return '관리자';
   }
   return '역할 미설정';
+}
+
+export function memberRolesLabel(source: unknown): string {
+  const roles = parseAuthRoles(source);
+  if (roles.length === 0) {
+    return '역할 미설정';
+  }
+  return roles.map((role) => memberRoleLabel(role)).join(' · ');
 }

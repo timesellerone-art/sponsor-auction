@@ -3,7 +3,13 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { AUTH_PRESENT_COOKIE_NAME, ROLE_COOKIE_NAME } from '@/lib/access';
 import { ROLE_SELECT_PATH, postSocialAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
 import { getSupabaseEnv } from '@/lib/supabase/env';
-import { isFirstAuthSignIn, needsRoleOnboarding, type SessionUser } from '@/types/auth';
+import {
+  isFirstAuthSignIn,
+  needsRoleOnboarding,
+  parseAuthRoles,
+  primaryAuthRole,
+  type SessionUser,
+} from '@/types/auth';
 
 function callbackOrigin(request: Request) {
   const url = new URL(request.url);
@@ -56,33 +62,34 @@ export async function GET(request: NextRequest) {
         if (authUser) {
           const profile = await supabase
             .from('profiles')
-            .select('role')
+            .select('role, roles')
             .eq('id', authUser.id)
             .maybeSingle();
-          const roleValue = typeof profile.data?.role === 'string' ? profile.data.role : null;
+          const roles = parseAuthRoles(profile.data?.roles, profile.data?.role);
           sessionLike = {
             id: authUser.id,
             email: authUser.email ?? '',
             name: '',
-            role:
-              roleValue === 'advertiser' || roleValue === 'creator' || roleValue === 'admin'
-                ? roleValue
-                : null,
+            role: primaryAuthRole(roles),
+            roles,
             createdAt: authUser.created_at,
             lastSignInAt: authUser.last_sign_in_at,
             onboardingComplete: authUser.user_metadata?.onboarding_complete === true,
           };
           if (
             needsRoleOnboarding(sessionLike) &&
-            sessionLike.role &&
-            sessionLike.role !== 'admin' &&
+            roles.length > 0 &&
+            !roles.includes('admin') &&
             isFirstAuthSignIn(authUser)
           ) {
-            await supabase.from('profiles').update({ role: null }).eq('id', authUser.id);
-            sessionLike = { ...sessionLike, role: null };
+            await supabase
+              .from('profiles')
+              .update({ role: null, roles: [] })
+              .eq('id', authUser.id);
+            sessionLike = { ...sessionLike, role: null, roles: [] };
           }
         }
-        const destination = postSocialAuthPath(sessionLike?.role, next, {
+        const destination = postSocialAuthPath(sessionLike, next, {
           needsOnboarding: needsRoleOnboarding(sessionLike),
         });
         const redirect = NextResponse.redirect(new URL(destination, origin));

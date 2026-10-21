@@ -2,23 +2,18 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { ROLE_COOKIE_NAME } from '@/lib/access';
 import { createClient } from '@/lib/supabase/server';
-import type { AuthProfileRole } from '@/types/auth';
+import { parseAuthRoles, primaryAuthRole, type AuthProfileRole } from '@/types/auth';
 
 export type PaymentActor = {
   role: AuthProfileRole;
+  roles: AuthProfileRole[];
   userId?: string;
 };
 
-function asRole(value: string): AuthProfileRole | null {
-  if (value === 'advertiser' || value === 'creator' || value === 'admin') {
-    return value;
-  }
-  return null;
-}
-
 export async function getPaymentActor(): Promise<PaymentActor | null> {
   const cookieStore = await cookies();
-  const cookieRole = asRole(cookieStore.get(ROLE_COOKIE_NAME)?.value ?? '');
+  const cookieRoles = parseAuthRoles(cookieStore.get(ROLE_COOKIE_NAME)?.value ?? '');
+  const cookieRole = primaryAuthRole(cookieRoles);
 
   try {
     const supabase = await createClient();
@@ -27,17 +22,13 @@ export async function getPaymentActor(): Promise<PaymentActor | null> {
       if (!error && data.user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, roles')
           .eq('id', data.user.id)
           .maybeSingle();
-        const profileRole = asRole(
-          typeof profile?.role === 'string' ? profile.role : '',
-        );
+        const roles = parseAuthRoles(profile?.roles, profile?.role, cookieRoles);
+        const profileRole = primaryAuthRole(roles) ?? cookieRole;
         if (profileRole) {
-          return { role: profileRole, userId: data.user.id };
-        }
-        if (cookieRole) {
-          return { role: cookieRole, userId: data.user.id };
+          return { role: profileRole, roles, userId: data.user.id };
         }
         return null;
       }
@@ -47,7 +38,7 @@ export async function getPaymentActor(): Promise<PaymentActor | null> {
   }
 
   if (cookieRole) {
-    return { role: cookieRole };
+    return { role: cookieRole, roles: cookieRoles };
   }
 
   return null;
@@ -76,5 +67,6 @@ export function forbiddenJson(message = '이 요청을 수행할 권한이 없�
 }
 
 export function canPreparePayment(actor: PaymentActor | null) {
-  return actor?.role === 'advertiser' || actor?.role === 'admin';
+  const roles = parseAuthRoles(actor);
+  return roles.includes('advertiser') || roles.includes('admin');
 }

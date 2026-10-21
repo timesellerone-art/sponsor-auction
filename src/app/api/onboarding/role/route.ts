@@ -90,6 +90,7 @@ export async function POST(request: Request) {
         email: synced.email,
         name: synced.name,
         role: synced.role,
+        roles: synced.roles,
       },
     });
   } catch (error) {

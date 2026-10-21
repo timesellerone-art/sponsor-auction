@@ -10,8 +10,9 @@ import { createClient } from '@/lib/supabase/client';
 import { getSupabaseOAuthCallbackUrl } from '@/lib/supabase/env';
 import { ROLE_SELECT_PATH, sanitizeNextPath } from '@/lib/auth-guard';
 import {
-  isAuthProfileRole,
   isMemberRole,
+  parseAuthRoles,
+  primaryAuthRole,
   type MemberRole,
   type SessionUser,
 } from '@/types/auth';
@@ -58,20 +59,21 @@ function publicAuthErrorMessage(error: unknown) {
 }
 
 function persistClientAuth(user: SessionUser | null) {
-  syncRoleCookie(user?.role ?? null);
+  syncRoleCookie(user?.role ?? null, user?.roles);
   syncAuthPresentCookie(Boolean(user));
 }
 
 const AUTH_CHANGED_EVENT = 'auth:changed';
 const AUTH_SESSION_EVENT = 'auth:session';
 
-const PROFILE_COLUMNS = 'id, name, email, role, status';
+const PROFILE_COLUMNS = 'id, name, email, role, roles, status';
 
 type ProfileRow = {
   id: string;
   name: string | null;
   email: string | null;
   role: string | null;
+  roles?: unknown;
   status: string | null;
 };
 
@@ -112,12 +114,15 @@ function mapSessionUser(
     last_sign_in_at?: string | null;
     user_metadata?: Record<string, unknown>;
   } | null,
+  roles?: unknown,
 ): SessionUser {
+  const parsed = parseAuthRoles(roles, role);
   return {
     id,
     email,
     name,
-    role: isAuthProfileRole(role) ? role : null,
+    role: primaryAuthRole(parsed),
+    roles: parsed,
     createdAt: authUser?.created_at,
     lastSignInAt: authUser?.last_sign_in_at,
     onboardingComplete: authUser?.user_metadata?.onboarding_complete === true,
@@ -320,6 +325,7 @@ async function loadProfile(
     row?.name?.trim() || fallbackName || fallbackEmail.split('@')[0] || '회원',
     row?.role,
     authUser,
+    row?.roles,
   );
 }
 
@@ -601,7 +607,8 @@ async function upsertProfileRow(
     id: string;
     name: string;
     email: string;
-    role: MemberRole;
+    role: MemberRole | 'admin';
+    roles: Array<MemberRole | 'admin'>;
     status: 'active';
   },
 ) {
@@ -621,6 +628,7 @@ async function upsertProfileRow(
         name: payload.name,
         email: payload.email,
         role: payload.role,
+        roles: payload.roles,
         status: payload.status,
       })
       .eq('id', payload.id)
@@ -636,7 +644,7 @@ async function upsertProfileRow(
   const roleOnly = await withTimeout(
     supabase
       .from('profiles')
-      .update({ role: payload.role })
+      .update({ role: payload.role, roles: payload.roles })
       .eq('id', payload.id)
       .select(PROFILE_COLUMNS)
       .maybeSingle(),
@@ -669,7 +677,7 @@ async function saveRoleViaApi(
     body: JSON.stringify({ role, name, email }),
   });
   const payload = (await response.json().catch(() => null)) as {
-    data?: { id?: string; email?: string; name?: string; role?: string | null };
+    data?: { id?: string; email?: string; name?: string; role?: string | null; roles?: unknown };
     error?: string;
   } | null;
   if (!response.ok || !payload?.data?.id) {
@@ -684,6 +692,8 @@ async function saveRoleViaApi(
       payload.data.email?.trim() || email,
       payload.data.name?.trim() || name,
       payload.data.role,
+      null,
+      payload.data.roles,
     ),
     error: null,
   };
@@ -744,11 +754,24 @@ export async function saveMemberRole(
       return ok(completed);
     }
 
+    let existingRoles: unknown;
+    try {
+      const existing = await withTimeout(
+        supabase.from('profiles').select('role, roles').eq('id', authUser.id).maybeSingle(),
+        2500,
+        '기존 역할 조회',
+      );
+      existingRoles = existing.data;
+    } catch {
+      existingRoles = null;
+    }
+    const nextRoles = parseAuthRoles(existingRoles, role);
     const payload = {
       id: authUser.id,
       name,
       email,
-      role,
+      role: primaryAuthRole(nextRoles) ?? role,
+      roles: nextRoles.length > 0 ? nextRoles : [role],
       status: 'active' as const,
     };
 
@@ -771,6 +794,7 @@ export async function saveMemberRole(
           onboarding_complete: true,
         },
       },
+      row.roles,
     );
     applyKnownSession(session);
     return ok(session);

@@ -42,7 +42,7 @@ export default function LoginPage() {
 
   const destinationAfterLogin = (sessionUser: SessionUser | null) => {
     const params = new URLSearchParams(window.location.search);
-    return postSocialAuthPath(sessionUser?.role, params.get('next'), {
+    return postSocialAuthPath(sessionUser, params.get('next'), {
       needsOnboarding: needsRoleOnboarding(sessionUser),
     });
   };

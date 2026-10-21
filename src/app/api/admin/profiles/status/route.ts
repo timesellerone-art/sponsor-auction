@@ -8,8 +8,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { isUuid } from '@/lib/uuid';
 import type { ProfileStatus } from '@/types/admin';
+import { parseAuthRoles } from '@/types/auth';
 
-const PROFILE_COLUMNS = 'id, name, email, role, status, created_at';
+const PROFILE_COLUMNS = 'id, name, email, role, roles, status, created_at';
 
 export async function POST(request: Request) {
   try {
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
     if (current.error || !current.data) {
       return NextResponse.json({ error: '해당 회원을 찾을 수 없습니다.' }, { status: 404 });
     }
-    if (current.data.role === 'admin') {
+    if (parseAuthRoles(current.data).includes('admin')) {
       return NextResponse.json({ error: '관리자 계정은 제재할 수 없습니다.' }, { status: 403 });
     }
 
@@ -81,6 +82,7 @@ export async function POST(request: Request) {
         name: data.name,
         email: data.email,
         role: data.role,
+        roles: data.roles,
         status: data.status,
         createdAt: data.created_at,
       },
