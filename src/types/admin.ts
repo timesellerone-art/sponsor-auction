@@ -12,6 +12,10 @@ export interface ProfileItem {
   roles?: ProfileRole[];
   status: ProfileStatus;
   createdAt: string;
+  rating?: number;
+  completionRate?: number;
+  penaltyCount?: number;
+  youtubeVerified?: boolean;
 }
 
 export interface PayoutItem {

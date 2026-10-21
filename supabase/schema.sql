@@ -73,6 +73,31 @@ alter table public.profiles alter column role drop default;
 alter table public.profiles
   add column if not exists roles public.profile_role[] not null default '{}'::public.profile_role[];
 
+create table if not exists public.creator_metrics (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  rating numeric(3, 2) not null default 0
+    constraint creator_metrics_rating_range check (rating >= 0 and rating <= 5),
+  completion_rate numeric(5, 2) not null default 0
+    constraint creator_metrics_completion_range check (completion_rate >= 0 and completion_rate <= 100),
+  penalty_count integer not null default 0
+    constraint creator_metrics_penalty_nonneg check (penalty_count >= 0),
+  youtube_verified boolean not null default false,
+  youtube_channel_id text,
+  youtube_channel_url text,
+  youtube_channel_title text,
+  youtube_subscriber_count bigint not null default 0
+    constraint creator_metrics_subscribers_nonneg check (youtube_subscriber_count >= 0),
+  youtube_video_count integer not null default 0
+    constraint creator_metrics_videos_nonneg check (youtube_video_count >= 0),
+  youtube_view_count bigint not null default 0
+    constraint creator_metrics_views_nonneg check (youtube_view_count >= 0),
+  youtube_metrics_synced_at timestamptz,
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists creator_metrics_rating_idx
+  on public.creator_metrics (rating desc);
+
 create table if not exists public.auctions (
   id uuid primary key default gen_random_uuid(),
   title text not null,
@@ -454,6 +479,7 @@ for each row
 execute function public.handle_new_user();
 
 alter table public.profiles enable row level security;
+alter table public.creator_metrics enable row level security;
 alter table public.auctions enable row level security;
 alter table public.bids enable row level security;
 alter table public.payouts enable row level security;
@@ -525,6 +551,28 @@ on public.profiles for update
 to authenticated
 using (auth.uid() = id or public.is_admin())
 with check (auth.uid() = id or public.is_admin());
+
+drop policy if exists "creator_metrics_select_own" on public.creator_metrics;
+create policy "creator_metrics_select_own"
+on public.creator_metrics for select
+to authenticated
+using (auth.uid() = profile_id or public.is_admin());
+
+drop policy if exists "creator_metrics_insert_own" on public.creator_metrics;
+create policy "creator_metrics_insert_own"
+on public.creator_metrics for insert
+to authenticated
+with check (auth.uid() = profile_id or public.is_admin());
+
+drop policy if exists "creator_metrics_update_own" on public.creator_metrics;
+create policy "creator_metrics_update_own"
+on public.creator_metrics for update
+to authenticated
+using (auth.uid() = profile_id or public.is_admin())
+with check (auth.uid() = profile_id or public.is_admin());
+
+grant select, insert, update on public.creator_metrics to authenticated;
+grant select, insert, update, delete on public.creator_metrics to service_role;
 
 drop policy if exists "auctions_select_public" on public.auctions;
 create policy "auctions_select_public"

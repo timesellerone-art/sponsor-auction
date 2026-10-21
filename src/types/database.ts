@@ -136,6 +136,53 @@ export type Database = {
         };
         Relationships: [];
       };
+      creator_metrics: {
+        Row: {
+          profile_id: string;
+          rating: number;
+          completion_rate: number;
+          penalty_count: number;
+          youtube_verified: boolean;
+          youtube_channel_id: string | null;
+          youtube_channel_url: string | null;
+          youtube_channel_title: string | null;
+          youtube_subscriber_count: number;
+          youtube_video_count: number;
+          youtube_view_count: number;
+          youtube_metrics_synced_at: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          profile_id: string;
+          rating?: number;
+          completion_rate?: number;
+          penalty_count?: number;
+          youtube_verified?: boolean;
+          youtube_channel_id?: string | null;
+          youtube_channel_url?: string | null;
+          youtube_channel_title?: string | null;
+          youtube_subscriber_count?: number;
+          youtube_video_count?: number;
+          youtube_view_count?: number;
+          youtube_metrics_synced_at?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          rating?: number;
+          completion_rate?: number;
+          penalty_count?: number;
+          youtube_verified?: boolean;
+          youtube_channel_id?: string | null;
+          youtube_channel_url?: string | null;
+          youtube_channel_title?: string | null;
+          youtube_subscriber_count?: number;
+          youtube_video_count?: number;
+          youtube_view_count?: number;
+          youtube_metrics_synced_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       payments: {
         Row: {
           order_id: string;
