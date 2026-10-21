@@ -8,7 +8,7 @@ import {
 import { syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import { createClient } from '@/lib/supabase/client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
-import { sanitizeNextPath } from '@/lib/auth-guard';
+import { ROLE_SELECT_PATH, sanitizeNextPath } from '@/lib/auth-guard';
 import {
   isAuthProfileRole,
   isMemberRole,
@@ -107,12 +107,20 @@ function mapSessionUser(
   email: string,
   name: string,
   role: string | null | undefined,
+  authUser?: {
+    created_at?: string;
+    last_sign_in_at?: string | null;
+    user_metadata?: Record<string, unknown>;
+  } | null,
 ): SessionUser {
   return {
     id,
     email,
     name,
     role: isAuthProfileRole(role) ? role : null,
+    createdAt: authUser?.created_at,
+    lastSignInAt: authUser?.last_sign_in_at,
+    onboardingComplete: authUser?.user_metadata?.onboarding_complete === true,
   };
 }
 
@@ -184,7 +192,7 @@ export type SocialOAuthProvider = 'google' | 'kakao' | 'naver' | 'apple';
 
 function oauthRedirectTo(nextPath?: string | null) {
   const origin = window.location.origin;
-  const next = sanitizeNextPath(nextPath) ?? '/';
+  const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
   return `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
@@ -257,6 +265,11 @@ async function loadProfile(
   userId: string,
   fallbackEmail: string,
   fallbackName: string,
+  authUser?: {
+    created_at?: string;
+    last_sign_in_at?: string | null;
+    user_metadata?: Record<string, unknown>;
+  } | null,
 ): Promise<SessionUser> {
   const { data, error } = await withTimeout(
     supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle(),
@@ -274,6 +287,7 @@ async function loadProfile(
     row?.email?.trim() || fallbackEmail,
     row?.name?.trim() || fallbackName || fallbackEmail.split('@')[0] || '회원',
     row?.role,
+    authUser,
   );
 }
 
@@ -334,7 +348,7 @@ export async function getSessionUser(): Promise<DataResult<SessionUser | null>> 
       (typeof user.user_metadata?.name === 'string'
         ? user.user_metadata.name
         : '') || email.split('@')[0] || '회원';
-    const session = await loadProfile(supabase, user.id, email, name);
+    const session = await loadProfile(supabase, user.id, email, name, user);
     return ok(session);
   } catch (error) {
     if (isAuthSessionMissing(error)) {
@@ -441,6 +455,7 @@ export async function signUp(input: {
       user.id,
       user.email?.trim() || email,
       name,
+      user,
     );
     applyKnownSession(session);
     notifyAuthChanged();
@@ -497,7 +512,7 @@ export async function signIn(input: {
       (typeof user.user_metadata?.name === 'string'
         ? user.user_metadata.name
         : '') || email.split('@')[0] || '회원';
-    const session = await loadProfile(supabase, user.id, email, name);
+    const session = await loadProfile(supabase, user.id, email, name, user);
     applyKnownSession(session);
     notifyAuthChanged();
     return ok(session);
@@ -653,11 +668,16 @@ export async function saveMemberRole(
         ? authUser.user_metadata.name
         : '') || email.split('@')[0] || '회원';
 
+    void supabase.auth.updateUser({
+      data: { onboarding_complete: true, role },
+    }).catch(() => null);
+
     if (accessToken) {
       const fromApi = await saveRoleViaApi(accessToken, role, name, email);
       if (fromApi) {
-        applyKnownSession(fromApi);
-        return ok(fromApi);
+        const completed = { ...fromApi, onboardingComplete: true as const };
+        applyKnownSession(completed);
+        return ok(completed);
       }
     }
 
@@ -681,6 +701,13 @@ export async function saveMemberRole(
       row.email?.trim() || email,
       row.name?.trim() || name,
       row.role,
+      {
+        ...authUser,
+        user_metadata: {
+          ...(authUser.user_metadata ?? {}),
+          onboarding_complete: true,
+        },
+      },
     );
     applyKnownSession(session);
     return ok(session);

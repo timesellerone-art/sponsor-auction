@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { showToast } from '@/components/Toast';
 import { getSessionUser, notifyAuthChanged } from '@/lib/auth';
-import { postAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
+import { ROLE_SELECT_PATH, postSocialAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
 import { getSupabaseClient } from '@/lib/supabase';
+import { needsRoleOnboarding } from '@/types/auth';
 
 export default function AuthOAuthCompletePage() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function AuthOAuthCompletePage() {
     const finish = async () => {
       const params = new URLSearchParams(window.location.search);
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      const next = sanitizeNextPath(params.get('next')) ?? '/';
+      const next = sanitizeNextPath(params.get('next')) ?? ROLE_SELECT_PATH;
       const errorDescription =
         params.get('error_description') ||
         hashParams.get('error_description') ||
@@ -58,7 +59,9 @@ export default function AuthOAuthCompletePage() {
 
         notifyAuthChanged();
         const session = await getSessionUser();
-        const destination = postAuthPath(session.data?.role ?? null, next);
+        const destination = postSocialAuthPath(session.data?.role ?? null, next, {
+          needsOnboarding: needsRoleOnboarding(session.data),
+        });
         if (!cancelled) {
           router.replace(destination);
           router.refresh();

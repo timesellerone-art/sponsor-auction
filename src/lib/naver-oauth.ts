@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { sanitizeNextPath } from '@/lib/auth-guard';
+import { ROLE_SELECT_PATH, sanitizeNextPath } from '@/lib/auth-guard';
 
 export const NAVER_STATE_COOKIE = 'sa_naver_oauth_state';
 export const NAVER_NEXT_COOKIE = 'sa_naver_oauth_next';
@@ -97,7 +97,7 @@ export function buildNaverAuthorizeUrl(params: {
 }
 
 export function readStoredNext(value: string | undefined) {
-  return sanitizeNextPath(value ?? null) ?? '/';
+  return sanitizeNextPath(value ?? null) ?? ROLE_SELECT_PATH;
 }
 
 export async function exchangeNaverCode(params: {

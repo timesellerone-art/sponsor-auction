@@ -48,6 +48,15 @@ export async function POST(request: Request) {
       name: body?.name?.trim() || profileNameFromUser(user),
       role,
     });
+    await admin.auth.admin
+      .updateUserById(user.id, {
+        user_metadata: {
+          ...(user.user_metadata ?? {}),
+          onboarding_complete: true,
+          role,
+        },
+      })
+      .catch(() => null);
     if (!synced) {
       return NextResponse.json({ error: '프로필을 저장하지 못했습니다.' }, { status: 500 });
     }

@@ -9,6 +9,9 @@ export interface SessionUser {
   email: string;
   name: string;
   role: AuthProfileRole | null;
+  createdAt?: string;
+  lastSignInAt?: string | null;
+  onboardingComplete?: boolean;
 }
 
 export function isMemberRole(value: unknown): value is MemberRole {
@@ -31,8 +34,40 @@ export function isCreator(role: string | null | undefined): boolean {
   return role === 'creator';
 }
 
+const FIRST_SIGNIN_WINDOW_MS = 15 * 60 * 1000;
+
+export function isFirstAuthSignIn(user: {
+  createdAt?: string | null;
+  lastSignInAt?: string | null;
+  created_at?: string | null;
+  last_sign_in_at?: string | null;
+} | null | undefined) {
+  const createdRaw = user?.createdAt || user?.created_at;
+  if (!createdRaw) {
+    return false;
+  }
+  const created = Date.parse(createdRaw);
+  const last = Date.parse(user?.lastSignInAt || user?.last_sign_in_at || createdRaw);
+  if (!Number.isFinite(created) || !Number.isFinite(last)) {
+    return false;
+  }
+  return Math.abs(last - created) < FIRST_SIGNIN_WINDOW_MS;
+}
+
 export function needsRoleOnboarding(user: SessionUser | null | undefined): boolean {
-  return Boolean(user && !isAuthProfileRole(user.role));
+  if (!user) {
+    return false;
+  }
+  if (user.role === 'admin') {
+    return false;
+  }
+  if (user.onboardingComplete && isAuthProfileRole(user.role)) {
+    return false;
+  }
+  if (!isAuthProfileRole(user.role)) {
+    return true;
+  }
+  return isFirstAuthSignIn(user);
 }
 
 export function canCreateAuction(role: string | null | undefined): boolean {

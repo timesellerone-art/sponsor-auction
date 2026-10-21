@@ -46,3 +46,14 @@ export function postAuthPath(role: string | null | undefined, nextPath?: string 
   }
   return '/my';
 }
+
+export function postSocialAuthPath(
+  role: string | null | undefined,
+  nextPath?: string | null,
+  options?: { needsOnboarding?: boolean },
+) {
+  if (options?.needsOnboarding) {
+    return ROLE_SELECT_PATH;
+  }
+  return postAuthPath(role, nextPath);
+}

@@ -68,6 +68,7 @@ create table if not exists public.profiles (
 );
 
 alter table public.profiles alter column role drop not null;
+alter table public.profiles alter column role drop default;
 
 create table if not exists public.auctions (
   id uuid primary key default gen_random_uuid(),
@@ -432,17 +433,12 @@ begin
       nullif(trim(new.email), ''),
       'user.' || replace(new.id::text, '-', '') || '@oauth.sponsor-auction.local'
     ),
-    case
-      when new.raw_user_meta_data ->> 'role' in ('advertiser', 'creator', 'admin')
-        then (new.raw_user_meta_data ->> 'role')::public.profile_role
-      else null
-    end,
+    null,
     'active'
   )
   on conflict (id) do update
     set name = excluded.name,
-        email = excluded.email,
-        role = coalesce(excluded.role, public.profiles.role);
+        email = excluded.email;
   return new;
 end;
 $$;

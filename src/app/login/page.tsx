@@ -16,8 +16,9 @@ import {
   signUp,
   type SocialOAuthProvider,
 } from '@/lib/auth';
-import { postAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
+import { postSocialAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
 import { cn } from '@/lib/utils';
+import { needsRoleOnboarding, type SessionUser } from '@/types/auth';
 
 type Mode = 'signin' | 'signup';
 
@@ -39,9 +40,11 @@ export default function LoginPage() {
     agreePrivacy?: string;
   }>({});
 
-  const destinationAfterLogin = (role: string | null) => {
+  const destinationAfterLogin = (sessionUser: SessionUser | null) => {
     const params = new URLSearchParams(window.location.search);
-    return postAuthPath(role, params.get('next'));
+    return postSocialAuthPath(sessionUser?.role, params.get('next'), {
+      needsOnboarding: needsRoleOnboarding(sessionUser),
+    });
   };
 
   useEffect(() => {
@@ -67,7 +70,7 @@ export default function LoginPage() {
         }
         const sessionUser = result.data;
         if (sessionUser) {
-          router.replace(destinationAfterLogin(sessionUser.role));
+          router.replace(destinationAfterLogin(sessionUser));
         }
       } catch (sessionError) {
         console.warn('[SponsorAuction] 로그인 페이지 세션 확인에 실패했습니다.', sessionError);
@@ -90,7 +93,7 @@ export default function LoginPage() {
     if (isLoading || !ready || !user) {
       return;
     }
-    router.replace(destinationAfterLogin(user.role));
+    router.replace(destinationAfterLogin(user));
   }, [isLoading, ready, router, user]);
 
   const ensureSignupAgreements = () => {
@@ -162,7 +165,7 @@ export default function LoginPage() {
         'success',
       );
       await refresh();
-      router.replace(destinationAfterLogin(result.data.role));
+      router.replace(destinationAfterLogin(result.data));
       router.refresh();
     } catch {
       setError(AUTH_FAIL_MESSAGE);
