@@ -6,10 +6,9 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { listAndBackfillProfiles } from '@/lib/supabase/profile-sync';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
-import { isAuthProfileRole } from '@/types/auth';
 
-const PROFILE_COLUMNS = 'id, name, email, role, status, created_at';
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
 } as const;
@@ -36,36 +35,17 @@ export async function GET() {
       );
     }
 
-    const { data, error } = await client
-      .from('profiles')
-      .select(PROFILE_COLUMNS)
-      .order('created_at', { ascending: false });
-
-    if (error && isSchemaMismatch(error)) {
+    const { profiles, error } = await listAndBackfillProfiles(client);
+    if (error && isSchemaMismatch({ message: error })) {
       return NextResponse.json({ fallbackMock: true }, { status: 409, headers: NO_STORE });
     }
-    if (error) {
-      console.warn('[SponsorAuction] 관리자 회원 목록 조회 실패', error.message);
+    if (error && profiles.length === 0) {
+      console.warn('[SponsorAuction] 관리자 회원 목록 조회 실패', error);
       return NextResponse.json(
         { error: '회원 목록을 불러오지 못했습니다.' },
         { status: 500, headers: NO_STORE },
       );
     }
-
-    const profiles = (data ?? [])
-      .filter((row) => {
-        const role = typeof row.role === 'string' ? row.role : '';
-        const status = row.status === 'suspended' ? 'suspended' : 'active';
-        return Boolean(row.id && row.email && isAuthProfileRole(role) && status);
-      })
-      .map((row) => ({
-        id: row.id,
-        name: row.name,
-        email: row.email,
-        role: row.role,
-        status: row.status,
-        createdAt: row.created_at,
-      }));
 
     return NextResponse.json({ data: profiles }, { headers: NO_STORE });
   } catch (error) {

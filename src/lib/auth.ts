@@ -401,6 +401,35 @@ export async function signUp(input: {
       return fail(null, '이메일 인증 후 로그인해 주세요.');
     }
 
+    const accessToken = data.session?.access_token ?? '';
+    if (accessToken) {
+      await fetch('/api/onboarding/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ name, email }),
+      }).catch(() => null);
+    } else {
+      await supabase
+        .from('profiles')
+        .upsert(
+          {
+            id: user.id,
+            name,
+            email: user.email?.trim() || email,
+            status: 'active',
+          },
+          { onConflict: 'id' },
+        )
+        .then(({ error: profileError }) => {
+          if (profileError) {
+            console.warn('[SponsorAuction] 가입 프로필 저장 실패', profileError.message);
+          }
+        });
+    }
+
     const session = await loadProfile(
       supabase,
       user.id,

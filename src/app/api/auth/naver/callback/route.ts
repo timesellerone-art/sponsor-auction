@@ -12,6 +12,7 @@ import {
 } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 
 function loginError(origin: string, message: string) {
   const login = new URL('/login', origin);
@@ -90,20 +91,19 @@ export async function GET(request: NextRequest) {
       return loginError(origin, '네이버 계정으로 가입하지 못했습니다.');
     }
 
-    const authUserId = created.data.user?.id;
+    let authUserId = created.data.user?.id ?? '';
+    if (!authUserId) {
+      const listed = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      authUserId =
+        listed.data.users.find((item) => item.email?.toLowerCase() === profile.email.toLowerCase())
+          ?.id ?? '';
+    }
     if (authUserId) {
-      const synced = await admin.from('profiles').upsert(
-        {
-          id: authUserId,
-          name: profile.name,
-          email: profile.email,
-          status: 'active',
-        },
-        { onConflict: 'id' },
-      );
-      if (synced.error) {
-        console.warn('[SponsorAuction] 네이버 프로필 동기화 실패', synced.error.message);
-      }
+      await upsertAppProfile(admin, {
+        id: authUserId,
+        name: profile.name,
+        email: profile.email,
+      });
     }
 
     const link = await admin.auth.admin.generateLink({

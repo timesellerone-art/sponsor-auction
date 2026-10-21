@@ -8,7 +8,7 @@ export interface ProfileItem {
   id: string;
   name: string;
   email: string;
-  role: ProfileRole;
+  role: ProfileRole | null;
   status: ProfileStatus;
   createdAt: string;
 }

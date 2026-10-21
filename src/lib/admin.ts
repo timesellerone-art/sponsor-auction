@@ -72,7 +72,10 @@ function isProfileStatus(value: string): value is ProfileStatus {
 }
 
 function mapProfile(row: ProfileRow): ProfileItem | null {
-  if (!row.role || !isProfileRole(row.role) || !isProfileStatus(row.status)) {
+  if (!row.id || !row.email || !isProfileStatus(row.status)) {
+    return null;
+  }
+  if (row.role && !isProfileRole(row.role)) {
     return null;
   }
 
@@ -119,14 +122,14 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
       fromDb = payload.data
         .map((row) => {
           const item = row as Partial<ProfileItem> & { created_at?: string };
-          if (!item.id || !item.email || !item.role || !item.status) {
+          if (!item.id || !item.email || !item.status) {
             return null;
           }
           return mapProfile({
             id: item.id,
             name: item.name || item.email,
             email: item.email,
-            role: item.role,
+            role: item.role ?? null,
             status: item.status,
             created_at: item.createdAt || item.created_at || '',
           });

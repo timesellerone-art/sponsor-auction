@@ -47,13 +47,6 @@ export function createAdminClient() {
     return null;
   }
 
-  console.info('[SponsorAuction] createAdminClient 준비됨', {
-    hasUrl: true,
-    keyLength: key.length,
-    jwtRole: role,
-    persistSession: false,
-  });
-
   return createClient<Database>(url, key, {
     auth: {
       persistSession: false,

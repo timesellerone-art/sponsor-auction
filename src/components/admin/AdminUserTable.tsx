@@ -14,6 +14,13 @@ const ROLE_LABEL: Record<ProfileRole, string> = {
   admin: '관리자',
 };
 
+function roleLabel(role: ProfileRole | null | undefined) {
+  if (!role) {
+    return '미설정';
+  }
+  return ROLE_LABEL[role] ?? role;
+}
+
 const STATUS_LABEL: Record<ProfileStatus, string> = {
   active: '정상',
   suspended: '정지',
@@ -90,7 +97,7 @@ export function AdminUserTable({
                 filtered.map((profile) => [
                   profile.name,
                   profile.email,
-                  ROLE_LABEL[profile.role] ?? profile.role,
+                  roleLabel(profile.role),
                   STATUS_LABEL[profile.status] ?? profile.status,
                   formatAdminTimestamp(profile.createdAt),
                 ]),
@@ -131,7 +138,7 @@ export function AdminUserTable({
                 const suspended = profile.status === 'suspended';
                 const busy = busyId === profile.id;
                 const anyBusy = Boolean(busyId);
-                const role = profile.role ?? 'advertiser';
+                const role = profile.role;
 
                 return (
                   <tr
@@ -153,7 +160,7 @@ export function AdminUserTable({
                       </p>
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
-                      {ROLE_LABEL[role] ?? role}
+                      {roleLabel(role)}
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
                       {formatAdminTimestamp(profile.createdAt)}
