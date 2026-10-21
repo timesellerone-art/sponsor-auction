@@ -119,6 +119,29 @@ export async function issueTaxInvoice(
     mgtKey,
   };
 
+  const client = createAdminClient();
+  if (client && input.paymentOrderId) {
+    try {
+      const existing = await client
+        .from('tax_invoice_logs')
+        .select('mgt_key, status')
+        .eq('payment_order_id', input.paymentOrderId)
+        .limit(1)
+        .maybeSingle();
+      if (existing.data?.mgt_key) {
+        return {
+          ok: true,
+          fallback: existing.data.status !== 'issued',
+          status: existing.data.status === 'issued' ? 'issued' : 'fallback',
+          mgtKey: existing.data.mgt_key,
+          message: '이미 신청된 세금계산서 기록을 재사용합니다.',
+        };
+      }
+    } catch {
+      // 중복 조회 실패 시 신규 발행을 진행합니다.
+    }
+  }
+
   if (!secret) {
     const result: TaxInvoiceIssueResult = {
       ok: true,

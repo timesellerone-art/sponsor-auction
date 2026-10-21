@@ -5,6 +5,7 @@ import {
   getPaymentActor,
   unauthorizedJson,
 } from '@/lib/payments/guard';
+import { recordBypassIfNeeded } from '@/lib/compliance';
 import { listTimeSlotBids, placeTimeSlotBid } from '@/lib/timeslots';
 import { hasAuthRole } from '@/types/auth';
 import { OffPlatformContactError, assertNoOffPlatformContact } from '@/utils/filter';
@@ -77,6 +78,12 @@ export async function POST(
     const { id } = await context.params;
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const message = asText(body?.message);
+    await recordBypassIfNeeded({
+      text: message,
+      source: 'timeslot_bid',
+      actorId: actor.userId,
+      auctionId: id,
+    });
     try {
       assertNoOffPlatformContact(message);
     } catch (error) {

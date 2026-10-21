@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, X } from 'lucide-react';
+import { EscrowNotice } from '@/components/EscrowNotice';
 import { showToast } from '@/components/Toast';
 import { REFUND_REQUIRED } from '@/lib/legal';
 import { rememberCheckoutContext } from '@/lib/payments/client';
@@ -267,9 +268,10 @@ export function PaymentCheckoutModal({
             </p>
             <p className="mt-1 text-xs text-zinc-500">
               공급가액 {formatWon(advertiserInvoice.supplyAmount)} + 부가세 10%{' '}
-              {formatWon(advertiserInvoice.vatAmount)}. 결제 완료 후에만 낙찰이 확정됩니다.
+              {formatWon(advertiserInvoice.vatAmount)}. 결제 완료 후에만 계약이 확정됩니다.
             </p>
           </div>
+          <EscrowNotice />
 
           {payError ? (
             <div

@@ -391,6 +391,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      compliance_logs: {
+        Row: {
+          id: string;
+          source: string;
+          keywords: string[];
+          snippet: string;
+          blocked: boolean;
+          actor_id: string | null;
+          auction_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          source: string;
+          keywords?: string[];
+          snippet?: string;
+          blocked?: boolean;
+          actor_id?: string | null;
+          auction_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          snippet?: string;
+          blocked?: boolean;
+        };
+        Relationships: [];
+      };
       tax_invoice_logs: {
         Row: {
           id: string;

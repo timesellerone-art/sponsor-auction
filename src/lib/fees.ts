@@ -44,6 +44,13 @@ export function bidAmountFromCreatorPayout(payoutAmount: number) {
   return Math.round(payoutAmount / (1 - CREATOR_FEE_RATE));
 }
 
+export function bidAmountFromAdvertiserCharge(chargeAmount: number) {
+  if (typeof chargeAmount !== 'number' || !Number.isFinite(chargeAmount) || chargeAmount <= 0) {
+    return 0;
+  }
+  return Math.round(chargeAmount / (1 + ADVERTISER_FEE_RATE));
+}
+
 export function creatorPayoutFromCharge(chargeAmount: number) {
   if (typeof chargeAmount !== 'number' || !Number.isFinite(chargeAmount) || chargeAmount <= 0) {
     return 0;

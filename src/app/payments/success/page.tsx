@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Loader2 } from 'lucide-react';
+import { EscrowNotice } from '@/components/EscrowNotice';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { notifyLifecycleEvent } from '@/lib/notification';
@@ -37,6 +38,7 @@ function PaymentSuccessContent() {
   const [orderId, setOrderId] = useState('');
   const [amountLabel, setAmountLabel] = useState('');
   const [auctionHref, setAuctionHref] = useState('/my');
+  const [taxMessage, setTaxMessage] = useState('');
 
   useEffect(() => {
     if (!ready || started.current) {
@@ -138,6 +140,9 @@ function PaymentSuccessContent() {
         setOrderId(confirmPayload.orderId || confirmedOrderId);
         setAmountLabel(formatWon(confirmPayload.amount));
         setAuctionHref(recoverAuctionHref(confirmPayload.auctionId));
+        if (confirmPayload.taxInvoice?.message) {
+          setTaxMessage(confirmPayload.taxInvoice.message);
+        }
 
         const [auctionResult, bidsResult] = await Promise.all([
           getAuctionById(confirmPayload.auctionId),
@@ -180,7 +185,7 @@ function PaymentSuccessContent() {
           return;
         }
 
-        setMessage('결제 및 낙찰이 완료되었습니다');
+        setMessage('결제가 완료되어 계약이 확정되었습니다. 대금은 플랫폼 에스크로로 보관됩니다.');
         setDone(true);
         showToast('낙찰이 확정되었고 역경매가 마감되었습니다.', 'success');
         const href = recoverAuctionHref(confirmPayload.auctionId);
@@ -273,11 +278,17 @@ function PaymentSuccessContent() {
               <p className="text-sm font-semibold">안전결제</p>
             </div>
             <h1 className="mt-2 text-xl font-bold text-zinc-950">
-              {done ? '결제 및 낙찰이 완료되었습니다' : '결제 승인 중'}
+              {done ? '계약이 확정되었습니다' : '결제 승인 중'}
             </h1>
             <p className="mt-3 text-sm leading-6 text-zinc-600">{message}</p>
             {done ? (
               <>
+                <div className="mt-4">
+                  <EscrowNotice compact />
+                </div>
+                {taxMessage ? (
+                  <p className="mt-3 text-xs leading-5 text-zinc-500">{taxMessage}</p>
+                ) : null}
                 <dl className="mt-5 grid grid-cols-1 gap-3 rounded-xl bg-zinc-50 px-4 py-3 text-sm">
                   <div>
                     <dt className="text-xs text-zinc-400">주문번호</dt>

@@ -3,7 +3,9 @@ export const BLOCKED_CONTACT_PLACEHOLDER = '[연락처/링크가 차단되었습
 export const OFF_PLATFORM_BLOCK_MESSAGE =
   '전화번호, 이메일, 카카오 ID, 외부 링크 등 플랫폼 우회 연락처는 사용할 수 없습니다.';
 
-export type OffPlatformKind = 'phone' | 'email' | 'kakao' | 'url';
+export type OffPlatformKind = 'phone' | 'email' | 'kakao' | 'url' | 'direct';
+
+export const BYPASS_MONITOR_KEYWORDS = ['계좌', '입금', '카톡', '직거래'] as const;
 
 export type OffPlatformHit = {
   kind: OffPlatformKind;
@@ -33,12 +35,23 @@ const KAKAO_PATTERN =
 const URL_PATTERN =
   /(?:https?:\/\/|www\.)[^\s<>"']+|\b[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.(?:com|net|org|io|me|kr|co\.kr)\b(?:\/[^\s<>"']*)?/gi;
 
+const DIRECT_DEAL_PATTERN = /직거래/g;
+
 const PATTERNS: Array<{ kind: OffPlatformKind; pattern: RegExp }> = [
   { kind: 'phone', pattern: PHONE_PATTERN },
   { kind: 'email', pattern: EMAIL_PATTERN },
   { kind: 'kakao', pattern: KAKAO_PATTERN },
   { kind: 'url', pattern: URL_PATTERN },
+  { kind: 'direct', pattern: DIRECT_DEAL_PATTERN },
 ];
+
+export function findBypassKeywords(text: string | null | undefined): string[] {
+  const source = text ?? '';
+  if (!source.trim()) {
+    return [];
+  }
+  return BYPASS_MONITOR_KEYWORDS.filter((keyword) => source.includes(keyword));
+}
 
 function cloneGlobal(pattern: RegExp) {
   return new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);

@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type React
 import { createPortal } from 'react-dom';
 import { Loader2, X } from 'lucide-react';
 import { AgreementFields } from '@/components/AgreementFields';
+import { EscrowNotice } from '@/components/EscrowNotice';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
@@ -324,6 +325,8 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
                 placeholder="https://www.youtube.com/@channel"
               />
             </Field>
+
+            <EscrowNotice compact />
 
             <AgreementFields
               agreeTerms={agreeTerms}

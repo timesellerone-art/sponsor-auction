@@ -55,6 +55,11 @@ export type ConfirmPaymentResult = {
   paymentKey: string;
   alreadyConfirmed: boolean;
   saved?: boolean;
+  taxInvoice?: {
+    status: 'issued' | 'fallback' | 'error';
+    mgtKey: string;
+    message: string;
+  } | null;
   error?: string;
   errorCode?: string;
   errorMessage?: string;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { AuctionBrowseBar } from '@/components/AuctionBrowseBar';
 import { AuctionCard, AuctionCardSkeleton } from '@/components/AuctionCard';
@@ -104,12 +105,12 @@ export default function Home() {
             >
               진행 중인 역경매 보기
             </a>
-            <a
+            <Link
               href="/inventory"
               className="inline-flex h-11 w-full items-center justify-center rounded-full border border-teal-200 bg-teal-50 px-5 text-sm font-semibold text-teal-900 hover:bg-teal-100 sm:w-auto"
             >
               타임슬롯 인벤토리
-            </a>
+            </Link>
           </div>
         </PageContainer>
       </section>

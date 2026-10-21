@@ -205,7 +205,7 @@ export function BidProposalList({
       <ConfirmModal
         open={Boolean(confirmBid)}
         title="이 제안을 낙찰할까요?"
-        description={`"${confirmBid?.creatorName || '크리에이터'}"의 제안을 선택하면 안전결제를 진행합니다. 결제가 완료된 뒤에만 역경매가 마감됩니다.`}
+        description={`"${confirmBid?.creatorName || '크리에이터'}"의 제안을 선택하면 플랫폼 에스크로 결제를 진행합니다. 외부 계좌·카톡 직거래는 보호되지 않으며, 결제 완료 후에만 계약이 확정되고 세금계산서가 신청됩니다.`}
         confirmLabel="결제하고 낙찰하기"
         busyLabel="결제 준비 중..."
         cancelLabel="취소"

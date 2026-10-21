@@ -848,3 +848,20 @@ revoke select on public.profiles from anon;
 revoke update, delete on public.profiles from anon;
 revoke select, update, delete on public.payouts from anon;
 revoke execute on function public.award_auction(uuid, uuid) from anon;
+
+create table if not exists public.compliance_logs (
+  id uuid primary key default gen_random_uuid(),
+  source text not null,
+  keywords text[] not null default '{}'::text[],
+  snippet text not null default '',
+  blocked boolean not null default false,
+  actor_id uuid,
+  auction_id text,
+  created_at timestamptz not null default timezone('utc', now())
+);
+create index if not exists compliance_logs_created_idx on public.compliance_logs (created_at desc);
+alter table public.compliance_logs enable row level security;
+drop policy if exists "compliance_logs_admin_select" on public.compliance_logs;
+create policy "compliance_logs_admin_select" on public.compliance_logs for select to authenticated using (public.is_admin());
+grant select, insert on public.compliance_logs to authenticated;
+grant select, insert, update, delete on public.compliance_logs to service_role;

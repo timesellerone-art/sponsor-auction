@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AdminAuctionTable } from '@/components/admin/AdminAuctionTable';
+import { AdminComplianceTable } from '@/components/admin/AdminComplianceTable';
 import { AdminBidTable } from '@/components/admin/AdminBidTable';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AccessGuard } from '@/components/AccessGuard';
@@ -32,8 +33,9 @@ import { cn } from '@/lib/utils';
 import type { PayoutItem, ProfileItem } from '@/types/admin';
 import { isAdmin, isAdvertiser, isCreator } from '@/types/auth';
 import type { AuctionItem, BidItem } from '@/types/auction';
+import type { ComplianceLog } from '@/types/compliance';
 
-type TabId = 'auctions' | 'users' | 'payouts' | 'bids';
+type TabId = 'auctions' | 'users' | 'payouts' | 'bids' | 'compliance';
 
 function asAuctionList(value: unknown): AuctionItem[] {
   if (!Array.isArray(value)) {
@@ -92,6 +94,7 @@ export function AdminDashboard({
     asProfileList(initialProfiles),
   );
   const [payouts, setPayouts] = useState<PayoutItem[]>(() => asPayoutList(initialPayouts));
+  const [complianceLogs, setComplianceLogs] = useState<ComplianceLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { busyKey: busyId, isBusy, run } = useActionLock();
@@ -119,12 +122,13 @@ export function AdminDashboard({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [auctionResult, bidResult, profileResult, payoutResult] =
+      const [auctionResult, bidResult, profileResult, payoutResult, complianceResponse] =
         await Promise.all([
           getAuctions(),
           getAdminBids(asBidList(initialBids)),
           getProfiles(),
           getPayouts(asPayoutList(initialPayouts)),
+          fetch('/api/admin/compliance', { cache: 'no-store' }),
         ]);
 
       setAuctions(asAuctionList(auctionResult.data));
@@ -134,6 +138,10 @@ export function AdminDashboard({
         nextProfiles.length > 0 ? nextProfiles : asProfileList(initialProfiles),
       );
       setPayouts(asPayoutList(payoutResult.data));
+      const compliancePayload = (await complianceResponse.json().catch(() => null)) as {
+        data?: ComplianceLog[];
+      } | null;
+      setComplianceLogs(Array.isArray(compliancePayload?.data) ? compliancePayload.data : []);
 
       const firstError =
         (auctionResult.data.length === 0 ? auctionResult.error : null) ||
@@ -147,6 +155,7 @@ export function AdminDashboard({
       setBids(asBidList(initialBids));
       setProfiles(asProfileList(initialProfiles));
       setPayouts(asPayoutList(initialPayouts));
+      setComplianceLogs([]);
       setLoadError('데이터를 불러오지 못했습니다.');
       showToast('데이터를 불러오지 못했습니다.');
     } finally {
@@ -461,6 +470,7 @@ export function AdminDashboard({
     { id: 'users', label: '회원 관리' },
     { id: 'payouts', label: '정산 관리' },
     { id: 'bids', label: '입찰 관리' },
+    { id: 'compliance', label: '우회 모니터링' },
   ];
 
   return (
@@ -472,7 +482,7 @@ export function AdminDashboard({
             관리자 대시보드
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
-            역경매, 회원, 정산을 한곳에서 모니터링하고 처리할 수 있습니다.
+            역경매, 회원, 정산, 우회 시도를 한곳에서 모니터링하고 처리할 수 있습니다.
           </p>
         </div>
 
@@ -549,6 +559,12 @@ export function AdminDashboard({
               onSaveMemo={handleSavePayoutMemo}
               onRefresh={() => fetchPayouts()}
             />
+          )
+        ) : tab === 'compliance' ? (
+          complianceLogs.length === 0 ? (
+            <AdminEmptyState message="감지된 우회 키워드 기록이 없습니다." />
+          ) : (
+            <AdminComplianceTable logs={complianceLogs} />
           )
         ) : asBidList(bids).length === 0 ? (
           <AdminEmptyState message={loadError ?? undefined} />

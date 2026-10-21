@@ -7,6 +7,7 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { hasAuthRole } from '@/types/auth';
+import { recordBypassIfNeeded } from '@/lib/compliance';
 import {
   OffPlatformContactError,
   assertNoOffPlatformContact,
@@ -56,6 +57,12 @@ export async function POST(request: Request) {
         { status: 400, headers: NO_STORE },
       );
     }
+    await recordBypassIfNeeded({
+      text: proposalText,
+      source: 'bid',
+      actorId: actor.userId,
+      auctionId,
+    });
     try {
       assertNoOffPlatformContact(proposalText);
     } catch (error) {

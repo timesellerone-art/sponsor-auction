@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, X } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
+import { EscrowNotice } from '@/components/EscrowNotice';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
@@ -23,28 +24,34 @@ export function TimeslotBidModal({
   slot: TimeSlotItem | null;
   onClose: () => void;
 }) {
-  const titleId = useId();
-  const { user } = useAuth();
-  const { requireAdvertiser } = useRequireAuth();
-  const [amount, setAmount] = useState('');
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const { isBusy, run } = useActionLock();
-
-  useEffect(() => {
-    if (!open || !slot) {
-      return;
-    }
-    setAmount(String(nextInventoryMinBid(slot.startingPrice, slot.currentHighestBid)));
-    setMessage('');
-    setError(null);
-  }, [open, slot]);
-
   if (!open || !slot) {
     return null;
   }
 
+  return (
+    <TimeslotBidForm
+      key={`${slot.id}:${slot.currentHighestBid}`}
+      slot={slot}
+      onClose={onClose}
+    />
+  );
+}
+
+function TimeslotBidForm({
+  slot,
+  onClose,
+}: {
+  slot: TimeSlotItem;
+  onClose: () => void;
+}) {
+  const titleId = useId();
+  const { user } = useAuth();
+  const { requireAdvertiser } = useRequireAuth();
   const minBid = nextInventoryMinBid(slot.startingPrice, slot.currentHighestBid);
+  const [amount, setAmount] = useState(String(minBid));
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const { isBusy, run } = useActionLock();
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -129,6 +136,9 @@ export function TimeslotBidModal({
           현재 최고가 {formatWon(slot.currentHighestBid || slot.startingPrice)} · 최소{' '}
           {formatWon(minBid)}
         </p>
+        <div className="mt-3">
+          <EscrowNotice compact />
+        </div>
         <label className="mt-4 block text-sm font-medium text-zinc-800" htmlFor="slot-bid-amount">
           입찰가
         </label>

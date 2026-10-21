@@ -81,7 +81,7 @@ export async function applyPaidAuctionStatus(
 
     const auctionUpdate = await supabaseAdmin
       .from('auctions')
-      .update({ status: 'completed' })
+      .update({ status: 'completed', winner_bid_id: bidId })
       .eq('id', auctionId);
 
     if (auctionUpdate.error) {

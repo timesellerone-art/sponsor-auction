@@ -8,13 +8,41 @@ import {
   resolveIntent,
   updateIntent,
 } from '@/lib/payments/intent';
+import { bidAmountFromAdvertiserCharge } from '@/lib/fees';
 import { applyPaidAuctionStatus } from '@/lib/payments/apply-paid-status';
+import { issueTaxInvoice } from '@/lib/popbill';
 import { canPreparePayment, getPaymentActor } from '@/lib/payments/guard';
 import { persistPayment } from '@/lib/payments/persist';
 import { confirmTossPayment, isDemoPaymentKey } from '@/lib/payments/toss';
 import { captureException } from '@/lib/monitoring';
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
 import type { ConfirmPaymentInput, ConfirmPaymentResult } from '@/types/payment';
+
+async function issuePaidTaxInvoice(intent: {
+  orderId: string;
+  auctionId: string;
+  bidId: string;
+  amount: number;
+  orderName: string;
+}) {
+  try {
+    const result = await issueTaxInvoice({
+      paymentOrderId: intent.orderId,
+      auctionId: intent.auctionId,
+      bidId: intent.bidId,
+      bidAmount: bidAmountFromAdvertiserCharge(intent.amount),
+      itemName: intent.orderName,
+    });
+    return {
+      status: result.status,
+      mgtKey: result.mgtKey,
+      message: result.message,
+    };
+  } catch (error) {
+    console.warn('[SponsorAuction] 결제 후 세금계산서 신청 예외', error);
+    return null;
+  }
+}
 
 function jsonError(
   status: number,
@@ -199,6 +227,7 @@ export async function POST(request: Request) {
         amount: intent.amount,
         orderName: intent.orderName,
       });
+      const replayTax = await issuePaidTaxInvoice(intent);
       const replay: ConfirmPaymentResult = {
         orderId: intent.orderId,
         auctionId: intent.auctionId,
@@ -207,6 +236,7 @@ export async function POST(request: Request) {
         paymentKey: replayKey,
         alreadyConfirmed: true,
         saved: replaySaved.ok,
+        taxInvoice: replayTax,
       };
       return NextResponse.json(replay, { status: 200 });
     }
@@ -286,6 +316,7 @@ export async function POST(request: Request) {
       amount: intent.amount,
       orderName: intent.orderName,
     });
+    const taxInvoice = await issuePaidTaxInvoice(intent);
 
     updateIntent(intent.orderId, {
       status: 'confirmed',
@@ -300,6 +331,7 @@ export async function POST(request: Request) {
       paymentKey: parsed.paymentKey,
       alreadyConfirmed: false,
       saved: saved.ok,
+      taxInvoice,
     };
 
     console.info('[SponsorAuction] 결제 승인 완료', {

@@ -1,6 +1,7 @@
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { listChatMessages, sendChatMessage } from '@/lib/chat';
+import { recordBypassIfNeeded } from '@/lib/compliance';
 import { unauthorizedJson, getPaymentActor } from '@/lib/payments/guard';
 import {
   OffPlatformContactError,
@@ -72,6 +73,12 @@ export async function POST(request: Request) {
 
     const payload = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const body = asText(payload?.body);
+    await recordBypassIfNeeded({
+      text: body,
+      source: 'chat',
+      actorId: actor.userId,
+      auctionId: asText(payload?.auctionId),
+    });
     try {
       assertNoOffPlatformContact(body);
     } catch (error) {
