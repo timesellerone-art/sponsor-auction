@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { showToast } from '@/components/Toast';
@@ -45,11 +45,7 @@ export function BidProposalList({
   const selectedBid =
     safeBids.find((bid) => isBidSelected(bid, auction.winnerBidId)) ?? null;
 
-  useEffect(() => {
-    if (closed) {
-      setPendingBid(null);
-    }
-  }, [closed]);
+  const confirmBid = closed ? null : pendingBid;
 
   return (
     <section
@@ -180,13 +176,13 @@ export function BidProposalList({
       )}
 
       <ConfirmModal
-        open={Boolean(pendingBid)}
+        open={Boolean(confirmBid)}
         title="이 제안을 낙찰할까요?"
-        description={`"${pendingBid?.creatorName || '크리에이터'}"의 제안을 선택하면 안전결제를 진행합니다. 결제가 완료된 뒤에만 역경매가 마감됩니다.`}
+        description={`"${confirmBid?.creatorName || '크리에이터'}"의 제안을 선택하면 안전결제를 진행합니다. 결제가 완료된 뒤에만 역경매가 마감됩니다.`}
         confirmLabel="결제하고 낙찰하기"
         busyLabel="결제 준비 중..."
         cancelLabel="취소"
-        busy={Boolean(pendingBid && busyId === pendingBid.id)}
+        busy={Boolean(confirmBid && busyId === confirmBid.id)}
         onClose={() => {
           if (!busyId) {
             setPendingBid(null);

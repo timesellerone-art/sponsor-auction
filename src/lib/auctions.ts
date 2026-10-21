@@ -119,7 +119,6 @@ export async function getAuctions(): Promise<DataResult<AuctionItem[]>> {
     return getMockAuctions();
   }
 
-  const started = Date.now();
   try {
     let { data, error } = await supabase
       .from('auctions')
@@ -150,8 +149,6 @@ export async function getAuctions(): Promise<DataResult<AuctionItem[]>> {
   } catch (error) {
     logDbError('경매 목록 조회 예외', error);
     return getMockAuctions();
-  } finally {
-    console.info(`[SponsorAuction] 경매 목록 조회 종료 (${Date.now() - started}ms)`);
   }
 }
 
@@ -183,7 +180,6 @@ export async function getAuctionsByAuthor(
     return getMockAuctionsByAuthor(authorId);
   }
 
-  const started = Date.now();
   try {
     let { data, error } = await supabase
       .from('auctions')
@@ -211,8 +207,6 @@ export async function getAuctionsByAuthor(
   } catch (error) {
     logDbError('광고주 경매 목록 조회 예외', error);
     return fail([], '캠페인 목록을 불러오지 못했습니다.');
-  } finally {
-    console.info(`[SponsorAuction] 광고주 경매 목록 조회 종료 (${Date.now() - started}ms)`);
   }
 }
 
@@ -224,7 +218,6 @@ export async function getAuctionById(
     return getMockAuctionById(id);
   }
 
-  const started = Date.now();
   try {
     if (!id.trim()) {
       return fail(null, '유효한 경매 ID가 필요합니다.');
@@ -266,8 +259,6 @@ export async function getAuctionById(
   } catch (error) {
     logDbError('경매 단건 조회 예외', error);
     return fail(null, '경매 정보를 불러오지 못했습니다.');
-  } finally {
-    console.info(`[SponsorAuction] 경매 단건 조회 종료 (${Date.now() - started}ms)`);
   }
 }
 
@@ -289,7 +280,6 @@ export async function createAuction(
     return createMockAuction(input);
   }
 
-  const started = Date.now();
   try {
     const authorId = await resolveAuthUserId(supabase, input.authorId);
     const payload = {
@@ -337,8 +327,6 @@ export async function createAuction(
   } catch (error) {
     logDbError('경매 등록 예외', error);
     return fail(null, INSERT_FAIL_MESSAGE);
-  } finally {
-    console.info(`[SponsorAuction] 경매 등록 종료 (${Date.now() - started}ms)`);
   }
 }
 
@@ -381,7 +369,6 @@ export async function createBid(
       return mocked;
     }
 
-    const started = Date.now();
     try {
       const creatorId = await resolveAuthUserId(supabase, input.creatorId);
 
@@ -465,8 +452,6 @@ export async function createBid(
     } catch (error) {
       logDbError('입찰 등록 예외', error);
       return fail(null, INSERT_FAIL_MESSAGE);
-    } finally {
-      console.info(`[SponsorAuction] 입찰 등록 종료 (${Date.now() - started}ms)`);
     }
   });
 }
@@ -480,7 +465,6 @@ export async function getBidsByCreator(
     return getMockBidsByCreator(userId, options);
   }
 
-  const started = Date.now();
   try {
     const creatorId = userId.trim();
     const creatorName = options?.creatorName?.trim() ?? '';
@@ -554,8 +538,6 @@ export async function getBidsByCreator(
   } catch (error) {
     logDbError('크리에이터 입찰 조회 예외', error);
     return fail([], '제안 목록을 불러오지 못했습니다.');
-  } finally {
-    console.info(`[SponsorAuction] 크리에이터 입찰 조회 종료 (${Date.now() - started}ms)`);
   }
 }
 
@@ -590,7 +572,6 @@ export async function getBids(): Promise<DataResult<BidItem[]>> {
     return getMockBids();
   }
 
-  const started = Date.now();
   try {
     let { data, error } = await supabase
       .from('bids')
@@ -620,8 +601,6 @@ export async function getBids(): Promise<DataResult<BidItem[]>> {
   } catch (error) {
     logDbError('입찰 목록 조회 예외', error);
     return fail([], '입찰 목록을 불러오지 못했습니다.');
-  } finally {
-    console.info(`[SponsorAuction] 입찰 목록 조회 종료 (${Date.now() - started}ms)`);
   }
 }
 
@@ -631,7 +610,6 @@ export async function deleteAuction(id: string): Promise<DataResult<boolean>> {
     return deleteMockAuction(id);
   }
 
-  const started = Date.now();
   try {
     if (!id.trim()) {
       return fail(false, '유효한 경매 ID가 필요합니다.');
@@ -650,8 +628,6 @@ export async function deleteAuction(id: string): Promise<DataResult<boolean>> {
   } catch (error) {
     logDbError('경매 삭제 예외', error);
     return fail(false, UPDATE_FAIL_MESSAGE);
-  } finally {
-    console.info(`[SponsorAuction] 경매 삭제 종료 (${Date.now() - started}ms)`);
   }
 }
 
@@ -664,7 +640,6 @@ export async function updateAuctionStatus(
     return updateMockAuctionStatus(id, status);
   }
 
-  const started = Date.now();
   try {
     if (!id.trim()) {
       return fail(null, '유효한 경매 ID가 필요합니다.');
@@ -693,8 +668,6 @@ export async function updateAuctionStatus(
   } catch (error) {
     logDbError('경매 상태 변경 예외', error);
     return fail(null, UPDATE_FAIL_MESSAGE);
-  } finally {
-    console.info(`[SponsorAuction] 경매 상태 변경 종료 (${Date.now() - started}ms)`);
   }
 }
 
@@ -708,7 +681,6 @@ export async function updateAuctionBlind(
       return updateMockAuctionBlind(id, isBlind);
     }
 
-    const started = Date.now();
     try {
       if (!id.trim()) {
         return fail(null, '유효한 경매 ID가 필요합니다.');
@@ -752,8 +724,6 @@ export async function updateAuctionBlind(
     } catch (error) {
       logDbError('블라인드 변경 예외', error);
       return fail(null, UPDATE_FAIL_MESSAGE);
-    } finally {
-      console.info(`[SponsorAuction] 블라인드 변경 종료 (${Date.now() - started}ms)`);
     }
   });
 }
@@ -766,7 +736,6 @@ export async function getBidsByAuctionId(
     return getMockBidsByAuctionId(auctionId);
   }
 
-  const started = Date.now();
   try {
     if (!auctionId.trim()) {
       return fail([], '유효한 경매 ID가 필요합니다.');
@@ -800,8 +769,6 @@ export async function getBidsByAuctionId(
   } catch (error) {
     logDbError('제안 목록 조회 예외', error);
     return fail([], '제안 목록을 불러오지 못했습니다.');
-  } finally {
-    console.info(`[SponsorAuction] 제안 목록 조회 종료 (${Date.now() - started}ms)`);
   }
 }
 
@@ -818,7 +785,6 @@ export async function awardBid(
         return awardMockBid(auctionId, bidId);
       }
 
-      const started = Date.now();
       try {
         if (!auctionId.trim() || !bidId.trim()) {
           return fail(null, '유효한 경매/제안 ID가 필요합니다.');
@@ -857,8 +823,6 @@ export async function awardBid(
       } catch (error) {
         logDbError('낙찰 처리 예외', error);
         return fail(null, UPDATE_FAIL_MESSAGE);
-      } finally {
-        console.info(`[SponsorAuction] 낙찰 처리 종료 (${Date.now() - started}ms)`);
       }
     },
   );

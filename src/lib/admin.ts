@@ -11,7 +11,6 @@ import { withExclusiveAction } from '@/lib/action-lock';
 import { mockGetSession } from '@/lib/auth-mock';
 import { markPayoutPaid, overlayDbPayoutStatus, updatePayoutMemo as persistPayoutMemo } from '@/lib/payouts';
 import { getDataClient } from '@/lib/supabase/data-client';
-import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { RATE_LIMIT_MESSAGE } from '@/lib/rate-limit';
 import { VALIDATION } from '@/lib/validation';
 import type {
@@ -25,8 +24,6 @@ import type { BidItem, DataResult } from '@/types/auction';
 
 export const ADMIN_UPDATE_FAIL_MESSAGE =
   '변경에 실패했습니다. 다시 시도해 주세요.';
-
-const PROFILE_COLUMNS = 'id, name, email, role, roles, status, created_at';
 
 type ProfileRow = {
   id: string;
@@ -202,7 +199,6 @@ export async function updateProfileStatus(
 }
 
 export async function getAdminBids(seedFromServer: BidItem[] = []): Promise<DataResult<BidItem[]>> {
-  const started = Date.now();
   let fromDb: BidItem[] = asBidItems(seedFromServer);
 
   try {
@@ -219,8 +215,6 @@ export async function getAdminBids(seedFromServer: BidItem[] = []): Promise<Data
     }
   } catch (error) {
     console.warn('[SponsorAuction] 입찰 API 목록 조회 실패', error);
-  } finally {
-    console.info(`[SponsorAuction] 관리자 입찰 목록 조회 종료 (${Date.now() - started}ms)`);
   }
 
   const mock = await mockGetSession();
@@ -248,7 +242,6 @@ export async function getAdminBids(seedFromServer: BidItem[] = []): Promise<Data
 }
 
 export async function getPayouts(seedFromServer: PayoutItem[] = []): Promise<DataResult<PayoutItem[]>> {
-  const started = Date.now();
   let fromDb: PayoutItem[] = asPayoutItems(seedFromServer);
 
   try {
@@ -265,8 +258,6 @@ export async function getPayouts(seedFromServer: PayoutItem[] = []): Promise<Dat
     }
   } catch (error) {
     console.warn('[SponsorAuction] 정산 API 목록 조회 실패', error);
-  } finally {
-    console.info(`[SponsorAuction] 정산 목록 조회 종료 (${Date.now() - started}ms)`);
   }
 
   const mock = await mockGetSession();
@@ -332,7 +323,6 @@ export async function approvePayout(
     return approveMockPayout(id);
   }
 
-  const started = Date.now();
   try {
     const result = await markPayoutPaid(supabase, {
       id,
@@ -353,8 +343,6 @@ export async function approvePayout(
     const message = error instanceof Error ? error.message : ADMIN_UPDATE_FAIL_MESSAGE;
     console.error('[SponsorAuction] 정산 승인 예외:', error);
     return fail(null, message);
-  } finally {
-    console.info(`[SponsorAuction] 정산 승인 종료 (${Date.now() - started}ms)`);
   }
   });
 }

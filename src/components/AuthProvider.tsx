@@ -31,7 +31,6 @@ type AuthContextValue = {
   needsOnboarding: boolean;
   activeRole: MemberRole | null;
   switchableRoles: MemberRole[];
-  canSwitchRole: boolean;
   canCreateAuction: boolean;
   canPlaceBid: boolean;
   setActiveRole: (role: MemberRole) => boolean;
@@ -44,7 +43,6 @@ const AuthContext = createContext<AuthContextValue>({
   needsOnboarding: false,
   activeRole: null,
   switchableRoles: [],
-  canSwitchRole: false,
   canCreateAuction: false,
   canPlaceBid: false,
   setActiveRole: () => false,
@@ -80,7 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void refresh();
+    const boot = window.setTimeout(() => {
+      void refresh();
+    }, 0);
     const failSafe = window.setTimeout(() => {
       setReady(true);
     }, 4000);
@@ -97,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void refresh();
     });
     return () => {
+      window.clearTimeout(boot);
       window.clearTimeout(failSafe);
       unsubKnown();
       unsubscribe();
@@ -111,14 +112,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     syncRoleCookie(user?.role ?? null, user?.roles);
     syncAuthPresentCookie(Boolean(user));
-    if (!user) {
-      setActiveRoleState(null);
-      syncActiveRoleCookie(null);
-      return;
-    }
-    setActiveRoleState((current) =>
-      resolveActiveMemberRole(user, current ?? readActiveRoleCookie()),
-    );
+    const timer = window.setTimeout(() => {
+      if (!user) {
+        setActiveRoleState(null);
+        syncActiveRoleCookie(null);
+        return;
+      }
+      setActiveRoleState((current) =>
+        resolveActiveMemberRole(user, current ?? readActiveRoleCookie()),
+      );
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [ready, user]);
 
   useEffect(() => {
@@ -148,7 +154,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       needsOnboarding,
       activeRole,
       switchableRoles,
-      canSwitchRole: switchableRoles.length > 1,
       canCreateAuction: activeRole === 'advertiser',
       canPlaceBid: activeRole === 'creator',
       setActiveRole,

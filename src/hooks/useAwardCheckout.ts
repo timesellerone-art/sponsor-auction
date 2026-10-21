@@ -52,7 +52,7 @@ export function useAwardCheckout() {
         return false;
       }
     },
-    [user?.id],
+    [user],
   );
 
   const closeCheckout = useCallback(() => {

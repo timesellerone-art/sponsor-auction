@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Loader2, X } from 'lucide-react';
 import { showToast } from '@/components/Toast';
 import { REFUND_REQUIRED } from '@/lib/legal';
@@ -41,6 +42,7 @@ export function PaymentCheckoutModal({
   checkout,
   onClose,
 }: PaymentCheckoutModalProps) {
+  const router = useRouter();
   const titleId = useId();
   const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
   const [ready, setReady] = useState(false);
@@ -73,11 +75,6 @@ export function PaymentCheckoutModal({
   useEffect(() => {
     if (!open || !checkout) {
       widgetsRef.current = null;
-      setReady(false);
-      setLoadError(null);
-      setPayError(null);
-      setAgreeRefund(false);
-      setRefundError(null);
       return;
     }
 
@@ -147,7 +144,7 @@ export function PaymentCheckoutModal({
   const failUrl = `${window.location.origin}/payments/fail?${checkoutQuery.toString()}`;
   const clientKey = resolveClientKey(checkout);
   const isDemoCheckout = !clientKey;
-  const useToss = Boolean(widgetsRef.current) && !isDemoCheckout && !loadError;
+  const useToss = ready && !isDemoCheckout && !loadError;
   const advertiserInvoice = splitAdvertiserInvoiceFromTotal(checkout.amount);
 
   const handlePay = async () => {
@@ -199,9 +196,7 @@ export function PaymentCheckoutModal({
         auctionId: checkout.auctionId,
         bidId: checkout.bidId,
       });
-      window.location.assign(
-        `${window.location.origin}/payments/success?${params.toString()}`,
-      );
+      router.push(`/payments/success?${params.toString()}`);
     } catch (error) {
       const info = parsePaymentError(error);
       const feedback = formatPaymentToast(info);

@@ -8,7 +8,12 @@ export function SiteFooter() {
   const [year, setYear] = useState<number | null>(null);
 
   useEffect(() => {
-    setYear(new Date().getFullYear());
+    const frame = window.requestAnimationFrame(() => {
+      setYear(new Date().getFullYear());
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   return (

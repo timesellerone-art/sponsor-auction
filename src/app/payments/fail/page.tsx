@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo } from 'react';
+import { Suspense, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { showToast } from '@/components/Toast';
@@ -52,15 +52,12 @@ function PaymentFailContent() {
   });
   const feedback = formatPaymentToast(info);
   const cancelled = info.kind === 'cancel';
-  const amountLabel = useMemo(() => {
-    if (Number.isInteger(amount) && amount > 0) {
-      return formatWon(amount);
-    }
-    if (stored?.amount) {
-      return formatWon(stored.amount);
-    }
-    return '';
-  }, [amount, stored?.amount]);
+  const amountLabel =
+    Number.isInteger(amount) && amount > 0
+      ? formatWon(amount)
+      : stored?.amount
+        ? formatWon(stored.amount)
+        : '';
 
   useEffect(() => {
     if (cancelled) {

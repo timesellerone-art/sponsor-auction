@@ -50,7 +50,7 @@ export function useRequireAuth() {
       }
       return true;
     },
-    [canPlaceBid, requireUser],
+    [canPlaceBid, requireUser, user],
   );
 
   const requireAdvertiser = useCallback(
@@ -68,7 +68,7 @@ export function useRequireAuth() {
       }
       return true;
     },
-    [canCreateAuction, requireUser],
+    [canCreateAuction, requireUser, user],
   );
 
   return {

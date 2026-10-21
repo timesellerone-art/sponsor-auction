@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
@@ -22,7 +22,6 @@ function allowedRoles(allow: AccessRole | readonly AccessRole[]) {
 export function AccessGuard({ allow, children }: AccessGuardProps) {
   const router = useRouter();
   const { user, ready } = useAuth();
-  const [allowed, setAllowed] = useState(false);
   const roles = allowedRoles(allow);
   const allowKey = roles.join('|');
   const hasAccess = Boolean(
@@ -30,18 +29,16 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
   );
 
   useEffect(() => {
-    if (!ready) {
+    if (!ready || hasAccess) {
+      if (ready) {
+        syncRoleCookie(user?.role, user?.roles);
+      }
       return;
     }
 
     syncRoleCookie(user?.role, user?.roles);
-    if (hasAccess) {
-      setAllowed(true);
-      return;
-    }
-
-    setAllowed(false);
-    const wantsAdmin = roles.includes('admin') && roles.length === 1;
+    const allowed = allowKey.split('|') as AccessRole[];
+    const wantsAdmin = allowed.includes('admin') && allowed.length === 1;
     if (!user) {
       const reason = wantsAdmin ? 'admin-auth' : 'advertiser-auth';
       showToast(ACCESS_REASON[reason]);
@@ -52,16 +49,16 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
 
     const forbidden = wantsAdmin
       ? ACCESS_REASON['admin-forbidden']
-      : roles.includes('advertiser') && !roles.includes('creator')
+      : allowed.includes('advertiser') && !allowed.includes('creator')
         ? ACCESS_REASON['advertiser-forbidden']
         : ACCESS_REASON['creator-forbidden'];
     showToast(forbidden);
     router.replace(
-      `/?reason=${wantsAdmin ? 'admin-forbidden' : roles.includes('advertiser') && !roles.includes('creator') ? 'advertiser-forbidden' : 'creator-forbidden'}`,
+      `/?reason=${wantsAdmin ? 'admin-forbidden' : allowed.includes('advertiser') && !allowed.includes('creator') ? 'advertiser-forbidden' : 'creator-forbidden'}`,
     );
   }, [allowKey, hasAccess, ready, router, user]);
 
-  if (hasAccess || allowed) {
+  if (hasAccess) {
     return (
       <div className="flex w-full min-w-0 max-w-none flex-1 flex-col">{children}</div>
     );

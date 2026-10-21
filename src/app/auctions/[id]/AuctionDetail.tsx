@@ -87,8 +87,10 @@ export function AuctionDetail({ id }: { id: string }) {
   }, [id]);
 
   useEffect(() => {
-    void loadAuction();
-    void loadBids();
+    const timer = window.setTimeout(() => {
+      void loadAuction();
+      void loadBids();
+    }, 0);
 
     const onChanged = () => {
       void loadAuction();
@@ -97,6 +99,7 @@ export function AuctionDetail({ id }: { id: string }) {
     window.addEventListener('auctions:changed', onChanged);
 
     return () => {
+      window.clearTimeout(timer);
       window.removeEventListener('auctions:changed', onChanged);
     };
   }, [loadAuction, loadBids]);

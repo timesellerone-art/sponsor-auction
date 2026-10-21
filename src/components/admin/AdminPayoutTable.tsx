@@ -77,18 +77,23 @@ export function AdminPayoutTable({
 
   useEffect(() => {
     const incoming = Array.isArray(payouts) ? payouts : [];
-    setRows((prev) => {
-      const paid = prev.filter((item) => item.status === 'paid');
-      const merged = paid.reduce((list, item) => applyPaidPayoutLocal(list, item), incoming);
-      return merged.map((item) => {
-        const local = prev.find((row) => row.id === item.id);
-        return {
-          ...item,
-          adminMemo: item.adminMemo || local?.adminMemo || '',
-          bankAccount: item.bankAccount || local?.bankAccount || '',
-        };
+    const timer = window.setTimeout(() => {
+      setRows((prev) => {
+        const paid = prev.filter((item) => item.status === 'paid');
+        const merged = paid.reduce((list, item) => applyPaidPayoutLocal(list, item), incoming);
+        return merged.map((item) => {
+          const local = prev.find((row) => row.id === item.id);
+          return {
+            ...item,
+            adminMemo: item.adminMemo || local?.adminMemo || '',
+            bankAccount: item.bankAccount || local?.bankAccount || '',
+          };
+        });
       });
-    });
+    }, 0);
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [payouts]);
 
   const filtered = useMemo(() => {

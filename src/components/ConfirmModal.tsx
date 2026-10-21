@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, X } from 'lucide-react';
 
@@ -31,6 +31,14 @@ export function ConfirmModal({
   const [localBusy, setLocalBusy] = useState(false);
   const isBusy = busy || localBusy;
 
+  const handleClose = useCallback(() => {
+    if (isBusy) {
+      return;
+    }
+    setLocalBusy(false);
+    onClose();
+  }, [isBusy, onClose]);
+
   useEffect(() => {
     if (!open) {
       return;
@@ -41,7 +49,7 @@ export function ConfirmModal({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !isBusy) {
-        onClose();
+        handleClose();
       }
     };
 
@@ -50,13 +58,8 @@ export function ConfirmModal({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [open, isBusy, onClose]);
+  }, [handleClose, open, isBusy]);
 
-  useEffect(() => {
-    if (!open || !busy) {
-      setLocalBusy(false);
-    }
-  }, [open, busy]);
 
   if (!open || typeof document === 'undefined') {
     return null;
@@ -65,7 +68,7 @@ export function ConfirmModal({
   return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-zinc-950/50 p-4"
-      onClick={isBusy ? undefined : onClose}
+      onClick={isBusy ? undefined : handleClose}
     >
       <div
         role="dialog"
@@ -83,7 +86,7 @@ export function ConfirmModal({
             className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 disabled:opacity-50"
             aria-label="닫기"
             disabled={isBusy}
-            onClick={onClose}
+            onClick={handleClose}
           >
             <X className="size-5" />
           </button>
@@ -93,7 +96,7 @@ export function ConfirmModal({
           <button
             type="button"
             disabled={isBusy}
-            onClick={onClose}
+            onClick={handleClose}
             className="inline-flex h-10 items-center justify-center rounded-full border border-zinc-200 px-4 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
           >
             {cancelLabel}

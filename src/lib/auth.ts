@@ -292,7 +292,9 @@ export async function signInWithNaver(nextPath?: string | null) {
     return fail(false, AUTH_FAIL_MESSAGE);
   }
   const next = sanitizeNextPath(nextPath) ?? '/';
-  window.location.assign(`/api/auth/naver?next=${encodeURIComponent(next)}`);
+  // 네이버 OAuth 시작은 Next 라우터가 아닌 전체 페이지 이동이어야 합니다.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.assign(`${window.location.origin}/api/auth/naver?next=${encodeURIComponent(next)}`);
   return ok(true);
 }
 

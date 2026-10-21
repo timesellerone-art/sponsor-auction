@@ -42,7 +42,7 @@ export function CreateAuctionModal({
   const [platform, setPlatform] = useState<PlatformType>('youtube_shorts');
   const [budget, setBudget] = useState('');
   const [description, setDescription] = useState('');
-  const [deadline, setDeadline] = useState('');
+  const [deadline, setDeadline] = useState(() => defaultDeadline());
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { isBusy: isSubmitting, run } = useActionLock();
@@ -51,8 +51,6 @@ export function CreateAuctionModal({
     if (!open) {
       return;
     }
-
-    setDeadline((current) => current || defaultDeadline());
 
     const frame = window.requestAnimationFrame(() => {
       firstFieldRef.current?.focus({ preventScroll: true });
