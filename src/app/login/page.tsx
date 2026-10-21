@@ -23,7 +23,7 @@ type Mode = 'signin' | 'signup';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, ready } = useAuth();
+  const { user, ready, refresh } = useAuth();
   const [mode, setMode] = useState<Mode>('signin');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -161,7 +161,8 @@ export default function LoginPage() {
         mode === 'signup' ? '가입되었습니다. 역할을 선택해 주세요.' : '로그인했습니다.',
         'success',
       );
-      router.push(destinationAfterLogin(result.data.role));
+      await refresh();
+      router.replace(destinationAfterLogin(result.data.role));
       router.refresh();
     } catch {
       setError(AUTH_FAIL_MESSAGE);

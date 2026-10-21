@@ -1,4 +1,4 @@
-import { syncRoleCookie } from '@/lib/access';
+import { syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import {
   isAuthProfileRole,
   isMemberRole,
@@ -74,10 +74,12 @@ function persistSession(user: SessionUser | null) {
     if (!user) {
       window.localStorage.removeItem(STORAGE_KEY);
       syncRoleCookie(null);
+      syncAuthPresentCookie(false);
       return;
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
     syncRoleCookie(user.role);
+    syncAuthPresentCookie(true);
   } catch {
     // 저장 실패해도 이번 세션 메모리 값은 유지합니다.
   }

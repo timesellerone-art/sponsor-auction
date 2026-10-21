@@ -3,7 +3,7 @@
 import { Suspense, useEffect, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
-import { loginPath, ROLE_SELECT_PATH } from '@/lib/auth-guard';
+import { ROLE_SELECT_PATH } from '@/lib/auth-guard';
 
 const OPEN_WITHOUT_ROLE = [
   ROLE_SELECT_PATH,
@@ -28,11 +28,6 @@ function RoleRouteGuardInner({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) {
-      return;
-    }
-
-    if (!user && pathname.startsWith('/onboarding')) {
-      router.replace(loginPath('auth-required', ROLE_SELECT_PATH));
       return;
     }
 

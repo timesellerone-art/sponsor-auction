@@ -5,6 +5,7 @@ import {
   mockSignOut,
   mockSignUp,
 } from '@/lib/auth-mock';
+import { syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import { createClient } from '@/lib/supabase/client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { sanitizeNextPath } from '@/lib/auth-guard';
@@ -18,19 +19,47 @@ import type { DataResult } from '@/types/auction';
 
 export const AUTH_FAIL_MESSAGE = '요청을 처리하지 못했습니다. 다시 시도해 주세요.';
 
-function isAuthSessionMissing(error: unknown): boolean {
+function errorText(error: unknown) {
   if (!error) {
-    return false;
+    return '';
   }
-  const message =
-    typeof error === 'object' && error !== null && 'message' in error
-      ? String((error as { message: unknown }).message)
-      : String(error);
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return String(error);
+}
+
+function isAuthSessionMissing(error: unknown): boolean {
   const name =
     typeof error === 'object' && error !== null && 'name' in error
       ? String((error as { name: unknown }).name)
       : '';
-  return /auth session missing/i.test(message) || name === 'AuthSessionMissingError';
+  return /auth session missing/i.test(errorText(error)) || name === 'AuthSessionMissingError';
+}
+
+function isInvalidLoginCredentials(error: unknown) {
+  return /invalid login credentials|invalid_credentials|invalid email or password/i.test(
+    errorText(error),
+  );
+}
+
+function publicAuthErrorMessage(error: unknown) {
+  const text = errorText(error);
+  if (isInvalidLoginCredentials(error)) {
+    return '이메일 또는 비밀번호가 올바르지 않습니다.';
+  }
+  if (/email not confirmed/i.test(text)) {
+    return '이메일 인증 후 로그인해 주세요.';
+  }
+  if (/too many requests|rate limit/i.test(text)) {
+    return '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.';
+  }
+  return AUTH_FAIL_MESSAGE;
+}
+
+function persistClientAuth(user: SessionUser | null) {
+  syncRoleCookie(user?.role ?? null);
+  syncAuthPresentCookie(Boolean(user));
 }
 
 const AUTH_CHANGED_EVENT = 'auth:changed';
@@ -304,6 +333,7 @@ export async function signUp(input: {
   if (!supabase) {
     const result = await mockSignUp(input);
     if (!result.error) {
+      persistClientAuth(result.data);
       notifyAuthChanged();
     }
     return result;
@@ -336,10 +366,11 @@ export async function signUp(input: {
       console.warn('[SponsorAuction] 회원가입에 실패했습니다.', error.message);
       const mock = await mockSignUp(input);
       if (!mock.error) {
+        persistClientAuth(mock.data);
         notifyAuthChanged();
         return mock;
       }
-      return fail(null, error.message || AUTH_FAIL_MESSAGE);
+      return fail(null, publicAuthErrorMessage(error));
     }
 
     const user = data.user;
@@ -353,12 +384,14 @@ export async function signUp(input: {
       user.email?.trim() || email,
       name,
     );
+    persistClientAuth(session);
     notifyAuthChanged();
     return ok(session);
   } catch (error) {
     console.warn('[SponsorAuction] 회원가입 중 예외가 발생했습니다.', error);
     const mock = await mockSignUp(input);
     if (!mock.error) {
+      persistClientAuth(mock.data);
       notifyAuthChanged();
       return mock;
     }
@@ -374,6 +407,7 @@ export async function signIn(input: {
   if (!supabase) {
     const result = await mockSignIn(input);
     if (!result.error) {
+      persistClientAuth(result.data);
       notifyAuthChanged();
     }
     return result;
@@ -390,13 +424,13 @@ export async function signIn(input: {
     );
 
     if (error || !data.user) {
-      console.warn('[SponsorAuction] Supabase 로그인에 실패했습니다.', error?.message);
       const mock = await mockSignIn(input);
       if (!mock.error) {
+        persistClientAuth(mock.data);
         notifyAuthChanged();
         return mock;
       }
-      return fail(null, '이메일 또는 비밀번호가 올바르지 않습니다.');
+      return fail(null, publicAuthErrorMessage(error));
     }
 
     const user = data.user;
@@ -406,22 +440,24 @@ export async function signIn(input: {
         ? user.user_metadata.name
         : '') || email.split('@')[0] || '회원';
     const session = await loadProfile(supabase, user.id, email, name);
+    persistClientAuth(session);
     notifyAuthChanged();
     return ok(session);
   } catch (error) {
-    console.warn('[SponsorAuction] 로그인 중 예외가 발생했습니다.', error);
     const mock = await mockSignIn(input);
     if (!mock.error) {
+      persistClientAuth(mock.data);
       notifyAuthChanged();
       return mock;
     }
-    return fail(null, AUTH_FAIL_MESSAGE);
+    return fail(null, publicAuthErrorMessage(error));
   }
 }
 
 export async function signOut(): Promise<DataResult<boolean>> {
   const supabase = createClient();
   if (!supabase) {
+    persistClientAuth(null);
     const result = await mockSignOut();
     if (!result.error) {
       notifyAuthChanged();
@@ -435,6 +471,7 @@ export async function signOut(): Promise<DataResult<boolean>> {
       console.warn('[SponsorAuction] 로그아웃에 실패했습니다.', error.message);
     }
 
+    persistClientAuth(null);
     const mock = await mockSignOut();
     if (!mock.error) {
       notifyAuthChanged();
@@ -464,6 +501,7 @@ export async function saveMemberRole(
   if (!supabase) {
     const result = await mockSaveMemberRole(role);
     if (!result.error) {
+      persistClientAuth(result.data);
       notifyAuthChanged();
     }
     return result;
@@ -481,6 +519,7 @@ export async function saveMemberRole(
     if (authError || !authData.user) {
       const mock = await mockSaveMemberRole(role);
       if (!mock.error) {
+        persistClientAuth(mock.data);
         notifyAuthChanged();
         return mock;
       }
@@ -513,6 +552,7 @@ export async function saveMemberRole(
       if (isSchemaMismatch(error)) {
         const mock = await mockSaveMemberRole(role);
         if (!mock.error) {
+          persistClientAuth(mock.data);
           notifyAuthChanged();
           return mock;
         }
@@ -527,6 +567,7 @@ export async function saveMemberRole(
       row.name?.trim() || name,
       row.role,
     );
+    persistClientAuth(session);
     notifyAuthChanged();
     return ok(session);
   } catch (error) {

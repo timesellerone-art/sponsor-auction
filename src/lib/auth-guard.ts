@@ -34,11 +34,11 @@ export function authGuardMessage(reason: AccessReason) {
 }
 
 export function postAuthPath(role: string | null | undefined, nextPath?: string | null) {
+  const next = sanitizeNextPath(nextPath);
   if (!isAuthProfileRole(role)) {
     return ROLE_SELECT_PATH;
   }
-  const next = sanitizeNextPath(nextPath);
-  if (next && !next.startsWith('/onboarding')) {
+  if (next && next !== ROLE_SELECT_PATH && !next.startsWith('/onboarding')) {
     return next;
   }
   if (role === 'admin') {

@@ -6,7 +6,9 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { PageContainer } from '@/components/PageContainer';
 import { RoleOnboarding } from '@/components/RoleOnboarding';
+import { getSessionUser } from '@/lib/auth';
 import { loginPath, postAuthPath, ROLE_SELECT_PATH } from '@/lib/auth-guard';
+import { needsRoleOnboarding } from '@/types/auth';
 
 export default function RoleSelectPage() {
   const router = useRouter();
@@ -16,14 +18,42 @@ export default function RoleSelectPage() {
     if (!ready) {
       return;
     }
-    if (!user) {
-      router.replace(loginPath('auth-required', ROLE_SELECT_PATH));
-      return;
-    }
-    if (!needsOnboarding) {
-      router.replace(postAuthPath(user.role));
-    }
-  }, [needsOnboarding, ready, router, user]);
+
+    let cancelled = false;
+
+    const settle = async () => {
+      try {
+        if (user) {
+          if (!needsOnboarding) {
+            router.replace(postAuthPath(user.role));
+          }
+          return;
+        }
+
+        const result = await getSessionUser();
+        if (cancelled) {
+          return;
+        }
+        if (result.data) {
+          await refresh();
+          if (!needsRoleOnboarding(result.data)) {
+            router.replace(postAuthPath(result.data.role));
+          }
+          return;
+        }
+        router.replace(loginPath('auth-required', ROLE_SELECT_PATH));
+      } catch {
+        if (!cancelled) {
+          router.replace(loginPath('auth-required', ROLE_SELECT_PATH));
+        }
+      }
+    };
+
+    void settle();
+    return () => {
+      cancelled = true;
+    };
+  }, [needsOnboarding, ready, refresh, router, user]);
 
   if (!ready || !user || !needsOnboarding) {
     return (
