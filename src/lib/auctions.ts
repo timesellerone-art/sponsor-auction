@@ -33,6 +33,11 @@ import type {
   CreateBidInput,
   DataResult,
 } from '@/types/auction';
+import {
+  computeBidEngineStats,
+  expiredAuctionStatus,
+} from '@/lib/auction-engine';
+import { attachScore, getCreatorScoresByIds } from '@/lib/creator-metrics';
 import { isPlatformType } from '@/lib/platforms';
 import type { Database } from '@/types/database';
 import {
@@ -45,7 +50,7 @@ export const INSERT_FAIL_MESSAGE = '등록에 실패했습니다. 다시 시도�
 export const UPDATE_FAIL_MESSAGE = '변경에 실패했습니다. 다시 시도해 주세요.';
 
 const AUCTION_COLUMNS =
-  'id, title, platform, budget, description, status, is_blind, author_id, author_name, winner_bid_id, deadline, created_at, updated_at, bids_count';
+  'id, title, platform, budget, description, status, is_blind, author_id, author_name, winner_bid_id, deadline, created_at, updated_at, bids_count, leading_bid_amount, highest_bid_amount';
 
 const AUCTION_COLUMNS_CORE =
   'id, title, platform, budget, description, status, deadline, created_at, bids_count';
@@ -75,7 +80,11 @@ function mapAuction(row: Partial<AuctionRow> & Pick<AuctionRow, 'id'>): AuctionI
     platform: isPlatformType(platformRaw) ? platformRaw : 'other',
     budget: row.budget ?? 0,
     description: row.description ?? '',
-    status: (row.status ?? 'active') as AuctionStatus,
+    status: expiredAuctionStatus(
+      row.status ?? 'active',
+      row.deadline ?? '',
+      row.winner_bid_id ?? null,
+    ) as AuctionStatus,
     isBlind: Boolean(row.is_blind),
     authorId: row.author_id ?? null,
     authorName: row.author_name?.trim() || '미상',
@@ -83,6 +92,8 @@ function mapAuction(row: Partial<AuctionRow> & Pick<AuctionRow, 'id'>): AuctionI
     deadline: row.deadline ?? '',
     createdAt: row.created_at ?? '',
     bidsCount: row.bids_count ?? 0,
+    leadingBidAmount: Number(row.leading_bid_amount) || 0,
+    highestBidAmount: Number(row.highest_bid_amount) || 0,
   };
 }
 
@@ -98,6 +109,36 @@ function mapBid(row: Partial<BidRow> & Pick<BidRow, 'id'>): BidItem {
     status: (row.status === 'selected' ? 'selected' : 'pending') as BidStatus,
     createdAt: row.created_at ?? '',
   };
+}
+
+async function withBidScores(bids: BidItem[]): Promise<BidItem[]> {
+  const scores = await getCreatorScoresByIds(bids.map((item) => item.creatorId));
+  return bids.map((item) => attachScore(item, scores));
+}
+
+async function syncAuctionBidEngine(
+  client: SponsorAuctionClient,
+  auctionId: string,
+  extraBidAmount?: number,
+) {
+  try {
+    const { data } = await client.from('bids').select('bid_amount').eq('auction_id', auctionId);
+    const amounts = (data ?? []).map((row) => Number(row.bid_amount) || 0);
+    if (typeof extraBidAmount === 'number') {
+      amounts.push(extraBidAmount);
+    }
+    const stats = computeBidEngineStats(amounts);
+    await client
+      .from('auctions')
+      .update({
+        leading_bid_amount: stats.leadingBidAmount,
+        highest_bid_amount: stats.highestBidAmount,
+        bids_count: stats.bidsCount,
+      })
+      .eq('id', auctionId);
+  } catch {
+    // 엔진 컬럼이 아직 없으면 입찰 저장은 유지합니다.
+  }
 }
 
 function logDbError(action: string, error: unknown) {
@@ -355,6 +396,7 @@ export async function createBid(
       auctionStatus: auction.status,
       isBlind: auction.isBlind,
       winnerBidId: auction.winnerBidId,
+      deadline: auction.deadline,
     });
     if (bidError) {
       return fail(null, bidError);
@@ -446,6 +488,7 @@ export async function createBid(
       }
 
       const created = mapBid(data);
+      void syncAuctionBidEngine(supabase, input.auctionId, created.bidAmount);
       void notifyLifecycleEvent({
         event: 'bid_received',
         auctionId: auction.id,
@@ -542,7 +585,7 @@ export async function getBidsByCreator(
     }
 
     merged.sort((left, right) => (right.createdAt || '').localeCompare(left.createdAt || ''));
-    return ok(merged);
+    return ok(await withBidScores(merged));
   } catch (error) {
     logDbError('크리에이터 입찰 조회 예외', error);
     return fail([], '제안 목록을 불러오지 못했습니다.');
@@ -571,7 +614,7 @@ export async function listBidsFromDatabase(
     return [];
   }
 
-  return (data ?? []).map((row) => mapBid(row));
+  return withBidScores((data ?? []).map((row) => mapBid(row)));
 }
 
 export async function getBids(): Promise<DataResult<BidItem[]>> {
@@ -605,7 +648,7 @@ export async function getBids(): Promise<DataResult<BidItem[]>> {
       return fail([], '등록된 입찰이 없습니다.');
     }
 
-    return ok(bids);
+    return ok(await withBidScores(bids));
   } catch (error) {
     logDbError('입찰 목록 조회 예외', error);
     return fail([], '입찰 목록을 불러오지 못했습니다.');
@@ -773,7 +816,7 @@ export async function getBidsByAuctionId(
       return fail([], '제안 목록을 불러오지 못했습니다.');
     }
 
-    return ok((data ?? []).map((row) => mapBid(row)));
+    return ok(await withBidScores((data ?? []).map((row) => mapBid(row))));
   } catch (error) {
     logDbError('제안 목록 조회 예외', error);
     return fail([], '제안 목록을 불러오지 못했습니다.');

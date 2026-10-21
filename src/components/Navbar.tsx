@@ -110,6 +110,12 @@ export function Navbar() {
           >
             역경매 둘러보기
           </Link>
+          <Link
+            href="/inventory"
+            className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-950"
+          >
+            인벤토리
+          </Link>
           {showDashboard ? (
             <Link
               href="/my"
@@ -212,6 +218,13 @@ export function Navbar() {
             onClick={() => setOpen(false)}
           >
             역경매 둘러보기
+          </Link>
+          <Link
+            href="/inventory"
+            className="rounded-lg px-3 py-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+            onClick={() => setOpen(false)}
+          >
+            인벤토리
           </Link>
           {showDashboard ? (
             <Link

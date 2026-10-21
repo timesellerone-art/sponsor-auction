@@ -20,6 +20,11 @@ import {
   validateAuctionPayload,
   validateBidPayload,
 } from '@/lib/validation';
+import {
+  computeBidEngineStats,
+  expiredAuctionStatus,
+} from '@/lib/auction-engine';
+import { attachScore } from '@/lib/creator-metrics';
 import { maskOffPlatformContact, sanitizeUserText } from '@/utils/filter';
 
 export const mockAuctions: AuctionItem[] = [
@@ -38,6 +43,8 @@ export const mockAuctions: AuctionItem[] = [
     deadline: '2026-10-25T23:59:59+09:00',
     createdAt: '2026-10-08T11:20:00+09:00',
     bidsCount: 4,
+    leadingBidAmount: 880_000,
+    highestBidAmount: 1_050_000,
   },
   {
     id: 'auc-002',
@@ -54,6 +61,8 @@ export const mockAuctions: AuctionItem[] = [
     deadline: '2026-10-20T18:00:00+09:00',
     createdAt: '2026-10-06T09:05:00+09:00',
     bidsCount: 2,
+    leadingBidAmount: 720_000,
+    highestBidAmount: 720_000,
   },
   {
     id: 'auc-003',
@@ -228,6 +237,8 @@ export const mockProfiles: ProfileItem[] = [
     role: 'creator',
     status: 'active',
     createdAt: '2026-07-14T08:30:00+09:00',
+    rating: 4.6,
+    completionRate: 94,
   },
   {
     id: 'usr-007',
@@ -236,6 +247,8 @@ export const mockProfiles: ProfileItem[] = [
     role: 'creator',
     status: 'active',
     createdAt: '2026-08-03T19:18:00+09:00',
+    rating: 4.9,
+    completionRate: 99,
   },
   {
     id: 'usr-008',
@@ -244,6 +257,8 @@ export const mockProfiles: ProfileItem[] = [
     role: 'creator',
     status: 'active',
     createdAt: '2026-08-27T07:55:00+09:00',
+    rating: 4.4,
+    completionRate: 91,
   },
   {
     id: 'usr-009',
@@ -427,7 +442,14 @@ function ok<T>(data: T): DataResult<T> {
 
 export async function getAuctions(): Promise<DataResult<AuctionItem[]>> {
   try {
-    const auctions = guardAuctionList(auctionsStore);
+    const auctions = guardAuctionList(auctionsStore).map((item) => ({
+      ...item,
+      status: expiredAuctionStatus(
+        item.status,
+        item.deadline,
+        item.winnerBidId,
+      ) as AuctionStatus,
+    }));
 
     if (auctions.length === 0) {
       return fail([], '등록된 경매가 없습니다.');
@@ -456,7 +478,14 @@ export async function getAuctionById(
       return fail(null, '해당 경매를 찾을 수 없습니다.');
     }
 
-    return ok(auction);
+    return ok({
+      ...auction,
+      status: expiredAuctionStatus(
+        auction.status,
+        auction.deadline,
+        auction.winnerBidId,
+      ) as AuctionStatus,
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : '경매 정보를 불러오지 못했습니다.';
@@ -545,6 +574,7 @@ export async function createBid(
       auctionStatus: auction.status,
       isBlind: auction.isBlind,
       winnerBidId: auction.winnerBidId,
+      deadline: auction.deadline,
     });
     if (bidError) {
       return fail(null, bidError);
@@ -573,10 +603,19 @@ export async function createBid(
 
     bidsStore = [created, ...bidsStore];
 
-    auctionsStore = auctionsStore.map((auction) =>
-      auction.id === created.auctionId
-        ? { ...auction, bidsCount: auction.bidsCount + 1 }
-        : auction,
+    const amounts = bidsStore
+      .filter((item) => item.auctionId === created.auctionId)
+      .map((item) => item.bidAmount);
+    const stats = computeBidEngineStats(amounts);
+    auctionsStore = auctionsStore.map((item) =>
+      item.id === created.auctionId
+        ? {
+            ...item,
+            bidsCount: stats.bidsCount,
+            leadingBidAmount: stats.leadingBidAmount,
+            highestBidAmount: stats.highestBidAmount,
+          }
+        : item,
     );
     persistCampaignStores();
 
@@ -613,10 +652,12 @@ function guardBidList(items: unknown): BidItem[] {
           bid.status === 'selected')
       );
     })
-    .map((item) => ({
-      ...item,
-      proposalText: maskOffPlatformContact(item.proposalText),
-    }));
+    .map((item) =>
+      attachScore(
+        { ...item, proposalText: maskOffPlatformContact(item.proposalText) },
+        new Map(),
+      ),
+    );
 }
 
 export async function getBidsByCreator(

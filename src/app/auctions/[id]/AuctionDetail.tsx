@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Clock, Users } from 'lucide-react';
+import { ArrowLeft, Users } from 'lucide-react';
+import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { AiAgentGuide } from '@/components/AiAgentGuide';
 import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
@@ -21,22 +22,6 @@ import { isOwnedAuction } from '@/lib/my-campaigns';
 import { formatWon } from '@/lib/utils';
 import type { AiAnalyzeResponse, AiReport } from '@/types/ai';
 import { isAuctionClosed, type AuctionItem, type BidItem } from '@/types/auction';
-
-function formatDeadline(deadline: string | undefined) {
-  if (!deadline) {
-    return '마감일 미정';
-  }
-
-  const date = new Date(deadline);
-  if (Number.isNaN(date.getTime())) {
-    return '마감일 미정';
-  }
-
-  return new Intl.DateTimeFormat('ko-KR', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
-}
 
 export function AuctionDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -284,14 +269,17 @@ export function AuctionDetail({ id }: { id: string }) {
               {auction.description || '설명이 없습니다.'}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-zinc-500">
-              <span className="inline-flex items-center gap-1">
-                <Clock className="size-4" aria-hidden />
-                {formatDeadline(auction.deadline)}
-              </span>
+              <AuctionCountdown deadline={auction.deadline} />
               <span className="inline-flex items-center gap-1">
                 <Users className="size-4" aria-hidden />
                 입찰 {auction.bidsCount ?? 0}
               </span>
+              {auction.highestBidAmount && auction.highestBidAmount > 0 ? (
+                <span>
+                  최저 {formatWon(auction.leadingBidAmount ?? 0)} · 최고{' '}
+                  {formatWon(auction.highestBidAmount)}
+                </span>
+              ) : null}
             </div>
             {canBid ? (
               <button

@@ -148,6 +148,10 @@ alter table if exists public.auctions
   add column if not exists updated_at timestamptz not null default timezone('utc', now());
 alter table if exists public.auctions
   add column if not exists bids_count integer not null default 0;
+alter table if exists public.auctions
+  add column if not exists leading_bid_amount integer not null default 0;
+alter table if exists public.auctions
+  add column if not exists highest_bid_amount integer not null default 0;
 
 alter table if exists public.bids
   add column if not exists creator_id uuid;
@@ -778,6 +782,65 @@ with check (
 grant select, insert on public.chat_messages to authenticated;
 grant select, insert, update, delete on public.chat_messages to service_role;
 revoke insert, update, delete on public.chat_messages from anon;
+
+do $$
+begin
+  if not exists (select 1 from pg_type where typname = 'time_slot_status') then
+    create type public.time_slot_status as enum ('open', 'closed', 'awarded');
+  end if;
+end
+$$;
+
+create table if not exists public.time_slots (
+  id uuid primary key default gen_random_uuid(),
+  creator_id uuid references public.profiles(id) on delete set null,
+  creator_name text not null,
+  title text not null,
+  platform public.platform_type not null,
+  description text not null default '',
+  expected_views integer not null,
+  starting_price integer not null,
+  current_highest_bid integer not null default 0,
+  bids_count integer not null default 0,
+  slot_start timestamptz not null,
+  slot_end timestamptz not null,
+  deadline timestamptz not null,
+  status public.time_slot_status not null default 'open',
+  winner_bid_id uuid,
+  created_at timestamptz not null default timezone('utc', now()),
+  constraint time_slots_title_len check (char_length(trim(title)) >= 5),
+  constraint time_slots_views_positive check (expected_views >= 1000),
+  constraint time_slots_price_positive check (starting_price >= 10000 and starting_price <= 100000000),
+  constraint time_slots_window check (slot_end > slot_start)
+);
+
+create table if not exists public.time_slot_bids (
+  id uuid primary key default gen_random_uuid(),
+  time_slot_id uuid not null references public.time_slots(id) on delete cascade,
+  advertiser_id uuid references public.profiles(id) on delete set null,
+  advertiser_name text not null,
+  bid_amount integer not null,
+  message text not null default '',
+  created_at timestamptz not null default timezone('utc', now()),
+  constraint time_slot_bids_amount_positive check (bid_amount > 0 and bid_amount <= 100000000)
+);
+
+alter table public.time_slots enable row level security;
+alter table public.time_slot_bids enable row level security;
+drop policy if exists "time_slots_select_public" on public.time_slots;
+create policy "time_slots_select_public" on public.time_slots for select to anon, authenticated using (true);
+drop policy if exists "time_slots_insert_own" on public.time_slots;
+create policy "time_slots_insert_own" on public.time_slots for insert to authenticated with check (creator_id = auth.uid() or public.is_admin());
+drop policy if exists "time_slot_bids_select_public" on public.time_slot_bids;
+create policy "time_slot_bids_select_public" on public.time_slot_bids for select to anon, authenticated using (true);
+drop policy if exists "time_slot_bids_insert_own" on public.time_slot_bids;
+create policy "time_slot_bids_insert_own" on public.time_slot_bids for insert to authenticated with check (advertiser_id = auth.uid() or public.is_admin());
+grant select on public.time_slots to anon, authenticated;
+grant insert, update, delete on public.time_slots to authenticated;
+grant select on public.time_slot_bids to anon, authenticated;
+grant insert on public.time_slot_bids to authenticated;
+drop policy if exists "creator_metrics_select_public" on public.creator_metrics;
+create policy "creator_metrics_select_public" on public.creator_metrics for select to anon, authenticated using (true);
 
 revoke insert, update, delete on public.auctions from anon;
 revoke insert, update, delete on public.bids from anon;

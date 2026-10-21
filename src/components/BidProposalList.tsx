@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { showToast } from '@/components/Toast';
+import { CreatorRatingBadge } from '@/components/CreatorRatingBadge';
 import { formatDateTime, formatWon } from '@/lib/utils';
 import { ACCESS_REASON } from '@/lib/access';
 import { getAwardBlockReason } from '@/lib/validation';
@@ -41,7 +42,15 @@ export function BidProposalList({
     auction.status === 'active' &&
     !auction.isBlind &&
     !auction.winnerBidId;
-  const safeBids = Array.isArray(bids) ? bids : [];
+  const safeBids = Array.isArray(bids) ? [...bids] : [];
+  const leadingAmount =
+    auction.leadingBidAmount && auction.leadingBidAmount > 0
+      ? auction.leadingBidAmount
+      : Math.min(...safeBids.map((item) => item.bidAmount), Number.POSITIVE_INFINITY);
+  const highestAmount =
+    auction.highestBidAmount && auction.highestBidAmount > 0
+      ? auction.highestBidAmount
+      : Math.max(...safeBids.map((item) => item.bidAmount), 0);
   const selectedBid =
     safeBids.find((bid) => isBidSelected(bid, auction.winnerBidId)) ?? null;
 
@@ -61,8 +70,15 @@ export function BidProposalList({
             제출된 크리에이터 제안 목록
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
-            채널, 제안 금액, 제안 메시지, 제출 일자를 비교한 뒤 낙찰할 수 있습니다.
+            채널, 평판 점수, 제안 금액, 제안 메시지를 비교한 뒤 낙찰할 수 있습니다.
           </p>
+          {safeBids.length > 0 ? (
+            <p className="mt-2 text-xs text-zinc-500">
+              최저 제안 {Number.isFinite(leadingAmount) ? formatWon(leadingAmount) : '-'}
+              {' · '}
+              최고 입찰가 {highestAmount > 0 ? formatWon(highestAmount) : '-'}
+            </p>
+          ) : null}
         </div>
         {closed ? (
           <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
@@ -118,6 +134,11 @@ export function BidProposalList({
                     <p className="font-semibold text-zinc-950">
                       {bid.creatorName || '이름 없음'}
                     </p>
+                    <CreatorRatingBadge
+                      className="mt-1"
+                      rating={bid.creatorRating}
+                      completionRate={bid.creatorCompletionRate}
+                    />
                     {bid.creatorChannelUrl ? (
                       <a
                         href={bid.creatorChannelUrl}
@@ -162,6 +183,12 @@ export function BidProposalList({
 
                 <p className="mt-3 text-lg font-bold tracking-tight text-zinc-950">
                   {formatWon(bid.bidAmount)}
+                  {bid.bidAmount === leadingAmount ? (
+                    <span className="ml-2 text-xs font-semibold text-teal-800">최저 제안</span>
+                  ) : null}
+                  {bid.bidAmount === highestAmount && highestAmount !== leadingAmount ? (
+                    <span className="ml-2 text-xs font-semibold text-amber-700">최고 입찰가</span>
+                  ) : null}
                 </p>
                 <p className="mt-2 text-sm leading-6 whitespace-pre-wrap text-zinc-600">
                   {bid.proposalText || '제안 내용 없음'}

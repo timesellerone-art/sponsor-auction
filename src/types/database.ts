@@ -25,6 +25,8 @@ export type Database = {
           created_at: string;
           updated_at: string;
           bids_count: number;
+          leading_bid_amount: number;
+          highest_bid_amount: number;
         };
         Insert: {
           id?: string;
@@ -49,6 +51,8 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           bids_count?: number;
+          leading_bid_amount?: number;
+          highest_bid_amount?: number;
         };
         Update: {
           title?: string;
@@ -71,6 +75,101 @@ export type Database = {
           deadline?: string;
           updated_at?: string;
           bids_count?: number;
+          leading_bid_amount?: number;
+          highest_bid_amount?: number;
+        };
+        Relationships: [];
+      };
+      time_slots: {
+        Row: {
+          id: string;
+          creator_id: string | null;
+          creator_name: string;
+          title: string;
+          platform:
+            | 'youtube_shorts'
+            | 'instagram_reels'
+            | 'tiktok'
+            | 'youtube'
+            | 'threads'
+            | 'naver_blog'
+            | 'x_twitter'
+            | 'other';
+          description: string;
+          expected_views: number;
+          starting_price: number;
+          current_highest_bid: number;
+          bids_count: number;
+          slot_start: string;
+          slot_end: string;
+          deadline: string;
+          status: 'open' | 'closed' | 'awarded';
+          winner_bid_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          creator_id?: string | null;
+          creator_name: string;
+          title: string;
+          platform:
+            | 'youtube_shorts'
+            | 'instagram_reels'
+            | 'tiktok'
+            | 'youtube'
+            | 'threads'
+            | 'naver_blog'
+            | 'x_twitter'
+            | 'other';
+          description?: string;
+          expected_views: number;
+          starting_price: number;
+          current_highest_bid?: number;
+          bids_count?: number;
+          slot_start: string;
+          slot_end: string;
+          deadline: string;
+          status?: 'open' | 'closed' | 'awarded';
+          winner_bid_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          title?: string;
+          description?: string;
+          expected_views?: number;
+          starting_price?: number;
+          current_highest_bid?: number;
+          bids_count?: number;
+          slot_start?: string;
+          slot_end?: string;
+          deadline?: string;
+          status?: 'open' | 'closed' | 'awarded';
+          winner_bid_id?: string | null;
+        };
+        Relationships: [];
+      };
+      time_slot_bids: {
+        Row: {
+          id: string;
+          time_slot_id: string;
+          advertiser_id: string | null;
+          advertiser_name: string;
+          bid_amount: number;
+          message: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          time_slot_id: string;
+          advertiser_id?: string | null;
+          advertiser_name: string;
+          bid_amount: number;
+          message?: string;
+          created_at?: string;
+        };
+        Update: {
+          bid_amount?: number;
+          message?: string;
         };
         Relationships: [];
       };

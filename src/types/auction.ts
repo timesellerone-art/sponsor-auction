@@ -31,6 +31,8 @@ export interface AuctionItem {
   deadline: string;
   createdAt: string;
   bidsCount: number;
+  leadingBidAmount?: number;
+  highestBidAmount?: number;
 }
 
 export interface BidItem {
@@ -43,6 +45,8 @@ export interface BidItem {
   proposalText: string;
   status: BidStatus;
   createdAt: string;
+  creatorRating?: number;
+  creatorCompletionRate?: number;
 }
 
 export type CreateAuctionInput = Omit<

@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AuctionCardSkeleton } from '@/components/AuctionCard';
+import { CreateTimeslotModal } from '@/components/CreateTimeslotModal';
 import { PageContainer } from '@/components/PageContainer';
 import { useAuth } from '@/components/AuthProvider';
 import { getCreatorDashboard } from '@/lib/dashboard';
+import { closeTimeSlot, listTimeSlots } from '@/lib/timeslots';
 import { CREATOR_FEE_RATE } from '@/lib/fees';
 import { auctionStatusLabel, bidStatusLabel } from '@/lib/status-labels';
 import { cn, formatDateTime, formatWon } from '@/lib/utils';
+import type { TimeSlotItem } from '@/types/timeslot';
 import type { CreatorDeal } from '@/types/dashboard';
 
 function creatorPayout(amount: number) {
@@ -18,8 +21,10 @@ function creatorPayout(amount: number) {
 export function CreatorDashboard() {
   const { user } = useAuth();
   const [deals, setDeals] = useState<CreatorDeal[]>([]);
+  const [slots, setSlots] = useState<TimeSlotItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [createSlotOpen, setCreateSlotOpen] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -31,13 +36,17 @@ export function CreatorDashboard() {
     const load = async () => {
       setLoading(true);
       try {
-        const result = await getCreatorDashboard(user);
+        const [result, slotResult] = await Promise.all([
+          getCreatorDashboard(user),
+          listTimeSlots({ creatorId: user.id }),
+        ]);
         if (cancelled) {
           return;
         }
         const list = Array.isArray(result.data) ? result.data : [];
         setDeals(list);
-        setError(list.length === 0 ? '제출한 제안이 없습니다.' : result.error);
+        setSlots(slotResult.data);
+        setError(list.length === 0 && slotResult.data.length === 0 ? '제출한 제안이 없습니다.' : result.error);
       } catch {
         if (!cancelled) {
           setDeals([]);
@@ -55,9 +64,11 @@ export function CreatorDashboard() {
       void load();
     };
     window.addEventListener('auctions:changed', onChanged);
+    window.addEventListener('timeslots:changed', onChanged);
     return () => {
       cancelled = true;
       window.removeEventListener('auctions:changed', onChanged);
+      window.removeEventListener('timeslots:changed', onChanged);
     };
   }, [user]);
 
@@ -69,8 +80,57 @@ export function CreatorDashboard() {
       <p className="text-sm font-semibold tracking-wide text-teal-800">크리에이터</p>
       <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">내 제안</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
-        제출한 입찰(제안 대기)과 낙찰·결제 완료된 캠페인을 한곳에서 확인할 수 있습니다.
+        타임슬롯 인벤토리와 제출한 입찰, 낙찰·결제 완료된 캠페인을 한곳에서 확인할 수 있습니다.
       </p>
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={() => setCreateSlotOpen(true)}
+          className="inline-flex h-10 items-center rounded-full bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+        >
+          타임슬롯 등록
+        </button>
+      </div>
+
+      {slots.length > 0 ? (
+        <section className="mt-8">
+          <h2 className="text-lg font-bold text-zinc-950">내 타임슬롯</h2>
+          <ul className="mt-4 flex max-h-[50vh] flex-col gap-3 overflow-y-auto pr-1">
+            {slots.map((slot) => (
+              <li key={slot.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <Link href={`/inventory/${slot.id}`} className="font-semibold hover:underline">
+                      {slot.title}
+                    </Link>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      최고가 {slot.currentHighestBid > 0 ? formatWon(slot.currentHighestBid) : '없음'} · 입찰{' '}
+                      {slot.bidsCount}
+                    </p>
+                  </div>
+                  {slot.status === 'open' ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const result = await closeTimeSlot(slot.id, user?.id);
+                        if (result.error) {
+                          return;
+                        }
+                        window.dispatchEvent(new Event('timeslots:changed'));
+                      }}
+                      className="text-xs font-semibold text-zinc-600 hover:underline"
+                    >
+                      마감
+                    </button>
+                  ) : (
+                    <span className="text-xs text-zinc-400">{slot.status === 'awarded' ? '낙찰' : '마감'}</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {loading ? (
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -143,6 +203,7 @@ export function CreatorDashboard() {
           </section>
         </div>
       )}
+      <CreateTimeslotModal open={createSlotOpen} onClose={() => setCreateSlotOpen(false)} />
     </PageContainer>
   );
 }

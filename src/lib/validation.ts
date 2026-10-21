@@ -1,9 +1,11 @@
-import { isAuctionClosed, type AuctionStatus } from '@/types/auction';
+import { isDeadlinePassed } from '@/lib/auction-engine';
+import { isAuctionClosed, type AuctionStatus, type PlatformType } from '@/types/auction';
 import { hasOffPlatformContact } from '@/utils/filter';
 
 export const MIN_TITLE_LENGTH = 5;
 export const MIN_DESCRIPTION_LENGTH = 10;
 export const MIN_PROPOSAL_LENGTH = 20;
+export const MIN_EXPECTED_VIEWS = 1_000;
 export const MIN_BUDGET = 10_000;
 export const MAX_BUDGET = 100_000_000;
 export const MAX_BID_AMOUNT = 100_000_000;
@@ -18,6 +20,11 @@ export const VALIDATION = {
   descriptionRequired: '상세설명을 입력해 주세요.',
   descriptionTooShort: `상세설명은 ${MIN_DESCRIPTION_LENGTH}자 이상 입력해 주세요.`,
   deadlineRequired: '마감일을 선택해 주세요.',
+  expectedViewsRequired: '예상 조회수를 입력해 주세요.',
+  expectedViewsTooLow: '예상 조회수는 1,000회 이상이어야 합니다.',
+  startingPriceRequired: '시작가를 입력해 주세요.',
+  slotWindowInvalid: '슬롯 종료 시각은 시작 시각보다 뒤여야 합니다.',
+  timeslotBidTooLow: '현재 최고가보다 높은 금액으로 입찰해 주세요.',
   bidRequired: '제안 금액을 입력해 주세요.',
   bidNotPositive: '제안 금액은 0원 이하일 수 없습니다.',
   bidTooHigh: '제안 금액은 1억 원을 초과할 수 없습니다.',
@@ -64,6 +71,16 @@ export type AuctionFieldErrors = {
   title?: string;
   budget?: string;
   description?: string;
+  deadline?: string;
+};
+
+export type TimeSlotFieldErrors = {
+  title?: string;
+  expectedViews?: string;
+  startingPrice?: string;
+  description?: string;
+  slotStart?: string;
+  slotEnd?: string;
   deadline?: string;
 };
 
@@ -206,12 +223,14 @@ export function getBidBlockReason(auction: {
   status?: AuctionStatus;
   isBlind?: boolean;
   winnerBidId?: string | null;
+  deadline?: string;
 }): string | null {
   if (
     auction.isBlind ||
     Boolean(auction.winnerBidId) ||
     isAuctionClosed(auction.status) ||
-    (auction.status != null && auction.status !== 'active')
+    (auction.status != null && auction.status !== 'active') ||
+    isDeadlinePassed(auction.deadline)
   ) {
     return VALIDATION.auctionClosed;
   }
@@ -239,6 +258,120 @@ export function getAwardBlockReason(auction: {
   return null;
 }
 
+export function validateTimeSlotPayload(input: {
+  title: string;
+  description: string;
+  expectedViews: number;
+  startingPrice: number;
+  slotStart: string;
+  slotEnd: string;
+  deadline: string;
+  platform?: PlatformType;
+}): string | null {
+  const title = input.title.trim();
+  if (!title) {
+    return VALIDATION.titleRequired;
+  }
+  if (title.length < MIN_TITLE_LENGTH) {
+    return VALIDATION.titleTooShort;
+  }
+  const description = input.description.trim();
+  if (!description) {
+    return VALIDATION.descriptionRequired;
+  }
+  if (description.length < MIN_DESCRIPTION_LENGTH) {
+    return VALIDATION.descriptionTooShort;
+  }
+  if (!Number.isFinite(input.expectedViews) || input.expectedViews <= 0) {
+    return VALIDATION.expectedViewsRequired;
+  }
+  if (input.expectedViews < MIN_EXPECTED_VIEWS) {
+    return VALIDATION.expectedViewsTooLow;
+  }
+  if (!Number.isFinite(input.startingPrice) || input.startingPrice <= 0) {
+    return VALIDATION.startingPriceRequired;
+  }
+  if (input.startingPrice < MIN_BUDGET) {
+    return VALIDATION.budgetTooLow;
+  }
+  if (input.startingPrice > MAX_BUDGET) {
+    return VALIDATION.budgetTooHigh;
+  }
+  if (!input.slotStart.trim() || !input.slotEnd.trim()) {
+    return VALIDATION.slotWindowInvalid;
+  }
+  const start = Date.parse(input.slotStart);
+  const end = Date.parse(input.slotEnd);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return VALIDATION.slotWindowInvalid;
+  }
+  if (!input.deadline.trim()) {
+    return VALIDATION.deadlineRequired;
+  }
+  return null;
+}
+
+export function validateTimeSlotForm(values: {
+  title: string;
+  description: string;
+  expectedViews: string;
+  startingPrice: string;
+  slotStart: string;
+  slotEnd: string;
+  deadline: string;
+}): TimeSlotFieldErrors {
+  const errors: TimeSlotFieldErrors = {};
+  const views = parseAmount(values.expectedViews);
+  const price = parseAmount(values.startingPrice);
+  const payloadError = validateTimeSlotPayload({
+    title: values.title,
+    description: values.description,
+    expectedViews: views.empty ? 0 : views.value,
+    startingPrice: price.empty ? 0 : price.value,
+    slotStart: values.slotStart,
+    slotEnd: values.slotEnd,
+    deadline: values.deadline,
+  });
+  if (!values.title.trim()) {
+    errors.title = VALIDATION.titleRequired;
+  } else if (values.title.trim().length < MIN_TITLE_LENGTH) {
+    errors.title = VALIDATION.titleTooShort;
+  }
+  if (!values.description.trim()) {
+    errors.description = VALIDATION.descriptionRequired;
+  } else if (values.description.trim().length < MIN_DESCRIPTION_LENGTH) {
+    errors.description = VALIDATION.descriptionTooShort;
+  }
+  if (views.empty) {
+    errors.expectedViews = VALIDATION.expectedViewsRequired;
+  } else if (views.value < MIN_EXPECTED_VIEWS) {
+    errors.expectedViews = VALIDATION.expectedViewsTooLow;
+  }
+  if (price.empty) {
+    errors.startingPrice = VALIDATION.startingPriceRequired;
+  } else if (price.value < MIN_BUDGET) {
+    errors.startingPrice = VALIDATION.budgetTooLow;
+  } else if (price.value > MAX_BUDGET) {
+    errors.startingPrice = VALIDATION.budgetTooHigh;
+  }
+  if (!values.slotStart || !values.slotEnd) {
+    errors.slotStart = VALIDATION.slotWindowInvalid;
+  } else {
+    const start = Date.parse(values.slotStart);
+    const end = Date.parse(values.slotEnd);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      errors.slotEnd = VALIDATION.slotWindowInvalid;
+    }
+  }
+  if (!values.deadline) {
+    errors.deadline = VALIDATION.deadlineRequired;
+  }
+  if (payloadError && Object.keys(errors).length === 0) {
+    errors.title = payloadError;
+  }
+  return errors;
+}
+
 export function validateBidPayload(input: {
   bidAmount: number;
   proposalText: string;
@@ -247,11 +380,13 @@ export function validateBidPayload(input: {
   auctionStatus?: AuctionStatus;
   isBlind?: boolean;
   winnerBidId?: string | null;
+  deadline?: string;
 }): string | null {
   const closedReason = getBidBlockReason({
     status: input.auctionStatus,
     isBlind: input.isBlind,
     winnerBidId: input.winnerBidId,
+    deadline: input.deadline,
   });
   if (closedReason) {
     return closedReason;

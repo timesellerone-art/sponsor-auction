@@ -12,6 +12,14 @@ export function formatWon(value: number) {
   return `${wonFormatter.format(amount)}원`;
 }
 
+export function formatViews(value: number) {
+  const amount = Number.isFinite(value) ? value : 0;
+  if (amount >= 10_000) {
+    return `${wonFormatter.format(Math.round(amount / 10_000))}만 회`;
+  }
+  return `${wonFormatter.format(amount)}회`;
+}
+
 const dateTimeLongFormatter = new Intl.DateTimeFormat('ko-KR', {
   dateStyle: 'medium',
   timeStyle: 'short',

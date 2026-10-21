@@ -7,7 +7,6 @@ import {
   AtSign,
   BookOpen,
   Camera,
-  Clock,
   Globe,
   Hash,
   MonitorPlay,
@@ -16,6 +15,7 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
+import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
 import { showToast } from '@/components/Toast';
@@ -25,7 +25,7 @@ import { loginPath } from '@/lib/auth-guard';
 import { isOwnedAuction } from '@/lib/my-campaigns';
 import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
 import { PLATFORM_LABELS } from '@/lib/platforms';
-import { cn } from '@/lib/utils';
+import { cn, formatWon } from '@/lib/utils';
 import type { AuctionItem, AuctionStatus, PlatformType } from '@/types/auction';
 
 type AuctionCardData = Partial<AuctionItem> & {
@@ -103,28 +103,11 @@ const statusMeta: Record<AuctionStatus, { label: string; className: string }> = 
 };
 
 const budgetFormatter = new Intl.NumberFormat('ko-KR');
-const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
-  month: 'short',
-  day: 'numeric',
-});
 
 function formatBudget(budget: number | null | undefined) {
   const value =
     typeof budget === 'number' && Number.isFinite(budget) ? budget : 0;
   return `${budgetFormatter.format(value)}원`;
-}
-
-function formatDeadline(deadline: string | undefined) {
-  if (!deadline) {
-    return '마감일 미정';
-  }
-
-  const date = new Date(deadline);
-  if (Number.isNaN(date.getTime())) {
-    return '마감일 미정';
-  }
-
-  return `${dateFormatter.format(date)} 마감`;
 }
 
 export function AuctionCard({
@@ -205,12 +188,16 @@ export function AuctionCard({
       <p className="mt-4 text-lg font-bold tracking-tight text-zinc-950 sm:text-xl">
         {formatBudget(auction.budget)}
       </p>
+      {auction.highestBidAmount && auction.highestBidAmount > 0 ? (
+        <p className="mt-1 text-xs text-zinc-500">
+          최저 {formatWon(auction.leadingBidAmount ?? auction.highestBidAmount)}
+          {' · '}
+          최고 {formatWon(auction.highestBidAmount)}
+        </p>
+      ) : null}
 
       <div className="mt-auto flex items-center justify-between gap-2 pt-4 text-xs text-zinc-500">
-        <span className="inline-flex min-w-0 items-center gap-1">
-          <Clock className="size-3.5 shrink-0" aria-hidden />
-          <span className="truncate">{formatDeadline(auction.deadline)}</span>
-        </span>
+        <AuctionCountdown className="min-w-0 truncate" deadline={auction.deadline} />
         <span className="inline-flex shrink-0 items-center gap-1">
           <Users className="size-3.5" aria-hidden />
           입찰 {auction.bidsCount ?? 0}
