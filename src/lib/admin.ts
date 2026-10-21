@@ -32,7 +32,7 @@ type ProfileRow = {
   id: string;
   name: string;
   email: string;
-  role: ProfileRole;
+  role: ProfileRole | null;
   status: ProfileStatus;
   created_at: string;
 };
@@ -72,7 +72,7 @@ function isProfileStatus(value: string): value is ProfileStatus {
 }
 
 function mapProfile(row: ProfileRow): ProfileItem | null {
-  if (!isProfileRole(row.role) || !isProfileStatus(row.status)) {
+  if (!row.role || !isProfileRole(row.role) || !isProfileStatus(row.status)) {
     return null;
   }
 
@@ -86,13 +86,78 @@ function mapProfile(row: ProfileRow): ProfileItem | null {
   };
 }
 
+function mergeProfiles(primary: ProfileItem[], secondary: ProfileItem[]) {
+  const merged = new Map<string, ProfileItem>();
+  for (const profile of secondary) {
+    merged.set(profile.id, profile);
+    merged.set(profile.email.trim().toLowerCase(), profile);
+  }
+  for (const profile of primary) {
+    merged.set(profile.id, profile);
+    merged.set(profile.email.trim().toLowerCase(), profile);
+  }
+  const unique = new Map<string, ProfileItem>();
+  for (const profile of merged.values()) {
+    unique.set(profile.id, profile);
+  }
+  return Array.from(unique.values()).sort((left, right) =>
+    right.createdAt.localeCompare(left.createdAt),
+  );
+}
+
 export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
+  let fromDb: ProfileItem[] = [];
+
+  try {
+    const response = await fetch('/api/admin/profiles', {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-store' },
+    });
+    const payload = await parseAdminJson(response, 'GET');
+    if (response.ok && Array.isArray(payload?.data)) {
+      fromDb = payload.data
+        .map((row) => {
+          const item = row as Partial<ProfileItem> & { created_at?: string };
+          if (!item.id || !item.email || !item.role || !item.status) {
+            return null;
+          }
+          return mapProfile({
+            id: item.id,
+            name: item.name || item.email,
+            email: item.email,
+            role: item.role,
+            status: item.status,
+            created_at: item.createdAt || item.created_at || '',
+          });
+        })
+        .filter((item): item is ProfileItem => item !== null);
+    } else if (!payload?.fallbackMock && response.status !== 409 && !response.ok) {
+      console.warn('[SponsorAuction] 회원 목록 API 조회 실패', payload?.error);
+    }
+  } catch (error) {
+    console.warn('[SponsorAuction] 회원 목록 API 호출 실패', error);
+  }
+
+  const mock = await mockGetSession();
+  if (mock.data) {
+    const mockResult = await getMockProfiles();
+    const list = mergeProfiles(fromDb, mockResult.data);
+    if (list.length === 0) {
+      return fail([], '등록된 회원이 없습니다.');
+    }
+    return ok(list);
+  }
+
+  if (fromDb.length > 0) {
+    return ok(fromDb);
+  }
+
   const supabase = await getDataClient();
   if (!supabase) {
     return getMockProfiles();
   }
 
-  const started = Date.now();
   try {
     const { data, error } = await supabase
       .from('profiles')
@@ -100,29 +165,21 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
       .order('created_at', { ascending: false });
 
     if (error && isSchemaMismatch(error)) {
-      console.warn('[SponsorAuction] profiles 테이블이 없어 Mock으로 전환합니다.', error.message);
       return getMockProfiles();
     }
-
     if (error) {
-      console.error('[SponsorAuction] 회원 목록 조회 실패:', error.message, error);
       return fail([], '회원 목록을 불러오지 못했습니다.');
     }
 
     const profiles = (data ?? [])
       .map((row) => mapProfile(row as ProfileRow))
       .filter((item): item is ProfileItem => item !== null);
-
     if (profiles.length === 0) {
       return fail([], '등록된 회원이 없습니다.');
     }
-
     return ok(profiles);
-  } catch (error) {
-    console.error('[SponsorAuction] 회원 목록 조회 예외:', error);
+  } catch {
     return fail([], '회원 목록을 불러오지 못했습니다.');
-  } finally {
-    console.info(`[SponsorAuction] 회원 목록 조회 종료 (${Date.now() - started}ms)`);
   }
 }
 

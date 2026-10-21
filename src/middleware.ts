@@ -120,5 +120,6 @@ export const config = {
     '/api/notifications/:path*',
     '/api/auth/naver',
     '/api/auth/naver/:path*',
+    '/api/onboarding/:path*',
   ],
 };

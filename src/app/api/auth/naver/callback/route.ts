@@ -90,6 +90,22 @@ export async function GET(request: NextRequest) {
       return loginError(origin, '네이버 계정으로 가입하지 못했습니다.');
     }
 
+    const authUserId = created.data.user?.id;
+    if (authUserId) {
+      const synced = await admin.from('profiles').upsert(
+        {
+          id: authUserId,
+          name: profile.name,
+          email: profile.email,
+          status: 'active',
+        },
+        { onConflict: 'id' },
+      );
+      if (synced.error) {
+        console.warn('[SponsorAuction] 네이버 프로필 동기화 실패', synced.error.message);
+      }
+    }
+
     const link = await admin.auth.admin.generateLink({
       type: 'magiclink',
       email: profile.email,

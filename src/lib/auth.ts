@@ -554,6 +554,35 @@ async function upsertProfileRow(
   return upserted;
 }
 
+async function saveRoleViaApi(
+  accessToken: string,
+  role: MemberRole,
+  name: string,
+  email: string,
+): Promise<SessionUser | null> {
+  const response = await fetch('/api/onboarding/role', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ role, name, email }),
+  });
+  const payload = (await response.json().catch(() => null)) as {
+    data?: { id?: string; email?: string; name?: string; role?: string | null };
+    error?: string;
+  } | null;
+  if (!response.ok || !payload?.data?.id) {
+    return null;
+  }
+  return mapSessionUser(
+    payload.data.id,
+    payload.data.email?.trim() || email,
+    payload.data.name?.trim() || name,
+    payload.data.role,
+  );
+}
+
 export async function saveMemberRole(
   role: MemberRole,
 ): Promise<DataResult<SessionUser | null>> {
@@ -571,7 +600,9 @@ export async function saveMemberRole(
   }
 
   try {
-    const authUser = await readBrowserAuthUser(supabase);
+    const sessionResult = await withTimeout(supabase.auth.getSession(), 2500, '세션 조회');
+    const authUser = sessionResult.data.session?.user ?? (await readBrowserAuthUser(supabase));
+    const accessToken = sessionResult.data.session?.access_token ?? '';
     if (!authUser) {
       const mock = await mockSaveMemberRole(role);
       if (!mock.error) {
@@ -587,6 +618,14 @@ export async function saveMemberRole(
         ? authUser.user_metadata.name
         : '') || email.split('@')[0] || '회원';
 
+    if (accessToken) {
+      const fromApi = await saveRoleViaApi(accessToken, role, name, email);
+      if (fromApi) {
+        applyKnownSession(fromApi);
+        return ok(fromApi);
+      }
+    }
+
     const payload = {
       id: authUser.id,
       name,
@@ -596,20 +635,12 @@ export async function saveMemberRole(
     };
 
     const { data, error } = await upsertProfileRow(supabase, payload);
-
-    if (error) {
-      console.warn('[SponsorAuction] 역할 저장에 실패했습니다.', error.message);
-      if (isSchemaMismatch(error)) {
-        const mock = await mockSaveMemberRole(role);
-        if (!mock.error) {
-          applyKnownSession(mock.data);
-          return mock;
-        }
-      }
+    if (error || !data) {
+      console.warn('[SponsorAuction] 역할 저장에 실패했습니다.', error?.message);
       return fail(null, AUTH_FAIL_MESSAGE);
     }
 
-    const row = (data ?? payload) as ProfileRow;
+    const row = data as ProfileRow;
     const session = mapSessionUser(
       authUser.id,
       row.email?.trim() || email,
@@ -620,15 +651,6 @@ export async function saveMemberRole(
     return ok(session);
   } catch (error) {
     console.warn('[SponsorAuction] 역할 저장 중 예외가 발생했습니다.', error);
-    try {
-      const mock = await mockSaveMemberRole(role);
-      if (!mock.error) {
-        applyKnownSession(mock.data);
-        return mock;
-      }
-    } catch {
-      // 목 저장도 실패하면 아래 메시지를 반환합니다.
-    }
     return fail(null, AUTH_FAIL_MESSAGE);
   }
 }
