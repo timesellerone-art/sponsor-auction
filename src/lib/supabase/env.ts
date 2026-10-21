@@ -36,6 +36,15 @@ export function getSupabaseEnv(): SupabaseEnv | null {
   return { url: url.replace(/\/$/, ''), anonKey };
 }
 
+/** 카카오/구글 콘솔에 등록하는 Supabase Auth 콜백. */
+export function getSupabaseOAuthCallbackUrl() {
+  const env = getSupabaseEnv();
+  if (!env) {
+    return null;
+  }
+  return `${env.url}/auth/v1/callback`;
+}
+
 /** 브라우저에 인라인된 공개 키. 서버가 env를 못 읽을 때 결제 API fallback용입니다. */
 export function publicSupabasePayload() {
   const env = getSupabaseEnv();

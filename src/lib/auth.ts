@@ -7,7 +7,7 @@ import {
 } from '@/lib/auth-mock';
 import { syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import { createClient } from '@/lib/supabase/client';
-import { isSchemaMismatch } from '@/lib/supabase/errors';
+import { getSupabaseOAuthCallbackUrl } from '@/lib/supabase/env';
 import { ROLE_SELECT_PATH, sanitizeNextPath } from '@/lib/auth-guard';
 import {
   isAuthProfileRole,
@@ -196,6 +196,35 @@ function oauthRedirectTo(nextPath?: string | null) {
   return `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
 }
 
+function authorizeUrlForProvider(provider: SocialOAuthProvider, url: string) {
+  if (provider !== 'kakao') {
+    return url;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const kakaoCallback = getSupabaseOAuthCallbackUrl();
+    if (parsed.hostname.includes('kakao.com') && kakaoCallback) {
+      parsed.searchParams.set('redirect_uri', kakaoCallback);
+    }
+    const scope = parsed.searchParams.get('scope') ?? '';
+    if (scope) {
+      const filtered = scope
+        .split(/[+\s,]+/)
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0 && item !== 'account_email');
+      if (filtered.length > 0) {
+        parsed.searchParams.set('scope', filtered.join(' '));
+      } else {
+        parsed.searchParams.delete('scope');
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 export async function signInWithOAuth(
   provider: SocialOAuthProvider,
   nextPath?: string | null,
@@ -215,10 +244,13 @@ export async function signInWithOAuth(
       options: {
         redirectTo: oauthRedirectTo(nextPath),
         skipBrowserRedirect: true,
+        scopes: provider === 'kakao' ? 'profile_nickname,profile_image' : undefined,
         queryParams:
           provider === 'google'
             ? { access_type: 'offline', prompt: 'consent' }
-            : undefined,
+            : provider === 'kakao'
+              ? { scope: 'profile_nickname profile_image' }
+              : undefined,
       },
     });
 
@@ -231,7 +263,7 @@ export async function signInWithOAuth(
       return fail(false, AUTH_FAIL_MESSAGE);
     }
 
-    window.location.assign(data.url);
+    window.location.assign(authorizeUrlForProvider(provider, data.url));
     return ok(true);
   } catch (error) {
     console.warn('[SponsorAuction] 소셜 로그인 중 예외가 발생했습니다.', error);
