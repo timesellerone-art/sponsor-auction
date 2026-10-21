@@ -13,6 +13,8 @@ declare namespace NodeJS {
     SUPABASE_SERVICE_KEY?: string;
     SERVICE_ROLE_KEY?: string;
     SUPABASE_SERVICE_ROLE?: string;
+    SUPABASE_WEBHOOK_SECRET?: string;
+    WEBHOOK_SECRET?: string;
     NEXT_PUBLIC_TOSS_CLIENT_KEY?: string;
     TOSS_SECRET_KEY?: string;
     NAVER_CLIENT_ID?: string;

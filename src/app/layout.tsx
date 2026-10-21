@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { AccessReasonToast } from '@/components/AccessReasonToast';
 import { AuthProvider } from '@/components/AuthProvider';
 import { Navbar } from '@/components/Navbar';
+import { RealtimeNotifications } from '@/components/RealtimeNotifications';
 import { RoleRouteGuard } from '@/components/RoleRouteGuard';
 import { SiteFooter } from '@/components/SiteFooter';
 import { ToastHost } from '@/components/Toast';
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
     >
       <body className="flex min-h-full w-full min-w-0 flex-col overflow-x-clip bg-background font-sans text-foreground">
         <AuthProvider>
+          <RealtimeNotifications />
           <RoleRouteGuard>
             <Navbar />
             <main className="flex min-h-screen w-full min-w-0 max-w-none flex-1 flex-col overflow-x-clip">

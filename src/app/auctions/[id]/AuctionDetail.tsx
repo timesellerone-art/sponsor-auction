@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Users } from 'lucide-react';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
+import { AuctionChat } from '@/components/AuctionChat';
 import { AiAgentGuide } from '@/components/AiAgentGuide';
 import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
@@ -321,6 +322,8 @@ export function AuctionDetail({ id }: { id: string }) {
             allowAward={isOwner}
             onAward={handleAward}
           />
+
+          <AuctionChat auctionId={auction.id} />
         </div>
       )}
 

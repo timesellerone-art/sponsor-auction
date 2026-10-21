@@ -865,3 +865,22 @@ drop policy if exists "compliance_logs_admin_select" on public.compliance_logs;
 create policy "compliance_logs_admin_select" on public.compliance_logs for select to authenticated using (public.is_admin());
 grant select, insert on public.compliance_logs to authenticated;
 grant select, insert, update, delete on public.compliance_logs to service_role;
+
+do $$
+declare
+  tbl text;
+begin
+  foreach tbl in array array['chat_messages', 'bids', 'time_slot_bids']
+  loop
+    if not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = tbl
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', tbl);
+    end if;
+  end loop;
+end
+$$;

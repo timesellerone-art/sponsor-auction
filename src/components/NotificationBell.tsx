@@ -18,6 +18,8 @@ const TYPE_LABEL: Record<AppNotification['type'], string> = {
   bid_received: '제안서 접수',
   award_complete: '낙찰 완료',
   payment_complete: '결제 완료',
+  chat_message: '새 메시지',
+  timeslot_bid: '인벤토리 입찰',
 };
 
 export function NotificationBell() {
@@ -60,7 +62,9 @@ export function NotificationBell() {
       >
         <Bell className="size-5" aria-hidden />
         {unread > 0 ? (
-          <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-teal-600" />
+          <span className="absolute -top-0.5 -right-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-teal-700 px-1 text-[10px] font-bold leading-4 text-white">
+            {unread > 99 ? '99+' : unread}
+          </span>
         ) : null}
       </button>
 

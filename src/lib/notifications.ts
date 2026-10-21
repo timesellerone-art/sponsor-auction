@@ -30,7 +30,13 @@ function asNotification(value: unknown): AppNotification | null {
   return {
     id: item.id,
     userId: item.userId,
-    type: item.type === 'award_complete' || item.type === 'payment_complete' ? item.type : 'bid_received',
+    type:
+      item.type === 'award_complete' ||
+      item.type === 'payment_complete' ||
+      item.type === 'chat_message' ||
+      item.type === 'timeslot_bid'
+        ? item.type
+        : 'bid_received',
     title: item.title,
     body: item.body,
     href: item.href,

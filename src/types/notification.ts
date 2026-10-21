@@ -2,6 +2,8 @@ export const NOTIFICATION_TYPES = [
   'bid_received',
   'award_complete',
   'payment_complete',
+  'chat_message',
+  'timeslot_bid',
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
