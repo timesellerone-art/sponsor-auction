@@ -31,6 +31,10 @@ export function isCreator(role: string | null | undefined): boolean {
   return role === 'creator';
 }
 
+export function needsRoleOnboarding(user: SessionUser | null | undefined): boolean {
+  return Boolean(user && !isAuthProfileRole(user.role));
+}
+
 export function canCreateAuction(role: string | null | undefined): boolean {
   return isAdvertiser(role);
 }

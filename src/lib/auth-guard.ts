@@ -1,4 +1,7 @@
 import { ACCESS_REASON, type AccessReason } from '@/lib/access';
+import { isAuthProfileRole } from '@/types/auth';
+
+export const ROLE_SELECT_PATH = '/onboarding/role-select';
 
 export function sanitizeNextPath(value: string | null | undefined) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) {
@@ -28,4 +31,18 @@ export function loginPath(reason: AccessReason, nextPath?: string | null) {
 
 export function authGuardMessage(reason: AccessReason) {
   return ACCESS_REASON[reason];
+}
+
+export function postAuthPath(role: string | null | undefined, nextPath?: string | null) {
+  if (!isAuthProfileRole(role)) {
+    return ROLE_SELECT_PATH;
+  }
+  const next = sanitizeNextPath(nextPath);
+  if (next && !next.startsWith('/onboarding')) {
+    return next;
+  }
+  if (role === 'admin') {
+    return '/admin';
+  }
+  return '/my';
 }

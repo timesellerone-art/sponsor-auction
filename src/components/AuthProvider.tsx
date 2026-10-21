@@ -9,13 +9,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { RoleOnboarding } from '@/components/RoleOnboarding';
 import { getSessionUser, subscribeAuthState } from '@/lib/auth';
-import { syncRoleCookie } from '@/lib/access';
+import { syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import {
   canCreateAuction,
   canPlaceBid,
-  isAdmin,
+  needsRoleOnboarding,
   type SessionUser,
 } from '@/types/auth';
 
@@ -67,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh]);
 
-  const needsOnboarding = Boolean(user && !user.role && !isAdmin(user.role));
+  const needsOnboarding = needsRoleOnboarding(user);
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -85,20 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     syncRoleCookie(user?.role ?? null);
+    syncAuthPresentCookie(Boolean(user));
   }, [ready, user]);
 
   return (
     <AuthContext.Provider value={value}>
       <div className="flex min-h-screen w-full min-w-0 flex-1 flex-col">
         {children}
-        {needsOnboarding ? (
-          <RoleOnboarding
-            name={user?.name || '회원'}
-            onCompleted={() => {
-              void refresh();
-            }}
-          />
-        ) : null}
       </div>
     </AuthContext.Provider>
   );

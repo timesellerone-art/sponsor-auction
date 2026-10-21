@@ -60,12 +60,14 @@ create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   email text not null unique,
-  role public.profile_role not null,
+  role public.profile_role,
   status public.profile_status not null default 'active',
   created_at timestamptz not null default timezone('utc', now()),
   constraint profiles_email_not_empty check (char_length(trim(email)) > 3),
   constraint profiles_name_not_empty check (char_length(trim(name)) > 0)
 );
+
+alter table public.profiles alter column role drop not null;
 
 create table if not exists public.auctions (
   id uuid primary key default gen_random_uuid(),
@@ -430,7 +432,7 @@ begin
     case
       when new.raw_user_meta_data ->> 'role' in ('advertiser', 'creator', 'admin')
         then (new.raw_user_meta_data ->> 'role')::public.profile_role
-      else 'advertiser'
+      else null
     end,
     'active'
   )

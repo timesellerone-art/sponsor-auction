@@ -113,7 +113,7 @@ export type Database = {
           id: string;
           name: string;
           email: string;
-          role: 'advertiser' | 'creator' | 'admin';
+          role: 'advertiser' | 'creator' | 'admin' | null;
           status: 'active' | 'suspended';
           created_at: string;
         };
@@ -121,14 +121,14 @@ export type Database = {
           id?: string;
           name: string;
           email: string;
-          role: 'advertiser' | 'creator' | 'admin';
+          role?: 'advertiser' | 'creator' | 'admin' | null;
           status?: 'active' | 'suspended';
           created_at?: string;
         };
         Update: {
           name?: string;
           email?: string;
-          role?: 'advertiser' | 'creator' | 'admin';
+          role?: 'advertiser' | 'creator' | 'admin' | null;
           status?: 'active' | 'suspended';
         };
         Relationships: [];

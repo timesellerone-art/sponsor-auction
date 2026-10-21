@@ -16,7 +16,7 @@ import {
   signUp,
   type SocialOAuthProvider,
 } from '@/lib/auth';
-import { sanitizeNextPath } from '@/lib/auth-guard';
+import { postAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
 import { cn } from '@/lib/utils';
 
 type Mode = 'signin' | 'signup';
@@ -41,18 +41,7 @@ export default function LoginPage() {
 
   const destinationAfterLogin = (role: string | null) => {
     const params = new URLSearchParams(window.location.search);
-    const next = sanitizeNextPath(params.get('next'));
-    if (next) {
-      return next;
-    }
-    const reason = params.get('reason');
-    if (role === 'admin' && reason?.startsWith('admin')) {
-      return '/admin';
-    }
-    if (role === 'advertiser' || role === 'creator') {
-      return '/my';
-    }
-    return '/';
+    return postAuthPath(role, params.get('next'));
   };
 
   useEffect(() => {

@@ -4,8 +4,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { showToast } from '@/components/Toast';
-import { notifyAuthChanged } from '@/lib/auth';
-import { sanitizeNextPath } from '@/lib/auth-guard';
+import { getSessionUser, notifyAuthChanged } from '@/lib/auth';
+import { postAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
 import { getSupabaseClient } from '@/lib/supabase';
 
 export default function AuthOAuthCompletePage() {
@@ -57,8 +57,10 @@ export default function AuthOAuthCompletePage() {
         }
 
         notifyAuthChanged();
+        const session = await getSessionUser();
+        const destination = postAuthPath(session.data?.role ?? null, next);
         if (!cancelled) {
-          router.replace(next);
+          router.replace(destination);
           router.refresh();
         }
       } catch (error) {

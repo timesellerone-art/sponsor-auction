@@ -1,4 +1,5 @@
 export const ROLE_COOKIE_NAME = 'sponsor-auction-role';
+export const AUTH_PRESENT_COOKIE_NAME = 'sponsor-auction-auth';
 
 export const ACCESS_REASON = {
   'admin-auth': '관리자 페이지는 로그인이 필요합니다.',
@@ -35,4 +36,13 @@ export function syncRoleCookie(role: string | null | undefined) {
     role === 'admin' || role === 'advertiser' || role === 'creator' ? role : '';
   const maxAge = value ? 60 * 60 * 24 * 7 : 0;
   document.cookie = `${ROLE_COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+}
+
+export function syncAuthPresentCookie(present: boolean) {
+  if (typeof document === 'undefined') {
+    return;
+  }
+
+  const maxAge = present ? 60 * 60 * 24 * 7 : 0;
+  document.cookie = `${AUTH_PRESENT_COOKIE_NAME}=${present ? '1' : ''}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
 }
