@@ -6,15 +6,10 @@ import {
 } from '@/lib/payments/guard';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
+import { isUuid } from '@/lib/uuid';
 import type { ProfileStatus } from '@/types/admin';
 
 const PROFILE_COLUMNS = 'id, name, email, role, status, created_at';
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
 
 export async function POST(request: Request) {
   try {

@@ -6,6 +6,7 @@ import {
   platformFeeFromAmount,
 } from '@/lib/fees';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
+import { isInvalidUuidError, isUuid, uuidIds } from '@/lib/uuid';
 import type { PayoutItem, PayoutStatus } from '@/types/admin';
 import type { Database } from '@/types/database';
 import type { SponsorAuctionClient } from '@/lib/supabase';
@@ -30,12 +31,6 @@ type PaymentSeed = {
 
 function isPayoutStatus(value: string): value is PayoutStatus {
   return value === 'pending' || value === 'paid';
-}
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
 }
 
 function isEphemeralPayoutId(value: string) {
@@ -297,14 +292,16 @@ async function loadByIds<T extends { id: string }>(
   columns: string,
   ids: string[],
 ): Promise<T[]> {
-  const unique = [...new Set(ids.filter(Boolean))];
+  const unique = uuidIds(ids);
   if (unique.length === 0) {
     return [];
   }
 
   const { data, error } = await client.from(table).select(columns).in('id', unique);
   if (error) {
-    console.error(`[SponsorAuction] 정산 ${table} 조회 실패:`, error.message, error);
+    if (!isInvalidUuidError(error)) {
+      console.error(`[SponsorAuction] 정산 ${table} 조회 실패:`, error.message, error);
+    }
     return [];
   }
 
@@ -678,7 +675,7 @@ function isSkippableWriteError(error: { message?: string; code?: string } | null
     return false;
   }
   return (
-    error.code === '22P02' ||
+    isInvalidUuidError(error) ||
     error.code === 'PGRST116' ||
     /invalid input syntax for type uuid/i.test(error.message ?? '') ||
     /cannot coerce the result to a single json object/i.test(error.message ?? '') ||
@@ -706,6 +703,9 @@ async function fetchConfirmedPayment(
       .eq('auction_id', auctionId)
       .eq('status', 'confirmed')
       .limit(1);
+    if (byAuction.error && isInvalidUuidError(byAuction.error)) {
+      return null;
+    }
     if (byAuction.data?.[0]) {
       return byAuction.data[0];
     }
@@ -717,7 +717,7 @@ async function fetchSelectedBid(
   client: SponsorAuctionClient,
   auctionId: string,
 ): Promise<BidLookup | undefined> {
-  if (!auctionId) {
+  if (!isUuid(auctionId)) {
     return undefined;
   }
   const { data } = await client

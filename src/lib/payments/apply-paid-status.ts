@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { upsertPaidPayout } from '@/lib/payouts';
 import type { PaymentSupabaseConfig } from '@/lib/supabase/payment-config';
 import type { Database } from '@/types/database';
+import { isUuid } from '@/lib/uuid';
 
 function createSupabaseAdmin(config: PaymentSupabaseConfig) {
   const key = config.serviceKey || config.anonKey;
@@ -33,6 +34,13 @@ export async function applyPaidAuctionStatus(
   try {
     if (!auctionId || !bidId) {
       console.error('[SponsorAuction] 결제 후 상태 업데이트 생략: auctionId/bidId 없음', {
+        auctionId,
+        bidId,
+      });
+      return;
+    }
+    if (!isUuid(auctionId) || !isUuid(bidId)) {
+      console.info('[SponsorAuction] 결제 후 상태 업데이트 생략: mock ID는 UUID 컬럼에 쓰지 않습니다.', {
         auctionId,
         bidId,
       });

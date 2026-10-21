@@ -16,6 +16,7 @@ import { notifyLifecycleEvent } from '@/lib/notification';
 import { type SponsorAuctionClient } from '@/lib/supabase';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
+import { isInvalidUuidError, isUuid, uuidIds } from '@/lib/uuid';
 import {
   VALIDATION,
   getAwardBlockReason,
@@ -100,6 +101,14 @@ function logDbError(action: string, error: unknown) {
       : typeof error === 'object' && error && 'message' in error
         ? String((error as { message?: unknown }).message)
         : String(error);
+  const code =
+    typeof error === 'object' && error && 'code' in error
+      ? String((error as { code?: unknown }).code)
+      : undefined;
+  if (isInvalidUuidError({ message: detail, code })) {
+    console.warn(`[SponsorAuction] ${action} UUID 형식이 아니어서 건너뜁니다.`, detail);
+    return;
+  }
   console.error(`[SponsorAuction] ${action} 실패:`, detail, error);
 }
 
@@ -158,6 +167,9 @@ export async function getAuctionById(
     if (!id.trim()) {
       return fail(null, '유효한 경매 ID가 필요합니다.');
     }
+    if (!isUuid(id)) {
+      return getMockAuctionById(id);
+    }
 
     let { data, error } = await supabase
       .from('auctions')
@@ -178,6 +190,9 @@ export async function getAuctionById(
 
     if (error) {
       logDbError('경매 단건 조회', error);
+      if (isInvalidUuidError(error)) {
+        return getMockAuctionById(id);
+      }
       return fail(null, '경매 정보를 불러오지 못했습니다.');
     }
 
@@ -290,7 +305,7 @@ export async function createBid(
       return fail(null, bidError);
     }
 
-    if (!supabase) {
+    if (!supabase || !isUuid(input.auctionId)) {
       const mocked = await createMockBid(input);
       if (mocked.data) {
         void notifyLifecycleEvent({
@@ -407,9 +422,12 @@ export async function getBidsByCreator(
   try {
     const creatorId = userId.trim();
     const creatorName = options?.creatorName?.trim() ?? '';
-    const bidIds = (options?.bidIds ?? []).filter((id) => id.trim().length > 0);
+    const bidIds = uuidIds(options?.bidIds ?? []);
     if (!creatorId && !creatorName && bidIds.length === 0) {
       return fail([], '유효한 크리에이터 정보가 필요합니다.');
+    }
+    if (!isUuid(creatorId) && !creatorName && bidIds.length === 0) {
+      return getMockBidsByCreator(userId, options);
     }
 
     const queries: PromiseLike<{
@@ -418,7 +436,7 @@ export async function getBidsByCreator(
     }>[] = [];
 
     const selectBids = (columns: string) => {
-      if (creatorId) {
+      if (isUuid(creatorId)) {
         queries.push(
           supabase.from('bids').select(columns).eq('creator_id', creatorId).order('created_at', {
             ascending: false,
@@ -556,6 +574,9 @@ export async function deleteAuction(id: string): Promise<DataResult<boolean>> {
     if (!id.trim()) {
       return fail(false, '유효한 경매 ID가 필요합니다.');
     }
+    if (!isUuid(id)) {
+      return deleteMockAuction(id);
+    }
 
     const { error } = await supabase.from('auctions').delete().eq('id', id);
     if (error) {
@@ -585,6 +606,9 @@ export async function updateAuctionStatus(
   try {
     if (!id.trim()) {
       return fail(null, '유효한 경매 ID가 필요합니다.');
+    }
+    if (!isUuid(id)) {
+      return updateMockAuctionStatus(id, status);
     }
 
     let query = supabase.from('auctions').update({ status }).eq('id', id);
@@ -626,6 +650,9 @@ export async function updateAuctionBlind(
     try {
       if (!id.trim()) {
         return fail(null, '유효한 경매 ID가 필요합니다.');
+      }
+      if (!isUuid(id)) {
+        return updateMockAuctionBlind(id, isBlind);
       }
 
       const current = await getAuctionById(id);
@@ -682,6 +709,9 @@ export async function getBidsByAuctionId(
     if (!auctionId.trim()) {
       return fail([], '유효한 경매 ID가 필요합니다.');
     }
+    if (!isUuid(auctionId)) {
+      return getMockBidsByAuctionId(auctionId);
+    }
 
     let { data, error } = await supabase
       .from('bids')
@@ -722,7 +752,7 @@ export async function awardBid(
     fail(null, VALIDATION.actionInFlight),
     async () => {
       const supabase = await getDataClient();
-      if (!supabase) {
+      if (!supabase || !isUuid(auctionId) || !isUuid(bidId)) {
         return awardMockBid(auctionId, bidId);
       }
 
