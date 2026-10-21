@@ -55,9 +55,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refresh();
-    return subscribeAuthState(() => {
+    const failSafe = window.setTimeout(() => {
+      setReady(true);
+    }, 4000);
+    const unsubscribe = subscribeAuthState(() => {
       void refresh();
     });
+    return () => {
+      window.clearTimeout(failSafe);
+      unsubscribe();
+    };
   }, [refresh]);
 
   const needsOnboarding = Boolean(user && !user.role && !isAdmin(user.role));

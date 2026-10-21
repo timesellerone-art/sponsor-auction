@@ -18,6 +18,21 @@ import type { DataResult } from '@/types/auction';
 
 export const AUTH_FAIL_MESSAGE = '요청을 처리하지 못했습니다. 다시 시도해 주세요.';
 
+function isAuthSessionMissing(error: unknown): boolean {
+  if (!error) {
+    return false;
+  }
+  const message =
+    typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as { message: unknown }).message)
+      : String(error);
+  const name =
+    typeof error === 'object' && error !== null && 'name' in error
+      ? String((error as { name: unknown }).name)
+      : '';
+  return /auth session missing/i.test(message) || name === 'AuthSessionMissingError';
+}
+
 const AUTH_CHANGED_EVENT = 'auth:changed';
 
 const PROFILE_COLUMNS = 'id, name, email, role, status';
@@ -100,7 +115,11 @@ export function subscribeAuthState(listener: () => void) {
   const {
     data: { subscription },
   } = supabase.auth.onAuthStateChange(() => {
-    listener();
+    try {
+      listener();
+    } catch (error) {
+      console.warn('[SponsorAuction] 인증 상태 리스너 처리에 실패했습니다.', error);
+    }
   });
 
   return () => {
@@ -200,38 +219,56 @@ async function loadProfile(
   );
 }
 
-export async function getSessionUser(): Promise<DataResult<SessionUser | null>> {
-  const supabase = createClient();
-  if (!supabase) {
-    return mockGetSession();
-  }
-
+async function readBrowserAuthUser(
+  supabase: NonNullable<ReturnType<typeof createClient>>,
+) {
   try {
-    const { data: sessionData, error: sessionError } = await withTimeout(
+    const { data, error } = await withTimeout(
       supabase.auth.getSession(),
       2500,
       '세션 조회',
     );
-    if (sessionError) {
-      console.warn('[SponsorAuction] 세션 조회에 실패했습니다.', sessionError.message);
-    }
-
-    let user = sessionData.session?.user ?? null;
-    if (!user) {
-      const { data, error } = await withTimeout(
-        supabase.auth.getUser(),
-        2500,
-        '사용자 조회',
-      );
-      if (error) {
-        console.warn('[SponsorAuction] 사용자 조회에 실패했습니다.', error.message);
-        return mockGetSession();
+    if (error) {
+      if (isAuthSessionMissing(error)) {
+        console.warn('[SponsorAuction] 인증 세션이 없습니다.', error.message);
+        return null;
       }
-      user = data.user;
+      console.warn('[SponsorAuction] 세션 조회에 실패했습니다.', error.message);
     }
+    return data.session?.user ?? null;
+  } catch (error) {
+    if (isAuthSessionMissing(error)) {
+      console.warn(
+        '[SponsorAuction] 인증 세션이 없습니다.',
+        error instanceof Error ? error.message : error,
+      );
+      return null;
+    }
+    console.warn('[SponsorAuction] 세션 조회 중 예외가 발생했습니다.', error);
+    return null;
+  }
+}
 
+export async function getSessionUser(): Promise<DataResult<SessionUser | null>> {
+  const supabase = createClient();
+  if (!supabase) {
+    try {
+      return await mockGetSession();
+    } catch (error) {
+      console.warn('[SponsorAuction] Mock 세션 조회에 실패했습니다.', error);
+      return ok(null);
+    }
+  }
+
+  try {
+    const user = await readBrowserAuthUser(supabase);
     if (!user) {
-      return mockGetSession();
+      try {
+        return await mockGetSession();
+      } catch (error) {
+        console.warn('[SponsorAuction] Mock 세션 조회에 실패했습니다.', error);
+        return ok(null);
+      }
     }
 
     const email = user.email?.trim() || '';
@@ -242,8 +279,19 @@ export async function getSessionUser(): Promise<DataResult<SessionUser | null>> 
     const session = await loadProfile(supabase, user.id, email, name);
     return ok(session);
   } catch (error) {
+    if (isAuthSessionMissing(error)) {
+      console.warn(
+        '[SponsorAuction] 인증 세션이 없습니다.',
+        error instanceof Error ? error.message : error,
+      );
+      return ok(null);
+    }
     console.warn('[SponsorAuction] 세션 조회 중 예외가 발생했습니다.', error);
-    return mockGetSession();
+    try {
+      return await mockGetSession();
+    } catch {
+      return ok(null);
+    }
   }
 }
 
@@ -423,6 +471,13 @@ export async function saveMemberRole(
 
   try {
     const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) {
+      if (isAuthSessionMissing(authError)) {
+        console.warn('[SponsorAuction] 인증 세션이 없습니다.', authError.message);
+      } else {
+        console.warn('[SponsorAuction] 사용자 조회에 실패했습니다.', authError.message);
+      }
+    }
     if (authError || !authData.user) {
       const mock = await mockSaveMemberRole(role);
       if (!mock.error) {

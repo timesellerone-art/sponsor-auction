@@ -38,6 +38,9 @@ export async function getDataClient(): Promise<SponsorAuctionClient | null> {
 
   try {
     const { data, error } = await withTimeout(supabase.auth.getSession(), 2000);
+    if (error) {
+      console.warn('[SponsorAuction] 데이터 클라이언트 세션 확인 경고', error.message);
+    }
     if (!error && data.session?.user) {
       return supabase;
     }

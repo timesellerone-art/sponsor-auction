@@ -10,6 +10,7 @@ import { showToast } from '@/components/Toast';
 import { SIGNUP_AGREEMENT_REQUIRED, validateSignupAgreement } from '@/lib/legal';
 import {
   AUTH_FAIL_MESSAGE,
+  getSessionUser,
   signIn,
   signInWithOAuth,
   signUp,
@@ -28,6 +29,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [oauthBusy, setOauthBusy] = useState<SocialOAuthProvider | null>(null);
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -61,11 +63,46 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (!ready || !user) {
+    let cancelled = false;
+    const timeoutId = window.setTimeout(() => {
+      if (!cancelled) {
+        setIsLoading(false);
+      }
+    }, 4000);
+
+    const checkSession = async () => {
+      try {
+        const result = await getSessionUser();
+        if (cancelled) {
+          return;
+        }
+        const sessionUser = result.data;
+        if (sessionUser) {
+          router.replace(destinationAfterLogin(sessionUser.role));
+        }
+      } catch (sessionError) {
+        console.warn('[SponsorAuction] 로그인 페이지 세션 확인에 실패했습니다.', sessionError);
+      } finally {
+        window.clearTimeout(timeoutId);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void checkSession();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [router]);
+
+  useEffect(() => {
+    if (isLoading || !ready || !user) {
       return;
     }
     router.replace(destinationAfterLogin(user.role));
-  }, [ready, router, user]);
+  }, [isLoading, ready, router, user]);
 
   const ensureSignupAgreements = () => {
     if (mode !== 'signup') {
@@ -146,7 +183,10 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-md min-w-0 flex-1 flex-col justify-center px-4 py-10 sm:px-6">
+    <div
+      aria-busy={isLoading}
+      className="mx-auto flex w-full max-w-md min-w-0 flex-1 flex-col justify-center px-4 py-10 sm:px-6"
+    >
       <p className="text-sm font-semibold tracking-wide text-teal-800">Account</p>
       <h1 className="mt-1 text-2xl font-bold text-zinc-950">
         {mode === 'signup' ? '회원가입' : '로그인'}
