@@ -583,6 +583,7 @@ create policy "auctions_select_public"
 on public.auctions for select
 to anon, authenticated
 using (true);
+grant select on public.auctions to anon, authenticated;
 
 drop policy if exists "auctions_insert_public" on public.auctions;
 drop policy if exists "auctions_insert_own" on public.auctions;
@@ -708,6 +709,23 @@ create table if not exists public.tax_invoice_logs (
   payload jsonb,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.tax_invoice_logs add column if not exists payout_id text;
+alter table public.tax_invoice_logs add column if not exists payment_order_id text;
+alter table public.tax_invoice_logs add column if not exists auction_id text;
+alter table public.tax_invoice_logs add column if not exists bid_id text;
+alter table public.tax_invoice_logs add column if not exists supply_amount integer not null default 0;
+alter table public.tax_invoice_logs add column if not exists vat_amount integer not null default 0;
+alter table public.tax_invoice_logs add column if not exists withholding_amount integer not null default 0;
+alter table public.tax_invoice_logs add column if not exists net_payout integer not null default 0;
+alter table public.tax_invoice_logs add column if not exists status text not null default 'fallback';
+alter table public.tax_invoice_logs add column if not exists provider text not null default 'popbill';
+alter table public.tax_invoice_logs add column if not exists mgt_key text;
+alter table public.tax_invoice_logs add column if not exists payload jsonb;
+
+create unique index if not exists tax_invoice_logs_payment_order_uidx
+  on public.tax_invoice_logs (payment_order_id)
+  where payment_order_id is not null and btrim(payment_order_id) <> '';
 
 alter table public.tax_invoice_logs enable row level security;
 drop policy if exists "tax_invoice_logs_admin" on public.tax_invoice_logs;

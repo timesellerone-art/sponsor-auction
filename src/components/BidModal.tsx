@@ -110,8 +110,10 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
           return;
         }
 
-        const latest = await getAuctionById(auction.id);
-        const blocked = getBidBlockReason(latest.data ?? auction);
+        const auctionId = auction.id.trim();
+        const latest = await getAuctionById(auctionId);
+        const currentAuction = latest.data ?? auction;
+        const blocked = getBidBlockReason(currentAuction);
         if (blocked) {
           setSubmitError(blocked);
           showToast(blocked);
@@ -122,7 +124,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
           creatorChannelUrl,
           bidAmount,
           proposalText,
-          auctionBudget: latest.data?.budget ?? auction.budget,
+          auctionBudget: currentAuction.budget,
           agreeTerms,
           agreePrivacy,
         });
@@ -145,7 +147,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         }
 
         const payload = {
-          auctionId: auction.id,
+          auctionId,
           creatorId: user.id,
           creatorName: user.name.trim() || '크리에이터',
           creatorChannelUrl: creatorChannelUrl.trim(),
@@ -157,6 +159,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         try {
           const response = await fetch('/api/bids', {
             method: 'POST',
+            credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });

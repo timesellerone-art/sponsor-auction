@@ -3,8 +3,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { applyAuthCookies } from '@/lib/access';
 import { ROLE_SELECT_PATH, postSocialAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
 import { getSupabaseEnv } from '@/lib/supabase/env';
+import { reconcileSocialIdentities } from '@/lib/auth-identity';
 import {
-  isFirstAuthSignIn,
   needsRoleOnboarding,
   parseAuthRoles,
   primaryAuthRole,
@@ -57,7 +57,26 @@ export async function GET(request: NextRequest) {
       const { error } = await supabase.auth.exchangeCodeForSession(code);
       if (!error) {
         const { data: userData } = await supabase.auth.getUser();
-        const authUser = userData.user;
+        let authUser = userData.user;
+        if (authUser) {
+          const linked = await reconcileSocialIdentities(authUser);
+          if (linked.switched && linked.tokenHash) {
+            const verified = await supabase.auth.verifyOtp({
+              token_hash: linked.tokenHash,
+              type: 'magiclink',
+            });
+            if (verified.error) {
+              console.warn(
+                '[SponsorAuction] 통합 계정 세션 전환에 실패했습니다.',
+                verified.error.message,
+              );
+            } else {
+              authUser = verified.data.user ?? linked.user;
+            }
+          } else {
+            authUser = linked.user;
+          }
+        }
         let sessionLike: SessionUser | null = null;
         if (authUser) {
           const profile = await supabase
@@ -78,18 +97,6 @@ export async function GET(request: NextRequest) {
             lastSignInAt: authUser.last_sign_in_at,
             onboardingComplete: authUser.user_metadata?.onboarding_complete === true,
           };
-          if (
-            needsRoleOnboarding(sessionLike) &&
-            roles.length > 0 &&
-            !roles.includes('admin') &&
-            isFirstAuthSignIn(authUser)
-          ) {
-            await supabase
-              .from('profiles')
-              .update({ role: null, roles: [] })
-              .eq('id', authUser.id);
-            sessionLike = { ...sessionLike, role: null, roles: [] };
-          }
         }
         const destination = postSocialAuthPath(sessionLike, next, {
           needsOnboarding: needsRoleOnboarding(sessionLike),

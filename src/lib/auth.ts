@@ -5,7 +5,12 @@ import {
   mockSignOut,
   mockSignUp,
 } from '@/lib/auth-mock';
-import { syncActiveRoleCookie, syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
+import {
+  readActiveRoleCookie,
+  syncActiveRoleCookie,
+  syncAuthPresentCookie,
+  syncRoleCookie,
+} from '@/lib/access';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseOAuthCallbackUrl } from '@/lib/supabase/env';
 import { ROLE_SELECT_PATH, sanitizeNextPath } from '@/lib/auth-guard';
@@ -13,6 +18,7 @@ import {
   isMemberRole,
   parseAuthRoles,
   primaryAuthRole,
+  resolveActiveMemberRole,
   type MemberRole,
   type SessionUser,
 } from '@/types/auth';
@@ -63,7 +69,9 @@ function persistClientAuth(user: SessionUser | null) {
   syncAuthPresentCookie(Boolean(user));
   if (!user) {
     syncActiveRoleCookie(null);
+    return;
   }
+  syncActiveRoleCookie(resolveActiveMemberRole(user, readActiveRoleCookie()));
 }
 
 const AUTH_CHANGED_EVENT = 'auth:changed';
@@ -215,18 +223,16 @@ function authorizeUrlForProvider(provider: SocialOAuthProvider, url: string) {
     if (parsed.hostname.includes('kakao.com') && kakaoCallback) {
       parsed.searchParams.set('redirect_uri', kakaoCallback);
     }
-    const scope = parsed.searchParams.get('scope') ?? '';
-    if (scope) {
-      const filtered = scope
+    const scopes = new Set(
+      (parsed.searchParams.get('scope') ?? '')
         .split(/[+\s,]+/)
         .map((item) => item.trim())
-        .filter((item) => item.length > 0 && item !== 'account_email');
-      if (filtered.length > 0) {
-        parsed.searchParams.set('scope', filtered.join(' '));
-      } else {
-        parsed.searchParams.delete('scope');
-      }
-    }
+        .filter((item) => item.length > 0),
+    );
+    scopes.add('profile_nickname');
+    scopes.add('profile_image');
+    scopes.add('account_email');
+    parsed.searchParams.set('scope', [...scopes].join(' '));
     return parsed.toString();
   } catch {
     return url;
@@ -247,20 +253,57 @@ export async function signInWithOAuth(
   }
 
   try {
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: provider as 'apple',
-      options: {
-        redirectTo: oauthRedirectTo(nextPath),
-        skipBrowserRedirect: true,
-        scopes: provider === 'kakao' ? 'profile_nickname,profile_image' : undefined,
-        queryParams:
-          provider === 'google'
-            ? { access_type: 'offline', prompt: 'consent' }
-            : provider === 'kakao'
-              ? { scope: 'profile_nickname profile_image' }
-              : undefined,
-      },
-    });
+    const { data: sessionData } = await supabase.auth.getSession();
+    const hasSession = Boolean(sessionData.session?.user);
+    const oauthOptions: {
+      redirectTo: string;
+      skipBrowserRedirect: boolean;
+      scopes?: string;
+      queryParams?: Record<string, string>;
+    } = {
+      redirectTo: oauthRedirectTo(nextPath),
+      skipBrowserRedirect: true,
+    };
+    if (provider === 'kakao') {
+      oauthOptions.scopes = 'profile_nickname,profile_image,account_email';
+      oauthOptions.queryParams = {
+        scope: 'profile_nickname profile_image account_email',
+      };
+    } else if (provider === 'google') {
+      oauthOptions.queryParams = { access_type: 'offline', prompt: 'consent' };
+    }
+
+    const startOAuth = () =>
+      supabase.auth.signInWithOAuth({
+        provider: provider as 'apple',
+        options: oauthOptions,
+      });
+
+    let data: Awaited<ReturnType<typeof startOAuth>>['data'];
+    let error: Awaited<ReturnType<typeof startOAuth>>['error'];
+
+    if (hasSession) {
+      const linked = await supabase.auth.linkIdentity({
+        provider: provider as 'apple',
+        options: oauthOptions,
+      });
+      if (linked.error) {
+        console.warn(
+          '[SponsorAuction] 기존 세션 Identity Linking에 실패해 OAuth 로그인을 계속합니다.',
+          linked.error.message,
+        );
+        const fallback = await startOAuth();
+        data = fallback.data;
+        error = fallback.error;
+      } else {
+        data = linked.data;
+        error = linked.error;
+      }
+    } else {
+      const started = await startOAuth();
+      data = started.data;
+      error = started.error;
+    }
 
     if (error) {
       console.warn('[SponsorAuction] 소셜 로그인에 실패했습니다.', error.message);

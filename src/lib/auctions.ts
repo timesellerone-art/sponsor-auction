@@ -256,26 +256,39 @@ export async function getAuctionsByAuthor(
   }
 }
 
+type AuctionQueryOptions = {
+  client?: SponsorAuctionClient | null;
+};
+
+async function resolveAuctionClient(options?: AuctionQueryOptions) {
+  if (options?.client) {
+    return options.client;
+  }
+  return getDataClient();
+}
+
 export async function getAuctionById(
   id: string,
+  options?: AuctionQueryOptions,
 ): Promise<DataResult<AuctionItem | null>> {
-  const supabase = await getDataClient();
+  const auctionId = id.trim();
+  const supabase = await resolveAuctionClient(options);
   if (!supabase) {
-    return getMockAuctionById(id);
+    return getMockAuctionById(auctionId);
   }
 
   try {
-    if (!id.trim()) {
+    if (!auctionId) {
       return fail(null, '유효한 경매 ID가 필요합니다.');
     }
-    if (!isUuid(id)) {
-      return getMockAuctionById(id);
+    if (!isUuid(auctionId)) {
+      return getMockAuctionById(auctionId);
     }
 
     let { data, error } = await supabase
       .from('auctions')
       .select(AUCTION_COLUMNS)
-      .eq('id', id)
+      .eq('id', auctionId)
       .maybeSingle();
 
     if (error && isSchemaMismatch(error)) {
@@ -283,7 +296,7 @@ export async function getAuctionById(
       const fallback = await supabase
         .from('auctions')
         .select(AUCTION_COLUMNS_CORE)
-        .eq('id', id)
+        .eq('id', auctionId)
         .maybeSingle();
       data = fallback.data as typeof data;
       error = fallback.error;
@@ -292,13 +305,16 @@ export async function getAuctionById(
     if (error) {
       logDbError('경매 단건 조회', error);
       if (isInvalidUuidError(error)) {
-        return getMockAuctionById(id);
+        return getMockAuctionById(auctionId);
       }
       return fail(null, '경매 정보를 불러오지 못했습니다.');
     }
 
     if (!data) {
-      return getMockAuctionById(id);
+      if (options?.client) {
+        return fail(null, '해당 경매를 찾을 수 없습니다.');
+      }
+      return getMockAuctionById(auctionId);
     }
 
     return ok(mapAuction(data));
@@ -378,11 +394,15 @@ export async function createAuction(
 
 export async function createBid(
   input: CreateBidInput,
+  options?: AuctionQueryOptions,
 ): Promise<DataResult<BidItem | null>> {
-  const lockKey = `bid:${input.auctionId}:${input.creatorName.trim().toLowerCase()}`;
+  const auctionId = input.auctionId.trim();
+  const lockKey = `bid:${auctionId}:${input.creatorName.trim().toLowerCase()}`;
   return withExclusiveAction(lockKey, fail(null, VALIDATION.actionInFlight), async () => {
-    const supabase = await getDataClient();
-    const auctionResult = await getAuctionById(input.auctionId);
+    const supabase = await resolveAuctionClient(options);
+    const auctionResult = await getAuctionById(auctionId, {
+      client: supabase ?? undefined,
+    });
     const auction = auctionResult.data;
     if (!auction) {
       return fail(null, auctionResult.error ?? '해당 경매를 찾을 수 없습니다.');
@@ -402,8 +422,8 @@ export async function createBid(
       return fail(null, bidError);
     }
 
-    if (!supabase || !isUuid(input.auctionId)) {
-      const mocked = await createMockBid(input);
+    if (!supabase || !isUuid(auctionId)) {
+      const mocked = await createMockBid({ ...input, auctionId });
       if (mocked.data) {
         void notifyLifecycleEvent({
           event: 'bid_received',
@@ -422,12 +442,12 @@ export async function createBid(
       let existing = await supabase
         .from('bids')
         .select('id, creator_id, creator_name')
-        .eq('auction_id', input.auctionId);
+        .eq('auction_id', auctionId);
       if (existing.error && isSchemaMismatch(existing.error)) {
         existing = (await supabase
           .from('bids')
           .select('id, creator_name')
-          .eq('auction_id', input.auctionId)) as typeof existing;
+          .eq('auction_id', auctionId)) as typeof existing;
       }
       if (existing.error) {
         logDbError('중복 제안 조회', existing.error);
@@ -450,7 +470,7 @@ export async function createBid(
       let { data, error } = await supabase
         .from('bids')
         .insert({
-          auction_id: input.auctionId,
+          auction_id: auctionId,
           creator_id: creatorId,
           creator_name: input.creatorName.trim(),
           creator_channel_url: input.creatorChannelUrl.trim(),
@@ -466,7 +486,7 @@ export async function createBid(
         const retry = await supabase
           .from('bids')
           .insert({
-            auction_id: input.auctionId,
+            auction_id: auctionId,
             creator_name: input.creatorName.trim(),
             creator_channel_url: input.creatorChannelUrl.trim(),
             bid_amount: input.bidAmount,
@@ -488,7 +508,7 @@ export async function createBid(
       }
 
       const created = mapBid(data);
-      void syncAuctionBidEngine(supabase, input.auctionId, created.bidAmount);
+      void syncAuctionBidEngine(supabase, auctionId, created.bidAmount);
       void notifyLifecycleEvent({
         event: 'bid_received',
         auctionId: auction.id,
@@ -957,19 +977,17 @@ async function resolveAuthUserId(
   supabase: SponsorAuctionClient,
   explicitId?: string | null,
 ): Promise<string | null> {
-  if (explicitId?.trim()) {
-    return explicitId.trim();
-  }
-
   try {
     const { data, error } = await supabase.auth.getUser();
+    if (!error && data.user?.id) {
+      return data.user.id;
+    }
     if (error) {
       logDbError('세션 사용자 조회', error);
-      return null;
     }
-    return data.user?.id ?? null;
-  } catch (error) {
-    logDbError('세션 사용자 조회 예외', error);
-    return null;
+  } catch {
+    // 세션이 없으면 호출자가 넘긴 데모 ID를 사용합니다.
   }
+
+  return explicitId?.trim() || null;
 }

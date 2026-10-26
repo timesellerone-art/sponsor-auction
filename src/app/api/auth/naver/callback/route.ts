@@ -11,6 +11,7 @@ import {
   requestOrigin,
 } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
+import { findAuthUserByEmail, reconcileSocialIdentities } from '@/lib/auth-identity';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 
@@ -79,31 +80,60 @@ export async function GET(request: NextRequest) {
       naver_id: profile.id,
     };
 
-    const created = await admin.auth.admin.createUser({
-      email: profile.email,
-      email_confirm: true,
-      user_metadata: metadata,
-      app_metadata: { provider: 'naver', providers: ['naver'] },
-    });
+    const existing = await findAuthUserByEmail(profile.email);
+    let authUserId = existing?.id ?? '';
 
-    if (created.error && !/already|registered|exists/i.test(created.error.message)) {
-      console.warn('[SponsorAuction] 네이버 사용자 생성 실패', created.error.message);
-      return loginError(origin, '네이버 계정으로 가입하지 못했습니다.');
-    }
-
-    let authUserId = created.data.user?.id ?? '';
     if (!authUserId) {
-      const listed = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-      authUserId =
-        listed.data.users.find((item) => item.email?.toLowerCase() === profile.email.toLowerCase())
-          ?.id ?? '';
+      const created = await admin.auth.admin.createUser({
+        email: profile.email,
+        email_confirm: true,
+        user_metadata: metadata,
+        app_metadata: { provider: 'naver', providers: ['naver'] },
+      });
+
+      if (created.error && !/already|registered|exists/i.test(created.error.message)) {
+        console.warn('[SponsorAuction] 네이버 사용자 생성 실패', created.error.message);
+        return loginError(origin, '네이버 계정으로 가입하지 못했습니다.');
+      }
+
+      authUserId = created.data.user?.id ?? '';
+      if (!authUserId) {
+        const fallback = await findAuthUserByEmail(profile.email);
+        authUserId = fallback?.id ?? '';
+      }
+    } else {
+      await admin.auth.admin.updateUserById(authUserId, {
+        email: profile.email,
+        email_confirm: true,
+        user_metadata: {
+          ...(existing?.user_metadata ?? {}),
+          ...metadata,
+        },
+        app_metadata: {
+          ...(existing?.app_metadata ?? {}),
+          provider: existing?.app_metadata?.provider ?? 'naver',
+          providers: [
+            ...new Set([
+              ...((Array.isArray(existing?.app_metadata?.providers)
+                ? existing.app_metadata.providers
+                : []) as string[]),
+              'naver',
+            ]),
+          ],
+        },
+      });
     }
+
     if (authUserId) {
       await upsertAppProfile(admin, {
         id: authUserId,
         name: profile.name,
         email: profile.email,
       });
+      const current = await admin.auth.admin.getUserById(authUserId);
+      if (current.data.user) {
+        await reconcileSocialIdentities(current.data.user);
+      }
     }
 
     const link = await admin.auth.admin.generateLink({

@@ -6,6 +6,7 @@ import {
   getPaymentActor,
   unauthorizedJson,
 } from '@/lib/payments/guard';
+import { createClient } from '@/lib/supabase/server';
 import { hasAuthRole } from '@/types/auth';
 import { recordBypassIfNeeded } from '@/lib/compliance';
 import {
@@ -76,14 +77,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await createBid({
-      auctionId,
-      creatorId: (actor.userId ?? asText(body?.creatorId)) || null,
-      creatorName: asText(body?.creatorName) || '크리에이터',
-      creatorChannelUrl: asText(body?.creatorChannelUrl),
-      bidAmount: asNumber(body?.bidAmount),
-      proposalText,
-    });
+    const supabase = await createClient();
+    const result = await createBid(
+      {
+        auctionId,
+        creatorId: (actor.userId ?? asText(body?.creatorId)) || null,
+        creatorName: asText(body?.creatorName) || '크리에이터',
+        creatorChannelUrl: asText(body?.creatorChannelUrl),
+        bidAmount: asNumber(body?.bidAmount),
+        proposalText,
+      },
+      { client: supabase },
+    );
 
     if (result.error || !result.data) {
       const message = result.error ?? '제안을 등록하지 못했습니다.';

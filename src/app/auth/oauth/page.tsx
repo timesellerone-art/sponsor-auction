@@ -58,6 +58,11 @@ export default function AuthOAuthCompletePage() {
         }
 
         notifyAuthChanged();
+        await fetch('/api/auth/identities/link', {
+          method: 'POST',
+          credentials: 'include',
+        }).catch(() => null);
+        notifyAuthChanged();
         const session = await getSessionUser();
         const destination = postSocialAuthPath(session.data, next, {
           needsOnboarding: needsRoleOnboarding(session.data),
