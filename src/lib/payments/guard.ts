@@ -25,8 +25,8 @@ export async function getPaymentActor(): Promise<PaymentActor | null> {
           .select('role, roles')
           .eq('id', data.user.id)
           .maybeSingle();
-        const roles = parseAuthRoles(profile?.roles, profile?.role, cookieRoles);
-        const profileRole = primaryAuthRole(roles) ?? cookieRole;
+        const roles = parseAuthRoles(profile?.roles, profile?.role);
+        const profileRole = primaryAuthRole(roles);
         if (profileRole) {
           return { role: profileRole, roles, userId: data.user.id };
         }

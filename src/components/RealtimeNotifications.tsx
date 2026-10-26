@@ -18,9 +18,13 @@ export function RealtimeNotifications() {
     if (!client) {
       return;
     }
-    return subscribeRealtimeTables(client, (change) => {
-      void applyRealtimeChange(change, userId);
-    });
+    return subscribeRealtimeTables(
+      client,
+      (change) => {
+        void applyRealtimeChange(change, userId);
+      },
+      `sponsor-auction-ops:${userId}`,
+    );
   }, [ready, userId]);
 
   return null;

@@ -6,6 +6,7 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { closeTimeSlot, getTimeSlotById } from '@/lib/timeslots';
+import { isUuid } from '@/lib/uuid';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -64,7 +65,11 @@ export async function PATCH(
       );
     }
     const current = await getTimeSlotById(id);
-    if (current.data?.creatorId && actor.userId && current.data.creatorId !== actor.userId) {
+    const ownerId = current.data?.creatorId;
+    if (ownerId && isUuid(ownerId) && ownerId !== actor.userId) {
+      return forbiddenJson('본인 슬롯만 마감할 수 있습니다.');
+    }
+    if (ownerId && actor.userId && ownerId !== actor.userId) {
       return forbiddenJson('본인 슬롯만 마감할 수 있습니다.');
     }
     const result = await closeTimeSlot(id, actor.userId);

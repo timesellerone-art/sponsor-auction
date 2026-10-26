@@ -10,7 +10,7 @@ import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { isUuid } from '@/lib/uuid';
 import { VALIDATION, validateTimeSlotPayload } from '@/lib/validation';
-import { sanitizeUserText } from '@/utils/filter';
+import { maskOffPlatformContact, sanitizeUserText } from '@/utils/filter';
 import type { DataResult } from '@/types/auction';
 import type { Database } from '@/types/database';
 import type {
@@ -81,7 +81,7 @@ function mapSlotBid(row: Partial<SlotBidRow> & Pick<SlotBidRow, 'id'>, leadingAm
     advertiserId: row.advertiser_id ?? null,
     advertiserName: row.advertiser_name ?? '광고주',
     bidAmount: amount,
-    message: row.message ?? '',
+    message: maskOffPlatformContact(row.message ?? ''),
     createdAt: row.created_at ?? '',
     isLeading: leadingAmount > 0 && amount === leadingAmount,
   };
@@ -513,20 +513,7 @@ export async function placeTimeSlotBid(
         .select(SLOT_BID_COLUMNS)
         .single();
       if (error || !data) {
-        const created: TimeSlotBidItem = {
-          id: `slot-bid-${Date.now()}`,
-          timeSlotId: input.timeSlotId,
-          advertiserId: input.advertiserId ?? null,
-          advertiserName: (input.advertiserName ?? '').trim() || '광고주',
-          bidAmount: input.bidAmount,
-          message,
-          createdAt: new Date().toISOString(),
-          isLeading: true,
-        };
-        slotBidsStore = [created, ...slotBidsStore];
-        refreshMockSlotEngine(input.timeSlotId);
-        persistSlots();
-        return ok(created);
+        return fail(null, INSERT_FAIL_MESSAGE);
       }
       return ok(mapSlotBid(data, input.bidAmount));
     } catch {
@@ -574,10 +561,15 @@ export async function awardTimeSlotBid(
       .from('time_slots')
       .update({ status: 'awarded', winner_bid_id: isUuid(bidId) ? bidId : null })
       .eq('id', slotId)
+      .eq('status', 'open')
+      .is('winner_bid_id', null)
       .select(SLOT_COLUMNS)
-      .single();
-    if (error || !data) {
+      .maybeSingle();
+    if (error) {
       return fail(null, UPDATE_FAIL_MESSAGE);
+    }
+    if (!data) {
+      return fail(null, '이미 마감된 타임슬롯입니다.');
     }
     return ok(mapSlot(data));
   } catch {

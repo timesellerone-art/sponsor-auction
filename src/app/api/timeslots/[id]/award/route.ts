@@ -6,6 +6,7 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { awardTimeSlotBid, getTimeSlotById } from '@/lib/timeslots';
+import { isUuid } from '@/lib/uuid';
 import { hasAuthRole } from '@/types/auth';
 
 const NO_STORE = {
@@ -35,7 +36,11 @@ export async function POST(
     }
     const { id } = await context.params;
     const slot = await getTimeSlotById(id);
-    if (slot.data?.creatorId && actor.userId && slot.data.creatorId !== actor.userId) {
+    const ownerId = slot.data?.creatorId;
+    if (ownerId && isUuid(ownerId) && ownerId !== actor.userId) {
+      return forbiddenJson('본인 슬롯만 낙찰할 수 있습니다.');
+    }
+    if (ownerId && actor.userId && ownerId !== actor.userId) {
       return forbiddenJson('본인 슬롯만 낙찰할 수 있습니다.');
     }
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;

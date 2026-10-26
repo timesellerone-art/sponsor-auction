@@ -33,6 +33,9 @@ export async function GET(request: NextRequest) {
   if (oauthError) {
     const login = new URL('/login', origin);
     login.searchParams.set('reason', 'auth-required');
+    if (!/KOE205|account_email/i.test(oauthError)) {
+      login.searchParams.set('oauth_error', oauthError);
+    }
     return NextResponse.redirect(login);
   }
 

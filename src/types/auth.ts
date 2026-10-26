@@ -113,16 +113,10 @@ export function needsRoleOnboarding(user: SessionUser | null | undefined): boole
     return false;
   }
   const roles = parseAuthRoles(user);
-  if (roles.includes('admin')) {
+  if (roles.includes('admin') || roles.some(isMemberRole)) {
     return false;
   }
-  if (user.onboardingComplete && roles.some(isMemberRole)) {
-    return false;
-  }
-  if (!roles.some(isMemberRole)) {
-    return true;
-  }
-  return isFirstAuthSignIn(user);
+  return true;
 }
 
 export function switchableMemberRoles(source: unknown): MemberRole[] {

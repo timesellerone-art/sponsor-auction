@@ -114,6 +114,25 @@ export async function persistPayment(
 
   const row = toRow(intent, status, paymentKey);
 
+  if (status !== 'confirmed') {
+    try {
+      const existing = await client
+        .from('payments')
+        .select('status')
+        .eq('order_id', row.order_id)
+        .maybeSingle();
+      if (existing.data?.status === 'confirmed') {
+        console.warn('[SponsorAuction] 이미 확정된 결제를 다른 상태로 덮어쓰지 않습니다.', {
+          order_id: row.order_id,
+          attemptedStatus: status,
+        });
+        return { ok: true };
+      }
+    } catch (error) {
+      console.warn('[SponsorAuction] 기존 결제 상태 조회를 건너뜁니다.', error);
+    }
+  }
+
   if (!row.auction_id || !row.bid_id) {
     const supabaseError = {
       message: 'auction_id 또는 bid_id가 비어 있어 payments 행을 완성할 수 없습니다.',

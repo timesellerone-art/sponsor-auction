@@ -5,8 +5,33 @@ import type { NotificationType } from '@/types/notification';
 import { CHAT_INSERTED_EVENT, type ChatInsertedDetail, type RealtimeChange } from '@/types/realtime';
 
 const seenKeys = new Set<string>();
-const auctionOwnerCache = new Map<string, { authorId: string | null; title: string }>();
-const slotOwnerCache = new Map<string, { creatorId: string | null; title: string }>();
+const CACHE_TTL_MS = 60_000;
+const CACHE_CAP = 80;
+const auctionOwnerCache = new Map<string, { authorId: string | null; title: string; at: number }>();
+const slotOwnerCache = new Map<string, { creatorId: string | null; title: string; at: number }>();
+
+function readCache<T extends { at: number }>(map: Map<string, T>, key: string) {
+  const hit = map.get(key);
+  if (!hit) {
+    return null;
+  }
+  if (Date.now() - hit.at > CACHE_TTL_MS) {
+    map.delete(key);
+    return null;
+  }
+  return hit;
+}
+
+function writeCache<T extends { at: number }>(map: Map<string, T>, key: string, value: T) {
+  map.set(key, value);
+  if (map.size <= CACHE_CAP) {
+    return;
+  }
+  const first = map.keys().next().value;
+  if (typeof first === 'string') {
+    map.delete(first);
+  }
+}
 
 function asText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
@@ -51,8 +76,11 @@ function emitInApp(input: {
   body: string;
   href: string;
 }) {
+  if (viewingPath(input.href)) {
+    return;
+  }
   pushNotification({ ...input, toast: false });
-  if (!viewingPath(input.href) && typeof window !== 'undefined') {
+  if (typeof window !== 'undefined') {
     window.dispatchEvent(
       new CustomEvent('app:toast', {
         detail: { message: `${input.title}: ${input.body}`, variant: 'info' },
@@ -62,15 +90,13 @@ function emitInApp(input: {
 }
 
 async function auctionMeta(auctionId: string) {
-  const cached = auctionOwnerCache.get(auctionId);
+  const cached = readCache(auctionOwnerCache, auctionId);
   if (cached) {
     return cached;
   }
   const client = getSupabaseClient();
   if (!client) {
-    const fallback = { authorId: null as string | null, title: '캠페인' };
-    auctionOwnerCache.set(auctionId, fallback);
-    return fallback;
+    return { authorId: null as string | null, title: '캠페인', at: Date.now() };
   }
   try {
     const { data } = await client
@@ -81,25 +107,23 @@ async function auctionMeta(auctionId: string) {
     const next = {
       authorId: asText(data?.author_id) || null,
       title: asText(data?.title) || '캠페인',
+      at: Date.now(),
     };
-    auctionOwnerCache.set(auctionId, next);
+    writeCache(auctionOwnerCache, auctionId, next);
     return next;
   } catch {
-    const fallback = { authorId: null as string | null, title: '캠페인' };
-    return fallback;
+    return { authorId: null as string | null, title: '캠페인', at: Date.now() };
   }
 }
 
 async function slotMeta(slotId: string) {
-  const cached = slotOwnerCache.get(slotId);
+  const cached = readCache(slotOwnerCache, slotId);
   if (cached) {
     return cached;
   }
   const client = getSupabaseClient();
   if (!client) {
-    const fallback = { creatorId: null as string | null, title: '인벤토리' };
-    slotOwnerCache.set(slotId, fallback);
-    return fallback;
+    return { creatorId: null as string | null, title: '인벤토리', at: Date.now() };
   }
   try {
     const { data } = await client
@@ -110,11 +134,12 @@ async function slotMeta(slotId: string) {
     const next = {
       creatorId: asText(data?.creator_id) || null,
       title: asText(data?.title) || '인벤토리',
+      at: Date.now(),
     };
-    slotOwnerCache.set(slotId, next);
+    writeCache(slotOwnerCache, slotId, next);
     return next;
   } catch {
-    return { creatorId: null as string | null, title: '인벤토리' };
+    return { creatorId: null as string | null, title: '인벤토리', at: Date.now() };
   }
 }
 
@@ -191,7 +216,7 @@ export async function applyRealtimeChange(change: RealtimeChange, userId: string
     return;
   }
 
-  if (change.table !== 'chat_messages' || change.eventType === 'DELETE') {
+  if (change.table !== 'chat_messages' || change.eventType !== 'INSERT') {
     return;
   }
 

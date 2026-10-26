@@ -179,21 +179,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (intent.amount !== parsed.amount) {
-      console.error('[SponsorAuction] 결제 승인 실패: 금액 불일치', {
-        orderId: parsed.orderId,
-        requestedAmount: parsed.amount,
-        intentAmount: intent.amount,
-      });
-      updateIntent(intent.orderId, { status: 'failed' });
-      await persistPayment(intent, 'failed', parsed.paymentKey, dbConfig);
-      return jsonError(
-        409,
-        'AMOUNT_MISMATCH',
-        '결제 금액이 주문 정보와 일치하지 않습니다. 낙찰은 진행되지 않았습니다.',
-      );
-    }
-
     const existing = getIntent(intent.orderId);
     if (existing?.status === 'confirmed') {
       if (existing.paymentKey && existing.paymentKey !== parsed.paymentKey) {
@@ -250,6 +235,21 @@ export async function POST(request: Request) {
         409,
         'INTENT_NOT_PENDING',
         '이미 취소되었거나 만료된 결제입니다. 낙찰은 진행되지 않았습니다.',
+      );
+    }
+
+    if (intent.amount !== parsed.amount) {
+      console.error('[SponsorAuction] 결제 승인 실패: 금액 불일치', {
+        orderId: parsed.orderId,
+        requestedAmount: parsed.amount,
+        intentAmount: intent.amount,
+      });
+      updateIntent(intent.orderId, { status: 'failed' });
+      await persistPayment(intent, 'failed', parsed.paymentKey, dbConfig);
+      return jsonError(
+        409,
+        'AMOUNT_MISMATCH',
+        '결제 금액이 주문 정보와 일치하지 않습니다. 낙찰은 진행되지 않았습니다.',
       );
     }
 

@@ -19,6 +19,12 @@ export function sanitizeNextPath(value: string | null | undefined) {
   return value;
 }
 
+export function buildAppOAuthCallbackUrl(origin: string, nextPath?: string | null) {
+  const base = origin.replace(/\/$/, '');
+  const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
+  return `${base}/auth/callback?next=${encodeURIComponent(next)}`;
+}
+
 export function loginPath(reason: AccessReason, nextPath?: string | null) {
   const params = new URLSearchParams();
   params.set('reason', reason);

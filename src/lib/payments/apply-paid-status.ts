@@ -59,6 +59,21 @@ export async function applyPaidAuctionStatus(
       return;
     }
 
+    const currentAuction = await supabaseAdmin
+      .from('auctions')
+      .select('winner_bid_id, status')
+      .eq('id', auctionId)
+      .maybeSingle();
+    const existingWinner = currentAuction.data?.winner_bid_id ?? null;
+    if (existingWinner && existingWinner !== bidId) {
+      console.error('[SponsorAuction] 결제 후 상태 업데이트 생략: 다른 낙찰이 이미 있습니다.', {
+        auctionId,
+        bidId,
+        existingWinner,
+      });
+      return;
+    }
+
     const bidUpdate = await supabaseAdmin
       .from('bids')
       .update({ status: 'selected' })
@@ -82,7 +97,8 @@ export async function applyPaidAuctionStatus(
     const auctionUpdate = await supabaseAdmin
       .from('auctions')
       .update({ status: 'completed', winner_bid_id: bidId })
-      .eq('id', auctionId);
+      .eq('id', auctionId)
+      .or(`winner_bid_id.is.null,winner_bid_id.eq.${bidId}`);
 
     if (auctionUpdate.error) {
       console.error('[SponsorAuction] 결제 후 auctions.status=completed 업데이트 실패', {

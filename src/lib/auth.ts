@@ -13,7 +13,8 @@ import {
 } from '@/lib/access';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseOAuthCallbackUrl } from '@/lib/supabase/env';
-import { ROLE_SELECT_PATH, sanitizeNextPath } from '@/lib/auth-guard';
+import { buildAppOAuthCallbackUrl, sanitizeNextPath } from '@/lib/auth-guard';
+import { sanitizeKakaoAuthorizeUrl } from '@/lib/kakao-oauth';
 import {
   isMemberRole,
   parseAuthRoles,
@@ -207,36 +208,14 @@ export function subscribeAuthState(listener: () => void) {
 export type SocialOAuthProvider = 'google' | 'kakao' | 'naver' | 'apple';
 
 function oauthRedirectTo(nextPath?: string | null) {
-  const origin = window.location.origin;
-  const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
-  return `${origin}/auth/callback?next=${encodeURIComponent(next)}`;
+  return buildAppOAuthCallbackUrl(window.location.origin, nextPath);
 }
 
 function authorizeUrlForProvider(provider: SocialOAuthProvider, url: string) {
   if (provider !== 'kakao') {
     return url;
   }
-
-  try {
-    const parsed = new URL(url);
-    const kakaoCallback = getSupabaseOAuthCallbackUrl();
-    if (parsed.hostname.includes('kakao.com') && kakaoCallback) {
-      parsed.searchParams.set('redirect_uri', kakaoCallback);
-    }
-    const scopes = new Set(
-      (parsed.searchParams.get('scope') ?? '')
-        .split(/[+\s,]+/)
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0),
-    );
-    scopes.add('profile_nickname');
-    scopes.add('profile_image');
-    scopes.add('account_email');
-    parsed.searchParams.set('scope', [...scopes].join(' '));
-    return parsed.toString();
-  } catch {
-    return url;
-  }
+  return sanitizeKakaoAuthorizeUrl(url, getSupabaseOAuthCallbackUrl());
 }
 
 export async function signInWithOAuth(
@@ -258,18 +237,12 @@ export async function signInWithOAuth(
     const oauthOptions: {
       redirectTo: string;
       skipBrowserRedirect: boolean;
-      scopes?: string;
       queryParams?: Record<string, string>;
     } = {
       redirectTo: oauthRedirectTo(nextPath),
       skipBrowserRedirect: true,
     };
-    if (provider === 'kakao') {
-      oauthOptions.scopes = 'profile_nickname,profile_image,account_email';
-      oauthOptions.queryParams = {
-        scope: 'profile_nickname profile_image account_email',
-      };
-    } else if (provider === 'google') {
+    if (provider === 'google') {
       oauthOptions.queryParams = { access_type: 'offline', prompt: 'consent' };
     }
 

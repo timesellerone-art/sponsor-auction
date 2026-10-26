@@ -56,7 +56,7 @@ export async function recordBypassIfNeeded(input: RecordBypassInput): Promise<Co
     auctionId: input.auctionId ?? null,
     createdAt: new Date().toISOString(),
   };
-  pushMemory(log);
+    pushMemory(log);
 
   const client = createAdminClient();
   if (!client) {
@@ -89,6 +89,10 @@ export async function recordBypassIfNeeded(input: RecordBypassInput): Promise<Co
       auctionId: data.auction_id ?? null,
       createdAt: data.created_at ?? log.createdAt,
     };
+    const memoryIndex = memoryLogs.findIndex((item) => item.id === log.id);
+    if (memoryIndex >= 0) {
+      memoryLogs.splice(memoryIndex, 1);
+    }
     return stored;
   } catch {
     return log;

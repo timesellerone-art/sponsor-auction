@@ -50,10 +50,23 @@ export function parseRealtimePayload(payload: {
 export function subscribeRealtimeTables(
   client: SupabaseClient<Database>,
   onChange: (change: RealtimeChange) => void,
+  channelName = 'sponsor-auction-ops',
 ): () => void {
   let channel: RealtimeChannel | null = null;
+  const teardown = () => {
+    if (!channel) {
+      return;
+    }
+    try {
+      void client.removeChannel(channel);
+    } catch (error) {
+      console.warn('[SponsorAuction] Realtime 구독 해제에 실패했습니다.', error);
+    }
+    channel = null;
+  };
+
   try {
-    channel = client.channel('sponsor-auction-ops');
+    channel = client.channel(channelName);
     for (const table of REALTIME_TABLES) {
       channel = channel.on(
         'postgres_changes',
@@ -78,17 +91,9 @@ export function subscribeRealtimeTables(
     });
   } catch (error) {
     console.warn('[SponsorAuction] Realtime 구독을 시작하지 못했습니다.', error);
+    teardown();
     return () => undefined;
   }
 
-  return () => {
-    if (!channel) {
-      return;
-    }
-    try {
-      void client.removeChannel(channel);
-    } catch (error) {
-      console.warn('[SponsorAuction] Realtime 구독 해제에 실패했습니다.', error);
-    }
-  };
+  return teardown;
 }

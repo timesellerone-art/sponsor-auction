@@ -47,10 +47,14 @@ function popbillLinkId() {
 }
 
 function makeMgtKey(input: TaxInvoiceIssueInput) {
-  const seed = (input.paymentOrderId || input.payoutId || input.auctionId || 'tax').replace(
+  const orderId = input.paymentOrderId?.trim() || '';
+  const seed = (orderId || input.payoutId || input.auctionId || 'tax').replace(
     /[^a-zA-Z0-9_-]/g,
     '',
   );
+  if (orderId) {
+    return `SA-${seed}`.slice(0, 24);
+  }
   return `SA-${seed.slice(0, 20)}-${Date.now().toString(36)}`.slice(0, 24);
 }
 
@@ -72,7 +76,7 @@ async function persistFallbackLog(log: FallbackLog) {
   try {
     const { error } = await client.from('tax_invoice_logs').insert({
       payout_id: log.input.payoutId || null,
-      payment_order_id: log.input.paymentOrderId || null,
+      payment_order_id: log.input.paymentOrderId?.trim() || null,
       auction_id: log.input.auctionId || null,
       bid_id: log.input.bidId || null,
       supply_amount: log.supplyAmount,
@@ -90,6 +94,9 @@ async function persistFallbackLog(log: FallbackLog) {
       },
     });
     if (error) {
+      if (error.code === '23505') {
+        return;
+      }
       console.warn('[SponsorAuction] tax_invoice_logs 저장 실패, 메모리만 유지', error.message);
     }
   } catch (error) {
@@ -120,12 +127,13 @@ export async function issueTaxInvoice(
   };
 
   const client = createAdminClient();
-  if (client && input.paymentOrderId) {
+  const paymentOrderId = input.paymentOrderId?.trim() || '';
+  if (client && paymentOrderId) {
     try {
       const existing = await client
         .from('tax_invoice_logs')
         .select('mgt_key, status')
-        .eq('payment_order_id', input.paymentOrderId)
+        .eq('payment_order_id', paymentOrderId)
         .limit(1)
         .maybeSingle();
       if (existing.data?.mgt_key) {

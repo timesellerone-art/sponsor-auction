@@ -185,6 +185,15 @@ export async function reconcileSocialIdentities(user: User): Promise<LinkedSocia
   }
 
   const emails = collectAuthEmails(user);
+  const displayName =
+    (typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : '') ||
+    (typeof user.user_metadata?.nickname === 'string' ? user.user_metadata.nickname : '') ||
+    (typeof user.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : '') ||
+    (typeof user.user_metadata?.preferred_username === 'string'
+      ? user.user_metadata.preferred_username
+      : '') ||
+    null;
+
   if (emails.length > 0) {
     await admin.auth.admin.updateUserById(user.id, {
       email: emails[0],
@@ -196,8 +205,7 @@ export async function reconcileSocialIdentities(user: User): Promise<LinkedSocia
     await upsertAppProfile(admin, {
       id: user.id,
       email: user.email,
-      name:
-        typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : null,
+      name: displayName,
     });
     return { user, switched: false, tokenHash: null };
   }
@@ -208,8 +216,7 @@ export async function reconcileSocialIdentities(user: User): Promise<LinkedSocia
     await upsertAppProfile(admin, {
       id: user.id,
       email: emails[0],
-      name:
-        typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : null,
+      name: displayName,
     });
     return { user, switched: false, tokenHash: null };
   }
