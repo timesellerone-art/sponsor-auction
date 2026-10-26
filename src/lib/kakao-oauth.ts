@@ -23,10 +23,7 @@ export function sanitizeKakaoScopes(scopes: string[]) {
   return scopes.filter((scope) => !isKakaoBlockedScope(scope));
 }
 
-/**
- * 카카오 인가 URL에서 KOE205를 유발하는 미승인 스코프(특히 account_email)를 제거합니다.
- * 스코프를 새로 추가하지 않고, 허용된 항목만 남기거나 scope 파라미터를 삭제합니다.
- */
+/** KOE205 방지: account_email 등 미승인 스코프만 제거하고 새 스코프는 넣지 않습니다. */
 export function sanitizeKakaoAuthorizeUrl(
   url: string,
   supabaseCallbackUrl?: string | null,
