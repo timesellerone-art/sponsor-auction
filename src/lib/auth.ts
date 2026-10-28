@@ -14,7 +14,12 @@ import {
 } from '@/lib/access';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseOAuthCallbackUrl } from '@/lib/supabase/env';
-import { ROLE_SELECT_PATH, buildAppOAuthCallbackUrl, sanitizeNextPath } from '@/lib/auth-guard';
+import {
+  OAUTH_NEXT_COOKIE,
+  ROLE_SELECT_PATH,
+  buildAppOAuthCallbackUrl,
+  sanitizeNextPath,
+} from '@/lib/auth-guard';
 import {
   kakaoOAuthScopeQuery,
   kakaoOAuthScopesOption,
@@ -214,8 +219,10 @@ export function subscribeAuthState(listener: () => void) {
 
 export type SocialOAuthProvider = 'google' | 'kakao' | 'naver' | 'apple';
 
-function oauthRedirectTo(nextPath?: string | null) {
-  return buildAppOAuthCallbackUrl(window.location.origin, nextPath);
+function rememberOAuthNext(nextPath?: string | null) {
+  const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
+  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${OAUTH_NEXT_COOKIE}=${encodeURIComponent(next)}; Path=/; Max-Age=600; SameSite=Lax${secure}`;
 }
 
 function authorizeUrlForProvider(provider: SocialOAuthProvider, url: string) {
@@ -239,15 +246,14 @@ export async function signInWithOAuth(
   }
 
   try {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const hasSession = Boolean(sessionData.session?.user);
+    rememberOAuthNext(nextPath);
     const oauthOptions: {
       redirectTo: string;
       skipBrowserRedirect: boolean;
       scopes?: string;
       queryParams?: Record<string, string>;
     } = {
-      redirectTo: oauthRedirectTo(nextPath),
+      redirectTo: buildAppOAuthCallbackUrl(window.location.origin),
       skipBrowserRedirect: true,
     };
     if (provider === 'kakao') {
@@ -257,37 +263,10 @@ export async function signInWithOAuth(
       oauthOptions.queryParams = { access_type: 'offline', prompt: 'consent' };
     }
 
-    const startOAuth = () =>
-      supabase.auth.signInWithOAuth({
-        provider: provider as 'apple',
-        options: oauthOptions,
-      });
-
-    let data: Awaited<ReturnType<typeof startOAuth>>['data'];
-    let error: Awaited<ReturnType<typeof startOAuth>>['error'];
-
-    if (hasSession) {
-      const linked = await supabase.auth.linkIdentity({
-        provider: provider as 'apple',
-        options: oauthOptions,
-      });
-      if (linked.error) {
-        console.warn(
-          '[SponsorAuction] 기존 세션 Identity Linking에 실패해 OAuth 로그인을 계속합니다.',
-          linked.error.message,
-        );
-        const fallback = await startOAuth();
-        data = fallback.data;
-        error = fallback.error;
-      } else {
-        data = linked.data;
-        error = linked.error;
-      }
-    } else {
-      const started = await startOAuth();
-      data = started.data;
-      error = started.error;
-    }
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: provider as 'apple',
+      options: oauthOptions,
+    });
 
     if (error) {
       console.warn('[SponsorAuction] 소셜 로그인에 실패했습니다.', error.message);
@@ -378,6 +357,17 @@ function hasClientAuthHint() {
 async function readBrowserAuthUser(
   supabase: NonNullable<ReturnType<typeof createClient>>,
 ) {
+  try {
+    const { data } = await withTimeout(supabase.auth.getSession(), 1500, '세션 조회');
+    if (data.session?.user) {
+      return data.session.user;
+    }
+  } catch (error) {
+    if (!isAuthSessionMissing(error)) {
+      console.warn('[SponsorAuction] 로컬 세션 조회 중 예외가 발생했습니다.', error);
+    }
+  }
+
   const attempts = hasClientAuthHint() ? 2 : 1;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {

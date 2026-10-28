@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -59,16 +60,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     readActiveRoleCookie(),
   );
 
+  const latestRequest = useRef(0);
+
   const refresh = useCallback(async () => {
+    const request = ++latestRequest.current;
     try {
       const result = await getSessionUser();
+      if (request !== latestRequest.current) {
+        return;
+      }
       applyKnownSession(result.data);
-      setUser(result.data);
     } catch (error) {
+      if (request !== latestRequest.current) {
+        return;
+      }
       console.warn('[SponsorAuction] 인증 상태를 갱신하지 못했습니다.', error);
       setUser(null);
     } finally {
-      setReady(true);
+      if (request === latestRequest.current) {
+        setReady(true);
+      }
     }
   }, []);
 
@@ -79,16 +90,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const failSafe = window.setTimeout(() => {
       setReady(true);
     }, AUTH_BOOT_TIMEOUT_MS);
-    let skipRefreshUntil = 0;
     const unsubKnown = onKnownSession((session) => {
-      skipRefreshUntil = Date.now() + 1500;
       setUser(session);
       setReady(true);
     });
     const unsubscribe = subscribeAuthState(() => {
-      if (Date.now() < skipRefreshUntil) {
-        return;
-      }
       void refresh();
     });
     return () => {

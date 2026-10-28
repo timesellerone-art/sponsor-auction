@@ -48,9 +48,9 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    const oauthError = new URLSearchParams(window.location.search).get('oauth_error');
-    if (oauthError) {
-      showToast(oauthError);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === 'oauth_failed') {
+      showToast(params.get('error_description') || '소셜 로그인에 실패했습니다. 다시 시도해 주세요.');
     }
   }, []);
 

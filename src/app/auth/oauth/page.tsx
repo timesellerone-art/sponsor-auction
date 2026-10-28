@@ -4,18 +4,38 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { showToast } from '@/components/Toast';
-import { getSessionUser, notifyAuthChanged } from '@/lib/auth';
-import { ROLE_SELECT_PATH, postSocialAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
+import { applyKnownSession, getSessionUser, notifyAuthChanged } from '@/lib/auth';
+import {
+  ROLE_SELECT_PATH,
+  describeOAuthError,
+  oauthFailedLoginPath,
+  postSocialAuthPath,
+  sanitizeNextPath,
+} from '@/lib/auth-guard';
 import { AUTH_BOOT_TIMEOUT_MS } from '@/lib/auth-timeout';
 import { getSupabaseClient } from '@/lib/supabase';
 import { needsRoleOnboarding } from '@/types/auth';
 
 function loginFallback(message?: string) {
-  const params = new URLSearchParams();
-  if (message) {
-    params.set('oauth_error', message);
+  return oauthFailedLoginPath(describeOAuthError(message));
+}
+
+// token_hash는 1회용이므로 StrictMode 재실행·재마운트에서도 한 번만 검증한다.
+const verifications = new Map<string, Promise<string | null>>();
+
+function verifyTokenOnce(
+  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
+  tokenHash: string,
+  type: 'magiclink' | 'email',
+) {
+  let pending = verifications.get(tokenHash);
+  if (!pending) {
+    pending = supabase.auth
+      .verifyOtp({ token_hash: tokenHash, type })
+      .then(({ error }) => error?.message ?? null);
+    verifications.set(tokenHash, pending);
   }
-  return `/login${params.toString() ? `?${params.toString()}` : ''}`;
+  return pending;
 }
 
 export default function AuthOAuthCompletePage() {
@@ -60,28 +80,15 @@ export default function AuthOAuthCompletePage() {
       }
 
       const supabase = getSupabaseClient();
-      const code = params.get('code');
       const tokenHash = params.get('token_hash');
       const otpType = params.get('type') === 'magiclink' ? 'magiclink' : 'email';
 
       try {
         if (supabase && tokenHash) {
-          const { error } = await supabase.auth.verifyOtp({
-            token_hash: tokenHash,
-            type: otpType,
-          });
+          const error = await verifyTokenOnce(supabase, tokenHash, otpType);
           if (error) {
-            console.warn('[SponsorAuction] 매직링크 세션 교환에 실패했습니다.', error.message);
-            showToast(error.message || '소셜 로그인에 실패했습니다.');
-            go(loginFallback(error.message || '소셜 로그인에 실패했습니다.'));
-            return;
-          }
-        } else if (supabase && code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) {
-            console.warn('[SponsorAuction] OAuth 세션 교환에 실패했습니다.', error.message);
-            showToast(error.message || '소셜 로그인에 실패했습니다.');
-            go(loginFallback(error.message || '소셜 로그인에 실패했습니다.'));
+            console.warn('[SponsorAuction] 매직링크 세션 교환에 실패했습니다.', error);
+            go(loginFallback(error));
             return;
           }
         }
@@ -93,6 +100,11 @@ export default function AuthOAuthCompletePage() {
         }).catch(() => null);
         notifyAuthChanged();
         const session = await getSessionUser();
+        if (!session.data) {
+          go(loginFallback('로그인 세션이 저장되지 않았습니다. 다시 로그인해 주세요.'));
+          return;
+        }
+        applyKnownSession(session.data);
         const destination = postSocialAuthPath(session.data, next, {
           needsOnboarding: needsRoleOnboarding(session.data),
         });

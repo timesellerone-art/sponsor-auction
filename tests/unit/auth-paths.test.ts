@@ -8,7 +8,7 @@ import {
   isAuthPassthroughPath,
   isSupabaseAuthCookieName,
   onboardingCanonicalPath,
-  serializeCookieHeader,
+  writeCookies,
 } from '../../src/lib/auth-paths';
 import { switchableMemberRoles } from '../../src/types/auth';
 
@@ -54,16 +54,14 @@ describe('post-auth destination', () => {
     ]);
   });
 
-  it('Supabase 세션 쿠키를 Path=/ Set-Cookie 문자열로 직렬화한다', () => {
+  it('Supabase 세션 쿠키 옵션을 그대로 보존해 응답에 기록한다', () => {
     assert.equal(isSupabaseAuthCookieName('sb-access-token'), true);
     assert.equal(isSupabaseAuthCookieName('sb-xxxx-auth-token'), true);
-    const header = serializeCookieHeader({
-      name: 'sb-access-token',
-      value: 'jwt',
-      options: { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 60 },
-    });
-    assert.match(header, /sb-access-token=jwt/);
-    assert.match(header, /Path=\//);
-    assert.match(header, /HttpOnly/);
+    const written: Array<{ name: string; options?: { path?: string; httpOnly?: boolean } }> = [];
+    writeCookies({ set: (name, _value, options) => written.push({ name, options }) }, [
+      { name: 'sb-xxxx-auth-token', value: 'jwt', options: { sameSite: 'lax', maxAge: 60 } },
+    ]);
+    assert.equal(written[0]?.options?.path, '/');
+    assert.notEqual(written[0]?.options?.httpOnly, true);
   });
 });

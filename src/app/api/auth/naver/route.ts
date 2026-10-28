@@ -1,6 +1,6 @@
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
-import { ROLE_SELECT_PATH, sanitizeNextPath } from '@/lib/auth-guard';
+import { ROLE_SELECT_PATH, oauthFailedLoginPath, sanitizeNextPath } from '@/lib/auth-guard';
 import {
   NAVER_NEXT_COOKIE,
   NAVER_STATE_COOKIE,
@@ -18,18 +18,22 @@ export async function GET(request: Request) {
     await connection();
     const limited = consumeRateLimit(clientIp(request), '/api/auth/naver');
     if (!limited.allowed) {
-      return NextResponse.redirect(new URL('/login?oauth_error=rate-limited', request.url));
+      return NextResponse.redirect(
+        new URL(oauthFailedLoginPath('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.'), request.url),
+      );
     }
 
     const origin = requestOrigin(request);
     const env = getNaverOAuthEnv();
     if (!env) {
-      const login = new URL('/login', origin);
-      login.searchParams.set(
-        'oauth_error',
-        '네이버 로그인 설정이 없습니다. NAVER_CLIENT_ID와 NAVER_CLIENT_SECRET을 확인하세요.',
+      return NextResponse.redirect(
+        new URL(
+          oauthFailedLoginPath(
+            '네이버 로그인 설정이 없습니다. NAVER_CLIENT_ID와 NAVER_CLIENT_SECRET을 확인하세요.',
+          ),
+          origin,
+        ),
       );
-      return NextResponse.redirect(login);
     }
 
     const next =
@@ -48,6 +52,8 @@ export async function GET(request: Request) {
     return response;
   } catch (error) {
     console.warn('[SponsorAuction] 네이버 로그인 시작에 실패했습니다.', error);
-    return NextResponse.redirect(new URL('/login?oauth_error=naver-start-failed', request.url));
+    return NextResponse.redirect(
+      new URL(oauthFailedLoginPath('네이버 로그인을 시작하지 못했습니다.'), request.url),
+    );
   }
 }

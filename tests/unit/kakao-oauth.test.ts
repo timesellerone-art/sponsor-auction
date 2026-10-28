@@ -49,17 +49,17 @@ describe('Kakao KOE205 스코프 차단', () => {
 });
 
 describe('OAuth 앱 콜백 URL (로컬/배포)', () => {
-  it('localhost 콜백은 /auth/callback 으로 고정된다', () => {
+  it('localhost 콜백은 쿼리 없는 /auth/callback 으로 고정된다', () => {
     assert.equal(
-      buildAppOAuthCallbackUrl('http://localhost:3000', '/my'),
-      'http://localhost:3000/auth/callback?next=%2Fmy',
+      buildAppOAuthCallbackUrl('http://localhost:3000'),
+      'http://localhost:3000/auth/callback',
     );
   });
 
   it('Vercel 배포 origin도 동일한 콜백 경로를 사용한다', () => {
     assert.equal(
-      buildAppOAuthCallbackUrl('https://sponsor-auction.vercel.app/', '/onboarding/role-select'),
-      'https://sponsor-auction.vercel.app/auth/callback?next=%2Fonboarding%2Frole-select',
+      buildAppOAuthCallbackUrl('https://sponsor-auction.vercel.app/'),
+      'https://sponsor-auction.vercel.app/auth/callback',
     );
   });
 });

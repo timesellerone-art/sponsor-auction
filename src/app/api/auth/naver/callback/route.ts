@@ -14,11 +14,12 @@ import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { findAuthUserByEmail, reconcileSocialIdentities } from '@/lib/auth-identity';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { upsertAppProfile } from '@/lib/supabase/profile-sync';
+import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
 
 function loginError(origin: string, message: string) {
-  const login = new URL('/login', origin);
-  login.searchParams.set('oauth_error', message);
-  const response = NextResponse.redirect(login);
+  const response = NextResponse.redirect(
+    new URL(oauthFailedLoginPath(describeOAuthError(message)), origin),
+  );
   response.cookies.delete(NAVER_STATE_COOKIE);
   response.cookies.delete(NAVER_NEXT_COOKIE);
   return response;

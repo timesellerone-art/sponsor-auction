@@ -19,10 +19,38 @@ export function sanitizeNextPath(value: string | null | undefined) {
   return value;
 }
 
-export function buildAppOAuthCallbackUrl(origin: string, nextPath?: string | null) {
-  const base = origin.replace(/\/$/, '');
-  const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
-  return `${base}/auth/callback?next=${encodeURIComponent(next)}`;
+export const OAUTH_NEXT_COOKIE = 'sponsor-auction-oauth-next';
+
+// Supabase Redirect URLs 허용 목록과 정확히 일치하도록 쿼리 없이 보낸다. next는 OAUTH_NEXT_COOKIE로 전달한다.
+export function buildAppOAuthCallbackUrl(origin: string) {
+  return `${origin.replace(/\/$/, '')}/auth/callback`;
+}
+
+export function oauthFailedLoginPath(reason?: string | null) {
+  const params = new URLSearchParams();
+  params.set('error', 'oauth_failed');
+  const detail = reason?.trim();
+  if (detail) {
+    params.set('error_description', detail.slice(0, 300));
+  }
+  return `/login?${params.toString()}`;
+}
+
+export function describeOAuthError(raw?: string | null) {
+  const text = raw?.trim() || '';
+  if (/database error (saving|creating) new user/i.test(text)) {
+    return '계정 생성 중 데이터베이스 오류가 발생했습니다. 동일 이메일의 기존 프로필과 충돌했을 수 있습니다.';
+  }
+  if (/code verifier|code_verifier|pkce/i.test(text)) {
+    return '로그인 세션 검증값이 없습니다. 같은 브라우저에서 처음부터 다시 로그인해 주세요.';
+  }
+  if (/invalid.*(grant|code)|expired|flow state/i.test(text)) {
+    return '로그인 코드가 만료되었거나 이미 사용되었습니다. 다시 로그인해 주세요.';
+  }
+  if (/access_denied|cancel/i.test(text)) {
+    return '소셜 로그인이 취소되었습니다.';
+  }
+  return text || '소셜 로그인에 실패했습니다. 다시 시도해 주세요.';
 }
 
 export function loginPath(reason: AccessReason, nextPath?: string | null) {

@@ -6,7 +6,12 @@ import { normalizeContactEmail, normalizePhone } from '@/lib/contact';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { parseAuthRoles, type MemberRole } from '@/types/auth';
 import { getSupabaseEnv } from '@/lib/supabase/env';
-import { upsertAppProfile } from '@/lib/supabase/profile-sync';
+import {
+  isMissingPhoneColumn,
+  markPhoneColumnMissing,
+  profilePhoneSupported,
+  upsertAppProfile,
+} from '@/lib/supabase/profile-sync';
 import type { Database } from '@/types/database';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -148,6 +153,13 @@ async function reassignOwnedRows(
   }
 }
 
+async function dropProfile(admin: SupabaseClient<Database>, userId: string) {
+  const { error } = await admin.from('profiles').delete().eq('id', userId);
+  if (error) {
+    console.warn('[SponsorAuction] 중복 프로필 삭제 실패', error.message);
+  }
+}
+
 async function generateMagicLinkHash(
   admin: NonNullable<ReturnType<typeof createAdminClient>>,
   user: User,
@@ -207,7 +219,12 @@ export async function findExistingAccountByContact(input: {
   }
 
   if (phone) {
-    const byPhone = await admin.from('profiles').select('id').eq('phone', phone).maybeSingle();
+    const byPhone = profilePhoneSupported()
+      ? await admin.from('profiles').select('id').eq('phone', phone).maybeSingle()
+      : { data: null, error: null };
+    if (isMissingPhoneColumn(byPhone.error)) {
+      markPhoneColumnMissing();
+    }
     if (byPhone.data?.id && byPhone.data.id !== exclude) {
       const user = await userById(admin, byPhone.data.id);
       if (user) {
@@ -305,6 +322,7 @@ export async function linkIncomingSocialUser(
   });
 
   await reassignOwnedRows(admin, incoming.id, canonical.id);
+  await dropProfile(admin, incoming.id);
   await upsertAppProfile(admin, {
     id: canonical.id,
     email: collectAuthEmails(canonical)[0] ?? canonical.email,
@@ -421,6 +439,7 @@ export async function reconcileSocialIdentities(user: User): Promise<LinkedSocia
   });
 
   await reassignOwnedRows(admin, user.id, canonical.id);
+  await dropProfile(admin, user.id);
   await upsertAppProfile(admin, {
     id: canonical.id,
     email: emails[0],

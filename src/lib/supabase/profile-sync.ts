@@ -1,10 +1,54 @@
 import 'server-only';
 
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import type { PostgrestError, SupabaseClient, User } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { parseAuthRoles, primaryAuthRole, type MemberRole } from '@/types/auth';
 
-const PROFILE_COLUMNS = 'id, name, email, phone, role, roles, status, created_at';
+const PROFILE_COLUMNS_WITH_PHONE = 'id, name, email, phone, role, roles, status, created_at';
+const PROFILE_COLUMNS_BASE = 'id, name, email, role, roles, status, created_at';
+
+let phoneColumnAvailable = true;
+
+export function isMissingPhoneColumn(error: Pick<PostgrestError, 'code' | 'message'> | null) {
+  if (!error) {
+    return false;
+  }
+  return error.code === '42703' || error.code === 'PGRST204' || /phone/i.test(error.message);
+}
+
+export function profilePhoneSupported() {
+  return phoneColumnAvailable;
+}
+
+export function markPhoneColumnMissing() {
+  phoneColumnAvailable = false;
+}
+
+function profileColumns() {
+  return phoneColumnAvailable ? PROFILE_COLUMNS_WITH_PHONE : PROFILE_COLUMNS_BASE;
+}
+
+type ProfileRow = {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  role: 'advertiser' | 'creator' | 'admin' | null;
+  roles?: Array<'advertiser' | 'creator' | 'admin'> | null;
+  status: 'active' | 'suspended';
+  created_at: string;
+};
+
+type ProfileResult = { data: ProfileRow | null; error: PostgrestError | null };
+
+async function withPhoneFallback(run: (includePhone: boolean) => PromiseLike<ProfileResult>) {
+  const first = await run(phoneColumnAvailable);
+  if (phoneColumnAvailable && isMissingPhoneColumn(first.error)) {
+    phoneColumnAvailable = false;
+    return run(false);
+  }
+  return first;
+}
 
 export type SyncedProfile = {
   id: string;
@@ -62,42 +106,36 @@ export async function upsertAppProfile(
     .maybeSingle();
   const nextRoles = parseAuthRoles(current.data?.roles, current.data?.role, input.roles, input.role);
   const nextRole = primaryAuthRole(nextRoles);
-  const payload = {
-    id: input.id,
+  const base = {
     name,
     email,
-    phone,
     status: 'active' as const,
     role: nextRole,
     roles: nextRoles,
   };
 
-  const upserted = await admin
-    .from('profiles')
-    .upsert(payload, { onConflict: 'id' })
-    .select(PROFILE_COLUMNS)
-    .maybeSingle();
-
+  const upserted = await withPhoneFallback((includePhone) =>
+    admin
+      .from('profiles')
+      .upsert(
+        includePhone ? { id: input.id, ...base, phone } : { id: input.id, ...base },
+        { onConflict: 'id' },
+      )
+      .select(includePhone ? PROFILE_COLUMNS_WITH_PHONE : PROFILE_COLUMNS_BASE)
+      .maybeSingle<ProfileRow>(),
+  );
   if (!upserted.error && upserted.data) {
     return toSynced(upserted.data);
   }
 
-  const patch = {
-    name,
-    email,
-    phone,
-    status: 'active' as const,
-    role: nextRole,
-    roles: nextRoles,
-  };
-
-  const updated = await admin
-    .from('profiles')
-    .update(patch)
-    .eq('id', input.id)
-    .select(PROFILE_COLUMNS)
-    .maybeSingle();
-
+  const updated = await withPhoneFallback((includePhone) =>
+    admin
+      .from('profiles')
+      .update(includePhone ? { ...base, phone } : base)
+      .eq('id', input.id)
+      .select(includePhone ? PROFILE_COLUMNS_WITH_PHONE : PROFILE_COLUMNS_BASE)
+      .maybeSingle<ProfileRow>(),
+  );
   if (!updated.error && updated.data) {
     return toSynced(updated.data);
   }
@@ -106,21 +144,10 @@ export async function upsertAppProfile(
     .from('profiles')
     .update({ role: nextRole, roles: nextRoles })
     .eq('id', input.id)
-    .select(PROFILE_COLUMNS)
-    .maybeSingle();
+    .select(profileColumns())
+    .maybeSingle<ProfileRow>();
   if (!roleOnly.error && roleOnly.data) {
     return toSynced(roleOnly.data);
-  }
-
-  const existing = await admin
-    .from('profiles')
-    .select(PROFILE_COLUMNS)
-    .eq('id', input.id)
-    .maybeSingle();
-  if (!existing.error && existing.data) {
-    if (nextRole && parseAuthRoles(existing.data).includes(nextRole)) {
-      return toSynced(existing.data);
-    }
   }
 
   console.warn(
@@ -131,16 +158,7 @@ export async function upsertAppProfile(
   return null;
 }
 
-function toSynced(row: {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string | null;
-  role: 'advertiser' | 'creator' | 'admin' | null;
-  roles?: Array<'advertiser' | 'creator' | 'admin'> | null;
-  status: 'active' | 'suspended';
-  created_at: string;
-}): SyncedProfile {
+function toSynced(row: ProfileRow): SyncedProfile {
   const roles = parseAuthRoles(row.roles, row.role);
   return {
     id: row.id,
@@ -155,26 +173,33 @@ function toSynced(row: {
 }
 
 export async function listAndBackfillProfiles(admin: SupabaseClient<Database>) {
-  const { data: existing, error } = await admin
-    .from('profiles')
-    .select(PROFILE_COLUMNS)
-    .order('created_at', { ascending: false });
+  const listProfiles = (includePhone: boolean) =>
+    admin
+      .from('profiles')
+      .select(includePhone ? PROFILE_COLUMNS_WITH_PHONE : PROFILE_COLUMNS_BASE)
+      .order('created_at', { ascending: false })
+      .returns<ProfileRow[]>();
 
-  if (error) {
-    return { profiles: [] as SyncedProfile[], error: error.message };
+  let listed = await listProfiles(phoneColumnAvailable);
+  if (phoneColumnAvailable && isMissingPhoneColumn(listed.error)) {
+    phoneColumnAvailable = false;
+    listed = await listProfiles(false);
+  }
+  if (listed.error) {
+    return { profiles: [] as SyncedProfile[], error: listed.error.message };
   }
 
-  const byId = new Map((existing ?? []).map((row) => [row.id, row]));
+  const byId = new Map((listed.data ?? []).map((row) => [row.id, row]));
 
   try {
     let page = 1;
     while (page <= 10) {
-      const listed = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-      if (listed.error) {
+      const users = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+      if (users.error) {
         break;
       }
-      const users = listed.data.users ?? [];
-      for (const user of users) {
+      const batch = users.data.users ?? [];
+      for (const user of batch) {
         if (byId.has(user.id)) {
           continue;
         }
@@ -196,7 +221,7 @@ export async function listAndBackfillProfiles(admin: SupabaseClient<Database>) {
           });
         }
       }
-      if (users.length < 1000) {
+      if (batch.length < 1000) {
         break;
       }
       page += 1;
