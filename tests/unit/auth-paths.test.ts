@@ -6,8 +6,11 @@ import {
   hasAuthPresence,
   isAuthCallbackPath,
   isAuthPassthroughPath,
+  isSupabaseAuthCookieName,
   onboardingCanonicalPath,
+  serializeCookieHeader,
 } from '../../src/lib/auth-paths';
+import { switchableMemberRoles } from '../../src/types/auth';
 
 describe('auth path helpers', () => {
   it('콜백과 온보딩은 공개 통과 경로이다', () => {
@@ -42,5 +45,25 @@ describe('post-auth destination', () => {
 
   it('광고주에게 /admin next를 강제하지 않는다', () => {
     assert.equal(postAuthPath({ roles: ['advertiser'] }, '/admin'), '/my');
+  });
+
+  it('온보딩 완료 후에는 광고주/크리에이터 모드를 전환할 수 있다', () => {
+    assert.deepEqual(switchableMemberRoles({ roles: ['advertiser'] }), [
+      'advertiser',
+      'creator',
+    ]);
+  });
+
+  it('Supabase 세션 쿠키를 Path=/ Set-Cookie 문자열로 직렬화한다', () => {
+    assert.equal(isSupabaseAuthCookieName('sb-access-token'), true);
+    assert.equal(isSupabaseAuthCookieName('sb-xxxx-auth-token'), true);
+    const header = serializeCookieHeader({
+      name: 'sb-access-token',
+      value: 'jwt',
+      options: { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 60 },
+    });
+    assert.match(header, /sb-access-token=jwt/);
+    assert.match(header, /Path=\//);
+    assert.match(header, /HttpOnly/);
   });
 });

@@ -19,6 +19,7 @@ import {
   syncRoleCookie,
 } from '@/lib/access';
 import {
+  MEMBER_ROLES,
   isMemberRole,
   needsRoleOnboarding,
   resolveActiveMemberRole,
@@ -140,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       syncActiveRoleCookie(role);
       const supabase = createClient();
       void supabase?.auth
-        .updateUser({ data: { current_mode: role } })
+        .updateUser({ data: { current_mode: role, roles: [...MEMBER_ROLES] } })
         .catch(() => null);
       return true;
     },

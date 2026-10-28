@@ -15,7 +15,7 @@ import {
 } from '@/lib/contact';
 import { parseOnboardingRoles, resolveOnboardingActor, type OnboardingBody } from '@/lib/onboarding';
 import { upsertAppProfile } from '@/lib/supabase/profile-sync';
-import { isMemberRole, parseAuthRoles, primaryAuthRole } from '@/types/auth';
+import { MEMBER_ROLES, isMemberRole, parseAuthRoles, primaryAuthRole } from '@/types/auth';
 
 export async function POST(request: Request) {
   try {
@@ -76,6 +76,7 @@ export async function POST(request: Request) {
           existingProfile.data?.role,
           existing.user_metadata?.roles,
           selectedRoles,
+          MEMBER_ROLES,
         );
         const linked = await linkIncomingSocialUser(actor.user, existing, {
           phone: phone || null,
@@ -119,13 +120,14 @@ export async function POST(request: Request) {
     }
 
     const email = contactEmail || actor.email;
+    const memberRoles = [...new Set([...MEMBER_ROLES, ...selectedRoles])];
     const synced = await upsertAppProfile(actor.admin, {
       id: actor.user.id,
       email,
       name: actor.name,
       phone: phone || null,
       role: selectedRoles[0],
-      roles: selectedRoles,
+      roles: memberRoles,
     });
     await actor.admin.auth.admin
       .updateUserById(actor.user.id, {
@@ -135,7 +137,7 @@ export async function POST(request: Request) {
         user_metadata: {
           onboarding_complete: true,
           role: synced?.role ?? selectedRoles[0],
-          roles: synced?.roles ?? selectedRoles,
+          roles: synced?.roles ?? memberRoles,
           name: actor.name || undefined,
           phone: phone || null,
           current_mode: selectedRoles[0],

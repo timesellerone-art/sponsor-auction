@@ -2,7 +2,12 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { applyAuthCookies } from '@/lib/access';
 import { ROLE_SELECT_PATH, postSocialAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
-import { createCookieBag, writeCookies } from '@/lib/auth-paths';
+import {
+  collectSupabaseAuthCookies,
+  createCookieBag,
+  injectAuthCookiesOnResponse,
+  mergeCookiesToSet,
+} from '@/lib/auth-paths';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import { reconcileSocialIdentities } from '@/lib/auth-identity';
 import {
@@ -118,7 +123,13 @@ export async function GET(request: NextRequest) {
           needsOnboarding: needsRoleOnboarding(sessionLike),
         });
         const redirect = NextResponse.redirect(new URL(destination, origin));
-        writeCookies(redirect.cookies, cookieBag.getAll());
+        injectAuthCookiesOnResponse(
+          redirect,
+          mergeCookiesToSet(
+            cookieBag.getAll(),
+            collectSupabaseAuthCookies(request.cookies.getAll()),
+          ),
+        );
         applyAuthCookies(redirect.cookies, {
           present: true,
           roles: destination === ROLE_SELECT_PATH ? [] : sessionLike?.roles,

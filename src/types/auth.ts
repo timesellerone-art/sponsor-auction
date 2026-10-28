@@ -121,8 +121,11 @@ export function needsRoleOnboarding(user: SessionUser | null | undefined): boole
 }
 
 export function switchableMemberRoles(source: unknown): MemberRole[] {
-  const owned = new Set(parseAuthRoles(source).filter(isMemberRole));
-  return MEMBER_ROLES.filter((role) => owned.has(role));
+  const owned = parseAuthRoles(source).filter(isMemberRole);
+  if (owned.length === 0) {
+    return [];
+  }
+  return [...MEMBER_ROLES];
 }
 
 export function resolveActiveMemberRole(
