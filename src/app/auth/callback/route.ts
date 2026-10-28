@@ -2,9 +2,11 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { applyAuthCookies } from '@/lib/access';
 import { ROLE_SELECT_PATH, postSocialAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
+import { createCookieBag, writeCookies } from '@/lib/auth-paths';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import { reconcileSocialIdentities } from '@/lib/auth-identity';
 import {
+  isMemberRole,
   needsRoleOnboarding,
   parseAuthRoles,
   primaryAuthRole,
@@ -21,6 +23,14 @@ function callbackOrigin(request: Request) {
   return url.origin;
 }
 
+function loginRedirect(origin: string, oauthError?: string | null) {
+  const login = new URL('/login', origin);
+  if (oauthError && !/KOE205|invalid_scope/i.test(oauthError)) {
+    login.searchParams.set('oauth_error', oauthError);
+  }
+  return NextResponse.redirect(login);
+}
+
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const origin = callbackOrigin(request);
@@ -31,28 +41,23 @@ export async function GET(request: NextRequest) {
     requestUrl.searchParams.get('error');
 
   if (oauthError) {
-    const login = new URL('/login', origin);
-    login.searchParams.set('reason', 'auth-required');
-    if (!/KOE205|invalid_scope/i.test(oauthError)) {
-      login.searchParams.set('oauth_error', oauthError);
-    }
-    return NextResponse.redirect(login);
+    return loginRedirect(origin, oauthError);
   }
 
   if (code) {
     const env = getSupabaseEnv();
     if (env) {
-      const successRedirect = NextResponse.redirect(new URL(next, origin));
+      const cookieBag = createCookieBag();
       const supabase = createServerClient(env.url, env.anonKey, {
         cookies: {
           getAll() {
             return request.cookies.getAll();
           },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
+            cookiesToSet.forEach(({ name, value }) => {
               request.cookies.set(name, value);
-              successRedirect.cookies.set(name, value, options);
             });
+            cookieBag.remember(cookiesToSet);
           },
         },
       });
@@ -87,7 +92,12 @@ export async function GET(request: NextRequest) {
             .select('role, roles')
             .eq('id', authUser.id)
             .maybeSingle();
-          const roles = parseAuthRoles(profile.data?.roles, profile.data?.role);
+          const roles = parseAuthRoles(
+            profile.data?.roles,
+            profile.data?.role,
+            authUser.user_metadata?.roles,
+            authUser.user_metadata?.role,
+          );
           sessionLike = {
             id: authUser.id,
             email: authUser.email?.includes('@')
@@ -99,20 +109,23 @@ export async function GET(request: NextRequest) {
             createdAt: authUser.created_at,
             lastSignInAt: authUser.last_sign_in_at,
             onboardingComplete: authUser.user_metadata?.onboarding_complete === true,
+            currentMode: isMemberRole(authUser.user_metadata?.current_mode)
+              ? authUser.user_metadata.current_mode
+              : null,
           };
         }
         const destination = postSocialAuthPath(sessionLike, next, {
           needsOnboarding: needsRoleOnboarding(sessionLike),
         });
         const redirect = NextResponse.redirect(new URL(destination, origin));
-        successRedirect.cookies.getAll().forEach((cookie) => {
-          redirect.cookies.set(cookie.name, cookie.value);
-        });
+        writeCookies(redirect.cookies, cookieBag.getAll());
         applyAuthCookies(redirect.cookies, {
           present: true,
           roles: destination === ROLE_SELECT_PATH ? [] : sessionLike?.roles,
           activeRole:
-            destination === ROLE_SELECT_PATH ? null : sessionLike?.roles,
+            destination === ROLE_SELECT_PATH
+              ? null
+              : sessionLike?.currentMode ?? sessionLike?.roles,
         });
         return redirect;
       }

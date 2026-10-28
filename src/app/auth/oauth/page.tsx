@@ -9,6 +9,14 @@ import { ROLE_SELECT_PATH, postSocialAuthPath, sanitizeNextPath } from '@/lib/au
 import { getSupabaseClient } from '@/lib/supabase';
 import { needsRoleOnboarding } from '@/types/auth';
 
+function loginFallback(message?: string) {
+  const params = new URLSearchParams();
+  if (message) {
+    params.set('oauth_error', message);
+  }
+  return `/login${params.toString() ? `?${params.toString()}` : ''}`;
+}
+
 export default function AuthOAuthCompletePage() {
   const router = useRouter();
 
@@ -25,8 +33,9 @@ export default function AuthOAuthCompletePage() {
         params.get('error');
 
       if (errorDescription) {
-        showToast(decodeURIComponent(errorDescription.replace(/\+/g, ' ')));
-        router.replace('/login?reason=auth-required');
+        const message = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
+        showToast(message);
+        router.replace(loginFallback(message));
         return;
       }
 
@@ -44,7 +53,7 @@ export default function AuthOAuthCompletePage() {
           if (error) {
             console.warn('[SponsorAuction] 매직링크 세션 교환에 실패했습니다.', error.message);
             showToast(error.message || '소셜 로그인에 실패했습니다.');
-            router.replace('/login?reason=auth-required');
+            router.replace(loginFallback(error.message || '소셜 로그인에 실패했습니다.'));
             return;
           }
         } else if (supabase && code) {
@@ -52,7 +61,7 @@ export default function AuthOAuthCompletePage() {
           if (error) {
             console.warn('[SponsorAuction] OAuth 세션 교환에 실패했습니다.', error.message);
             showToast(error.message || '소셜 로그인에 실패했습니다.');
-            router.replace('/login?reason=auth-required');
+            router.replace(loginFallback(error.message || '소셜 로그인에 실패했습니다.'));
             return;
           }
         }
@@ -74,7 +83,7 @@ export default function AuthOAuthCompletePage() {
       } catch (error) {
         console.warn('[SponsorAuction] OAuth 콜백 처리 중 예외가 발생했습니다.', error);
         showToast('소셜 로그인에 실패했습니다. 다시 시도해 주세요.');
-        router.replace('/login?reason=auth-required');
+        router.replace(loginFallback('소셜 로그인에 실패했습니다. 다시 시도해 주세요.'));
       }
     };
 

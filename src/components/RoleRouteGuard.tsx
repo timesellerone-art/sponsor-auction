@@ -7,9 +7,10 @@ import { ROLE_SELECT_PATH } from '@/lib/auth-guard';
 
 const OPEN_WITHOUT_ROLE = [
   ROLE_SELECT_PATH,
+  '/onboarding',
+  '/select-role',
   '/login',
-  '/auth/callback',
-  '/auth/oauth',
+  '/auth',
   '/privacy',
   '/terms',
   '/refund',

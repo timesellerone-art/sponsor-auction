@@ -17,7 +17,6 @@ import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 
 function loginError(origin: string, message: string) {
   const login = new URL('/login', origin);
-  login.searchParams.set('reason', 'auth-required');
   login.searchParams.set('oauth_error', message);
   const response = NextResponse.redirect(login);
   response.cookies.delete(NAVER_STATE_COOKIE);

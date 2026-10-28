@@ -6,6 +6,7 @@ import {
   mockSignUp,
 } from '@/lib/auth-mock';
 import {
+  AUTH_PRESENT_COOKIE_NAME,
   readActiveRoleCookie,
   syncActiveRoleCookie,
   syncAuthPresentCookie,
@@ -13,7 +14,7 @@ import {
 } from '@/lib/access';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseOAuthCallbackUrl } from '@/lib/supabase/env';
-import { buildAppOAuthCallbackUrl, sanitizeNextPath } from '@/lib/auth-guard';
+import { ROLE_SELECT_PATH, buildAppOAuthCallbackUrl, sanitizeNextPath } from '@/lib/auth-guard';
 import {
   kakaoOAuthScopeQuery,
   kakaoOAuthScopesOption,
@@ -317,10 +318,11 @@ export async function signInWithNaver(nextPath?: string | null) {
   if (typeof window === 'undefined') {
     return fail(false, AUTH_FAIL_MESSAGE);
   }
-  const next = sanitizeNextPath(nextPath) ?? '/';
-  // 네이버 OAuth 시작은 Next 라우터가 아닌 전체 페이지 이동이어야 합니다.
+  const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
+  const naverStart = `${window.location.origin}/api/auth/naver?next=${encodeURIComponent(next)}`;
+  // 네이버는 라우터 전환이 아니라 전체 문서 이동이 필요합니다.
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-  window.location.assign(`${window.location.origin}/api/auth/naver?next=${encodeURIComponent(next)}`);
+  window.location.assign(naverStart);
   return ok(true);
 }
 
@@ -360,34 +362,49 @@ async function loadProfile(
   );
 }
 
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function hasClientAuthHint() {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+  return document.cookie.split(';').some((part) => part.trim() === `${AUTH_PRESENT_COOKIE_NAME}=1`);
+}
+
 async function readBrowserAuthUser(
   supabase: NonNullable<ReturnType<typeof createClient>>,
 ) {
-  try {
-    const { data, error } = await withTimeout(
-      supabase.auth.getSession(),
-      2500,
-      '세션 조회',
-    );
-    if (error) {
-      if (isAuthSessionMissing(error)) {
-        console.warn('[SponsorAuction] 인증 세션이 없습니다.', error.message);
+  const attempts = hasClientAuthHint() ? 3 : 1;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const { data, error } = await withTimeout(
+        supabase.auth.getUser(),
+        4000,
+        '세션 조회',
+      );
+      if (data.user) {
+        return data.user;
+      }
+      if (error && !isAuthSessionMissing(error)) {
+        console.warn('[SponsorAuction] 세션 조회에 실패했습니다.', error.message);
+      }
+    } catch (error) {
+      if (attempt === attempts - 1) {
+        if (!isAuthSessionMissing(error)) {
+          console.warn('[SponsorAuction] 세션 조회 중 예외가 발생했습니다.', error);
+        }
         return null;
       }
-      console.warn('[SponsorAuction] 세션 조회에 실패했습니다.', error.message);
     }
-    return data.session?.user ?? null;
-  } catch (error) {
-    if (isAuthSessionMissing(error)) {
-      console.warn(
-        '[SponsorAuction] 인증 세션이 없습니다.',
-        error instanceof Error ? error.message : error,
-      );
-      return null;
+    if (attempt < attempts - 1) {
+      await sleep(300);
     }
-    console.warn('[SponsorAuction] 세션 조회 중 예외가 발생했습니다.', error);
-    return null;
   }
+  return null;
 }
 
 export async function getSessionUser(): Promise<DataResult<SessionUser | null>> {
@@ -404,12 +421,7 @@ export async function getSessionUser(): Promise<DataResult<SessionUser | null>> 
   try {
     const user = await readBrowserAuthUser(supabase);
     if (!user) {
-      try {
-        return await mockGetSession();
-      } catch (error) {
-        console.warn('[SponsorAuction] Mock 세션 조회에 실패했습니다.', error);
-        return ok(null);
-      }
+      return ok(null);
     }
 
     const email = user.email?.trim() || '';
@@ -421,18 +433,10 @@ export async function getSessionUser(): Promise<DataResult<SessionUser | null>> 
     return ok(session);
   } catch (error) {
     if (isAuthSessionMissing(error)) {
-      console.warn(
-        '[SponsorAuction] 인증 세션이 없습니다.',
-        error instanceof Error ? error.message : error,
-      );
       return ok(null);
     }
     console.warn('[SponsorAuction] 세션 조회 중 예외가 발생했습니다.', error);
-    try {
-      return await mockGetSession();
-    } catch {
-      return ok(null);
-    }
+    return ok(null);
   }
 }
 

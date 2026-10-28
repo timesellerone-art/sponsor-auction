@@ -58,22 +58,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const refresh = useCallback(async () => {
-    let settled = false;
-    const failSafe = window.setTimeout(() => {
-      if (!settled) {
-        setReady(true);
-      }
-    }, 2500);
     try {
       const result = await getSessionUser();
-      settled = true;
       setUser(result.data);
     } catch (error) {
-      settled = true;
       console.warn('[SponsorAuction] 인증 상태를 갱신하지 못했습니다.', error);
       setUser(null);
     } finally {
-      window.clearTimeout(failSafe);
       setReady(true);
     }
   }, []);
@@ -82,9 +73,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const boot = window.setTimeout(() => {
       void refresh();
     }, 0);
-    const failSafe = window.setTimeout(() => {
-      setReady(true);
-    }, 4000);
     let skipRefreshUntil = 0;
     const unsubKnown = onKnownSession((session) => {
       skipRefreshUntil = Date.now() + 1500;
@@ -99,7 +87,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       window.clearTimeout(boot);
-      window.clearTimeout(failSafe);
       unsubKnown();
       unsubscribe();
     };

@@ -39,13 +39,30 @@ export function authGuardMessage(reason: AccessReason) {
   return ACCESS_REASON[reason];
 }
 
+function canFollowNextPath(roles: ReturnType<typeof parseAuthRoles>, next: string) {
+  if (next === ROLE_SELECT_PATH || next.startsWith('/onboarding')) {
+    return false;
+  }
+  if (next === '/admin' || next.startsWith('/admin/')) {
+    return roles.includes('admin');
+  }
+  if (next === '/my' || next.startsWith('/my/') || next.startsWith('/payments')) {
+    return (
+      roles.includes('advertiser') ||
+      roles.includes('creator') ||
+      roles.includes('admin')
+    );
+  }
+  return true;
+}
+
 export function postAuthPath(role: unknown, nextPath?: string | null) {
   const next = sanitizeNextPath(nextPath);
   const roles = parseAuthRoles(role);
   if (roles.length === 0) {
     return ROLE_SELECT_PATH;
   }
-  if (next && next !== ROLE_SELECT_PATH && !next.startsWith('/onboarding')) {
+  if (next && canFollowNextPath(roles, next)) {
     return next;
   }
   if (roles.includes('admin')) {

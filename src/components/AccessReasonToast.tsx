@@ -7,7 +7,19 @@ import { accessReasonMessage } from '@/lib/access';
 export function AccessReasonToast() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const message = accessReasonMessage(params.get('reason'));
+    const reason = params.get('reason');
+    const next = params.get('next') ?? '';
+    if (reason === 'auth-required' && next.startsWith('/onboarding')) {
+      params.delete('reason');
+      const search = params.toString();
+      window.history.replaceState(
+        {},
+        '',
+        `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`,
+      );
+      return;
+    }
+    const message = accessReasonMessage(reason);
     if (!message) {
       return;
     }
@@ -17,8 +29,8 @@ export function AccessReasonToast() {
     }, 0);
     params.delete('reason');
     const search = params.toString();
-    const next = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
-    window.history.replaceState({}, '', next);
+    const cleaned = `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`;
+    window.history.replaceState({}, '', cleaned);
   }, []);
 
   return null;
