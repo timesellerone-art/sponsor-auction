@@ -516,6 +516,35 @@ after delete on auth.users
 for each row
 execute function public.handle_deleted_user();
 
+create or replace function public.merge_auth_identities(p_from uuid, p_to uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_moved integer;
+begin
+  if p_from is null or p_to is null or p_from = p_to then
+    return 0;
+  end if;
+  if not exists (select 1 from auth.users where id = p_to) then
+    raise exception 'merge target % not found', p_to;
+  end if;
+
+  update auth.identities
+     set user_id = p_to,
+         updated_at = now()
+   where user_id = p_from
+     and provider <> 'email';
+  get diagnostics v_moved = row_count;
+  return v_moved;
+end;
+$$;
+
+revoke all on function public.merge_auth_identities(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.merge_auth_identities(uuid, uuid) to service_role;
+
 alter table public.profiles enable row level security;
 alter table public.creator_metrics enable row level security;
 alter table public.auctions enable row level security;

@@ -20,20 +20,42 @@ function loginFallback(message?: string) {
   return oauthFailedLoginPath(describeOAuthError(message));
 }
 
-// token_hash는 1회용이므로 StrictMode 재실행·재마운트에서도 한 번만 검증한다.
-const verifications = new Map<string, Promise<string | null>>();
+// token_hash는 1회용이고 계정 병합도 한 번만 실행돼야 하므로 StrictMode 재실행·재마운트에서도 한 번만 처리한다.
+const completions = new Map<string, Promise<string | null>>();
 
-function verifyTokenOnce(
-  supabase: NonNullable<ReturnType<typeof getSupabaseClient>>,
-  tokenHash: string,
+async function verifyAndLink(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  tokenHash: string | null,
+  type: 'magiclink' | 'email',
+): Promise<string | null> {
+  if (supabase && tokenHash) {
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    if (error) {
+      console.warn('[SponsorAuction] 매직링크 세션 교환에 실패했습니다.', error.message);
+      return error.message;
+    }
+  }
+  const linked = await fetch('/api/auth/identities/link', {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!linked.ok) {
+    const payload = (await linked.json().catch(() => null)) as { error?: string } | null;
+    return payload?.error || '계정 통합에 실패했습니다.';
+  }
+  return null;
+}
+
+function completeOnce(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  tokenHash: string | null,
   type: 'magiclink' | 'email',
 ) {
-  let pending = verifications.get(tokenHash);
+  const key = tokenHash ?? 'session';
+  let pending = completions.get(key);
   if (!pending) {
-    pending = supabase.auth
-      .verifyOtp({ token_hash: tokenHash, type })
-      .then(({ error }) => error?.message ?? null);
-    verifications.set(tokenHash, pending);
+    pending = verifyAndLink(supabase, tokenHash, type);
+    completions.set(key, pending);
   }
   return pending;
 }
@@ -84,20 +106,11 @@ export default function AuthOAuthCompletePage() {
       const otpType = params.get('type') === 'magiclink' ? 'magiclink' : 'email';
 
       try {
-        if (supabase && tokenHash) {
-          const error = await verifyTokenOnce(supabase, tokenHash, otpType);
-          if (error) {
-            console.warn('[SponsorAuction] 매직링크 세션 교환에 실패했습니다.', error);
-            go(loginFallback(error));
-            return;
-          }
+        const failure = await completeOnce(supabase, tokenHash, otpType);
+        if (failure) {
+          go(loginFallback(failure));
+          return;
         }
-
-        notifyAuthChanged();
-        await fetch('/api/auth/identities/link', {
-          method: 'POST',
-          credentials: 'include',
-        }).catch(() => null);
         notifyAuthChanged();
         const session = await getSessionUser();
         if (!session.data) {

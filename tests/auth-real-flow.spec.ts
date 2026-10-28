@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { expect, test } from '@playwright/test';
+import { expect, test, type BrowserContext } from '@playwright/test';
 
 const AUTH_REQUIRED_TOAST = '이 기능을 사용하려면 로그인이 필요합니다.';
 const SESSION_FAIL_COPY = '로그인 정보를 확인하지 못했습니다';
@@ -34,6 +34,21 @@ function adminClient(): SupabaseClient | null {
     return null;
   }
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+async function sessionUserId(context: BrowserContext): Promise<string | null> {
+  const chunks = (await context.cookies('http://localhost:3000'))
+    .filter((cookie) => /^sb-.+-auth-token(\.\d+)?$/.test(cookie.name))
+    .sort((left, right) => left.name.localeCompare(right.name, 'en', { numeric: true }));
+  const raw = chunks.map((cookie) => cookie.value).join('');
+  if (!raw) {
+    return null;
+  }
+  const json = raw.startsWith('base64-')
+    ? Buffer.from(raw.slice('base64-'.length), 'base64url').toString('utf8')
+    : decodeURIComponent(raw);
+  const session = JSON.parse(json) as { user?: { id?: string } };
+  return session.user?.id ?? null;
 }
 
 test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
@@ -161,6 +176,131 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
       if (userId) {
         await admin.auth.admin.deleteUser(userId);
         await admin.from('profiles').delete().eq('id', userId);
+      }
+    }
+  });
+
+  test('d) 다른 소셜 수단 신규 계정이 온보딩 대표 이메일로 기존 계정에 병합되고 중복 유저가 삭제된다', async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(90_000);
+    const admin = adminClient();
+    test.skip(!admin, 'SUPABASE_SERVICE_ROLE_KEY가 없어 실유저 시나리오를 건너뜁니다.');
+    if (!admin) {
+      return;
+    }
+
+    const stamp = Date.now();
+    const canonicalEmail = `e2e.canonical.${stamp}@sponsor-auction.test`;
+    const canonical = await admin.auth.admin.createUser({
+      email: canonicalEmail,
+      email_confirm: true,
+      app_metadata: { provider: 'google', providers: ['google'] },
+      user_metadata: {
+        name: 'E2E 대표계정',
+        roles: ['advertiser', 'creator'],
+        role: 'advertiser',
+        current_mode: 'creator',
+        onboarding_complete: true,
+      },
+    });
+    expect(canonical.error, canonical.error?.message).toBeNull();
+    const canonicalId = canonical.data.user?.id ?? '';
+    await admin
+      .from('profiles')
+      .update({ role: 'advertiser', roles: ['advertiser', 'creator'] })
+      .eq('id', canonicalId);
+
+    const incoming = await admin.auth.admin.createUser({
+      email: `user.${stamp.toString(16)}e2e@oauth.sponsor-auction.local`,
+      email_confirm: true,
+      app_metadata: { provider: 'kakao', providers: ['kakao'] },
+      user_metadata: { name: 'E2E 카카오' },
+    });
+    expect(incoming.error, incoming.error?.message).toBeNull();
+    const incomingId = incoming.data.user?.id ?? '';
+
+    try {
+      const incomingLink = await admin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: incoming.data.user?.email ?? '',
+      });
+      await page.goto(
+        `/auth/oauth?token_hash=${incomingLink.data.properties?.hashed_token}&type=magiclink&next=${encodeURIComponent('/onboarding')}`,
+      );
+      await expect(page.getByRole('heading', { name: /역할을 선택해 주세요/ })).toBeVisible({
+        timeout: 15000,
+      });
+      expect(await sessionUserId(context)).toBe(incomingId);
+
+      await page.getByLabel('대표 이메일').fill(canonicalEmail);
+      await page.getByRole('button', { name: /광고주로 시작하기/ }).click();
+      await expect(page.getByRole('heading', { name: '이미 가입된 계정이 있습니다' })).toBeVisible({
+        timeout: 10000,
+      });
+      await expect(page.getByRole('button', { name: 'Google 계정으로 본인 확인' })).toBeVisible();
+      await expect(page.getByRole('button', { name: '이메일 로그인 링크로 본인 확인' })).toBeVisible();
+
+      const pending = await admin.auth.admin.getUserById(incomingId);
+      expect(pending.data.user?.app_metadata?.pending_merge?.into).toBe(canonicalId);
+      const mergeCookie = (await context.cookies('http://localhost:3000')).find(
+        (cookie) => cookie.name === 'sponsor-auction-merge-from',
+      );
+      expect(mergeCookie?.value).toBe(incomingId);
+      expect(mergeCookie?.httpOnly).toBe(true);
+
+      const canonicalLink = await admin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: canonicalEmail,
+      });
+      const linkResponse = page.waitForResponse((response) =>
+        response.url().includes('/api/auth/identities/link'),
+      );
+      await page.goto(
+        `/auth/oauth?token_hash=${canonicalLink.data.properties?.hashed_token}&type=magiclink&next=${encodeURIComponent('/onboarding/role-select')}`,
+      );
+      expect((await linkResponse).status(), '계정 통합 API가 성공해야 한다').toBe(200);
+      await expect(page).not.toHaveURL(/\/auth\/oauth|\/onboarding|\/login/, { timeout: 20000 });
+      expect(await sessionUserId(context)).toBe(canonicalId);
+
+      const deletedUser = await admin.auth.admin.getUserById(incomingId);
+      expect(deletedUser.data.user, '중복 auth.users 행은 삭제되어야 한다').toBeNull();
+      const deletedProfile = await admin.from('profiles').select('id').eq('id', incomingId);
+      expect(deletedProfile.data ?? []).toHaveLength(0);
+
+      const merged = (await admin.auth.admin.getUserById(canonicalId)).data.user;
+      expect(merged?.user_metadata?.current_mode).toBe('creator');
+      expect(merged?.app_metadata?.pending_merge ?? null).toBeNull();
+      const mergedProfile = await admin
+        .from('profiles')
+        .select('roles')
+        .eq('id', canonicalId)
+        .single();
+      expect(mergedProfile.data?.roles).toEqual(expect.arrayContaining(['advertiser', 'creator']));
+      expect(
+        (await context.cookies('http://localhost:3000')).some(
+          (cookie) => cookie.name === 'sponsor-auction-merge-from',
+        ),
+      ).toBe(false);
+
+      const switcher = page.getByRole('group', { name: '역할 전환' }).first();
+      await expect(switcher).toBeVisible({ timeout: 10000 });
+      await expect(switcher.getByRole('button', { name: '크리에이터 모드' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await switcher.getByRole('button', { name: '광고주 모드' }).click();
+      await expect(switcher.getByRole('button', { name: '광고주 모드' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    } finally {
+      for (const id of [incomingId, canonicalId]) {
+        if (id) {
+          await admin.auth.admin.deleteUser(id);
+          await admin.from('profiles').delete().eq('id', id);
+        }
       }
     }
   });

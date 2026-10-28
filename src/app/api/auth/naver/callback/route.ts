@@ -11,7 +11,16 @@ import {
   requestOrigin,
 } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
-import { findAuthUserByEmail, reconcileSocialIdentities } from '@/lib/auth-identity';
+import {
+  findAuthUserByEmail,
+  findUserByNaverId,
+  reconcileSocialIdentities,
+} from '@/lib/auth-identity';
+import { collectAuthEmails } from '@/lib/auth-emails';
+
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
 import { createAdminClient } from '@/lib/supabase/admin';
 import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
@@ -80,7 +89,8 @@ export async function GET(request: NextRequest) {
       naver_id: profile.id,
     };
 
-    const existing = await findAuthUserByEmail(profile.email);
+    const linkedByNaverId = await findUserByNaverId(profile.id);
+    const existing = linkedByNaverId ?? (await findAuthUserByEmail(profile.email));
     let authUserId = existing?.id ?? '';
 
     if (!authUserId) {
@@ -88,7 +98,7 @@ export async function GET(request: NextRequest) {
         email: profile.email,
         email_confirm: true,
         user_metadata: metadata,
-        app_metadata: { provider: 'naver', providers: ['naver'] },
+        app_metadata: { provider: 'naver', providers: ['naver'], naver_ids: [profile.id] },
       });
 
       if (created.error && !/already|registered|exists/i.test(created.error.message)) {
@@ -101,48 +111,33 @@ export async function GET(request: NextRequest) {
         const fallback = await findAuthUserByEmail(profile.email);
         authUserId = fallback?.id ?? '';
       }
-    } else {
+      if (authUserId) {
+        await upsertAppProfile(admin, { id: authUserId, name: profile.name, email: profile.email });
+      }
+    } else if (existing) {
       await admin.auth.admin.updateUserById(authUserId, {
-        email: profile.email,
-        email_confirm: true,
-        user_metadata: {
-          ...(existing?.user_metadata ?? {}),
-          ...metadata,
-        },
+        user_metadata: { ...metadata, ...(existing.user_metadata ?? {}) },
         app_metadata: {
-          ...(existing?.app_metadata ?? {}),
-          provider: existing?.app_metadata?.provider ?? 'naver',
-          providers: [
-            ...new Set([
-              ...((Array.isArray(existing?.app_metadata?.providers)
-                ? existing.app_metadata.providers
-                : []) as string[]),
-              'naver',
-            ]),
-          ],
+          providers: [...new Set([...stringList(existing.app_metadata?.providers), 'naver'])],
+          naver_ids: [...new Set([...stringList(existing.app_metadata?.naver_ids), profile.id])],
         },
       });
     }
 
-    if (authUserId) {
-      await upsertAppProfile(admin, {
-        id: authUserId,
-        name: profile.name,
-        email: profile.email,
-      });
-      const current = await admin.auth.admin.getUserById(authUserId);
-      if (current.data.user) {
-        await reconcileSocialIdentities(current.data.user);
-      }
+    const current = authUserId ? (await admin.auth.admin.getUserById(authUserId)).data.user : null;
+    if (!current) {
+      return loginError(origin, '네이버 계정과 연결된 사용자를 찾지 못했습니다.');
+    }
+    const resolved = (await reconcileSocialIdentities(current)).user;
+    const sessionEmail = collectAuthEmails(resolved)[0] ?? resolved.email;
+    if (!sessionEmail) {
+      return loginError(origin, '네이버 로그인 세션을 만들지 못했습니다.');
     }
 
     const link = await admin.auth.admin.generateLink({
       type: 'magiclink',
-      email: profile.email,
-      options: {
-        data: metadata,
-        redirectTo: `${origin}${next}`,
-      },
+      email: sessionEmail,
+      options: { redirectTo: `${origin}${next}` },
     });
 
     const tokenHash = link.data.properties?.hashed_token;

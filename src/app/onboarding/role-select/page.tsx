@@ -14,7 +14,6 @@ import {
 } from '@/lib/access';
 import { postAuthPath } from '@/lib/auth-guard';
 import { useSafetyTimeout } from '@/lib/auth-timeout';
-import { isPlaceholderOAuthEmail } from '@/lib/contact';
 import { resolveActiveMemberRole } from '@/types/auth';
 
 function persistSessionCookies(user: {
@@ -99,7 +98,6 @@ export default function RoleSelectPage() {
       <RoleOnboarding
         name={user.name || '회원'}
         email={user.email}
-        needsContact={isPlaceholderOAuthEmail(user.email)}
         onCompleted={(roles) => {
           persistSessionCookies({ role: roles[0], roles });
           router.replace(postAuthPath(roles));

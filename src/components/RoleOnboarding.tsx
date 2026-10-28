@@ -1,17 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import { Briefcase, Clapperboard, Loader2 } from 'lucide-react';
+import { Briefcase, Clapperboard, Link2, Loader2 } from 'lucide-react';
 import { showToast } from '@/components/Toast';
-import { AUTH_FAIL_MESSAGE, saveMemberRole } from '@/lib/auth';
+import {
+  AUTH_FAIL_MESSAGE,
+  saveMemberRole,
+  sendAccountProofEmail,
+  signInWithOAuth,
+  type SocialOAuthProvider,
+} from '@/lib/auth';
+import { ROLE_SELECT_PATH } from '@/lib/auth-guard';
 import { isPlaceholderOAuthEmail, isValidContactEmail, isValidPhone } from '@/lib/contact';
 import { cn } from '@/lib/utils';
-import { isMemberRole, type MemberRole } from '@/types/auth';
+import {
+  isMemberRole,
+  type AccountMergeChallenge,
+  type MemberRole,
+  type ProofProvider,
+} from '@/types/auth';
 
 type RoleOnboardingProps = {
   name: string;
   email?: string | null;
-  needsContact?: boolean;
   onCompleted: (roles: MemberRole[]) => void;
 };
 
@@ -35,47 +46,52 @@ const ROLE_OPTIONS: {
   },
 ];
 
-export function RoleOnboarding({
-  name,
-  email,
-  needsContact,
-  onCompleted,
-}: RoleOnboardingProps) {
-  const collectContact = needsContact ?? isPlaceholderOAuthEmail(email);
-  const [contactEmail, setContactEmail] = useState('');
+const PROOF_LABELS: Record<ProofProvider, string> = {
+  google: 'Google 계정으로 본인 확인',
+  kakao: '카카오 계정으로 본인 확인',
+  naver: '네이버 계정으로 본인 확인',
+  email: '이메일 로그인 링크로 본인 확인',
+};
+
+export function RoleOnboarding({ name, email, onCompleted }: RoleOnboardingProps) {
+  const providerEmail = isPlaceholderOAuthEmail(email) ? '' : (email?.trim() ?? '');
+  const [contactEmail, setContactEmail] = useState(providerEmail);
   const [phone, setPhone] = useState('');
-  const [busy, setBusy] = useState<MemberRole | null>(null);
+  const [busy, setBusy] = useState<MemberRole | ProofProvider | null>(null);
+  const [challenge, setChallenge] = useState<AccountMergeChallenge | null>(null);
 
   const handleChoose = async (role: MemberRole) => {
     if (!isMemberRole(role) || busy) {
       return;
     }
-    if (collectContact) {
-      if (!isValidContactEmail(contactEmail)) {
-        showToast('기존 계정과 연결할 이메일을 입력해 주세요.');
-        return;
-      }
-      if (phone.trim() && !isValidPhone(phone)) {
-        showToast('전화번호 형식을 확인해 주세요.');
-        return;
-      }
+    if (!isValidContactEmail(contactEmail)) {
+      showToast('대표 이메일을 입력해 주세요.');
+      return;
+    }
+    if (phone.trim() && !isValidPhone(phone)) {
+      showToast('전화번호 형식을 확인해 주세요.');
+      return;
     }
 
     setBusy(role);
     try {
-      const result = await saveMemberRole(
-        role,
-        collectContact ? { email: contactEmail.trim(), phone: phone.trim() } : undefined,
-      );
+      const result = await saveMemberRole(role, {
+        email: contactEmail.trim(),
+        phone: phone.trim(),
+      });
       if (result.error || !result.data) {
         showToast(result.error ?? AUTH_FAIL_MESSAGE);
+        return;
+      }
+      if (result.data.kind === 'merge-required') {
+        setChallenge(result.data.challenge);
         return;
       }
       showToast(
         role === 'advertiser' ? '광고주로 시작합니다.' : '크리에이터로 시작합니다.',
         'success',
       );
-      const savedRoles = (result.data.roles ?? []).filter(isMemberRole);
+      const savedRoles = (result.data.user.roles ?? []).filter(isMemberRole);
       onCompleted(savedRoles.length > 0 ? savedRoles : [role]);
     } catch {
       showToast(AUTH_FAIL_MESSAGE);
@@ -84,6 +100,71 @@ export function RoleOnboarding({
     }
   };
 
+  const handleProof = async (provider: ProofProvider) => {
+    if (busy) {
+      return;
+    }
+    setBusy(provider);
+    try {
+      if (provider === 'email') {
+        const sent = await sendAccountProofEmail(contactEmail);
+        showToast(
+          sent.error ?? '메일함의 로그인 링크를 이 브라우저에서 열면 계정이 합쳐집니다.',
+          sent.error ? undefined : 'success',
+        );
+        return;
+      }
+      const started = await signInWithOAuth(provider as SocialOAuthProvider, ROLE_SELECT_PATH);
+      if (started.error) {
+        showToast(started.error);
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (challenge) {
+    return (
+      <div className="mx-auto w-full max-w-lg">
+        <p className="text-sm font-semibold tracking-wide text-teal-800">계정 통합</p>
+        <h1 className="mt-1 text-2xl font-bold text-zinc-950">이미 가입된 계정이 있습니다</h1>
+        <p className="mt-2 text-sm text-zinc-500">
+          {challenge.maskedEmail ? `${challenge.maskedEmail} 계정과 ` : '기존 계정과 '}
+          대표 이메일 또는 전화번호가 일치합니다. 기존 계정으로 로그인해 본인임을 확인하면 지금
+          로그인한 소셜 계정이 기존 계정에 합쳐지고, 기존 역할과 모드가 그대로 유지됩니다.
+        </p>
+        <div className="mt-6 flex flex-col gap-3">
+          {challenge.providers.map((provider) => (
+            <button
+              key={provider}
+              type="button"
+              disabled={Boolean(busy)}
+              onClick={() => {
+                void handleProof(provider);
+              }}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy === provider ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Link2 className="size-4" aria-hidden />
+              )}
+              {PROOF_LABELS[provider]}
+            </button>
+          ))}
+          <button
+            type="button"
+            disabled={Boolean(busy)}
+            onClick={() => setChallenge(null)}
+            className="inline-flex h-11 w-full items-center justify-center rounded-full border border-zinc-200 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-60"
+          >
+            다른 이메일 입력
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-lg">
       <p className="text-sm font-semibold tracking-wide text-teal-800">시작하기</p>
@@ -91,39 +172,36 @@ export function RoleOnboarding({
         {name}님, 역할을 선택해 주세요
       </h1>
       <p className="mt-2 text-sm text-zinc-500">
-        {collectContact
-          ? '카카오는 이메일 없이 로그인됩니다. 구글/네이버와 같은 계정이면 아래에 연락처를 적어 하나로 연결합니다.'
-          : '회원가입 또는 소셜 로그인 후 한 번만 선택합니다. 선택한 역할에 따라 메뉴와 권한이 달라집니다.'}
+        대표 이메일과 전화번호로 계정을 하나로 관리합니다. 구글·네이버·카카오 중 이미 가입한 계정이
+        있으면 같은 이메일을 입력해 하나로 합칠 수 있습니다.
       </p>
 
-      {collectContact ? (
-        <div className="mt-5 space-y-3">
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-zinc-800">이메일</span>
-            <input
-              type="email"
-              autoComplete="email"
-              value={contactEmail}
-              onChange={(event) => setContactEmail(event.target.value)}
-              className="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm text-zinc-950 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-              placeholder="기존 구글/네이버 가입 이메일"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-zinc-800">
-              전화번호 <span className="font-normal text-zinc-400">(선택)</span>
-            </span>
-            <input
-              type="tel"
-              autoComplete="tel"
-              value={phone}
-              onChange={(event) => setPhone(event.target.value)}
-              className="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm text-zinc-950 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-              placeholder="01012345678"
-            />
-          </label>
-        </div>
-      ) : null}
+      <div className="mt-5 space-y-3">
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-zinc-800">대표 이메일</span>
+          <input
+            type="email"
+            autoComplete="email"
+            value={contactEmail}
+            onChange={(event) => setContactEmail(event.target.value)}
+            className="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm text-zinc-950 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+            placeholder="name@example.com"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium text-zinc-800">
+            전화번호 <span className="font-normal text-zinc-400">(선택)</span>
+          </span>
+          <input
+            type="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            className="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm text-zinc-950 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+            placeholder="01012345678"
+          />
+        </label>
+      </div>
 
       <div className="mt-6 flex flex-col gap-3">
         {ROLE_OPTIONS.map((option) => {

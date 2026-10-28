@@ -30,6 +30,7 @@ import {
   parseAuthRoles,
   primaryAuthRole,
   resolveActiveMemberRole,
+  type AccountMergeChallenge,
   type MemberRole,
   type SessionUser,
 } from '@/types/auth';
@@ -627,134 +628,27 @@ export async function signOut(): Promise<DataResult<boolean>> {
   }
 }
 
-async function upsertProfileRow(
-  supabase: NonNullable<ReturnType<typeof createClient>>,
-  payload: {
-    id: string;
-    name: string;
-    email: string;
-    role: MemberRole | 'admin';
-    roles: Array<MemberRole | 'admin'>;
-    status: 'active';
-  },
-) {
-  const upserted = await withTimeout(
-    supabase.from('profiles').upsert(payload, { onConflict: 'id' }).select(PROFILE_COLUMNS).maybeSingle(),
-    4000,
-    '프로필 저장',
-  );
-  if (!upserted.error && upserted.data) {
-    return upserted;
-  }
+export type SaveRoleOutcome =
+  | { kind: 'saved'; user: SessionUser }
+  | { kind: 'merge-required'; challenge: AccountMergeChallenge };
 
-  const updated = await withTimeout(
-    supabase
-      .from('profiles')
-      .update({
-        name: payload.name,
-        email: payload.email,
-        role: payload.role,
-        roles: payload.roles,
-        status: payload.status,
-      })
-      .eq('id', payload.id)
-      .select(PROFILE_COLUMNS)
-      .maybeSingle(),
-    4000,
-    '프로필 수정',
-  );
-  if (!updated.error && updated.data) {
-    return updated;
-  }
-
-  const roleOnly = await withTimeout(
-    supabase
-      .from('profiles')
-      .update({ role: payload.role, roles: payload.roles })
-      .eq('id', payload.id)
-      .select(PROFILE_COLUMNS)
-      .maybeSingle(),
-    4000,
-    '역할 수정',
-  );
-  if (!roleOnly.error && roleOnly.data) {
-    return roleOnly;
-  }
-
-  return updated.error ? updated : upserted;
-}
-
-async function saveRoleViaApi(
-  accessToken: string,
-  role: MemberRole,
-  name: string,
-  email: string,
-  phone?: string,
-): Promise<{ user: SessionUser | null; error: string | null }> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+type RoleApiPayload = {
+  data?: {
+    id?: string;
+    email?: string;
+    name?: string;
+    role?: string | null;
+    roles?: unknown;
+    currentMode?: unknown;
   };
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
-  }
-  const response = await fetch('/api/onboarding/role', {
-    method: 'POST',
-    credentials: 'include',
-    headers,
-    body: JSON.stringify({ role, roles: [role], name, email, phone }),
-  });
-  const payload = (await response.json().catch(() => null)) as {
-    data?: {
-      id?: string;
-      email?: string;
-      name?: string;
-      role?: string | null;
-      roles?: unknown;
-      currentMode?: unknown;
-    };
-    tokenHash?: string | null;
-    error?: string;
-  } | null;
-  if (!response.ok || !payload?.data?.id) {
-    return {
-      user: null,
-      error: payload?.error || `역할 저장에 실패했습니다. (${response.status})`,
-    };
-  }
-  if (payload.tokenHash) {
-    const supabase = createClient();
-    if (supabase) {
-      const verified = await supabase.auth.verifyOtp({
-        token_hash: payload.tokenHash,
-        type: 'magiclink',
-      });
-      if (verified.error) {
-        console.warn('[SponsorAuction] 통합 계정 세션 전환 실패', verified.error.message);
-      }
-    }
-  }
-  return {
-    user: mapSessionUser(
-      payload.data.id,
-      payload.data.email?.trim() || email,
-      payload.data.name?.trim() || name,
-      payload.data.role,
-      {
-        user_metadata: {
-          onboarding_complete: true,
-          current_mode: payload.data.currentMode,
-        },
-      },
-      payload.data.roles,
-    ),
-    error: null,
-  };
-}
+  mergeRequired?: AccountMergeChallenge;
+  error?: string;
+};
 
 export async function saveMemberRole(
   role: MemberRole,
   contact?: { email?: string; phone?: string },
-): Promise<DataResult<SessionUser | null>> {
+): Promise<DataResult<SaveRoleOutcome | null>> {
   if (!isMemberRole(role)) {
     return fail(null, '광고주 또는 크리에이터 역할을 선택해 주세요.');
   }
@@ -762,109 +656,83 @@ export async function saveMemberRole(
   const supabase = createClient();
   if (!supabase) {
     const result = await mockSaveMemberRole(role);
-    if (!result.error) {
-      applyKnownSession(result.data);
+    if (result.error || !result.data) {
+      return fail(null, result.error ?? AUTH_FAIL_MESSAGE);
     }
-    return result;
+    applyKnownSession(result.data);
+    return ok({ kind: 'saved', user: result.data });
   }
 
   try {
-    let sessionResult: Awaited<ReturnType<typeof supabase.auth.getSession>> | null = null;
-    try {
-      sessionResult = await withTimeout(supabase.auth.getSession(), 4000, '세션 조회');
-    } catch (error) {
-      console.warn('[SponsorAuction] 역할 저장 세션 조회 지연', error);
-    }
-    const authUser =
-      sessionResult?.data.session?.user ?? (await readBrowserAuthUser(supabase));
-    const accessToken = sessionResult?.data.session?.access_token ?? '';
-    if (!authUser) {
-      const mock = await mockSaveMemberRole(role);
-      if (!mock.error) {
-        applyKnownSession(mock.data);
-        return mock;
-      }
+    const { data: sessionData } = await withTimeout(supabase.auth.getSession(), 4000, '세션 조회');
+    const session = sessionData.session;
+    if (!session?.user) {
       return fail(null, '로그인이 필요합니다.');
     }
 
-    const email =
-      contact?.email?.trim() ||
-      (authUser.email?.includes('@')
-        ? authUser.email.trim()
-        : `user.${authUser.id.replace(/-/g, '').slice(0, 12)}@oauth.sponsor-auction.local`);
-    const name =
-      (typeof authUser.user_metadata?.name === 'string'
-        ? authUser.user_metadata.name.trim()
-        : '') || email.split('@')[0] || '회원';
+    const response = await fetch('/api/onboarding/role', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        role,
+        roles: [role],
+        email: contact?.email?.trim() || undefined,
+        phone: contact?.phone?.trim() || undefined,
+      }),
+    });
+    const payload = (await response.json().catch(() => null)) as RoleApiPayload | null;
 
-    const fromApi = await saveRoleViaApi(
-      accessToken,
-      role,
-      name,
-      email,
-      contact?.phone,
-    );
-    if (fromApi.user) {
-      const completed = { ...fromApi.user, onboardingComplete: true as const };
-      applyKnownSession(completed);
-      void supabase.auth
-        .updateUser({
-          data: {
-            onboarding_complete: true,
-            role: completed.role,
-            roles: completed.roles ?? [role],
-          },
-        })
-        .catch(() => null);
-      return ok(completed);
+    if (payload?.mergeRequired) {
+      return ok({ kind: 'merge-required', challenge: payload.mergeRequired });
+    }
+    if (!response.ok || !payload?.data?.id) {
+      return fail(null, payload?.error || `역할 저장에 실패했습니다. (${response.status})`);
     }
 
-    let existingRoles: unknown;
-    try {
-      const existing = await withTimeout(
-        supabase.from('profiles').select('role, roles').eq('id', authUser.id).maybeSingle(),
-        2500,
-        '기존 역할 조회',
-      );
-      existingRoles = existing.data;
-    } catch {
-      existingRoles = null;
-    }
-    const nextRoles = parseAuthRoles(existingRoles, role);
-    const payload = {
-      id: authUser.id,
-      name,
-      email,
-      role: primaryAuthRole(nextRoles) ?? role,
-      roles: nextRoles.length > 0 ? nextRoles : [role],
-      status: 'active' as const,
-    };
-
-    const { data, error } = await upsertProfileRow(supabase, payload);
-    if (error || !data) {
-      console.warn('[SponsorAuction] 역할 저장에 실패했습니다.', error?.message, fromApi.error);
-      return fail(null, fromApi.error || error?.message || AUTH_FAIL_MESSAGE);
-    }
-
-    const row = data as ProfileRow;
-    const session = mapSessionUser(
-      authUser.id,
-      row.email?.trim() || email,
-      row.name?.trim() || name,
-      row.role,
+    const user = mapSessionUser(
+      payload.data.id,
+      payload.data.email?.trim() || session.user.email || '',
+      payload.data.name?.trim() || '회원',
+      payload.data.role,
       {
-        ...authUser,
+        ...session.user,
         user_metadata: {
-          ...(authUser.user_metadata ?? {}),
+          ...(session.user.user_metadata ?? {}),
           onboarding_complete: true,
+          current_mode: payload.data.currentMode,
         },
       },
-      row.roles,
+      payload.data.roles,
     );
-    applyKnownSession(session);
-    return ok(session);
+    void supabase.auth.refreshSession().catch(() => null);
+    applyKnownSession(user);
+    return ok({ kind: 'saved', user });
   } catch (error) {
     console.warn('[SponsorAuction] 역할 저장 중 예외가 발생했습니다.', error);
     return fail(null, AUTH_FAIL_MESSAGE);
   }
+}
+
+/** 기존 계정 소유 확인용 이메일 로그인 링크. 링크를 열면 /auth/callback에서 대기 중인 병합이 완료된다. */
+export async function sendAccountProofEmail(email: string): Promise<DataResult<boolean>> {
+  const supabase = createClient();
+  if (!supabase) {
+    return fail(false, 'Supabase가 설정되지 않았습니다.');
+  }
+  rememberOAuthNext(ROLE_SELECT_PATH);
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim().toLowerCase(),
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: buildAppOAuthCallbackUrl(window.location.origin),
+    },
+  });
+  if (error) {
+    return fail(false, error.message || '이메일 링크를 보내지 못했습니다.');
+  }
+  return ok(true);
 }

@@ -467,6 +467,10 @@ export type Database = {
         Args: { p_auction_id: string; p_bid_id: string };
         Returns: Database['public']['Tables']['auctions']['Row'];
       };
+      merge_auth_identities: {
+        Args: { p_from: string; p_to: string };
+        Returns: number;
+      };
     };
     Enums: {
       platform_type:
