@@ -105,6 +105,10 @@ export async function POST(request: Request) {
         phone,
         current_mode: selectedRoles[0],
       },
+      app_metadata: {
+        contact_email: contactEmail,
+        contact_phone: phone,
+      },
     });
     if (updated.error) {
       console.warn('[SponsorAuction] 온보딩 메타데이터 저장 실패', updated.error.message);

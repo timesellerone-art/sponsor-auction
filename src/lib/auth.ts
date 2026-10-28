@@ -471,48 +471,25 @@ export async function signUp(input: {
 
     if (error) {
       console.warn('[SponsorAuction] 회원가입에 실패했습니다.', error.message);
-      const mock = await mockSignUp(input);
-      if (!mock.error) {
-        applyKnownSession(mock.data);
-        notifyAuthChanged();
-        return mock;
-      }
       return fail(null, publicAuthErrorMessage(error));
     }
 
     const user = data.user;
-    if (!user) {
+    if (!user || !data.session) {
       return fail(null, '이메일 인증 후 로그인해 주세요.');
     }
 
-    const accessToken = data.session?.access_token ?? '';
-    if (accessToken) {
-      await fetch('/api/onboarding/profile', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ name, email, roles: [] }),
-      }).catch(() => null);
-    } else {
-      await supabase
-        .from('profiles')
-        .upsert(
-          {
-            id: user.id,
-            name,
-            email: user.email?.trim() || email,
-            status: 'active',
-          },
-          { onConflict: 'id' },
-        )
-        .then(({ error: profileError }) => {
-          if (profileError) {
-            console.warn('[SponsorAuction] 가입 프로필 저장 실패', profileError.message);
-          }
-        });
+    const profiled = await fetch('/api/onboarding/profile', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${data.session.access_token}`,
+      },
+      body: JSON.stringify({ name, email, roles: [] }),
+    }).catch(() => null);
+    if (!profiled?.ok) {
+      console.warn('[SponsorAuction] 가입 프로필 저장 실패', profiled?.status);
     }
 
     const session = await loadProfile(
@@ -523,16 +500,9 @@ export async function signUp(input: {
       user,
     );
     applyKnownSession(session);
-    notifyAuthChanged();
     return ok(session);
   } catch (error) {
     console.warn('[SponsorAuction] 회원가입 중 예외가 발생했습니다.', error);
-    const mock = await mockSignUp(input);
-    if (!mock.error) {
-      applyKnownSession(mock.data);
-      notifyAuthChanged();
-      return mock;
-    }
     return fail(null, AUTH_FAIL_MESSAGE);
   }
 }
@@ -561,13 +531,7 @@ export async function signIn(input: {
       '로그인',
     );
 
-    if (error || !data.user) {
-      const mock = await mockSignIn(input);
-      if (!mock.error) {
-        applyKnownSession(mock.data);
-        notifyAuthChanged();
-        return mock;
-      }
+    if (error || !data.user || !data.session) {
       return fail(null, publicAuthErrorMessage(error));
     }
 
@@ -579,15 +543,8 @@ export async function signIn(input: {
         : '') || email.split('@')[0] || '회원';
     const session = await loadProfile(supabase, user.id, email, name, user);
     applyKnownSession(session);
-    notifyAuthChanged();
     return ok(session);
   } catch (error) {
-    const mock = await mockSignIn(input);
-    if (!mock.error) {
-      applyKnownSession(mock.data);
-      notifyAuthChanged();
-      return mock;
-    }
     return fail(null, publicAuthErrorMessage(error));
   }
 }
@@ -605,22 +562,12 @@ export async function signOut(): Promise<DataResult<boolean>> {
 
   try {
     const { error } = await supabase.auth.signOut();
+    applyKnownSession(null);
+    notifyAuthChanged();
     if (error) {
       console.warn('[SponsorAuction] 로그아웃에 실패했습니다.', error.message);
-    }
-
-    applyKnownSession(null);
-    const mock = await mockSignOut();
-    if (!mock.error) {
-      notifyAuthChanged();
-      return ok(true);
-    }
-
-    if (error) {
       return fail(false, AUTH_FAIL_MESSAGE);
     }
-
-    notifyAuthChanged();
     return ok(true);
   } catch (error) {
     console.warn('[SponsorAuction] 로그아웃 중 예외가 발생했습니다.', error);

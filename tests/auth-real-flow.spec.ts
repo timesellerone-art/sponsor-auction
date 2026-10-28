@@ -180,6 +180,137 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
     }
   });
 
+  test('a) admin@demo.com 이메일 로그인은 튕김 없이 유지되고 관리자 메뉴가 보인다', async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(60_000);
+    const passwordGrant: number[] = [];
+    page.on('response', (response) => {
+      if (response.url().includes('/auth/v1/token?grant_type=password')) {
+        passwordGrant.push(response.status());
+      }
+    });
+
+    await page.goto('/login');
+    await expect(page.locator('form button[type=submit]')).toBeEnabled();
+    await page.waitForLoadState('networkidle');
+    await page.getByLabel('이메일').fill('admin@demo.com');
+    await page.getByLabel('비밀번호').fill('demo1234');
+    await page.locator('form button[type=submit]').click();
+
+    await expect(page).toHaveURL(/\/admin(\?|$)/, { timeout: 15000 });
+    expect(passwordGrant).toEqual([200]);
+    const header = page.locator('header');
+    await expect(header.getByRole('link', { name: '관리자', exact: true }).first()).toBeVisible();
+    await expect(header.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible();
+    expect(await sessionUserId(context)).toBeTruthy();
+
+    await page.waitForTimeout(3000);
+    await expect(page).toHaveURL(/\/admin(\?|$)/);
+    await expect(header.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible();
+
+    await page.reload();
+    await expect(page).toHaveURL(/\/admin(\?|$)/);
+    await expect(header.getByRole('link', { name: '관리자', exact: true }).first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('form button[type=submit]')).toHaveCount(0);
+  });
+
+  test('e) 이메일 없는 카카오 계정의 대표 이메일로 나중에 가입한 구글 계정이 병합·삭제된다', async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(120_000);
+    const admin = adminClient();
+    test.skip(!admin, 'SUPABASE_SERVICE_ROLE_KEY가 없어 실유저 시나리오를 건너뜁니다.');
+    if (!admin) {
+      return;
+    }
+
+    const stamp = Date.now();
+    const contactEmail = `e2e.contact.${stamp}@sponsor-auction.test`;
+    const kakao = await admin.auth.admin.createUser({
+      email: `user.${stamp.toString(16)}k@oauth.sponsor-auction.local`,
+      email_confirm: true,
+      app_metadata: { provider: 'kakao', providers: ['kakao'] },
+      user_metadata: { name: 'E2E 카카오 대표' },
+    });
+    expect(kakao.error, kakao.error?.message).toBeNull();
+    const kakaoId = kakao.data.user?.id ?? '';
+    const google = await admin.auth.admin.createUser({
+      email: `e2e.google.${stamp}@sponsor-auction.test`,
+      email_confirm: true,
+      app_metadata: { provider: 'google', providers: ['google'] },
+      user_metadata: { name: 'E2E 구글' },
+    });
+    expect(google.error, google.error?.message).toBeNull();
+    const googleId = google.data.user?.id ?? '';
+
+    const loginAs = async (email: string, next: string) => {
+      const link = await admin.auth.admin.generateLink({ type: 'magiclink', email });
+      await page.goto(
+        `/auth/oauth?token_hash=${link.data.properties?.hashed_token}&type=magiclink&next=${encodeURIComponent(next)}`,
+      );
+    };
+
+    try {
+      await loginAs(kakao.data.user?.email ?? '', '/onboarding');
+      await expect(page.getByRole('heading', { name: /역할을 선택해 주세요/ })).toBeVisible({
+        timeout: 15000,
+      });
+      await page.getByLabel('대표 이메일').fill(contactEmail);
+      await page.getByRole('button', { name: /크리에이터로 시작하기/ }).click();
+      await expect(page).not.toHaveURL(/\/onboarding/, { timeout: 15000 });
+      const onboarded = (await admin.auth.admin.getUserById(kakaoId)).data.user;
+      expect(onboarded?.app_metadata?.contact_email).toBe(contactEmail);
+      // Admin API로는 실제 카카오 identity를 만들 수 없고, 매직링크 로그인 시 GoTrue가 providers를 email로 재계산한다.
+      await admin.auth.admin.updateUserById(kakaoId, {
+        app_metadata: { provider: 'kakao', providers: ['kakao'] },
+      });
+
+      await context.clearCookies();
+      await loginAs(google.data.user?.email ?? '', '/onboarding');
+      await expect(page.getByRole('heading', { name: /역할을 선택해 주세요/ })).toBeVisible({
+        timeout: 15000,
+      });
+      expect(await sessionUserId(context)).toBe(googleId);
+      await page.getByLabel('대표 이메일').fill(contactEmail);
+      await page.getByRole('button', { name: /광고주로 시작하기/ }).click();
+      await expect(page.getByRole('heading', { name: '이미 가입된 계정이 있습니다' })).toBeVisible({
+        timeout: 10000,
+      });
+      await expect(page.getByRole('button', { name: '카카오 계정으로 본인 확인' })).toBeVisible();
+      const pending = (await admin.auth.admin.getUserById(googleId)).data.user;
+      expect(pending?.app_metadata?.pending_merge?.into).toBe(kakaoId);
+
+      const linkResponse = page.waitForResponse((response) =>
+        response.url().includes('/api/auth/identities/link'),
+      );
+      await loginAs(kakao.data.user?.email ?? '', '/onboarding/role-select');
+      expect((await linkResponse).status(), '계정 통합 API가 성공해야 한다').toBe(200);
+      await expect(page).not.toHaveURL(/\/auth\/oauth|\/onboarding|\/login/, { timeout: 20000 });
+      expect(await sessionUserId(context)).toBe(kakaoId);
+
+      expect((await admin.auth.admin.getUserById(googleId)).data.user).toBeNull();
+      const googleProfile = await admin.from('profiles').select('id').eq('id', googleId);
+      expect(googleProfile.data ?? []).toHaveLength(0);
+      const kakaoProfile = await admin
+        .from('profiles')
+        .select('email, roles')
+        .eq('id', kakaoId)
+        .single();
+      expect(kakaoProfile.data?.email).toBe(contactEmail);
+      expect(kakaoProfile.data?.roles).toEqual(expect.arrayContaining(['creator']));
+    } finally {
+      for (const id of [googleId, kakaoId]) {
+        if (id) {
+          await admin.auth.admin.deleteUser(id);
+          await admin.from('profiles').delete().eq('id', id);
+        }
+      }
+    }
+  });
+
   test('d) 다른 소셜 수단 신규 계정이 온보딩 대표 이메일로 기존 계정에 병합되고 중복 유저가 삭제된다', async ({
     page,
     context,

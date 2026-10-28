@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { PostgrestError, SupabaseClient, User } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
+import { isPlaceholderOAuthEmail } from '@/lib/contact';
 import { parseAuthRoles, primaryAuthRole, type MemberRole } from '@/types/auth';
 
 const PROFILE_COLUMNS_WITH_PHONE = 'id, name, email, phone, role, roles, status, created_at';
@@ -96,14 +97,19 @@ export async function upsertAppProfile(
     roles?: Array<MemberRole | 'admin'> | null;
   },
 ): Promise<SyncedProfile | null> {
-  const email = resolveProfileEmail(input.id, input.email);
-  const name = input.name?.trim() || email.split('@')[0] || '회원';
-  const phone = input.phone?.trim() || null;
   const current = await admin
     .from('profiles')
-    .select('role, roles')
+    .select('email, role, roles')
     .eq('id', input.id)
     .maybeSingle();
+  const requestedEmail = resolveProfileEmail(input.id, input.email);
+  const storedEmail = current.data?.email ?? '';
+  const email =
+    isPlaceholderOAuthEmail(requestedEmail) && !isPlaceholderOAuthEmail(storedEmail)
+      ? storedEmail
+      : requestedEmail;
+  const name = input.name?.trim() || email.split('@')[0] || '회원';
+  const phone = input.phone?.trim() || null;
   const nextRoles = parseAuthRoles(current.data?.roles, current.data?.role, input.roles, input.role);
   const nextRole = primaryAuthRole(nextRoles);
   const base = {

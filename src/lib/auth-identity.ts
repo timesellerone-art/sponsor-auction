@@ -182,13 +182,18 @@ export async function findExistingAccountByContact(input: {
     if (candidates.has(item.id)) {
       return true;
     }
-    if (email && collectAuthEmails(item).includes(email)) {
+    const contactEmail = normalizeContactEmail(
+      typeof item.app_metadata?.contact_email === 'string' ? item.app_metadata.contact_email : '',
+    );
+    if (email && (collectAuthEmails(item).includes(email) || contactEmail === email)) {
       return true;
     }
-    const itemPhone = normalizePhone(
-      item.phone || (typeof item.user_metadata?.phone === 'string' ? item.user_metadata.phone : ''),
-    );
-    return Boolean(phone) && itemPhone === phone;
+    const itemPhones = [
+      item.phone,
+      typeof item.app_metadata?.contact_phone === 'string' ? item.app_metadata.contact_phone : '',
+      typeof item.user_metadata?.phone === 'string' ? item.user_metadata.phone : '',
+    ].map((value) => normalizePhone(value));
+    return Boolean(phone) && itemPhones.includes(phone);
   });
   return pickCanonicalUser(matches);
 }
@@ -225,6 +230,18 @@ async function generateMagicLinkHash(admin: AdminClient, user: User) {
     return null;
   }
   return link.data.properties?.hashed_token ?? null;
+}
+
+async function deleteUserOrThrow(admin: AdminClient, userId: string) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const deleted = await admin.auth.admin.deleteUser(userId);
+    const remaining = await admin.auth.admin.getUserById(userId);
+    if (!remaining.data.user) {
+      return;
+    }
+    console.error('[SponsorAuction] 중복 auth.users 삭제 실패', userId, deleted.error?.message);
+  }
+  throw new Error('중복 계정을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.');
 }
 
 /**
@@ -290,16 +307,15 @@ export async function mergeUserInto(
     },
     app_metadata: {
       naver_ids: [...new Set([...naverIdsOf(canonical), ...naverIdsOf(incoming)])],
+      contact_email: canonical.app_metadata?.contact_email ?? incoming.app_metadata?.contact_email ?? null,
+      contact_phone: phone,
       pending_merge: null,
     },
   });
 
   await reassignOwnedRows(admin, incoming.id, canonical.id);
   await admin.from('profiles').delete().eq('id', incoming.id);
-  const deleted = await admin.auth.admin.deleteUser(incoming.id);
-  if (deleted.error) {
-    console.error('[SponsorAuction] 중복 auth.users 삭제 실패', incoming.id, deleted.error.message);
-  }
+  await deleteUserOrThrow(admin, incoming.id);
 
   await upsertAppProfile(admin, {
     id: canonical.id,
