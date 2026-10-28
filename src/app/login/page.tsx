@@ -60,7 +60,7 @@ export default function LoginPage() {
       if (!cancelled) {
         setIsLoading(false);
       }
-    }, 4000);
+    }, 2500);
 
     const checkSession = async () => {
       try {

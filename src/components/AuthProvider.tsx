@@ -9,7 +9,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { getSessionUser, onKnownSession, subscribeAuthState } from '@/lib/auth';
+import { applyKnownSession, getSessionUser, onKnownSession, subscribeAuthState } from '@/lib/auth';
+import { AUTH_BOOT_TIMEOUT_MS } from '@/lib/auth-timeout';
 import { createClient } from '@/lib/supabase/client';
 import {
   readActiveRoleCookie,
@@ -60,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const result = await getSessionUser();
+      applyKnownSession(result.data);
       setUser(result.data);
     } catch (error) {
       console.warn('[SponsorAuction] 인증 상태를 갱신하지 못했습니다.', error);
@@ -73,6 +75,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const boot = window.setTimeout(() => {
       void refresh();
     }, 0);
+    const failSafe = window.setTimeout(() => {
+      setReady(true);
+    }, AUTH_BOOT_TIMEOUT_MS);
     let skipRefreshUntil = 0;
     const unsubKnown = onKnownSession((session) => {
       skipRefreshUntil = Date.now() + 1500;
@@ -87,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       window.clearTimeout(boot);
+      window.clearTimeout(failSafe);
       unsubKnown();
       unsubscribe();
     };

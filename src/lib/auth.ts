@@ -343,7 +343,7 @@ async function loadProfile(
 ): Promise<SessionUser> {
   const { data, error } = await withTimeout(
     supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle(),
-    2500,
+    2000,
     '프로필 조회',
   );
 
@@ -378,12 +378,12 @@ function hasClientAuthHint() {
 async function readBrowserAuthUser(
   supabase: NonNullable<ReturnType<typeof createClient>>,
 ) {
-  const attempts = hasClientAuthHint() ? 3 : 1;
+  const attempts = hasClientAuthHint() ? 2 : 1;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const { data, error } = await withTimeout(
         supabase.auth.getUser(),
-        4000,
+        1500,
         '세션 조회',
       );
       if (data.user) {

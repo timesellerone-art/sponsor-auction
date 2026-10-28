@@ -6,6 +6,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { ACCESS_REASON, syncRoleCookie } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
+import { useSafetyTimeout } from '@/lib/auth-timeout';
 import { hasAuthRole, type AuthProfileRole } from '@/types/auth';
 
 type AccessRole = 'admin' | 'advertiser' | 'creator';
@@ -22,15 +23,17 @@ function allowedRoles(allow: AccessRole | readonly AccessRole[]) {
 export function AccessGuard({ allow, children }: AccessGuardProps) {
   const router = useRouter();
   const { user, ready } = useAuth();
+  const timedOut = useSafetyTimeout();
+  const settled = ready || timedOut;
   const roles = allowedRoles(allow);
   const allowKey = roles.join('|');
   const hasAccess = Boolean(
-    ready && user && roles.some((role) => hasAuthRole(user, role as AuthProfileRole)),
+    settled && user && roles.some((role) => hasAuthRole(user, role as AuthProfileRole)),
   );
 
   useEffect(() => {
-    if (!ready || hasAccess) {
-      if (ready) {
+    if (!settled || hasAccess) {
+      if (settled) {
         syncRoleCookie(user?.role, user?.roles);
       }
       return;
@@ -56,7 +59,7 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
     router.replace(
       `/?reason=${wantsAdmin ? 'admin-forbidden' : allowed.includes('advertiser') && !allowed.includes('creator') ? 'advertiser-forbidden' : 'creator-forbidden'}`,
     );
-  }, [allowKey, hasAccess, ready, router, user]);
+  }, [allowKey, hasAccess, router, settled, user]);
 
   if (hasAccess) {
     return (

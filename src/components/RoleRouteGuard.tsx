@@ -3,7 +3,9 @@
 import { Suspense, useEffect, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
+import { syncActiveRoleCookie, syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import { ROLE_SELECT_PATH } from '@/lib/auth-guard';
+import { resolveActiveMemberRole } from '@/types/auth';
 
 const OPEN_WITHOUT_ROLE = [
   ROLE_SELECT_PATH,
@@ -38,6 +40,9 @@ function RoleRouteGuardInner({ children }: { children: ReactNode }) {
     }
 
     if (user && !needsOnboarding && pathname.startsWith('/onboarding')) {
+      syncRoleCookie(user.role, user.roles);
+      syncAuthPresentCookie(true);
+      syncActiveRoleCookie(resolveActiveMemberRole(user, user.currentMode));
       router.replace(user.role === 'admin' || user.roles?.includes('admin') ? '/admin' : '/my');
     }
   }, [needsOnboarding, pathname, ready, router, user]);
