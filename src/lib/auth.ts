@@ -14,7 +14,11 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseOAuthCallbackUrl } from '@/lib/supabase/env';
 import { buildAppOAuthCallbackUrl, sanitizeNextPath } from '@/lib/auth-guard';
-import { sanitizeKakaoAuthorizeUrl } from '@/lib/kakao-oauth';
+import {
+  kakaoOAuthScopeQuery,
+  kakaoOAuthScopesOption,
+  sanitizeKakaoAuthorizeUrl,
+} from '@/lib/kakao-oauth';
 import {
   isMemberRole,
   parseAuthRoles,
@@ -237,12 +241,16 @@ export async function signInWithOAuth(
     const oauthOptions: {
       redirectTo: string;
       skipBrowserRedirect: boolean;
+      scopes?: string;
       queryParams?: Record<string, string>;
     } = {
       redirectTo: oauthRedirectTo(nextPath),
       skipBrowserRedirect: true,
     };
-    if (provider === 'google') {
+    if (provider === 'kakao') {
+      oauthOptions.scopes = kakaoOAuthScopesOption();
+      oauthOptions.queryParams = { scope: kakaoOAuthScopeQuery() };
+    } else if (provider === 'google') {
       oauthOptions.queryParams = { access_type: 'offline', prompt: 'consent' };
     }
 

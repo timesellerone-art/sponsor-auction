@@ -1,6 +1,16 @@
 const KAKAO_BLOCKED_SCOPE_RE =
   /email|account_ci|phone_number|gender|age_range|birthday|birthyear|talk_message|^friends$/i;
 
+export const KAKAO_PROFILE_SCOPES = ['profile_nickname', 'profile_image'] as const;
+
+export function kakaoOAuthScopesOption() {
+  return KAKAO_PROFILE_SCOPES.join(',');
+}
+
+export function kakaoOAuthScopeQuery() {
+  return KAKAO_PROFILE_SCOPES.join(' ');
+}
+
 export function parseOAuthScopes(raw: string | null | undefined): string[] {
   if (!raw) {
     return [];
@@ -16,14 +26,15 @@ export function isKakaoBlockedScope(scope: string) {
   if (!value) {
     return true;
   }
-  return value === 'account_email' || KAKAO_BLOCKED_SCOPE_RE.test(value);
+  return KAKAO_BLOCKED_SCOPE_RE.test(value);
 }
 
 export function sanitizeKakaoScopes(scopes: string[]) {
-  return scopes.filter((scope) => !isKakaoBlockedScope(scope));
+  const allowed = new Set<string>(KAKAO_PROFILE_SCOPES);
+  return scopes.filter((scope) => allowed.has(scope) && !isKakaoBlockedScope(scope));
 }
 
-/** KOE205 방지: account_email 등 미승인 스코프만 제거하고 새 스코프는 넣지 않습니다. */
+/** KOE205 방지: 닉네임·프로필 이미지만 남기고 이메일 등 미승인 스코프는 제거합니다. */
 export function sanitizeKakaoAuthorizeUrl(
   url: string,
   supabaseCallbackUrl?: string | null,
@@ -34,13 +45,8 @@ export function sanitizeKakaoAuthorizeUrl(
       parsed.searchParams.set('redirect_uri', supabaseCallbackUrl);
     }
 
-    const allowed = sanitizeKakaoScopes(parseOAuthScopes(parsed.searchParams.get('scope')));
-    if (allowed.length > 0) {
-      parsed.searchParams.set('scope', allowed.join(' '));
-    } else {
-      parsed.searchParams.delete('scope');
-    }
-
+    const kept = sanitizeKakaoScopes(parseOAuthScopes(parsed.searchParams.get('scope')));
+    parsed.searchParams.set('scope', (kept.length > 0 ? kept : [...KAKAO_PROFILE_SCOPES]).join(' '));
     return parsed.toString();
   } catch {
     return url;
