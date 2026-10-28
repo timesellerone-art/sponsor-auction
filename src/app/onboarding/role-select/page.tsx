@@ -9,6 +9,7 @@ import { RoleOnboarding } from '@/components/RoleOnboarding';
 import { AUTH_PRESENT_COOKIE_NAME, syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import { getSessionUser } from '@/lib/auth';
 import { loginPath, postAuthPath, ROLE_SELECT_PATH } from '@/lib/auth-guard';
+import { isPlaceholderOAuthEmail } from '@/lib/contact';
 import { needsRoleOnboarding } from '@/types/auth';
 
 function goDashboard(path: string) {
@@ -136,6 +137,8 @@ export default function RoleSelectPage() {
     <PageContainer className="flex flex-1 flex-col justify-center py-10 sm:py-16">
       <RoleOnboarding
         name={user?.name || '회원'}
+        email={user?.email}
+        needsContact={isPlaceholderOAuthEmail(user?.email)}
         onCompleted={(roles) => {
           const path = postAuthPath(roles);
           router.replace(path);

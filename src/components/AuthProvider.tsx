@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { getSessionUser, onKnownSession, subscribeAuthState } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/client';
 import {
   readActiveRoleCookie,
   syncActiveRoleCookie,
@@ -119,7 +120,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       setActiveRoleState((current) =>
-        resolveActiveMemberRole(user, current ?? readActiveRoleCookie()),
+        resolveActiveMemberRole(
+          user,
+          current ?? readActiveRoleCookie() ?? user.currentMode,
+        ),
       );
     }, 0);
     return () => {
@@ -141,6 +145,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setActiveRoleState(role);
       syncActiveRoleCookie(role);
+      const supabase = createClient();
+      void supabase?.auth
+        .updateUser({ data: { current_mode: role } })
+        .catch(() => null);
       return true;
     },
     [switchableRoles],

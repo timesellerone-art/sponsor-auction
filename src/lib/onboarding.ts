@@ -14,6 +14,7 @@ export type OnboardingBody = {
   roles?: unknown;
   name?: string;
   email?: string;
+  phone?: string;
 };
 
 export function bearerToken(request: Request) {

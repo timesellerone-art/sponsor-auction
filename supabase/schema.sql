@@ -60,6 +60,7 @@ create table if not exists public.profiles (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   email text not null unique,
+  phone text,
   role public.profile_role,
   roles public.profile_role[] not null default '{}'::public.profile_role[],
   status public.profile_status not null default 'active',
@@ -72,6 +73,11 @@ alter table public.profiles alter column role drop not null;
 alter table public.profiles alter column role drop default;
 alter table public.profiles
   add column if not exists roles public.profile_role[] not null default '{}'::public.profile_role[];
+alter table public.profiles
+  add column if not exists phone text;
+create unique index if not exists profiles_phone_unique
+  on public.profiles (phone)
+  where phone is not null and char_length(trim(phone)) > 0;
 
 create table if not exists public.creator_metrics (
   profile_id uuid primary key references public.profiles(id) on delete cascade,

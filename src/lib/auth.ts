@@ -133,6 +133,7 @@ function mapSessionUser(
   roles?: unknown,
 ): SessionUser {
   const parsed = parseAuthRoles(roles, role);
+  const modeRaw = authUser?.user_metadata?.current_mode;
   return {
     id,
     email,
@@ -142,6 +143,7 @@ function mapSessionUser(
     createdAt: authUser?.created_at,
     lastSignInAt: authUser?.last_sign_in_at,
     onboardingComplete: authUser?.user_metadata?.onboarding_complete === true,
+    currentMode: isMemberRole(modeRaw) ? modeRaw : null,
   };
 }
 
@@ -693,6 +695,7 @@ async function saveRoleViaApi(
   role: MemberRole,
   name: string,
   email: string,
+  phone?: string,
 ): Promise<{ user: SessionUser | null; error: string | null }> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -704,10 +707,18 @@ async function saveRoleViaApi(
     method: 'POST',
     credentials: 'include',
     headers,
-    body: JSON.stringify({ role, roles: [role], name, email }),
+    body: JSON.stringify({ role, roles: [role], name, email, phone }),
   });
   const payload = (await response.json().catch(() => null)) as {
-    data?: { id?: string; email?: string; name?: string; role?: string | null; roles?: unknown };
+    data?: {
+      id?: string;
+      email?: string;
+      name?: string;
+      role?: string | null;
+      roles?: unknown;
+      currentMode?: unknown;
+    };
+    tokenHash?: string | null;
     error?: string;
   } | null;
   if (!response.ok || !payload?.data?.id) {
@@ -716,13 +727,30 @@ async function saveRoleViaApi(
       error: payload?.error || `역할 저장에 실패했습니다. (${response.status})`,
     };
   }
+  if (payload.tokenHash) {
+    const supabase = createClient();
+    if (supabase) {
+      const verified = await supabase.auth.verifyOtp({
+        token_hash: payload.tokenHash,
+        type: 'magiclink',
+      });
+      if (verified.error) {
+        console.warn('[SponsorAuction] 통합 계정 세션 전환 실패', verified.error.message);
+      }
+    }
+  }
   return {
     user: mapSessionUser(
       payload.data.id,
       payload.data.email?.trim() || email,
       payload.data.name?.trim() || name,
       payload.data.role,
-      null,
+      {
+        user_metadata: {
+          onboarding_complete: true,
+          current_mode: payload.data.currentMode,
+        },
+      },
       payload.data.roles,
     ),
     error: null,
@@ -731,6 +759,7 @@ async function saveRoleViaApi(
 
 export async function saveMemberRole(
   role: MemberRole,
+  contact?: { email?: string; phone?: string },
 ): Promise<DataResult<SessionUser | null>> {
   if (!isMemberRole(role)) {
     return fail(null, '광고주 또는 크리에이터 역할을 선택해 주세요.');
@@ -764,15 +793,23 @@ export async function saveMemberRole(
       return fail(null, '로그인이 필요합니다.');
     }
 
-    const email = authUser.email?.includes('@')
-      ? authUser.email.trim()
-      : `user.${authUser.id.replace(/-/g, '').slice(0, 12)}@oauth.sponsor-auction.local`;
+    const email =
+      contact?.email?.trim() ||
+      (authUser.email?.includes('@')
+        ? authUser.email.trim()
+        : `user.${authUser.id.replace(/-/g, '').slice(0, 12)}@oauth.sponsor-auction.local`);
     const name =
       (typeof authUser.user_metadata?.name === 'string'
         ? authUser.user_metadata.name.trim()
         : '') || email.split('@')[0] || '회원';
 
-    const fromApi = await saveRoleViaApi(accessToken, role, name, email);
+    const fromApi = await saveRoleViaApi(
+      accessToken,
+      role,
+      name,
+      email,
+      contact?.phone,
+    );
     if (fromApi.user) {
       const completed = { ...fromApi.user, onboardingComplete: true as const };
       applyKnownSession(completed);

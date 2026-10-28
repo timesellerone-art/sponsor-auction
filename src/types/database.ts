@@ -237,6 +237,7 @@ export type Database = {
           id: string;
           name: string;
           email: string;
+          phone: string | null;
           role: 'advertiser' | 'creator' | 'admin' | null;
           roles: Array<'advertiser' | 'creator' | 'admin'>;
           status: 'active' | 'suspended';
@@ -246,6 +247,7 @@ export type Database = {
           id?: string;
           name: string;
           email: string;
+          phone?: string | null;
           role?: 'advertiser' | 'creator' | 'admin' | null;
           roles?: Array<'advertiser' | 'creator' | 'admin'>;
           status?: 'active' | 'suspended';
@@ -254,6 +256,7 @@ export type Database = {
         Update: {
           name?: string;
           email?: string;
+          phone?: string | null;
           role?: 'advertiser' | 'creator' | 'admin' | null;
           roles?: Array<'advertiser' | 'creator' | 'admin'>;
           status?: 'active' | 'suspended';

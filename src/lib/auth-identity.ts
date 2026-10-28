@@ -2,7 +2,9 @@ import 'server-only';
 
 import type { User, UserIdentity } from '@supabase/supabase-js';
 import { collectAuthEmails } from '@/lib/auth-emails';
+import { normalizeContactEmail, normalizePhone } from '@/lib/contact';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { parseAuthRoles, type MemberRole } from '@/types/auth';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 import type { Database } from '@/types/database';
@@ -163,6 +165,170 @@ async function generateMagicLinkHash(
     return null;
   }
   return link.data.properties?.hashed_token ?? null;
+}
+
+export function isKakaoProviderUser(user: User) {
+  return providersOf(user).includes('kakao');
+}
+
+async function userById(
+  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  id: string,
+) {
+  const result = await admin.auth.admin.getUserById(id);
+  return result.data.user ?? null;
+}
+
+export async function findExistingAccountByContact(input: {
+  email?: string | null;
+  phone?: string | null;
+  excludeUserId?: string | null;
+}): Promise<User | null> {
+  const admin = createAdminClient();
+  if (!admin) {
+    return null;
+  }
+  const email = normalizeContactEmail(input.email);
+  const phone = normalizePhone(input.phone);
+  const exclude = input.excludeUserId?.trim() || '';
+
+  if (email) {
+    const byProfile = await admin.from('profiles').select('id').eq('email', email).maybeSingle();
+    if (byProfile.data?.id && byProfile.data.id !== exclude) {
+      const user = await userById(admin, byProfile.data.id);
+      if (user) {
+        return user;
+      }
+    }
+    const byAuth = await findAuthUserByEmail(email);
+    if (byAuth && byAuth.id !== exclude) {
+      return byAuth;
+    }
+  }
+
+  if (phone) {
+    const byPhone = await admin.from('profiles').select('id').eq('phone', phone).maybeSingle();
+    if (byPhone.data?.id && byPhone.data.id !== exclude) {
+      const user = await userById(admin, byPhone.data.id);
+      if (user) {
+        return user;
+      }
+    }
+    const listed = await listMatchingUsers(admin, email ? [email] : []);
+    const all = listed.length > 0 ? listed : await listAllUsers(admin);
+    const match = all.find((item) => {
+      if (item.id === exclude) {
+        return false;
+      }
+      const itemPhone = normalizePhone(
+        item.phone ||
+          (typeof item.user_metadata?.phone === 'string' ? item.user_metadata.phone : ''),
+      );
+      return Boolean(itemPhone) && itemPhone === phone;
+    });
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+async function listAllUsers(admin: NonNullable<ReturnType<typeof createAdminClient>>) {
+  const users: User[] = [];
+  let page = 1;
+  while (page <= 10) {
+    const listed = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (listed.error) {
+      break;
+    }
+    const batch = listed.data.users ?? [];
+    users.push(...batch);
+    if (batch.length < 1000) {
+      break;
+    }
+    page += 1;
+  }
+  return users;
+}
+
+export async function linkIncomingSocialUser(
+  incoming: User,
+  canonical: User,
+  options?: { phone?: string | null; roles?: Array<MemberRole | 'admin'> | null },
+): Promise<LinkedSocialUser> {
+  const admin = createAdminClient();
+  if (!admin) {
+    return { user: incoming, switched: false, tokenHash: null };
+  }
+
+  for (const identity of incoming.identities ?? []) {
+    if (identity.provider === 'email') {
+      continue;
+    }
+    const already = (canonical.identities ?? []).some(
+      (item) => item.provider === identity.provider && item.id === identity.id,
+    );
+    if (!already) {
+      await attachIdentity(canonical.id, identity);
+    }
+  }
+
+  const mergedRoles = parseAuthRoles(
+    canonical.user_metadata?.roles,
+    canonical.app_metadata?.roles,
+    options?.roles,
+  );
+  const nextProviders = providersOf({
+    ...canonical,
+    app_metadata: {
+      ...(canonical.app_metadata ?? {}),
+      providers: [...providersOf(canonical), ...providersOf(incoming)],
+    },
+    identities: [...(canonical.identities ?? []), ...(incoming.identities ?? [])],
+  });
+
+  await admin.auth.admin.updateUserById(canonical.id, {
+    email_confirm: true,
+    phone: options?.phone || canonical.phone || undefined,
+    user_metadata: {
+      ...(canonical.user_metadata ?? {}),
+      ...(incoming.user_metadata ?? {}),
+      phone: options?.phone || canonical.user_metadata?.phone || null,
+      roles: mergedRoles.length > 0 ? mergedRoles : canonical.user_metadata?.roles,
+    },
+    app_metadata: {
+      ...(canonical.app_metadata ?? {}),
+      provider: canonical.app_metadata?.provider ?? incoming.app_metadata?.provider,
+      providers: nextProviders,
+    },
+  });
+
+  await reassignOwnedRows(admin, incoming.id, canonical.id);
+  await upsertAppProfile(admin, {
+    id: canonical.id,
+    email: collectAuthEmails(canonical)[0] ?? canonical.email,
+    name:
+      (typeof canonical.user_metadata?.name === 'string'
+        ? canonical.user_metadata.name
+        : null) ||
+      (typeof incoming.user_metadata?.name === 'string' ? incoming.user_metadata.name : null),
+    phone: options?.phone,
+    roles: mergedRoles.length > 0 ? mergedRoles : undefined,
+  });
+
+  const tokenHash = await generateMagicLinkHash(admin, canonical);
+  const deleted = await admin.auth.admin.deleteUser(incoming.id);
+  if (deleted.error) {
+    console.warn('[SponsorAuction] 중복 소셜 계정 삭제 실패', deleted.error.message);
+  }
+
+  const refreshed = await admin.auth.admin.getUserById(canonical.id);
+  return {
+    user: refreshed.data.user ?? canonical,
+    switched: true,
+    tokenHash,
+  };
 }
 
 export async function findAuthUserByEmail(email: string): Promise<User | null> {

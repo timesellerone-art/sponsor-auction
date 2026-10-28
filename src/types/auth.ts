@@ -13,6 +13,7 @@ export interface SessionUser {
   createdAt?: string;
   lastSignInAt?: string | null;
   onboardingComplete?: boolean;
+  currentMode?: MemberRole | null;
 }
 
 export function isMemberRole(value: unknown): value is MemberRole {

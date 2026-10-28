@@ -4,12 +4,13 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { parseAuthRoles, primaryAuthRole, type MemberRole } from '@/types/auth';
 
-const PROFILE_COLUMNS = 'id, name, email, role, roles, status, created_at';
+const PROFILE_COLUMNS = 'id, name, email, phone, role, roles, status, created_at';
 
 export type SyncedProfile = {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   role: 'advertiser' | 'creator' | 'admin' | null;
   roles: Array<'advertiser' | 'creator' | 'admin'>;
   status: 'active' | 'suspended';
@@ -46,12 +47,14 @@ export async function upsertAppProfile(
     id: string;
     email?: string | null;
     name?: string | null;
+    phone?: string | null;
     role?: MemberRole | 'admin' | null;
     roles?: Array<MemberRole | 'admin'> | null;
   },
 ): Promise<SyncedProfile | null> {
   const email = resolveProfileEmail(input.id, input.email);
   const name = input.name?.trim() || email.split('@')[0] || '회원';
+  const phone = input.phone?.trim() || null;
   const current = await admin
     .from('profiles')
     .select('role, roles')
@@ -63,6 +66,7 @@ export async function upsertAppProfile(
     id: input.id,
     name,
     email,
+    phone,
     status: 'active' as const,
     role: nextRole,
     roles: nextRoles,
@@ -81,6 +85,7 @@ export async function upsertAppProfile(
   const patch = {
     name,
     email,
+    phone,
     status: 'active' as const,
     role: nextRole,
     roles: nextRoles,
@@ -130,6 +135,7 @@ function toSynced(row: {
   id: string;
   name: string;
   email: string;
+  phone?: string | null;
   role: 'advertiser' | 'creator' | 'admin' | null;
   roles?: Array<'advertiser' | 'creator' | 'admin'> | null;
   status: 'active' | 'suspended';
@@ -140,6 +146,7 @@ function toSynced(row: {
     id: row.id,
     name: row.name,
     email: row.email,
+    phone: row.phone ?? null,
     role: primaryAuthRole(roles) ?? row.role,
     roles,
     status: row.status,
@@ -181,6 +188,7 @@ export async function listAndBackfillProfiles(admin: SupabaseClient<Database>) {
             id: synced.id,
             name: synced.name,
             email: synced.email,
+            phone: synced.phone,
             role: synced.role,
             roles: synced.roles,
             status: synced.status,
