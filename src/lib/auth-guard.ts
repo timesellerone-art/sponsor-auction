@@ -20,6 +20,20 @@ export function sanitizeNextPath(value: string | null | undefined) {
 }
 
 export const OAUTH_NEXT_COOKIE = 'sponsor-auction-oauth-next';
+export const OAUTH_PROVIDER_COOKIE = 'sponsor-auction-oauth-provider';
+export const OAUTH_RETRY_ERROR = 'oauth_retry';
+
+/** 공급자가 Supabase 콜백을 중복 호출하면(카카오 2단계 인증 등) 두 번째 요청이 state를 찾지 못한다. */
+export function isOAuthStateLost(code?: string | null, message?: string | null) {
+  return (
+    code === 'bad_oauth_state' ||
+    /bad_oauth_state|oauth state not found|state.*expired/i.test(message ?? '')
+  );
+}
+
+export function oauthRetryLoginPath() {
+  return `/login?error=${OAUTH_RETRY_ERROR}`;
+}
 
 // Supabase Redirect URLs 허용 목록과 정확히 일치하도록 쿼리 없이 보낸다. next는 OAUTH_NEXT_COOKIE로 전달한다.
 export function buildAppOAuthCallbackUrl(origin: string) {
@@ -43,6 +57,9 @@ export function describeOAuthError(raw?: string | null) {
   }
   if (/code verifier|code_verifier|pkce/i.test(text)) {
     return '로그인 세션 검증값이 없습니다. 같은 브라우저에서 처음부터 다시 로그인해 주세요.';
+  }
+  if (isOAuthStateLost(null, text)) {
+    return '소셜 로그인 확인이 중복 처리되었습니다. 다시 로그인해 주세요.';
   }
   if (/invalid.*(grant|code)|expired|flow state/i.test(text)) {
     return '로그인 코드가 만료되었거나 이미 사용되었습니다. 다시 로그인해 주세요.';

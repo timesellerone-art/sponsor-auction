@@ -64,4 +64,26 @@ describe('post-auth destination', () => {
     assert.equal(written[0]?.options?.path, '/');
     assert.notEqual(written[0]?.options?.httpOnly, true);
   });
+
+  it('OAuth 시작 시 남는 PKCE verifier 쿠키는 로그인 상태로 보지 않는다', () => {
+    assert.equal(isSupabaseAuthCookieName('sb-xxxx-auth-token.0'), true);
+    assert.equal(isSupabaseAuthCookieName('sb-xxxx-auth-token-code-verifier'), false);
+    assert.equal(isSupabaseAuthCookieName('sb-xxxx-auth-token-flow-ab12-code-verifier'), false);
+    assert.equal(isSupabaseAuthCookieName('sb-xxxx-auth-token-flows-code-verifier'), false);
+    assert.equal(
+      hasAuthPresence([{ name: 'sb-xxxx-auth-token-code-verifier', value: 'verifier' }]),
+      false,
+    );
+  });
+
+  it('https 응답의 세션 쿠키에는 Secure와 SameSite=Lax를 명시한다', () => {
+    const written: Array<{ options?: { secure?: boolean; sameSite?: string } }> = [];
+    writeCookies(
+      { set: (_name, _value, options) => written.push({ options }) },
+      [{ name: 'sb-xxxx-auth-token', value: 'jwt' }],
+      { secure: true },
+    );
+    assert.equal(written[0]?.options?.secure, true);
+    assert.equal(written[0]?.options?.sameSite, 'lax');
+  });
 });

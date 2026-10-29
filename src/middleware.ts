@@ -37,6 +37,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (request.nextUrl.searchParams.has('error_code')) {
+    const callback = request.nextUrl.clone();
+    callback.pathname = '/auth/callback';
+    return NextResponse.redirect(callback);
+  }
+
   const session = await updateSession(request);
   const cookieRoles = parseAuthRoles(request.cookies.get(ROLE_COOKIE_NAME)?.value ?? '');
   const hasAdmin = cookieRoles.includes('admin');

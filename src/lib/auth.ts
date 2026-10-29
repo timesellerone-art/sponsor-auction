@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/client';
 import { getSupabaseOAuthCallbackUrl } from '@/lib/supabase/env';
 import {
   OAUTH_NEXT_COOKIE,
+  OAUTH_PROVIDER_COOKIE,
   ROLE_SELECT_PATH,
   buildAppOAuthCallbackUrl,
   sanitizeNextPath,
@@ -220,10 +221,51 @@ export function subscribeAuthState(listener: () => void) {
 
 export type SocialOAuthProvider = 'google' | 'kakao' | 'naver' | 'apple';
 
-function rememberOAuthNext(nextPath?: string | null) {
+function rememberOAuthStart(provider: SocialOAuthProvider | null, nextPath?: string | null) {
   const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
   const secure = window.location.protocol === 'https:' ? '; Secure' : '';
   document.cookie = `${OAUTH_NEXT_COOKIE}=${encodeURIComponent(next)}; Path=/; Max-Age=600; SameSite=Lax${secure}`;
+  document.cookie = `${OAUTH_PROVIDER_COOKIE}=${provider ?? ''}; Path=/; Max-Age=${provider ? 600 : 0}; SameSite=Lax${secure}`;
+}
+
+function readCookie(name: string) {
+  const raw = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${name}=`));
+  return raw ? decodeURIComponent(raw.slice(name.length + 1)) : '';
+}
+
+const OAUTH_RETRY_STORAGE_KEY = 'sponsor-auction-oauth-retried-at';
+const OAUTH_RETRY_WINDOW_MS = 3 * 60 * 1000;
+let oauthRetryInFlight = false;
+
+/**
+ * 공급자 콜백 중복으로 state가 소실된 경우, 공급자 측 로그인은 이미 끝났으므로 같은 공급자로 한 번만 다시 시작한다.
+ * 재시도했으면 true, 재시도하지 않았으면(이미 재시도했거나 공급자 정보 없음) false.
+ */
+export async function retryLostOAuthOnce(): Promise<boolean> {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  if (oauthRetryInFlight) {
+    return true;
+  }
+  const provider = readCookie(OAUTH_PROVIDER_COOKIE);
+  if (provider !== 'google' && provider !== 'kakao' && provider !== 'apple') {
+    return false;
+  }
+  const retriedAt = Number(window.sessionStorage.getItem(OAUTH_RETRY_STORAGE_KEY) || 0);
+  if (Date.now() - retriedAt < OAUTH_RETRY_WINDOW_MS) {
+    return false;
+  }
+  window.sessionStorage.setItem(OAUTH_RETRY_STORAGE_KEY, String(Date.now()));
+  oauthRetryInFlight = true;
+  const result = await signInWithOAuth(provider, readCookie(OAUTH_NEXT_COOKIE) || null);
+  if (!result.data) {
+    oauthRetryInFlight = false;
+  }
+  return result.data === true;
 }
 
 function authorizeUrlForProvider(provider: SocialOAuthProvider, url: string) {
@@ -247,7 +289,7 @@ export async function signInWithOAuth(
   }
 
   try {
-    rememberOAuthNext(nextPath);
+    rememberOAuthStart(provider, nextPath);
     const oauthOptions: {
       redirectTo: string;
       skipBrowserRedirect: boolean;
@@ -670,7 +712,7 @@ export async function sendAccountProofEmail(email: string): Promise<DataResult<b
   if (!supabase) {
     return fail(false, 'Supabase가 설정되지 않았습니다.');
   }
-  rememberOAuthNext(ROLE_SELECT_PATH);
+  rememberOAuthStart(null, ROLE_SELECT_PATH);
   const { error } = await supabase.auth.signInWithOtp({
     email: email.trim().toLowerCase(),
     options: {

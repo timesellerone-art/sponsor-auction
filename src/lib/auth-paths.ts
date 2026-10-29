@@ -40,11 +40,12 @@ export function onboardingCanonicalPath(pathname: string) {
   return null;
 }
 
+/** 세션 쿠키(분할 조각 포함)만 해당한다. OAuth 시작 시 생기는 PKCE verifier 쿠키는 로그인 상태가 아니다. */
 export function isSupabaseAuthCookieName(name: string) {
   return (
     name === 'sb-access-token' ||
     name === 'sb-refresh-token' ||
-    name.includes('-auth-token')
+    /^sb-.+-auth-token(\.\d+)?$/.test(name)
   );
 }
 
@@ -97,6 +98,7 @@ export function writeCookies(
     ) => void;
   },
   cookiesToSet: CookieToSet[],
+  defaults: { secure?: boolean } = {},
 ) {
   cookiesToSet.forEach(({ name, value, options }) => {
     const sameSite =
@@ -104,15 +106,19 @@ export function writeCookies(
         ? 'strict'
         : options?.sameSite === false
           ? 'none'
-          : options?.sameSite;
+          : (options?.sameSite ?? 'lax');
     store.set(name, value, {
       domain: options?.domain,
       path: options?.path ?? '/',
       expires: options?.expires,
       maxAge: options?.maxAge,
       httpOnly: options?.httpOnly,
-      secure: options?.secure,
+      secure: options?.secure ?? defaults.secure,
       sameSite,
     });
   });
+}
+
+export function isPkceVerifierCookieName(name: string) {
+  return name.includes('-auth-token') && name.endsWith('-code-verifier');
 }

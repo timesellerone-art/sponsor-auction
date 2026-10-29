@@ -11,12 +11,18 @@ import { SIGNUP_AGREEMENT_REQUIRED, validateSignupAgreement } from '@/lib/legal'
 import {
   AUTH_FAIL_MESSAGE,
   getSessionUser,
+  retryLostOAuthOnce,
   signIn,
   signInWithOAuth,
   signUp,
   type SocialOAuthProvider,
 } from '@/lib/auth';
-import { postSocialAuthPath, sanitizeNextPath } from '@/lib/auth-guard';
+import {
+  OAUTH_RETRY_ERROR,
+  describeOAuthError,
+  postSocialAuthPath,
+  sanitizeNextPath,
+} from '@/lib/auth-guard';
 import { cn } from '@/lib/utils';
 import { needsRoleOnboarding, type SessionUser } from '@/types/auth';
 
@@ -49,8 +55,15 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('error') === 'oauth_failed') {
+    const error = params.get('error');
+    if (error === 'oauth_failed') {
       showToast(params.get('error_description') || '소셜 로그인에 실패했습니다. 다시 시도해 주세요.');
+    } else if (error === OAUTH_RETRY_ERROR) {
+      void retryLostOAuthOnce().then((retrying) => {
+        if (!retrying) {
+          showToast(describeOAuthError('bad_oauth_state'));
+        }
+      });
     }
   }, []);
 

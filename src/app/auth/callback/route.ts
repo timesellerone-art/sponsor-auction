@@ -4,13 +4,16 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { applyAuthCookies } from '@/lib/access';
 import {
   OAUTH_NEXT_COOKIE,
+  OAUTH_PROVIDER_COOKIE,
   ROLE_SELECT_PATH,
   describeOAuthError,
+  isOAuthStateLost,
   oauthFailedLoginPath,
+  oauthRetryLoginPath,
   postSocialAuthPath,
   sanitizeNextPath,
 } from '@/lib/auth-guard';
-import { createCookieBag, writeCookies } from '@/lib/auth-paths';
+import { createCookieBag, isPkceVerifierCookieName, writeCookies } from '@/lib/auth-paths';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import {
   PENDING_MERGE_COOKIE,
@@ -62,10 +65,14 @@ function failRedirect(
     code: detail.code ?? null,
     status: detail.status ?? null,
   });
+  if (stage === 'provider' && isOAuthStateLost(detail.code, detail.message)) {
+    return NextResponse.redirect(new URL(oauthRetryLoginPath(), origin));
+  }
   const response = NextResponse.redirect(
     new URL(oauthFailedLoginPath(describeOAuthError(detail.message)), origin),
   );
   response.cookies.delete(OAUTH_NEXT_COOKIE);
+  response.cookies.delete(OAUTH_PROVIDER_COOKIE);
   return response;
 }
 
@@ -189,8 +196,19 @@ export async function GET(request: NextRequest) {
     needsOnboarding: needsRoleOnboarding(sessionLike),
   });
   const redirect = NextResponse.redirect(new URL(destination, origin));
-  writeCookies(redirect.cookies, cookieBag.getAll());
+  const issued = cookieBag.getAll();
+  request.cookies
+    .getAll()
+    .filter(
+      (cookie) =>
+        isPkceVerifierCookieName(cookie.name) && !issued.some((item) => item.name === cookie.name),
+    )
+    .forEach((cookie) => {
+      redirect.cookies.set(cookie.name, '', { path: '/', maxAge: 0, sameSite: 'lax' });
+    });
+  writeCookies(redirect.cookies, issued, { secure: origin.startsWith('https://') });
   redirect.cookies.delete(OAUTH_NEXT_COOKIE);
+  redirect.cookies.delete(OAUTH_PROVIDER_COOKIE);
   redirect.cookies.delete(PENDING_MERGE_COOKIE);
   applyAuthCookies(redirect.cookies, {
     present: true,

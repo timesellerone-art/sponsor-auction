@@ -119,6 +119,42 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
     expect(location.searchParams.get('error_description')).toContain('데이터베이스 오류');
   });
 
+  test('b) 카카오 콜백 중복으로 Supabase가 bad_oauth_state를 보내면 같은 공급자로 한 번만 재시도한다', async ({
+    page,
+  }) => {
+    // Supabase가 Site URL로 보내는 실제 오류 리다이렉트 형식 그대로다.
+    const stateLost =
+      '/?error=invalid_request&error_code=bad_oauth_state&error_description=OAuth+state+not+found+or+expired';
+    const kakaoAuthorize = (url: string) =>
+      /\/auth\/v1\/authorize\?/.test(url) && new URL(url).searchParams.get('provider') === 'kakao';
+
+    await page.goto('/login');
+    const firstAuthorize = page.waitForRequest((request) => kakaoAuthorize(request.url()));
+    await page.getByRole('button', { name: '카카오로 계속하기' }).click();
+    await firstAuthorize;
+    await page.waitForURL(/kakao\.com/, { timeout: 20000 });
+
+    const retried = page.waitForRequest((request) => kakaoAuthorize(request.url()), { timeout: 20000 });
+    await page.goto(stateLost);
+    const retriedUrl = new URL((await retried).url());
+    expect(retriedUrl.searchParams.get('redirect_to')).toBe('http://localhost:3000/auth/callback');
+    await page.waitForURL(/kakao\.com/, { timeout: 20000 });
+
+    let loopedAuthorize = false;
+    page.on('request', (request) => {
+      if (kakaoAuthorize(request.url())) {
+        loopedAuthorize = true;
+      }
+    });
+    await page.goto(stateLost);
+    await expect(page).toHaveURL(/\/login\?error=oauth_retry/);
+    await expect(page.getByText('소셜 로그인 확인이 중복 처리되었습니다')).toBeVisible({
+      timeout: 10000,
+    });
+    await page.waitForTimeout(1500);
+    expect(loopedAuthorize, '두 번째 state 소실에서는 자동 재시도로 루프를 돌지 않는다').toBe(false);
+  });
+
   test('c) 실제 Supabase 신규 유저 세션으로 온보딩에 진입하면 실패 화면/무한 스피너가 없다', async ({
     page,
     context,
