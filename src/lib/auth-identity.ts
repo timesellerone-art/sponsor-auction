@@ -284,7 +284,7 @@ export async function mergeUserInto(
   return refreshed.data.user ?? canonical;
 }
 
-/** 같은 검증 이메일을 가진 기존 계정이 있으면 지금 로그인한 계정을 그쪽으로 합치고 세션 전환 토큰을 돌려준다. */
+/** 같은 검증 이메일·전화번호를 가진 기존 계정이 있으면 지금 로그인한 계정을 그쪽으로 합치고 세션 전환 토큰을 돌려준다. */
 export async function reconcileSocialIdentities(user: User): Promise<LinkedSocialUser> {
   const admin = createAdminClient();
   if (!admin) {
@@ -292,14 +292,28 @@ export async function reconcileSocialIdentities(user: User): Promise<LinkedSocia
   }
 
   const emails = collectAuthEmails(user);
-  const canonical =
+  const phone = normalizePhone(
+    user.phone ||
+      (typeof user.app_metadata?.contact_phone === 'string' ? user.app_metadata.contact_phone : '') ||
+      (typeof user.user_metadata?.phone === 'string' ? user.user_metadata.phone : ''),
+  );
+  const byEmail =
     emails.length > 0 ? pickCanonicalUser(await usersByEmails(admin, emails)) : null;
+  const byContact = await findExistingAccountByContact({
+    email: emails[0] ?? null,
+    phone: phone || null,
+    excludeUserId: user.id,
+  });
+  const canonical = pickCanonicalUser(
+    [byEmail, byContact].filter((item): item is User => Boolean(item)),
+  );
 
   if (!canonical || canonical.id === user.id) {
     await upsertAppProfile(admin, {
       id: user.id,
       email: emails[0] ?? user.email,
       name: displayNameOf(user),
+      phone: phone || null,
     });
     return { user, switched: false, tokenHash: null };
   }

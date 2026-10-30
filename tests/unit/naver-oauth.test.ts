@@ -4,6 +4,7 @@ import {
   buildNaverAuthorizeUrl,
   getNaverOAuthEnv,
   missingNaverOAuthEnvKeys,
+  parseNaverProfilePayload,
 } from '../../src/lib/naver-oauth';
 
 const KEYS = [
@@ -64,6 +65,30 @@ describe('네이버 OAuth 환경변수', () => {
     process.env.NAVER_CLIENT_SECRET = 'YOUR_NAVER_CLIENT_SECRET_HERE';
     assert.equal(getNaverOAuthEnv(), null);
     assert.deepEqual(missingNaverOAuthEnvKeys(), ['NAVER_CLIENT_ID', 'NAVER_CLIENT_SECRET']);
+  });
+
+  it('프로필에서 이메일과 휴대전화(E.164·국내번호)를 정규화한다', () => {
+    const profile = parseNaverProfilePayload({
+      resultcode: '00',
+      response: {
+        id: 'naver-sub-1',
+        email: 'shared@example.com',
+        name: '네이버회원',
+        mobile: '010-5555-1234',
+      },
+    });
+    assert.equal(profile.email, 'shared@example.com');
+    assert.equal(profile.phone, '01055551234');
+
+    const fromE164 = parseNaverProfilePayload({
+      resultcode: '00',
+      response: {
+        id: 'naver-sub-2',
+        mobile_e164: '+821055551234',
+      },
+    });
+    assert.equal(fromE164.email, 'naver.naver-sub-2@oauth.sponsor-auction.local');
+    assert.equal(fromE164.phone, '01055551234');
   });
 
   it('인가 URL은 구글·카카오처럼 바로 로그인 창이 뜨도록 재인증을 강제하지 않는다', () => {

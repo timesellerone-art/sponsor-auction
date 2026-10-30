@@ -18,6 +18,16 @@ describe('collectAuthEmails', () => {
     assert.deepEqual(emails.sort(), ['google@example.com', 'same@example.com']);
   });
 
+  it('온보딩 대표 이메일(contact_email)도 계정 매칭에 쓴다', () => {
+    assert.deepEqual(
+      collectAuthEmails({
+        email: 'user.abc@oauth.sponsor-auction.local',
+        app_metadata: { contact_email: 'owner@example.com' },
+      }),
+      ['owner@example.com'],
+    );
+  });
+
   it('이메일이 없으면 빈 배열을 반환한다', () => {
     assert.deepEqual(collectAuthEmails({ email: 'not-an-email' }), []);
     assert.deepEqual(collectAuthEmails(null), []);

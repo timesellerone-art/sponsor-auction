@@ -2,11 +2,9 @@ import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { collectAuthEmails } from '@/lib/auth-emails';
 import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
-import {
-  findAuthUserByEmail,
-  findUserByNaverId,
-  reconcileSocialIdentities,
-} from '@/lib/auth-identity';
+import { mergeUserInto, reconcileSocialIdentities } from '@/lib/auth-identity';
+import { expireAuthDebrisCookies } from '@/lib/auth-paths';
+import { linkNaverProfile } from '@/lib/naver-link';
 import {
   NAVER_NEXT_COOKIE,
   NAVER_STATE_COOKIE,
@@ -20,18 +18,14 @@ import {
 } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 
-function stringList(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
-}
-
-function loginError(origin: string, message: string) {
+function loginError(request: NextRequest, origin: string, message: string) {
   const response = NextResponse.redirect(
     new URL(oauthFailedLoginPath(describeOAuthError(message)), origin),
   );
   response.cookies.delete(NAVER_STATE_COOKIE);
   response.cookies.delete(NAVER_NEXT_COOKIE);
+  expireAuthDebrisCookies(request, response);
   return response;
 }
 
@@ -40,7 +34,7 @@ export async function GET(request: NextRequest) {
     await connection();
     const limited = consumeRateLimit(clientIp(request), '/api/auth/naver/callback');
     if (!limited.allowed) {
-      return loginError(requestOrigin(request), '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.');
+      return loginError(request, requestOrigin(request), '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.');
     }
 
     const origin = requestOrigin(request);
@@ -50,14 +44,14 @@ export async function GET(request: NextRequest) {
     const naverError = url.searchParams.get('error_description') || url.searchParams.get('error');
 
     if (naverError) {
-      return loginError(origin, decodeURIComponent(naverError.replace(/\+/g, ' ')));
+      return loginError(request, origin, decodeURIComponent(naverError.replace(/\+/g, ' ')));
     }
 
     const expectedState = request.cookies.get(NAVER_STATE_COOKIE)?.value ?? '';
     const next = readStoredNext(request.cookies.get(NAVER_NEXT_COOKIE)?.value);
 
     if (!code || !state || !expectedState || state !== expectedState) {
-      return loginError(origin, '네이버 로그인 검증에 실패했습니다. 다시 시도해 주세요.');
+      return loginError(request, origin, '네이버 로그인 검증에 실패했습니다. 다시 시도해 주세요.');
     }
 
     const env = getNaverOAuthEnv();
@@ -65,7 +59,7 @@ export async function GET(request: NextRequest) {
       console.warn('[SponsorAuction] 네이버 OAuth 환경변수 없음', {
         missing: missingNaverOAuthEnvKeys(),
       });
-      return loginError(origin, '네이버 로그인 설정이 없습니다.');
+      return loginError(request, origin, '네이버 로그인 설정이 없습니다.');
     }
 
     const accessToken = await exchangeNaverCode({
@@ -80,62 +74,19 @@ export async function GET(request: NextRequest) {
     const admin = createAdminClient();
     if (!admin) {
       return loginError(
+        request,
         origin,
         'Supabase 서비스 키가 없어 네이버 계정을 연결할 수 없습니다.',
       );
     }
 
-    const metadata = {
-      name: profile.name,
-      full_name: profile.name,
-      avatar_url: profile.avatarUrl,
-      provider: 'naver',
-      naver_id: profile.id,
-    };
-
-    const linkedByNaverId = await findUserByNaverId(profile.id);
-    const existing = linkedByNaverId ?? (await findAuthUserByEmail(profile.email));
-    let authUserId = existing?.id ?? '';
-
-    if (!authUserId) {
-      const created = await admin.auth.admin.createUser({
-        email: profile.email,
-        email_confirm: true,
-        user_metadata: metadata,
-        app_metadata: { provider: 'naver', providers: ['naver'], naver_ids: [profile.id] },
-      });
-
-      if (created.error && !/already|registered|exists/i.test(created.error.message)) {
-        console.warn('[SponsorAuction] 네이버 사용자 생성 실패', created.error.message);
-        return loginError(origin, '네이버 계정으로 가입하지 못했습니다.');
-      }
-
-      authUserId = created.data.user?.id ?? '';
-      if (!authUserId) {
-        const fallback = await findAuthUserByEmail(profile.email);
-        authUserId = fallback?.id ?? '';
-      }
-      if (authUserId) {
-        await upsertAppProfile(admin, { id: authUserId, name: profile.name, email: profile.email });
-      }
-    } else if (existing) {
-      await admin.auth.admin.updateUserById(authUserId, {
-        user_metadata: { ...metadata, ...(existing.user_metadata ?? {}) },
-        app_metadata: {
-          providers: [...new Set([...stringList(existing.app_metadata?.providers), 'naver'])],
-          naver_ids: [...new Set([...stringList(existing.app_metadata?.naver_ids), profile.id])],
-        },
-      });
-    }
-
-    const current = authUserId ? (await admin.auth.admin.getUserById(authUserId)).data.user : null;
-    if (!current) {
-      return loginError(origin, '네이버 계정과 연결된 사용자를 찾지 못했습니다.');
-    }
-    const resolved = (await reconcileSocialIdentities(current)).user;
+    const linked = await linkNaverProfile(admin, profile, (incoming, canonical) =>
+      mergeUserInto(incoming, canonical, { phone: profile.phone }),
+    );
+    const resolved = (await reconcileSocialIdentities(linked.user)).user;
     const sessionEmail = collectAuthEmails(resolved)[0] ?? resolved.email;
     if (!sessionEmail) {
-      return loginError(origin, '네이버 로그인 세션을 만들지 못했습니다.');
+      return loginError(request, origin, '네이버 로그인 세션을 만들지 못했습니다.');
     }
 
     const link = await admin.auth.admin.generateLink({
@@ -147,7 +98,7 @@ export async function GET(request: NextRequest) {
     const tokenHash = link.data.properties?.hashed_token;
     if (link.error || !tokenHash) {
       console.warn('[SponsorAuction] 네이버 세션 링크 생성 실패', link.error?.message);
-      return loginError(origin, '네이버 로그인 세션을 만들지 못했습니다.');
+      return loginError(request, origin, '네이버 로그인 세션을 만들지 못했습니다.');
     }
 
     const complete = new URL('/auth/oauth', origin);
@@ -157,10 +108,11 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.redirect(complete);
     response.cookies.delete(NAVER_STATE_COOKIE);
     response.cookies.delete(NAVER_NEXT_COOKIE);
+    expireAuthDebrisCookies(request, response);
     return response;
   } catch (error) {
     const detail = error instanceof Error ? error.message : '네이버 로그인에 실패했습니다.';
     console.warn('[SponsorAuction] 네이버 콜백 처리 예외', error);
-    return loginError(requestOrigin(request), detail);
+    return loginError(request, requestOrigin(request), detail);
   }
 }

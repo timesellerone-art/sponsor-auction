@@ -7,6 +7,7 @@ type EmailUserLike = {
   email?: string | null;
   identities?: EmailIdentity[] | null;
   user_metadata?: Record<string, unknown> | null;
+  app_metadata?: Record<string, unknown> | null;
 };
 
 function asEmail(value: unknown): string | null {
@@ -34,6 +35,10 @@ export function collectAuthEmails(user: EmailUserLike | null | undefined): strin
   const metaEmail = asEmail(user.user_metadata?.email);
   if (metaEmail) {
     emails.add(metaEmail);
+  }
+  const contactEmail = asEmail(user.app_metadata?.contact_email);
+  if (contactEmail) {
+    emails.add(contactEmail);
   }
 
   for (const identity of user.identities ?? []) {

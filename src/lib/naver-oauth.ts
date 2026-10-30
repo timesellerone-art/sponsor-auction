@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto';
 import { ROLE_SELECT_PATH, sanitizeNextPath } from '@/lib/auth-guard';
+import { isPlaceholderOAuthEmail, normalizePhone } from '@/lib/contact';
 
 export const NAVER_STATE_COOKIE = 'sa_naver_oauth_state';
 export const NAVER_NEXT_COOKIE = 'sa_naver_oauth_next';
@@ -27,6 +28,8 @@ type NaverProfileResponse = {
     name?: string;
     nickname?: string;
     profile_image?: string;
+    mobile?: string;
+    mobile_e164?: string;
   };
 };
 
@@ -34,6 +37,7 @@ export type NaverProfile = {
   id: string;
   email: string;
   name: string;
+  phone: string | null;
   avatarUrl: string | null;
 };
 
@@ -175,24 +179,22 @@ export async function exchangeNaverCode(params: {
   return accessToken;
 }
 
-export async function fetchNaverProfile(accessToken: string): Promise<NaverProfile> {
-  const response = await fetch(NAVER_PROFILE_URL, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-    cache: 'no-store',
-  });
-  const payload = (await response.json().catch(() => null)) as NaverProfileResponse | null;
+export function parseNaverProfilePayload(
+  payload: NaverProfileResponse | null,
+): NaverProfile {
   const profile = payload?.response;
   const id = profile?.id?.trim() ?? '';
-  if (!response.ok || payload?.resultcode !== '00' || !id) {
+  if (payload?.resultcode !== '00' || !id) {
     throw new Error(payload?.message || '네이버 프로필을 가져오지 못했습니다.');
   }
 
   const emailFromNaver = profile?.email?.trim().toLowerCase() ?? '';
-  const email = emailFromNaver.includes('@')
-    ? emailFromNaver
-    : `naver.${id}@oauth.sponsor-auction.local`;
+  const email =
+    emailFromNaver.includes('@') && !isPlaceholderOAuthEmail(emailFromNaver)
+      ? emailFromNaver
+      : `naver.${id}@oauth.sponsor-auction.local`;
+  const phone =
+    normalizePhone(profile?.mobile_e164) || normalizePhone(profile?.mobile) || null;
   const name =
     profile?.name?.trim() ||
     profile?.nickname?.trim() ||
@@ -203,6 +205,21 @@ export async function fetchNaverProfile(accessToken: string): Promise<NaverProfi
     id,
     email,
     name,
+    phone,
     avatarUrl: profile?.profile_image?.trim() || null,
   };
+}
+
+export async function fetchNaverProfile(accessToken: string): Promise<NaverProfile> {
+  const response = await fetch(NAVER_PROFILE_URL, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: 'no-store',
+  });
+  const payload = (await response.json().catch(() => null)) as NaverProfileResponse | null;
+  if (!response.ok) {
+    throw new Error(payload?.message || '네이버 프로필을 가져오지 못했습니다.');
+  }
+  return parseNaverProfilePayload(payload);
 }
