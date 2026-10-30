@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AuctionCardSkeleton } from '@/components/AuctionCard';
 import { CreateTimeslotModal } from '@/components/CreateTimeslotModal';
@@ -20,6 +20,8 @@ function creatorPayout(amount: number) {
 
 export function CreatorDashboard() {
   const { user } = useAuth();
+  const userId = user?.id ?? '';
+  const userRef = useRef(user);
   const [deals, setDeals] = useState<CreatorDeal[]>([]);
   const [slots, setSlots] = useState<TimeSlotItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,18 +29,28 @@ export function CreatorDashboard() {
   const [createSlotOpen, setCreateSlotOpen] = useState(false);
 
   useEffect(() => {
-    if (!user) {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    if (!userId) {
       return;
     }
 
     let cancelled = false;
 
-    const load = async () => {
-      setLoading(true);
+    const load = async (silent: boolean) => {
+      const actor = userRef.current;
+      if (!actor) {
+        return;
+      }
+      if (!silent) {
+        setLoading(true);
+      }
       try {
         const [result, slotResult] = await Promise.all([
-          getCreatorDashboard(user),
-          listTimeSlots({ creatorId: user.id }),
+          getCreatorDashboard(actor),
+          listTimeSlots({ creatorId: actor.id }),
         ]);
         if (cancelled) {
           return;
@@ -46,7 +58,11 @@ export function CreatorDashboard() {
         const list = Array.isArray(result.data) ? result.data : [];
         setDeals(list);
         setSlots(slotResult.data);
-        setError(list.length === 0 && slotResult.data.length === 0 ? '제출한 제안이 없습니다.' : result.error);
+        setError(
+          list.length === 0 && slotResult.data.length === 0
+            ? '제출한 제안이 없습니다.'
+            : result.error,
+        );
       } catch {
         if (!cancelled) {
           setDeals([]);
@@ -59,9 +75,9 @@ export function CreatorDashboard() {
       }
     };
 
-    void load();
+    void load(false);
     const onChanged = () => {
-      void load();
+      void load(true);
     };
     window.addEventListener('auctions:changed', onChanged);
     window.addEventListener('timeslots:changed', onChanged);
@@ -70,7 +86,7 @@ export function CreatorDashboard() {
       window.removeEventListener('auctions:changed', onChanged);
       window.removeEventListener('timeslots:changed', onChanged);
     };
-  }, [user]);
+  }, [userId]);
 
   const wonDeals = deals.filter((deal) => deal.bid.status === 'selected');
   const pendingDeals = deals.filter((deal) => deal.bid.status !== 'selected');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AuctionCard, AuctionCardSkeleton } from '@/components/AuctionCard';
 import { PageContainer } from '@/components/PageContainer';
@@ -17,6 +17,8 @@ import type { AuctionItem, BidItem } from '@/types/auction';
 
 export function AdvertiserDashboard() {
   const { user, requireAdvertiser } = useRequireAuth();
+  const userId = user?.id ?? '';
+  const userRef = useRef(user);
   const [deals, setDeals] = useState<AdvertiserDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,16 +27,26 @@ export function AdvertiserDashboard() {
   const { checkout, startCheckout, closeCheckout } = useAwardCheckout();
 
   useEffect(() => {
-    if (!user) {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    if (!userId) {
       return;
     }
 
     let cancelled = false;
 
-    const load = async () => {
-      setLoading(true);
+    const load = async (silent: boolean) => {
+      const actor = userRef.current;
+      if (!actor) {
+        return;
+      }
+      if (!silent) {
+        setLoading(true);
+      }
       try {
-        const result = await getAdvertiserDashboard(user);
+        const result = await getAdvertiserDashboard(actor);
         if (cancelled) {
           return;
         }
@@ -53,16 +65,16 @@ export function AdvertiserDashboard() {
       }
     };
 
-    void load();
+    void load(false);
     const onChanged = () => {
-      void load();
+      void load(true);
     };
     window.addEventListener('auctions:changed', onChanged);
     return () => {
       cancelled = true;
       window.removeEventListener('auctions:changed', onChanged);
     };
-  }, [user]);
+  }, [userId]);
 
   const handleAward = async (auction: AuctionItem, bid: BidItem) => {
     if (!auction?.id || !bid?.id) {

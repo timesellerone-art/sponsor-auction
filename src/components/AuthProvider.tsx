@@ -20,7 +20,6 @@ import {
   syncRoleCookie,
 } from '@/lib/access';
 import {
-  MEMBER_ROLES,
   isMemberRole,
   needsRoleOnboarding,
   resolveActiveMemberRole,
@@ -53,10 +52,18 @@ const AuthContext = createContext<AuthContextValue>({
   refresh: async () => undefined,
 });
 
+function persistCurrentMode(role: MemberRole) {
+  const supabase = createClient();
+  if (!supabase) {
+    return;
+  }
+  void supabase.auth.updateUser({ data: { current_mode: role } }).catch(() => null);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
-  const [activeRole, setActiveRoleState] = useState<MemberRole | null>(() =>
+  const [roleOverride, setRoleOverride] = useState<MemberRole | null>(() =>
     readActiveRoleCookie(),
   );
 
@@ -84,21 +91,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const boot = window.setTimeout(() => {
-      void refresh();
-    }, 0);
     const failSafe = window.setTimeout(() => {
       setReady(true);
     }, AUTH_BOOT_TIMEOUT_MS);
     const unsubKnown = onKnownSession((session) => {
       setUser(session);
       setReady(true);
+      if (!session) {
+        setRoleOverride(null);
+      }
     });
     const unsubscribe = subscribeAuthState(() => {
       void refresh();
     });
+    if (!createClient()) {
+      void refresh();
+    }
     return () => {
-      window.clearTimeout(boot);
       window.clearTimeout(failSafe);
       unsubKnown();
       unsubscribe();
@@ -106,6 +115,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const switchableRoles = useMemo(() => switchableMemberRoles(user), [user]);
+  const activeRole = user
+    ? resolveActiveMemberRole(user, roleOverride ?? user.currentMode)
+    : null;
 
   useEffect(() => {
     if (!ready) {
@@ -113,28 +125,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     syncRoleCookie(user?.role ?? null, user?.roles);
     syncAuthPresentCookie(Boolean(user));
-    const timer = window.setTimeout(() => {
-      if (!user) {
-        setActiveRoleState(null);
-        syncActiveRoleCookie(null);
-        return;
-      }
-      setActiveRoleState((current) =>
-        resolveActiveMemberRole(
-          user,
-          current ?? readActiveRoleCookie() ?? user.currentMode,
-        ),
-      );
-    }, 0);
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [ready, user]);
-
-  useEffect(() => {
-    if (!ready) {
-      return;
-    }
     syncActiveRoleCookie(user ? activeRole : null);
   }, [activeRole, ready, user]);
 
@@ -143,12 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isMemberRole(role) || !switchableRoles.includes(role)) {
         return false;
       }
-      setActiveRoleState(role);
+      setRoleOverride(role);
       syncActiveRoleCookie(role);
-      const supabase = createClient();
-      void supabase?.auth
-        .updateUser({ data: { current_mode: role, roles: [...MEMBER_ROLES] } })
-        .catch(() => null);
+      persistCurrentMode(role);
       return true;
     },
     [switchableRoles],
@@ -172,9 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={value}>
-      <div className="flex min-h-screen w-full min-w-0 flex-1 flex-col">
-        {children}
-      </div>
+      <div className="flex min-h-screen w-full min-w-0 flex-1 flex-col">{children}</div>
     </AuthContext.Provider>
   );
 }

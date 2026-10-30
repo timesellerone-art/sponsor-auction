@@ -11,7 +11,7 @@ import {
   onboardingCanonicalPath,
   writeCookies,
 } from '../../src/lib/auth-paths';
-import { switchableMemberRoles } from '../../src/types/auth';
+import { resolveActiveMemberRole, switchableMemberRoles } from '../../src/types/auth';
 
 describe('auth path helpers', () => {
   it('콜백과 온보딩은 공개 통과 경로이다', () => {
@@ -46,6 +46,17 @@ describe('post-auth destination', () => {
 
   it('광고주에게 /admin next를 강제하지 않는다', () => {
     assert.equal(postAuthPath({ roles: ['advertiser'] }, '/admin'), '/my');
+  });
+
+  it('역할 전환은 쿠키/선택 값을 세션 재조회 없이 유지한다', () => {
+    assert.equal(
+      resolveActiveMemberRole({ roles: ['advertiser', 'creator'] }, 'creator'),
+      'creator',
+    );
+    assert.equal(
+      resolveActiveMemberRole({ roles: ['advertiser', 'creator'] }, 'advertiser'),
+      'advertiser',
+    );
   });
 
   it('온보딩 완료 후에는 광고주/크리에이터 모드를 전환할 수 있다', () => {

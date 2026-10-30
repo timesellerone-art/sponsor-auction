@@ -195,8 +195,12 @@ export function onAuthChanged(listener: () => void) {
   };
 }
 
-export function subscribeAuthState(listener: () => void) {
-  const unsubWindow = onAuthChanged(listener);
+const AUTH_REFRESH_EVENTS = new Set(['INITIAL_SESSION', 'SIGNED_IN', 'SIGNED_OUT']);
+
+export function subscribeAuthState(listener: (event?: string) => void) {
+  const unsubWindow = onAuthChanged(() => {
+    listener('auth:changed');
+  });
   const supabase = createClient();
   if (!supabase) {
     return unsubWindow;
@@ -204,9 +208,12 @@ export function subscribeAuthState(listener: () => void) {
 
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange(() => {
+  } = supabase.auth.onAuthStateChange((event) => {
     try {
-      listener();
+      if (!AUTH_REFRESH_EVENTS.has(event)) {
+        return;
+      }
+      listener(event);
     } catch (error) {
       console.warn('[SponsorAuction] 인증 상태 리스너 처리에 실패했습니다.', error);
     }

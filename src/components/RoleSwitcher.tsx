@@ -14,9 +14,20 @@ type RoleSwitcherProps = {
 };
 
 export function RoleSwitcher({ className }: RoleSwitcherProps) {
-  const { ready, activeRole, switchableRoles, setActiveRole } = useAuth();
-  if (!ready || switchableRoles.length === 0 || !activeRole) {
+  const { ready, user, activeRole, switchableRoles, setActiveRole } = useAuth();
+  if (!user || switchableRoles.length === 0) {
     return null;
+  }
+  if (!ready || !activeRole) {
+    return (
+      <span
+        className={cn(
+          'inline-flex h-[30px] w-[12.5rem] shrink-0 rounded-full border border-zinc-200 bg-zinc-50',
+          className,
+        )}
+        aria-hidden
+      />
+    );
   }
 
   if (switchableRoles.length === 1) {

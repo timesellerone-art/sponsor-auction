@@ -80,7 +80,7 @@ export default function Home() {
             광고주는 예산을 올리고,
             <br className="hidden sm:block" /> 크리에이터가 제안합니다.
           </h1>
-          <p className="max-w-2xl text-sm leading-6 text-zinc-600 sm:text-base">
+          <p className="max-w-2xl min-h-[3.25rem] text-sm leading-6 text-zinc-600 sm:text-base">
             {isAdvertiser
               ? '지금 입찰이 열린 역경매와 내가 등록한 캠페인을 메인에서 바로 확인하세요. 제안이 들어오면 상세에서 낙찰할 수 있습니다.'
               : isCreator
