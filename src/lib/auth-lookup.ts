@@ -33,13 +33,21 @@ async function profileIdsByPhone(admin: AdminClient, phone: string) {
   return (result.data ?? []).map((row) => row.id);
 }
 
+let contactRpcAvailable = true;
+
 async function rpcUserIds(admin: AdminClient, input: { emails: string[]; phone: string; naverId: string }) {
+  if (!contactRpcAvailable) {
+    return [] as string[];
+  }
   const result = await admin.rpc('find_auth_user_ids_by_contact', {
     p_emails: input.emails,
     p_phone: input.phone || null,
     p_naver_id: input.naverId || null,
   });
   if (result.error) {
+    if (result.error.code === 'PGRST202') {
+      contactRpcAvailable = false;
+    }
     return [] as string[];
   }
   return (result.data ?? [])

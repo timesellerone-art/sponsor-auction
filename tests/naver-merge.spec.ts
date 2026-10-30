@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { expect, test, type BrowserContext } from '@playwright/test';
-import { linkNaverProfile } from '../src/lib/naver-link';
+import { linkNaverProfile, userHasNaverIdentity } from '../src/lib/naver-link';
 
 function readEnv() {
   const values: Record<string, string> = { ...process.env } as Record<string, string>;
@@ -65,6 +65,10 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
     page,
     context,
   }) => {
+    const env = readEnv();
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??= env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??=
+      env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY || env.SUPABASE_SECRET_KEY;
     const admin = adminClient();
     test.skip(!admin, 'SUPABASE_SERVICE_ROLE_KEY가 없어 네이버 병합 시나리오를 건너뜁니다.');
     if (!admin) {
@@ -163,9 +167,31 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
       if (stubId) {
         expect((await admin.auth.admin.getUserById(stubId)).data.user).toBeNull();
       }
-      expect((await admin.auth.admin.getUserById(googleId)).data.user?.app_metadata?.naver_ids).toEqual(
+      const mergedUser = (await admin.auth.admin.getUserById(googleId)).data.user;
+      expect(mergedUser?.app_metadata?.naver_ids).toEqual(
         expect.arrayContaining([naverEmailId, naverPhoneId]),
       );
+      expect(mergedUser?.app_metadata?.providers).toEqual(expect.arrayContaining(['naver']));
+      const identityRpc = await admin.rpc('link_naver_identity', {
+        p_user_id: googleId,
+        p_naver_id: naverEmailId,
+        p_email: googleEmail,
+        p_name: 'E2E 구글',
+      });
+      if (identityRpc.error?.code === 'PGRST202') {
+        expect(mergedUser?.app_metadata?.providers).toEqual(expect.arrayContaining(['naver']));
+      } else {
+        expect(identityRpc.error, identityRpc.error?.message).toBeNull();
+        await admin.rpc('link_naver_identity', {
+          p_user_id: googleId,
+          p_naver_id: naverPhoneId,
+          p_email: googleEmail,
+          p_name: 'E2E 구글',
+        });
+        const withIdentities = (await admin.auth.admin.getUserById(googleId)).data.user;
+        expect(userHasNaverIdentity(withIdentities, naverEmailId)).toBe(true);
+        expect(userHasNaverIdentity(withIdentities, naverPhoneId)).toBe(true);
+      }
 
       const delayToast = page.getByText('로그인 확인이 지연');
       const link = await admin.auth.admin.generateLink({ type: 'magiclink', email: googleEmail });

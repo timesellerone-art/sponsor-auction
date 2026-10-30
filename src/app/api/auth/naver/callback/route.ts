@@ -1,7 +1,6 @@
 import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { completeMagicLinkSession } from '@/lib/auth-complete';
-import { collectAuthEmails } from '@/lib/auth-emails';
 import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
 import { mergeUserInto } from '@/lib/auth-identity';
 import { expireAuthDebrisCookies } from '@/lib/auth-paths';
@@ -81,23 +80,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const linked = await linkNaverProfile(admin, profile, (incoming, canonical) =>
-      mergeUserInto(incoming, canonical, { phone: profile.phone }),
+    const linked = await linkNaverProfile(
+      admin,
+      profile,
+      (incoming, canonical) => mergeUserInto(incoming, canonical, { phone: profile.phone }),
+      async (email) => {
+        const link = await admin.auth.admin.generateLink({
+          type: 'magiclink',
+          email,
+          options: { redirectTo: `${origin}${next}` },
+        });
+        if (link.error || !link.data.properties?.hashed_token) {
+          console.warn('[SponsorAuction] 네이버 세션 링크 생성 실패', link.error?.message);
+          return null;
+        }
+        return link.data.properties.hashed_token;
+      },
     );
-    const sessionEmail = collectAuthEmails(linked.user)[0] ?? linked.user.email;
-    if (!sessionEmail) {
-      return loginError(request, origin, '네이버 로그인 세션을 만들지 못했습니다.');
-    }
-
-    const link = await admin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: sessionEmail,
-      options: { redirectTo: `${origin}${next}` },
-    });
-
-    const tokenHash = link.data.properties?.hashed_token;
-    if (link.error || !tokenHash) {
-      console.warn('[SponsorAuction] 네이버 세션 링크 생성 실패', link.error?.message);
+    const tokenHash = linked.tokenHash;
+    if (!tokenHash) {
       return loginError(request, origin, '네이버 로그인 세션을 만들지 못했습니다.');
     }
 

@@ -475,6 +475,15 @@ export type Database = {
         Args: { p_emails?: string[]; p_phone?: string | null; p_naver_id?: string | null };
         Returns: Array<{ id: string }>;
       };
+      link_naver_identity: {
+        Args: {
+          p_user_id: string;
+          p_naver_id: string;
+          p_email?: string | null;
+          p_name?: string | null;
+        };
+        Returns: string;
+      };
     };
     Enums: {
       platform_type:
