@@ -31,7 +31,6 @@ import {
   parseAuthRoles,
   primaryAuthRole,
   resolveActiveMemberRole,
-  type AccountMergeChallenge,
   type MemberRole,
   type SessionUser,
 } from '@/types/auth';
@@ -252,7 +251,7 @@ export async function retryLostOAuthOnce(): Promise<boolean> {
     return true;
   }
   const provider = readCookie(OAUTH_PROVIDER_COOKIE);
-  if (provider !== 'google' && provider !== 'kakao' && provider !== 'apple') {
+  if (provider !== 'google' && provider !== 'kakao' && provider !== 'naver' && provider !== 'apple') {
     return false;
   }
   const retriedAt = Number(window.sessionStorage.getItem(OAUTH_RETRY_STORAGE_KEY) || 0);
@@ -340,6 +339,7 @@ export async function signInWithNaver(nextPath?: string | null) {
   if (typeof window === 'undefined') {
     return fail(false, AUTH_FAIL_MESSAGE);
   }
+  rememberOAuthStart('naver', nextPath);
   const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
   const naverStart = `${window.location.origin}/api/auth/naver?next=${encodeURIComponent(next)}`;
   // 네이버는 라우터 전환이 아니라 전체 문서 이동이 필요합니다.
@@ -617,10 +617,6 @@ export async function signOut(): Promise<DataResult<boolean>> {
   }
 }
 
-export type SaveRoleOutcome =
-  | { kind: 'saved'; user: SessionUser }
-  | { kind: 'merge-required'; challenge: AccountMergeChallenge };
-
 type RoleApiPayload = {
   data?: {
     id?: string;
@@ -630,14 +626,14 @@ type RoleApiPayload = {
     roles?: unknown;
     currentMode?: unknown;
   };
-  mergeRequired?: AccountMergeChallenge;
+  sessionSwitch?: { tokenHash?: string };
   error?: string;
 };
 
 export async function saveMemberRole(
   role: MemberRole,
   contact?: { email?: string; phone?: string },
-): Promise<DataResult<SaveRoleOutcome | null>> {
+): Promise<DataResult<SessionUser | null>> {
   if (!isMemberRole(role)) {
     return fail(null, '광고주 또는 크리에이터 역할을 선택해 주세요.');
   }
@@ -649,7 +645,7 @@ export async function saveMemberRole(
       return fail(null, result.error ?? AUTH_FAIL_MESSAGE);
     }
     applyKnownSession(result.data);
-    return ok({ kind: 'saved', user: result.data });
+    return ok(result.data);
   }
 
   try {
@@ -674,23 +670,32 @@ export async function saveMemberRole(
       }),
     });
     const payload = (await response.json().catch(() => null)) as RoleApiPayload | null;
-
-    if (payload?.mergeRequired) {
-      return ok({ kind: 'merge-required', challenge: payload.mergeRequired });
-    }
     if (!response.ok || !payload?.data?.id) {
       return fail(null, payload?.error || `역할 저장에 실패했습니다. (${response.status})`);
     }
 
+    let sessionUser = session.user;
+    const tokenHash = payload.sessionSwitch?.tokenHash?.trim() ?? '';
+    if (tokenHash) {
+      const verified = await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: 'magiclink',
+      });
+      if (verified.error || !verified.data.user) {
+        return fail(null, '계정이 통합되었지만 세션 전환에 실패했습니다. 다시 로그인해 주세요.');
+      }
+      sessionUser = verified.data.user;
+    }
+
     const user = mapSessionUser(
       payload.data.id,
-      payload.data.email?.trim() || session.user.email || '',
+      payload.data.email?.trim() || sessionUser.email || '',
       payload.data.name?.trim() || '회원',
       payload.data.role,
       {
-        ...session.user,
+        ...sessionUser,
         user_metadata: {
-          ...(session.user.user_metadata ?? {}),
+          ...(sessionUser.user_metadata ?? {}),
           onboarding_complete: true,
           current_mode: payload.data.currentMode,
         },
@@ -699,29 +704,10 @@ export async function saveMemberRole(
     );
     void supabase.auth.refreshSession().catch(() => null);
     applyKnownSession(user);
-    return ok({ kind: 'saved', user });
+    notifyAuthChanged();
+    return ok(user);
   } catch (error) {
     console.warn('[SponsorAuction] 역할 저장 중 예외가 발생했습니다.', error);
     return fail(null, AUTH_FAIL_MESSAGE);
   }
-}
-
-/** 기존 계정 소유 확인용 이메일 로그인 링크. 링크를 열면 /auth/callback에서 대기 중인 병합이 완료된다. */
-export async function sendAccountProofEmail(email: string): Promise<DataResult<boolean>> {
-  const supabase = createClient();
-  if (!supabase) {
-    return fail(false, 'Supabase가 설정되지 않았습니다.');
-  }
-  rememberOAuthStart(null, ROLE_SELECT_PATH);
-  const { error } = await supabase.auth.signInWithOtp({
-    email: email.trim().toLowerCase(),
-    options: {
-      shouldCreateUser: false,
-      emailRedirectTo: buildAppOAuthCallbackUrl(window.location.origin),
-    },
-  });
-  if (error) {
-    return fail(false, error.message || '이메일 링크를 보내지 못했습니다.');
-  }
-  return ok(true);
 }

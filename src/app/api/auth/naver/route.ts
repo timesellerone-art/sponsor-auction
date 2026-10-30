@@ -8,6 +8,7 @@ import {
   cookieOptions,
   createNaverState,
   getNaverOAuthEnv,
+  missingNaverOAuthEnvKeys,
   naverCallbackUrl,
   requestOrigin,
 } from '@/lib/naver-oauth';
@@ -26,6 +27,9 @@ export async function GET(request: Request) {
     const origin = requestOrigin(request);
     const env = getNaverOAuthEnv();
     if (!env) {
+      console.warn('[SponsorAuction] 네이버 OAuth 환경변수 없음', {
+        missing: missingNaverOAuthEnvKeys(),
+      });
       return NextResponse.redirect(
         new URL(
           oauthFailedLoginPath(

@@ -13,13 +13,15 @@ import {
   postSocialAuthPath,
   sanitizeNextPath,
 } from '@/lib/auth-guard';
-import { createCookieBag, isPkceVerifierCookieName, writeCookies } from '@/lib/auth-paths';
-import { getSupabaseEnv } from '@/lib/supabase/env';
 import {
-  PENDING_MERGE_COOKIE,
-  completePendingMerge,
-  reconcileSocialIdentities,
-} from '@/lib/auth-identity';
+  LEGACY_PENDING_MERGE_COOKIE,
+  createCookieBag,
+  expireAuthDebrisCookies,
+  isPkceVerifierCookieName,
+  writeCookies,
+} from '@/lib/auth-paths';
+import { getSupabaseEnv } from '@/lib/supabase/env';
+import { reconcileSocialIdentities } from '@/lib/auth-identity';
 import {
   isMemberRole,
   needsRoleOnboarding,
@@ -156,18 +158,6 @@ export async function GET(request: NextRequest) {
   }
 
   let authUser = exchanged.data.user ?? exchanged.data.session.user;
-  try {
-    const pending = await completePendingMerge(
-      request.cookies.get(PENDING_MERGE_COOKIE)?.value,
-      authUser,
-    );
-    authUser = pending.user;
-  } catch (error) {
-    return failRedirect(origin, 'pending-merge', {
-      message: error instanceof Error ? error.message : '계정 통합에 실패했습니다.',
-    });
-  }
-
   const linked = await reconcileSocialIdentities(authUser);
   if (linked.switched) {
     if (!linked.tokenHash) {
@@ -207,9 +197,10 @@ export async function GET(request: NextRequest) {
       redirect.cookies.set(cookie.name, '', { path: '/', maxAge: 0, sameSite: 'lax' });
     });
   writeCookies(redirect.cookies, issued, { secure: origin.startsWith('https://') });
+  expireAuthDebrisCookies(request, redirect);
   redirect.cookies.delete(OAUTH_NEXT_COOKIE);
   redirect.cookies.delete(OAUTH_PROVIDER_COOKIE);
-  redirect.cookies.delete(PENDING_MERGE_COOKIE);
+  redirect.cookies.delete(LEGACY_PENDING_MERGE_COOKIE);
   applyAuthCookies(redirect.cookies, {
     present: true,
     roles: destination === ROLE_SELECT_PATH ? [] : sessionLike.roles,

@@ -81,6 +81,26 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
     await page.waitForURL(/accounts\.google\.com/, { timeout: 20000 });
   });
 
+  test('a) 네이버 로그인은 자체 콜백으로 실제 네이버 인가 창에 간다', async ({ page, context }) => {
+    await page.goto('/login');
+    const authorize = page.waitForRequest(/nid\.naver\.com\/oauth2\.0\/authorize/);
+    await page.getByRole('button', { name: '네이버로 계속하기' }).click();
+    const authorizeUrl = new URL((await authorize).url());
+    expect(authorizeUrl.searchParams.get('response_type')).toBe('code');
+    expect(authorizeUrl.searchParams.get('client_id')).toBeTruthy();
+    expect(authorizeUrl.searchParams.get('redirect_uri')).toBe(
+      'http://localhost:3000/api/auth/naver/callback',
+    );
+    expect(authorizeUrl.searchParams.get('auth_type')).toBeNull();
+
+    const cookies = await context.cookies('http://localhost:3000');
+    expect(cookies.find((cookie) => cookie.name === 'sa_naver_oauth_state')?.httpOnly).toBe(true);
+    expect(
+      decodeURIComponent(cookies.find((cookie) => cookie.name === 'sa_naver_oauth_next')?.value ?? ''),
+    ).toBe('/onboarding/role-select');
+    await page.waitForURL(/nid\.naver\.com/, { timeout: 20000 });
+  });
+
   test('b) 콜백 교환 실패 시 상세 사유와 함께 /login?error=oauth_failed 로 보낸다', async ({
     page,
     request,
@@ -312,18 +332,7 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
       expect(await sessionUserId(context)).toBe(googleId);
       await page.getByLabel('대표 이메일').fill(contactEmail);
       await page.getByRole('button', { name: /광고주로 시작하기/ }).click();
-      await expect(page.getByRole('heading', { name: '이미 가입된 계정이 있습니다' })).toBeVisible({
-        timeout: 10000,
-      });
-      await expect(page.getByRole('button', { name: '카카오 계정으로 본인 확인' })).toBeVisible();
-      const pending = (await admin.auth.admin.getUserById(googleId)).data.user;
-      expect(pending?.app_metadata?.pending_merge?.into).toBe(kakaoId);
-
-      const linkResponse = page.waitForResponse((response) =>
-        response.url().includes('/api/auth/identities/link'),
-      );
-      await loginAs(kakao.data.user?.email ?? '', '/onboarding/role-select');
-      expect((await linkResponse).status(), '계정 통합 API가 성공해야 한다').toBe(200);
+      await expect(page.getByRole('heading', { name: '이미 가입된 계정이 있습니다' })).toHaveCount(0);
       await expect(page).not.toHaveURL(/\/auth\/oauth|\/onboarding|\/login/, { timeout: 20000 });
       expect(await sessionUserId(context)).toBe(kakaoId);
 
@@ -403,31 +412,7 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
 
       await page.getByLabel('대표 이메일').fill(canonicalEmail);
       await page.getByRole('button', { name: /광고주로 시작하기/ }).click();
-      await expect(page.getByRole('heading', { name: '이미 가입된 계정이 있습니다' })).toBeVisible({
-        timeout: 10000,
-      });
-      await expect(page.getByRole('button', { name: 'Google 계정으로 본인 확인' })).toBeVisible();
-      await expect(page.getByRole('button', { name: '이메일 로그인 링크로 본인 확인' })).toBeVisible();
-
-      const pending = await admin.auth.admin.getUserById(incomingId);
-      expect(pending.data.user?.app_metadata?.pending_merge?.into).toBe(canonicalId);
-      const mergeCookie = (await context.cookies('http://localhost:3000')).find(
-        (cookie) => cookie.name === 'sponsor-auction-merge-from',
-      );
-      expect(mergeCookie?.value).toBe(incomingId);
-      expect(mergeCookie?.httpOnly).toBe(true);
-
-      const canonicalLink = await admin.auth.admin.generateLink({
-        type: 'magiclink',
-        email: canonicalEmail,
-      });
-      const linkResponse = page.waitForResponse((response) =>
-        response.url().includes('/api/auth/identities/link'),
-      );
-      await page.goto(
-        `/auth/oauth?token_hash=${canonicalLink.data.properties?.hashed_token}&type=magiclink&next=${encodeURIComponent('/onboarding/role-select')}`,
-      );
-      expect((await linkResponse).status(), '계정 통합 API가 성공해야 한다').toBe(200);
+      await expect(page.getByRole('heading', { name: '이미 가입된 계정이 있습니다' })).toHaveCount(0);
       await expect(page).not.toHaveURL(/\/auth\/oauth|\/onboarding|\/login/, { timeout: 20000 });
       expect(await sessionUserId(context)).toBe(canonicalId);
 

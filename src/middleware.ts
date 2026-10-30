@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { ROLE_COOKIE_NAME } from '@/lib/access';
 import { ROLE_SELECT_PATH } from '@/lib/auth-guard';
 import {
+  expireAuthDebrisCookies,
   hasAuthPresence,
   isAuthCallbackPath,
   isAuthPassthroughPath,
@@ -15,6 +16,11 @@ import {
   rateLimitResponse,
   shouldRateLimitPath,
 } from '@/lib/rate-limit';
+
+function finish(request: NextRequest, response: NextResponse) {
+  expireAuthDebrisCookies(request, response);
+  return response;
+}
 
 function redirectTo(request: NextRequest, pathname: string, reason?: string) {
   const url = request.nextUrl.clone();
@@ -60,7 +66,7 @@ export async function middleware(request: NextRequest) {
 
   const onboardingPath = onboardingCanonicalPath(pathname);
   if (onboardingPath) {
-    return withSessionCookies(session, redirectTo(request, onboardingPath));
+    return finish(request, withSessionCookies(session, redirectTo(request, onboardingPath)));
   }
 
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
@@ -69,56 +75,65 @@ export async function middleware(request: NextRequest) {
   const needsRole = loggedIn && !hasMemberRole;
 
   if (needsRole && (pathname.startsWith('/login') || !isAuthPassthroughPath(pathname))) {
-    return withSessionCookies(session, redirectTo(request, ROLE_SELECT_PATH));
+    return finish(request, withSessionCookies(session, redirectTo(request, ROLE_SELECT_PATH)));
   }
 
   if (pathname.startsWith('/onboarding') && hasMemberRole) {
-    return withSessionCookies(
-      session,
-      redirectTo(request, hasAdmin ? '/admin' : '/my'),
+    return finish(
+      request,
+      withSessionCookies(session, redirectTo(request, hasAdmin ? '/admin' : '/my')),
     );
   }
 
   if (isAdminPath && !hasAdmin) {
-    return withSessionCookies(
-      session,
-      redirectTo(
-        request,
-        hasMemberRole ? '/' : '/login',
-        hasMemberRole ? 'admin-forbidden' : 'admin-auth',
+    return finish(
+      request,
+      withSessionCookies(
+        session,
+        redirectTo(
+          request,
+          hasMemberRole ? '/' : '/login',
+          hasMemberRole ? 'admin-forbidden' : 'admin-auth',
+        ),
       ),
     );
   }
 
   if (isDashboardPath && !hasAdvertiser && !hasCreator) {
     if (loggedIn && !hasMemberRole) {
-      return withSessionCookies(session, redirectTo(request, ROLE_SELECT_PATH));
+      return finish(request, withSessionCookies(session, redirectTo(request, ROLE_SELECT_PATH)));
     }
-    return withSessionCookies(
-      session,
-      redirectTo(
-        request,
-        hasMemberRole ? '/' : '/login',
-        hasMemberRole ? 'advertiser-forbidden' : 'advertiser-auth',
+    return finish(
+      request,
+      withSessionCookies(
+        session,
+        redirectTo(
+          request,
+          hasMemberRole ? '/' : '/login',
+          hasMemberRole ? 'advertiser-forbidden' : 'advertiser-auth',
+        ),
       ),
     );
   }
 
   if (isPaymentPath && !hasAdvertiser && !hasCreator && !hasAdmin) {
     if (loggedIn && !hasMemberRole) {
-      return withSessionCookies(session, redirectTo(request, ROLE_SELECT_PATH));
+      return finish(request, withSessionCookies(session, redirectTo(request, ROLE_SELECT_PATH)));
     }
-    return withSessionCookies(
-      session,
-      redirectTo(
-        request,
-        hasMemberRole ? '/' : '/login',
-        hasMemberRole ? 'advertiser-forbidden' : 'payment-auth',
+    return finish(
+      request,
+      withSessionCookies(
+        session,
+        redirectTo(
+          request,
+          hasMemberRole ? '/' : '/login',
+          hasMemberRole ? 'advertiser-forbidden' : 'payment-auth',
+        ),
       ),
     );
   }
 
-  return session.response;
+  return finish(request, session.response);
 }
 
 export const config = {

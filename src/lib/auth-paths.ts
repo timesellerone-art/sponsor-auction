@@ -122,3 +122,30 @@ export function writeCookies(
 export function isPkceVerifierCookieName(name: string) {
   return name.includes('-auth-token') && name.endsWith('-code-verifier');
 }
+
+/** 예전 본인 확인 병합 플로우가 남긴 쿠키. 지금은 즉시 병합하므로 만료시킨다. */
+export const LEGACY_PENDING_MERGE_COOKIE = 'sponsor-auction-merge-from';
+
+export function isAuthDebrisCookieName(name: string) {
+  return isPkceVerifierCookieName(name) || name === LEGACY_PENDING_MERGE_COOKIE;
+}
+
+export function expireAuthDebrisCookies(
+  request: { cookies: { getAll: () => Array<{ name: string }> } },
+  response: {
+    cookies: {
+      set: (
+        name: string,
+        value: string,
+        options: { path: string; maxAge: number; sameSite: 'lax' },
+      ) => void;
+    };
+  },
+) {
+  for (const cookie of request.cookies.getAll()) {
+    if (!isAuthDebrisCookieName(cookie.name)) {
+      continue;
+    }
+    response.cookies.set(cookie.name, '', { path: '/', maxAge: 0, sameSite: 'lax' });
+  }
+}

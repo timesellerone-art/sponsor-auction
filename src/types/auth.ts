@@ -4,13 +4,6 @@ export type MemberRole = (typeof MEMBER_ROLES)[number];
 
 export type AuthProfileRole = MemberRole | 'admin';
 
-export type ProofProvider = 'google' | 'kakao' | 'naver' | 'email';
-
-export type AccountMergeChallenge = {
-  maskedEmail: string;
-  providers: ProofProvider[];
-};
-
 export interface SessionUser {
   id: string;
   email: string;

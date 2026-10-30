@@ -1,29 +1,30 @@
 import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
+import { collectAuthEmails } from '@/lib/auth-emails';
+import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
+import {
+  findAuthUserByEmail,
+  findUserByNaverId,
+  reconcileSocialIdentities,
+} from '@/lib/auth-identity';
 import {
   NAVER_NEXT_COOKIE,
   NAVER_STATE_COOKIE,
   exchangeNaverCode,
   fetchNaverProfile,
   getNaverOAuthEnv,
+  missingNaverOAuthEnvKeys,
   naverCallbackUrl,
   readStoredNext,
   requestOrigin,
 } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
-import {
-  findAuthUserByEmail,
-  findUserByNaverId,
-  reconcileSocialIdentities,
-} from '@/lib/auth-identity';
-import { collectAuthEmails } from '@/lib/auth-emails';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
-import { createAdminClient } from '@/lib/supabase/admin';
-import { upsertAppProfile } from '@/lib/supabase/profile-sync';
-import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
 
 function loginError(origin: string, message: string) {
   const response = NextResponse.redirect(
@@ -61,6 +62,9 @@ export async function GET(request: NextRequest) {
 
     const env = getNaverOAuthEnv();
     if (!env) {
+      console.warn('[SponsorAuction] 네이버 OAuth 환경변수 없음', {
+        missing: missingNaverOAuthEnvKeys(),
+      });
       return loginError(origin, '네이버 로그인 설정이 없습니다.');
     }
 

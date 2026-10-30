@@ -5,6 +5,7 @@ import { postAuthPath, postSocialAuthPath } from '../../src/lib/auth-guard';
 import {
   hasAuthPresence,
   isAuthCallbackPath,
+  isAuthDebrisCookieName,
   isAuthPassthroughPath,
   isSupabaseAuthCookieName,
   onboardingCanonicalPath,
@@ -63,6 +64,12 @@ describe('post-auth destination', () => {
     ]);
     assert.equal(written[0]?.options?.path, '/');
     assert.notEqual(written[0]?.options?.httpOnly, true);
+  });
+
+  it('잔여 PKCE verifier와 예전 병합 쿠키는 로그인 쓰레기로 본다', () => {
+    assert.equal(isAuthDebrisCookieName('sb-xxxx-auth-token-code-verifier'), true);
+    assert.equal(isAuthDebrisCookieName('sponsor-auction-merge-from'), true);
+    assert.equal(isAuthDebrisCookieName('sb-xxxx-auth-token'), false);
   });
 
   it('OAuth 시작 시 남는 PKCE verifier 쿠키는 로그인 상태로 보지 않는다', () => {

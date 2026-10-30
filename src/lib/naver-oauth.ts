@@ -37,6 +37,22 @@ export type NaverProfile = {
   avatarUrl: string | null;
 };
 
+const NAVER_CLIENT_ID_KEYS = [
+  'NAVER_CLIENT_ID',
+  'NEXT_PUBLIC_NAVER_CLIENT_ID',
+  'SUPABASE_AUTH_EXTERNAL_NAVER_CLIENT_ID',
+  'AUTH_NAVER_CLIENT_ID',
+  'NAVER_ID',
+] as const;
+
+const NAVER_CLIENT_SECRET_KEYS = [
+  'NAVER_CLIENT_SECRET',
+  'NAVER_SECRET',
+  'SUPABASE_AUTH_EXTERNAL_NAVER_SECRET',
+  'AUTH_NAVER_SECRET',
+  'NAVER_CLIENT_SECRET_KEY',
+] as const;
+
 function cleanEnv(value: string | undefined) {
   const trimmed = value?.trim().replace(/^["']+|["']+$/g, '') ?? '';
   if (!trimmed || /YOUR_|placeholder/i.test(trimmed)) {
@@ -45,9 +61,35 @@ function cleanEnv(value: string | undefined) {
   return trimmed;
 }
 
+/** Next 빌드 시 `process.env.NAME` 정적 치환을 피하고 Vercel 런타임 값을 읽는다. */
+export function readServerEnv(name: string) {
+  return process.env[name];
+}
+
+function firstCleanEnv(keys: readonly string[]) {
+  for (const key of keys) {
+    const value = cleanEnv(readServerEnv(key));
+    if (value) {
+      return value;
+    }
+  }
+  return '';
+}
+
+export function missingNaverOAuthEnvKeys() {
+  const missing: string[] = [];
+  if (!firstCleanEnv(NAVER_CLIENT_ID_KEYS)) {
+    missing.push('NAVER_CLIENT_ID');
+  }
+  if (!firstCleanEnv(NAVER_CLIENT_SECRET_KEYS)) {
+    missing.push('NAVER_CLIENT_SECRET');
+  }
+  return missing;
+}
+
 export function getNaverOAuthEnv(): NaverEnv | null {
-  const clientId = cleanEnv(process.env.NAVER_CLIENT_ID);
-  const clientSecret = cleanEnv(process.env.NAVER_CLIENT_SECRET);
+  const clientId = firstCleanEnv(NAVER_CLIENT_ID_KEYS);
+  const clientSecret = firstCleanEnv(NAVER_CLIENT_SECRET_KEYS);
   if (!clientId || !clientSecret) {
     return null;
   }
@@ -92,7 +134,6 @@ export function buildNaverAuthorizeUrl(params: {
   url.searchParams.set('client_id', params.clientId);
   url.searchParams.set('redirect_uri', params.redirectUri);
   url.searchParams.set('state', params.state);
-  url.searchParams.set('auth_type', 'reauthenticate');
   return url.toString();
 }
 

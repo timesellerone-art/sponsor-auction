@@ -17,7 +17,6 @@ import {
   parseAuthRoles,
   primaryAuthRole,
   type MemberRole,
-  type ProofProvider,
 } from '@/types/auth';
 
 type AdminClient = SupabaseClient<Database>;
@@ -26,16 +25,6 @@ export type LinkedSocialUser = {
   user: User;
   switched: boolean;
   tokenHash: string | null;
-};
-
-export const PENDING_MERGE_COOKIE = 'sponsor-auction-merge-from';
-export const PENDING_MERGE_TTL_SECONDS = 30 * 60;
-
-type PendingMerge = {
-  into: string;
-  roles: MemberRole[];
-  phone: string | null;
-  expires_at: string;
 };
 
 export class AccountMergeUnavailableError extends Error {
@@ -51,18 +40,6 @@ function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
-function providersOf(user: User): string[] {
-  const provider =
-    typeof user.app_metadata?.provider === 'string' ? [user.app_metadata.provider] : [];
-  return [
-    ...new Set([
-      ...stringList(user.app_metadata?.providers),
-      ...(user.identities ?? []).map((item) => item.provider),
-      ...provider,
-    ]),
-  ];
-}
-
 function naverIdsOf(user: User): string[] {
   return stringList(user.app_metadata?.naver_ids);
 }
@@ -76,28 +53,6 @@ function displayNameOf(user: User): string | null {
     }
   }
   return null;
-}
-
-/** 기존 계정 소유를 증명할 로그인 수단. 이메일 링크는 입력한 이메일이 그 계정의 이메일일 때만 허용한다. */
-export function proofProvidersOf(user: User, typedEmail?: string | null): ProofProvider[] {
-  const providers = providersOf(user);
-  const proofs: ProofProvider[] = (['google', 'kakao', 'naver'] as const).filter((provider) =>
-    providers.includes(provider),
-  );
-  const email = normalizeContactEmail(typedEmail);
-  if (email && collectAuthEmails(user).includes(email)) {
-    proofs.push('email');
-  }
-  return proofs;
-}
-
-export function maskEmail(email: string | null | undefined) {
-  const value = email?.trim() || '';
-  const [local, domain] = value.split('@');
-  if (!local || !domain) {
-    return '';
-  }
-  return `${local.slice(0, Math.min(3, local.length))}***@${domain}`;
 }
 
 async function listAllUsers(admin: AdminClient) {
@@ -219,7 +174,7 @@ async function reassignOwnedRows(admin: AdminClient, fromId: string, toId: strin
   }
 }
 
-async function generateMagicLinkHash(admin: AdminClient, user: User) {
+export async function generateMagicLinkHash(admin: AdminClient, user: User) {
   const email = collectAuthEmails(user)[0] ?? user.email;
   if (!email) {
     return null;
@@ -309,7 +264,6 @@ export async function mergeUserInto(
       naver_ids: [...new Set([...naverIdsOf(canonical), ...naverIdsOf(incoming)])],
       contact_email: canonical.app_metadata?.contact_email ?? incoming.app_metadata?.contact_email ?? null,
       contact_phone: phone,
-      pending_merge: null,
     },
   });
 
@@ -328,70 +282,6 @@ export async function mergeUserInto(
 
   const refreshed = await admin.auth.admin.getUserById(canonical.id);
   return refreshed.data.user ?? canonical;
-}
-
-/** 본인 확인(기존 계정 로그인) 전까지 병합 요청을 incoming 유저의 app_metadata에 기록한다. */
-export async function requestPendingMerge(
-  incoming: User,
-  canonical: User,
-  options: { roles: MemberRole[]; phone?: string | null },
-) {
-  const admin = createAdminClient();
-  if (!admin) {
-    throw new Error('Supabase 서비스 키가 없어 계정을 통합할 수 없습니다.');
-  }
-  const pending: PendingMerge = {
-    into: canonical.id,
-    roles: options.roles,
-    phone: normalizePhone(options.phone) || null,
-    expires_at: new Date(Date.now() + PENDING_MERGE_TTL_SECONDS * 1000).toISOString(),
-  };
-  const { error } = await admin.auth.admin.updateUserById(incoming.id, {
-    app_metadata: { pending_merge: pending },
-  });
-  if (error) {
-    throw new Error(`병합 요청 저장 실패: ${error.message}`);
-  }
-}
-
-function readPendingMerge(user: User): PendingMerge | null {
-  const raw = user.app_metadata?.pending_merge as Partial<PendingMerge> | null | undefined;
-  if (!raw || typeof raw.into !== 'string' || typeof raw.expires_at !== 'string') {
-    return null;
-  }
-  if (Date.parse(raw.expires_at) < Date.now()) {
-    return null;
-  }
-  return {
-    into: raw.into,
-    roles: (raw.roles ?? []).filter(isMemberRole),
-    phone: typeof raw.phone === 'string' ? raw.phone : null,
-    expires_at: raw.expires_at,
-  };
-}
-
-/**
- * 기존(대표) 계정으로 로그인해 본인 확인이 끝난 뒤 호출한다.
- * 쿠키의 임시 계정이 현재 로그인한 계정으로의 병합을 요청해 둔 경우에만 병합한다.
- */
-export async function completePendingMerge(
-  fromUserId: string | null | undefined,
-  current: User,
-): Promise<{ merged: boolean; user: User }> {
-  const admin = createAdminClient();
-  if (!admin || !fromUserId || fromUserId === current.id) {
-    return { merged: false, user: current };
-  }
-  const incoming = (await admin.auth.admin.getUserById(fromUserId)).data.user;
-  const pending = incoming ? readPendingMerge(incoming) : null;
-  if (!incoming || !pending || pending.into !== current.id) {
-    return { merged: false, user: current };
-  }
-  const user = await mergeUserInto(incoming, current, {
-    roles: pending.roles,
-    phone: pending.phone,
-  });
-  return { merged: true, user };
 }
 
 /** 같은 검증 이메일을 가진 기존 계정이 있으면 지금 로그인한 계정을 그쪽으로 합치고 세션 전환 토큰을 돌려준다. */

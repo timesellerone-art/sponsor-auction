@@ -1,11 +1,8 @@
 import { connection } from 'next/server';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import {
-  PENDING_MERGE_COOKIE,
-  completePendingMerge,
-  reconcileSocialIdentities,
-} from '@/lib/auth-identity';
+import { reconcileSocialIdentities } from '@/lib/auth-identity';
+import { expireAuthDebrisCookies } from '@/lib/auth-paths';
 import { createClient } from '@/lib/supabase/server';
 
 const NO_STORE = {
@@ -29,13 +26,7 @@ export async function POST() {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401, headers: NO_STORE });
     }
 
-    const cookieStore = await cookies();
-    const pending = await completePendingMerge(
-      cookieStore.get(PENDING_MERGE_COOKIE)?.value,
-      data.user,
-    );
-
-    const linked = await reconcileSocialIdentities(pending.user);
+    const linked = await reconcileSocialIdentities(data.user);
     if (linked.switched && linked.tokenHash) {
       const verified = await supabase.auth.verifyOtp({
         token_hash: linked.tokenHash,
@@ -47,17 +38,18 @@ export async function POST() {
     }
 
     const current = await supabase.auth.getUser();
+    const cookieStore = await cookies();
     const response = NextResponse.json(
       {
         data: {
           id: current.data.user?.id ?? linked.user.id,
           email: current.data.user?.email ?? linked.user.email ?? null,
-          merged: pending.merged || linked.switched,
+          merged: linked.switched,
         },
       },
       { headers: NO_STORE },
     );
-    response.cookies.delete(PENDING_MERGE_COOKIE);
+    expireAuthDebrisCookies({ cookies: cookieStore }, response);
     return response;
   } catch (error) {
     console.error('[SponsorAuction] 소셜 계정 통합 중 예외가 발생했습니다.', error);
