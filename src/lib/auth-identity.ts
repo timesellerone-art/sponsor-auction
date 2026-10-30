@@ -2,14 +2,10 @@ import 'server-only';
 
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { collectAuthEmails } from '@/lib/auth-emails';
+import { lookupUsersByContact } from '@/lib/auth-lookup';
 import { normalizeContactEmail, normalizePhone } from '@/lib/contact';
 import { createAdminClient } from '@/lib/supabase/admin';
-import {
-  isMissingPhoneColumn,
-  markPhoneColumnMissing,
-  profilePhoneSupported,
-  upsertAppProfile,
-} from '@/lib/supabase/profile-sync';
+import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 import type { Database } from '@/types/database';
 import {
   MEMBER_ROLES,
@@ -55,23 +51,6 @@ function displayNameOf(user: User): string | null {
   return null;
 }
 
-async function listAllUsers(admin: AdminClient) {
-  const users: User[] = [];
-  for (let page = 1; page <= 10; page += 1) {
-    const listed = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-    if (listed.error) {
-      console.warn('[SponsorAuction] auth.users 조회 실패', listed.error.message);
-      break;
-    }
-    const batch = listed.data.users ?? [];
-    users.push(...batch);
-    if (batch.length < 1000) {
-      break;
-    }
-  }
-  return users;
-}
-
 function pickCanonicalUser(users: User[]): User | null {
   const sorted = [...users].sort((left, right) => {
     const diff = Date.parse(left.created_at) - Date.parse(right.created_at);
@@ -82,8 +61,8 @@ function pickCanonicalUser(users: User[]): User | null {
 
 async function usersByEmails(admin: AdminClient, emails: string[]) {
   const wanted = new Set(emails);
-  const all = await listAllUsers(admin);
-  return all.filter((item) => collectAuthEmails(item).some((email) => wanted.has(email)));
+  const found = await lookupUsersByContact(admin, { emails });
+  return found.filter((item) => collectAuthEmails(item).some((email) => wanted.has(email)));
 }
 
 export async function findAuthUserByEmail(email: string): Promise<User | null> {
@@ -100,8 +79,8 @@ export async function findUserByNaverId(naverId: string): Promise<User | null> {
   if (!admin || !naverId) {
     return null;
   }
-  const all = await listAllUsers(admin);
-  return pickCanonicalUser(all.filter((item) => naverIdsOf(item).includes(naverId)));
+  const found = await lookupUsersByContact(admin, { naverId });
+  return pickCanonicalUser(found.filter((item) => naverIdsOf(item).includes(naverId)));
 }
 
 export async function findExistingAccountByContact(input: {
@@ -115,27 +94,10 @@ export async function findExistingAccountByContact(input: {
   }
   const email = normalizeContactEmail(input.email);
   const phone = normalizePhone(input.phone);
-  const candidates = new Set<string>();
-
-  if (email) {
-    const byProfile = await admin.from('profiles').select('id').eq('email', email);
-    (byProfile.data ?? []).forEach((row) => candidates.add(row.id));
-  }
-  if (phone && profilePhoneSupported()) {
-    const byPhone = await admin.from('profiles').select('id').eq('phone', phone);
-    if (isMissingPhoneColumn(byPhone.error)) {
-      markPhoneColumnMissing();
-    }
-    (byPhone.data ?? []).forEach((row) => candidates.add(row.id));
-  }
-
-  const all = await listAllUsers(admin);
-  const matches = all.filter((item) => {
+  const found = await lookupUsersByContact(admin, { emails: [email], phone });
+  const matches = found.filter((item) => {
     if (item.id === input.excludeUserId) {
       return false;
-    }
-    if (candidates.has(item.id)) {
-      return true;
     }
     const contactEmail = normalizeContactEmail(
       typeof item.app_metadata?.contact_email === 'string' ? item.app_metadata.contact_email : '',
@@ -163,15 +125,17 @@ async function reassignOwnedRows(admin: AdminClient, fromId: string, toId: strin
     { table: 'time_slot_bids', column: 'advertiser_id' },
     { table: 'compliance_logs', column: 'actor_id' },
   ];
-  for (const item of tables) {
-    const { error } = await admin
-      .from(item.table)
-      .update({ [item.column]: toId } as never)
-      .eq(item.column, fromId);
-    if (error) {
-      console.warn(`[SponsorAuction] ${item.table}.${item.column} 계정 병합 실패`, error.message);
-    }
-  }
+  await Promise.all(
+    tables.map(async (item) => {
+      const { error } = await admin
+        .from(item.table)
+        .update({ [item.column]: toId } as never)
+        .eq(item.column, fromId);
+      if (error) {
+        console.warn(`[SponsorAuction] ${item.table}.${item.column} 계정 병합 실패`, error.message);
+      }
+    }),
+  );
 }
 
 export async function generateMagicLinkHash(admin: AdminClient, user: User) {
@@ -250,7 +214,7 @@ export async function mergeUserInto(
     (typeof canonical.user_metadata?.phone === 'string' ? canonical.user_metadata.phone : '') ||
     null;
 
-  await admin.auth.admin.updateUserById(canonical.id, {
+  const updated = await admin.auth.admin.updateUserById(canonical.id, {
     user_metadata: {
       ...(incoming.user_metadata ?? {}),
       ...(canonical.user_metadata ?? {}),
@@ -268,20 +232,20 @@ export async function mergeUserInto(
   });
 
   await reassignOwnedRows(admin, incoming.id, canonical.id);
-  await admin.from('profiles').delete().eq('id', incoming.id);
-  await deleteUserOrThrow(admin, incoming.id);
+  await Promise.all([
+    admin.from('profiles').delete().eq('id', incoming.id),
+    deleteUserOrThrow(admin, incoming.id),
+    upsertAppProfile(admin, {
+      id: canonical.id,
+      email: collectAuthEmails(canonical)[0] ?? canonical.email,
+      name: displayNameOf(canonical) || displayNameOf(incoming),
+      phone,
+      roles,
+      role: primaryAuthRole(roles),
+    }),
+  ]);
 
-  await upsertAppProfile(admin, {
-    id: canonical.id,
-    email: collectAuthEmails(canonical)[0] ?? canonical.email,
-    name: displayNameOf(canonical) || displayNameOf(incoming),
-    phone,
-    roles,
-    role: primaryAuthRole(roles),
-  });
-
-  const refreshed = await admin.auth.admin.getUserById(canonical.id);
-  return refreshed.data.user ?? canonical;
+  return updated.data.user ?? canonical;
 }
 
 /** 같은 검증 이메일·전화번호를 가진 기존 계정이 있으면 지금 로그인한 계정을 그쪽으로 합치고 세션 전환 토큰을 돌려준다. */
@@ -297,24 +261,13 @@ export async function reconcileSocialIdentities(user: User): Promise<LinkedSocia
       (typeof user.app_metadata?.contact_phone === 'string' ? user.app_metadata.contact_phone : '') ||
       (typeof user.user_metadata?.phone === 'string' ? user.user_metadata.phone : ''),
   );
-  const byEmail =
-    emails.length > 0 ? pickCanonicalUser(await usersByEmails(admin, emails)) : null;
-  const byContact = await findExistingAccountByContact({
-    email: emails[0] ?? null,
+  const matches = await lookupUsersByContact(admin, {
+    emails,
     phone: phone || null,
-    excludeUserId: user.id,
   });
-  const canonical = pickCanonicalUser(
-    [byEmail, byContact].filter((item): item is User => Boolean(item)),
-  );
+  const canonical = pickCanonicalUser(matches.filter((item) => item.id !== user.id));
 
   if (!canonical || canonical.id === user.id) {
-    await upsertAppProfile(admin, {
-      id: user.id,
-      email: emails[0] ?? user.email,
-      name: displayNameOf(user),
-      phone: phone || null,
-    });
     return { user, switched: false, tokenHash: null };
   }
 

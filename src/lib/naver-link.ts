@@ -1,5 +1,6 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { collectAuthEmails } from './auth-emails';
+import { lookupUsersByContact } from './auth-lookup';
 import { normalizeContactEmail, normalizePhone } from './contact';
 import type { NaverProfile } from './naver-oauth';
 
@@ -35,22 +36,6 @@ function pickCanonicalUser(users: User[]): User | null {
     return Number.isFinite(diff) && diff !== 0 ? diff : left.id.localeCompare(right.id);
   });
   return sorted[0] ?? null;
-}
-
-async function listAllUsers(admin: AdminClient) {
-  const users: User[] = [];
-  for (let page = 1; page <= 10; page += 1) {
-    const listed = await admin.auth.admin.listUsers({ page, perPage: 1000 });
-    if (listed.error) {
-      break;
-    }
-    const batch = listed.data.users ?? [];
-    users.push(...batch);
-    if (batch.length < 1000) {
-      break;
-    }
-  }
-  return users;
 }
 
 function phonesOf(user: User): string[] {
@@ -91,23 +76,13 @@ async function collectNaverMatches(
 ) {
   const email = normalizeContactEmail(profile.email);
   const phone = normalizePhone(profile.phone);
-  const all = await listAllUsers(admin);
+  const all = await lookupUsersByContact(admin, {
+    emails: [email, profile.email, `naver.${profile.id}@oauth.sponsor-auction.local`],
+    phone,
+    naverId: profile.id,
+  });
   const byNaver = all.filter((item) => naverIdsOf(item).includes(profile.id));
-
-  const candidateIds = new Set<string>();
-  if (email) {
-    const byProfile = await admin.from('profiles').select('id').eq('email', email);
-    (byProfile.data ?? []).forEach((row) => candidateIds.add(row.id));
-  }
-  if (phone) {
-    const byPhone = await admin.from('profiles').select('id').eq('phone', phone);
-    (byPhone.data ?? []).forEach((row) => candidateIds.add(row.id));
-  }
-
   const byContact = all.filter((item) => {
-    if (candidateIds.has(item.id)) {
-      return true;
-    }
     const contactEmail = normalizeContactEmail(
       typeof item.app_metadata?.contact_email === 'string' ? item.app_metadata.contact_email : '',
     );
@@ -155,9 +130,10 @@ async function stampNaverOnUser(admin: AdminClient, user: User, profile: NaverPr
     ...metadata,
     ...(e164 ? { phone: e164 } : {}),
   });
-  if (withPhone.error && e164) {
-    await admin.auth.admin.updateUserById(user.id, metadata);
-  }
+  const stamped =
+    withPhone.error && e164
+      ? await admin.auth.admin.updateUserById(user.id, metadata)
+      : withPhone;
 
   const patch: Record<string, string> = {};
   if (email) {
@@ -179,7 +155,7 @@ async function stampNaverOnUser(admin: AdminClient, user: User, profile: NaverPr
     }
   }
 
-  return (await admin.auth.admin.getUserById(user.id)).data.user ?? user;
+  return stamped.data.user ?? user;
 }
 
 /**
@@ -264,7 +240,9 @@ async function defaultMerge(admin: AdminClient, incoming: User, canonical: User)
   if (moved.error && moved.error.code !== 'PGRST202') {
     throw new Error(`identity 이전 실패: ${moved.error.message}`);
   }
-  await admin.from('profiles').delete().eq('id', incoming.id);
-  await admin.auth.admin.deleteUser(incoming.id);
-  return (await admin.auth.admin.getUserById(canonical.id)).data.user ?? canonical;
+  await Promise.all([
+    admin.from('profiles').delete().eq('id', incoming.id),
+    admin.auth.admin.deleteUser(incoming.id),
+  ]);
+  return canonical;
 }

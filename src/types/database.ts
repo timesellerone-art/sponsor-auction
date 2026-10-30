@@ -471,6 +471,10 @@ export type Database = {
         Args: { p_from: string; p_to: string };
         Returns: number;
       };
+      find_auth_user_ids_by_contact: {
+        Args: { p_emails?: string[]; p_phone?: string | null; p_naver_id?: string | null };
+        Returns: Array<{ id: string }>;
+      };
     };
     Enums: {
       platform_type:

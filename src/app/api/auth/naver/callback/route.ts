@@ -1,8 +1,9 @@
 import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
+import { completeMagicLinkSession } from '@/lib/auth-complete';
 import { collectAuthEmails } from '@/lib/auth-emails';
 import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
-import { mergeUserInto, reconcileSocialIdentities } from '@/lib/auth-identity';
+import { mergeUserInto } from '@/lib/auth-identity';
 import { expireAuthDebrisCookies } from '@/lib/auth-paths';
 import { linkNaverProfile } from '@/lib/naver-link';
 import {
@@ -83,8 +84,7 @@ export async function GET(request: NextRequest) {
     const linked = await linkNaverProfile(admin, profile, (incoming, canonical) =>
       mergeUserInto(incoming, canonical, { phone: profile.phone }),
     );
-    const resolved = (await reconcileSocialIdentities(linked.user)).user;
-    const sessionEmail = collectAuthEmails(resolved)[0] ?? resolved.email;
+    const sessionEmail = collectAuthEmails(linked.user)[0] ?? linked.user.email;
     if (!sessionEmail) {
       return loginError(request, origin, '네이버 로그인 세션을 만들지 못했습니다.');
     }
@@ -101,15 +101,16 @@ export async function GET(request: NextRequest) {
       return loginError(request, origin, '네이버 로그인 세션을 만들지 못했습니다.');
     }
 
-    const complete = new URL('/auth/oauth', origin);
-    complete.searchParams.set('token_hash', tokenHash);
-    complete.searchParams.set('type', 'magiclink');
-    complete.searchParams.set('next', next);
-    const response = NextResponse.redirect(complete);
-    response.cookies.delete(NAVER_STATE_COOKIE);
-    response.cookies.delete(NAVER_NEXT_COOKIE);
-    expireAuthDebrisCookies(request, response);
-    return response;
+    const redirect = await completeMagicLinkSession({
+      request,
+      origin,
+      tokenHash,
+      type: 'magiclink',
+      next,
+    });
+    redirect.cookies.delete(NAVER_STATE_COOKIE);
+    redirect.cookies.delete(NAVER_NEXT_COOKIE);
+    return redirect;
   } catch (error) {
     const detail = error instanceof Error ? error.message : '네이버 로그인에 실패했습니다.';
     console.warn('[SponsorAuction] 네이버 콜백 처리 예외', error);

@@ -115,8 +115,9 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
       roles: ['advertiser', 'creator'],
     });
 
+    const stubEmail = `naver.${naverPhoneId}@oauth.sponsor-auction.local`;
     const stub = await admin.auth.admin.createUser({
-      email: `naver.e2e.${stamp}@oauth.sponsor-auction.local`,
+      email: stubEmail,
       email_confirm: true,
       app_metadata: {
         provider: 'naver',
@@ -127,8 +128,18 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
       user_metadata: { name: 'E2E 네이버 스텁', naver_id: naverPhoneId, phone: sharedPhone },
     });
     const stubId = stub.data.user?.id ?? '';
+    if (stubId) {
+      await admin.from('profiles').upsert({
+        id: stubId,
+        email: stubEmail,
+        name: 'E2E 네이버 스텁',
+        role: null,
+        roles: [],
+      });
+    }
 
     try {
+      const mergeStarted = Date.now();
       const byEmail = await linkNaverProfile(admin, {
         id: naverEmailId,
         email: googleEmail,
@@ -138,10 +149,11 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
       });
       expect(byEmail.user.id).toBe(googleId);
       expect(byEmail.merged).toBe(true);
+      expect(Date.now() - mergeStarted).toBeLessThan(1000);
 
       const byPhone = await linkNaverProfile(admin, {
         id: naverPhoneId,
-        email: `naver.${stamp}@oauth.sponsor-auction.local`,
+        email: stubEmail,
         name: '네이버 전화',
         phone: sharedPhone,
         avatarUrl: null,
@@ -155,14 +167,16 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
         expect.arrayContaining([naverEmailId, naverPhoneId]),
       );
 
+      const delayToast = page.getByText('로그인 확인이 지연');
       const link = await admin.auth.admin.generateLink({ type: 'magiclink', email: googleEmail });
       const tokenHash = link.data.properties?.hashed_token ?? '';
       const started = Date.now();
       await page.goto(
         `/auth/oauth?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink&next=${encodeURIComponent('/my')}`,
       );
-      await expect(page).toHaveURL(/\/my/, { timeout: 20000 });
-      expect(Date.now() - started).toBeLessThan(8000);
+      await expect(page).toHaveURL(/\/my/, { timeout: 3000 });
+      expect(Date.now() - started).toBeLessThan(1000);
+      await expect(delayToast).toHaveCount(0);
       await expect(page.getByRole('heading', { name: '이미 가입된 계정이 있습니다' })).toHaveCount(0);
       await expect(page.getByRole('heading', { name: /역할을 선택해 주세요/ })).toHaveCount(0);
       expect(await sessionUserId(context)).toBe(googleId);
@@ -175,7 +189,8 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
       }
       await deleteMatchingUsers(
         admin,
-        (email) => email === googleEmail || email.startsWith(`naver.e2e.${stamp}`),
+        (email) =>
+          email === googleEmail || email === stubEmail || email.startsWith(`naver.e2e.${stamp}`),
       );
     }
   });
