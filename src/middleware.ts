@@ -43,7 +43,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname === '/auth/oauth' && request.nextUrl.searchParams.has('token_hash')) {
+  if (
+    pathname === '/auth/oauth' &&
+    request.nextUrl.searchParams.has('token_hash') &&
+    request.nextUrl.searchParams.get('client') !== '1'
+  ) {
     const complete = request.nextUrl.clone();
     complete.pathname = '/api/auth/session/complete';
     return NextResponse.rewrite(complete);

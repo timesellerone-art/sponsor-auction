@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr';
+import { sessionCookieOptions } from '@/lib/auth-paths';
 import { getSupabaseEnv, warnMockFallback } from '@/lib/supabase/env';
 import type { Database } from '@/types/database';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -25,10 +26,7 @@ export function createClient(): SupabaseClient<Database> | null {
   try {
     browserClient = createBrowserClient<Database>(env.url, env.anonKey, {
       isSingleton: true,
-      cookieOptions: {
-        path: '/',
-        sameSite: 'lax',
-      },
+      cookieOptions: sessionCookieOptions(),
       auth: {
         flowType: 'pkce',
         persistSession: true,

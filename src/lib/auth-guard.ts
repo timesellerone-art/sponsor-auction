@@ -27,7 +27,9 @@ export const OAUTH_RETRY_ERROR = 'oauth_retry';
 export function isOAuthStateLost(code?: string | null, message?: string | null) {
   return (
     code === 'bad_oauth_state' ||
-    /bad_oauth_state|oauth state not found|state.*expired/i.test(message ?? '')
+    /bad_oauth_state|oauth state not found|state.*expired|code verifier|code_verifier|pkce/i.test(
+      message ?? '',
+    )
   );
 }
 

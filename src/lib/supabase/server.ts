@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { sessionCookieOptions } from '@/lib/auth-paths';
 import { getSupabaseEnv, warnMockFallback } from '@/lib/supabase/env';
 import type { Database } from '@/types/database';
 
@@ -15,6 +16,7 @@ export async function createClient() {
     const cookieStore = await cookies();
 
     return createServerClient<Database>(env.url, env.anonKey, {
+      cookieOptions: sessionCookieOptions(),
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -22,7 +24,11 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
+              cookieStore.set(name, value, {
+                ...options,
+                path: options?.path ?? '/',
+                sameSite: options?.sameSite ?? 'lax',
+              });
             });
           } catch {
             // Server Component에서 set이 호출되면 무시합니다.

@@ -1,6 +1,11 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { createCookieBag, writeCookies, type CookieToSet } from '@/lib/auth-paths';
+import {
+  createCookieBag,
+  sessionCookieOptions,
+  writeCookies,
+  type CookieToSet,
+} from '@/lib/auth-paths';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 
 export type SessionMiddlewareResult = {
@@ -19,6 +24,7 @@ export async function updateSession(request: NextRequest): Promise<SessionMiddle
   }
 
   const supabase = createServerClient(env.url, env.anonKey, {
+    cookieOptions: sessionCookieOptions(secure),
     cookies: {
       getAll() {
         return request.cookies.getAll();

@@ -33,8 +33,11 @@ function adminClient(): SupabaseClient | null {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-async function sessionUserId(context: BrowserContext): Promise<string | null> {
-  const chunks = (await context.cookies('http://localhost:3000'))
+async function sessionUserId(
+  context: BrowserContext,
+  origin = 'http://localhost:3000',
+): Promise<string | null> {
+  const chunks = (await context.cookies(origin))
     .filter((cookie) => /^sb-.+-auth-token(\.\d+)?$/.test(cookie.name))
     .sort((left, right) => left.name.localeCompare(right.name, 'en', { numeric: true }));
   const raw = chunks.map((cookie) => cookie.value).join('');
@@ -207,6 +210,140 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
         (email) =>
           email === googleEmail || email === stubEmail || email.startsWith(`naver.e2e.${stamp}`),
       );
+    }
+  });
+
+  test('시크릿 창에서 구글 로그아웃 후 네이버 로그인은 세션 검증값 없이 /my로 들어간다', async ({
+    browser,
+  }) => {
+    const env = readEnv();
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??= env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.SUPABASE_SERVICE_ROLE_KEY ??=
+      env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY || env.SUPABASE_SECRET_KEY;
+    const admin = adminClient();
+    test.skip(!admin, 'SUPABASE_SERVICE_ROLE_KEY가 없어 네이버 병합 시나리오를 건너뜁니다.');
+    if (!admin) {
+      return;
+    }
+
+    const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
+    const context = await browser.newContext({ locale: 'ko-KR', baseURL });
+    const page = await context.newPage();
+    const stamp = Date.now().toString();
+    const googleEmail = `e2e.naverpkce.${stamp}@sponsor-auction.test`;
+    const naverId = `naver-pkce-${stamp}`;
+    let googleId = '';
+
+    await deleteMatchingUsers(admin, (email) => email.startsWith('e2e.naverpkce.'));
+
+    const google = await admin.auth.admin.createUser({
+      email: googleEmail,
+      email_confirm: true,
+      app_metadata: {
+        provider: 'google',
+        providers: ['google'],
+        contact_email: googleEmail,
+      },
+      user_metadata: {
+        name: 'E2E 구글 PKCE',
+        roles: ['advertiser', 'creator'],
+        role: 'advertiser',
+        current_mode: 'advertiser',
+        onboarding_complete: true,
+      },
+    });
+    expect(google.error, google.error?.message).toBeNull();
+    googleId = google.data.user?.id ?? '';
+    await admin.from('profiles').upsert({
+      id: googleId,
+      email: googleEmail,
+      name: 'E2E 구글 PKCE',
+      role: 'advertiser',
+      roles: ['advertiser', 'creator'],
+    });
+
+    try {
+      const authorize = await context.request.fetch('/api/auth/naver?next=/my', {
+        maxRedirects: 0,
+      });
+      const location = authorize.headers()['location'] ?? '';
+      if (/nid\.naver\.com/.test(location)) {
+        const setCookies = authorize
+          .headersArray()
+          .filter((header) => header.name.toLowerCase() === 'set-cookie')
+          .map((header) => header.value);
+        expect(
+          setCookies.some(
+            (value) =>
+              value.includes('sa_naver_oauth_state') &&
+              /Path=\//i.test(value) &&
+              /SameSite=Lax/i.test(value),
+          ),
+        ).toBe(true);
+        expect(
+          setCookies.some(
+            (value) =>
+              value.includes('sa_naver_oauth_next') &&
+              /Path=\//i.test(value) &&
+              /SameSite=Lax/i.test(value),
+          ),
+        ).toBe(true);
+      }
+
+      const googleLink = await admin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: googleEmail,
+      });
+      const googleHash = googleLink.data.properties?.hashed_token ?? '';
+      await page.goto(
+        `/auth/oauth?token_hash=${encodeURIComponent(googleHash)}&type=magiclink&next=${encodeURIComponent('/my')}`,
+      );
+      await expect(page).toHaveURL(/\/my/, { timeout: 3000 });
+      await page.getByRole('button', { name: '로그아웃', exact: true }).click();
+      await expect(page.getByRole('link', { name: '로그인' }).first()).toBeVisible();
+      await context.clearCookies();
+
+      const mergeStarted = Date.now();
+      const linked = await linkNaverProfile(admin, {
+        id: naverId,
+        email: googleEmail,
+        name: '네이버 회원',
+        phone: null,
+        avatarUrl: null,
+      });
+      expect(linked.user.id).toBe(googleId);
+      expect(linked.merged).toBe(true);
+      expect(Date.now() - mergeStarted).toBeLessThan(1000);
+
+      const mergedUser = (await admin.auth.admin.getUserById(googleId)).data.user;
+      expect(
+        userHasNaverIdentity(mergedUser, naverId),
+        'auth.identities에 provider=naver가 없습니다.',
+      ).toBe(true);
+
+      const verifyToast = page.getByText('로그인 세션 검증값이 없습니다');
+      const delayToast = page.getByText('로그인 확인이 지연');
+      const naverLink = await admin.auth.admin.generateLink({
+        type: 'magiclink',
+        email: googleEmail,
+      });
+      const tokenHash = naverLink.data.properties?.hashed_token ?? '';
+      const started = Date.now();
+      await page.goto(
+        `/auth/oauth?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink&next=${encodeURIComponent('/my')}`,
+      );
+      await expect(page).toHaveURL(/\/my/, { timeout: 3000 });
+      expect(Date.now() - started).toBeLessThan(1000);
+      await expect(verifyToast).toHaveCount(0);
+      await expect(delayToast).toHaveCount(0);
+      expect(await sessionUserId(context, baseURL)).toBe(googleId);
+    } finally {
+      await context.close();
+      if (googleId) {
+        await admin.auth.admin.deleteUser(googleId);
+        await admin.from('profiles').delete().eq('id', googleId);
+      }
+      await deleteMatchingUsers(admin, (email) => email === googleEmail);
     }
   });
 });

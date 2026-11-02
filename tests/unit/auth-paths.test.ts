@@ -9,6 +9,7 @@ import {
   isAuthPassthroughPath,
   isSupabaseAuthCookieName,
   onboardingCanonicalPath,
+  sessionCookieOptions,
   writeCookies,
 } from '../../src/lib/auth-paths';
 import { resolveActiveMemberRole, switchableMemberRoles } from '../../src/types/auth';
@@ -79,8 +80,8 @@ describe('post-auth destination', () => {
     assert.notEqual(written[0]?.options?.httpOnly, true);
   });
 
-  it('잔여 PKCE verifier와 예전 병합 쿠키는 로그인 쓰레기로 본다', () => {
-    assert.equal(isAuthDebrisCookieName('sb-xxxx-auth-token-code-verifier'), true);
+  it('진행 중인 PKCE verifier는 쓰레기로 지우지 않고 예전 병합 쿠키만 만료한다', () => {
+    assert.equal(isAuthDebrisCookieName('sb-xxxx-auth-token-code-verifier'), false);
     assert.equal(isAuthDebrisCookieName('sponsor-auction-merge-from'), true);
     assert.equal(isAuthDebrisCookieName('sb-xxxx-auth-token'), false);
   });
@@ -105,5 +106,10 @@ describe('post-auth destination', () => {
     );
     assert.equal(written[0]?.options?.secure, true);
     assert.equal(written[0]?.options?.sameSite, 'lax');
+    const options = sessionCookieOptions(true);
+    assert.equal(options.path, '/');
+    assert.equal(options.sameSite, 'lax');
+    assert.equal(options.secure, true);
+    assert.equal('maxAge' in options, false);
   });
 });

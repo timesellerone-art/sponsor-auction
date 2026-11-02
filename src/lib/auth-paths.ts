@@ -132,7 +132,15 @@ export function isPkceVerifierCookieName(name: string) {
 export const LEGACY_PENDING_MERGE_COOKIE = 'sponsor-auction-merge-from';
 
 export function isAuthDebrisCookieName(name: string) {
-  return isPkceVerifierCookieName(name) || name === LEGACY_PENDING_MERGE_COOKIE;
+  return name === LEGACY_PENDING_MERGE_COOKIE;
+}
+
+export function sessionCookieOptions(secure?: boolean) {
+  return {
+    path: '/' as const,
+    sameSite: 'lax' as const,
+    ...(typeof secure === 'boolean' ? { secure } : {}),
+  };
 }
 
 export function expireAuthDebrisCookies(
@@ -142,15 +150,21 @@ export function expireAuthDebrisCookies(
       set: (
         name: string,
         value: string,
-        options: { path: string; maxAge: number; sameSite: 'lax' },
+        options: { path: string; maxAge: number; sameSite: 'lax'; secure?: boolean },
       ) => void;
     };
   },
+  defaults: { secure?: boolean } = {},
 ) {
   for (const cookie of request.cookies.getAll()) {
     if (!isAuthDebrisCookieName(cookie.name)) {
       continue;
     }
-    response.cookies.set(cookie.name, '', { path: '/', maxAge: 0, sameSite: 'lax' });
+    response.cookies.set(cookie.name, '', {
+      path: '/',
+      maxAge: 0,
+      sameSite: 'lax',
+      ...(defaults.secure ? { secure: true } : {}),
+    });
   }
 }

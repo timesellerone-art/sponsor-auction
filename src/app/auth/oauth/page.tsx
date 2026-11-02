@@ -95,7 +95,7 @@ export default function AuthOAuthCompletePage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('token_hash')) {
+    if (params.get('token_hash') && params.get('client') !== '1') {
       window.location.replace(`/api/auth/session/complete?${params.toString()}`);
       return;
     }
@@ -138,9 +138,10 @@ export default function AuthOAuthCompletePage() {
       const supabase = getSupabaseClient();
       const otpType = params.get('type') === 'magiclink' ? 'magiclink' : 'email';
       const alreadyLinked = params.get('linked') === '1';
+      const tokenHash = params.get('token_hash');
 
       try {
-        const result = await completeOnce(supabase, null, otpType, next, alreadyLinked);
+        const result = await completeOnce(supabase, tokenHash, otpType, next, alreadyLinked);
         if (result.error || !result.destination) {
           go(loginFallback(result.error ?? undefined));
           return;

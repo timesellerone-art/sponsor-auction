@@ -108,50 +108,54 @@ function adminRestEnv() {
 }
 
 async function attachNaverIdentity(admin: AdminClient, userId: string, profile: NaverProfile) {
-  const email = normalizeContactEmail(profile.email) || null;
-  if (linkIdentityRpcAvailable) {
-    const linked = await admin.rpc('link_naver_identity', {
-      p_user_id: userId,
-      p_naver_id: profile.id,
-      p_email: email,
-      p_name: profile.name,
-    });
-    if (!linked.error) {
+  try {
+    const email = normalizeContactEmail(profile.email) || null;
+    if (linkIdentityRpcAvailable) {
+      const linked = await admin.rpc('link_naver_identity', {
+        p_user_id: userId,
+        p_naver_id: profile.id,
+        p_email: email,
+        p_name: profile.name,
+      });
+      if (!linked.error) {
+        return;
+      }
+      if (linked.error.code === 'PGRST202') {
+        linkIdentityRpcAvailable = false;
+      }
+    }
+
+    const env = adminRestEnv();
+    if (!env) {
       return;
     }
-    if (linked.error.code === 'PGRST202') {
-      linkIdentityRpcAvailable = false;
-    }
-  }
-
-  const env = adminRestEnv();
-  if (!env) {
-    return;
-  }
-  await Promise.all(
-    (['naver', 'custom:naver'] as const).map((provider) =>
-      fetch(`${env.url}/auth/v1/admin/users/${userId}/identities`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${env.key}`,
-          apikey: env.key,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          provider,
-          identity_data: {
-            sub: profile.id,
-            email: email ?? undefined,
-            name: profile.name,
-            email_verified: Boolean(email),
-            iss: 'https://nid.naver.com',
-            provider: 'naver',
+    await Promise.all(
+      (['naver', 'custom:naver'] as const).map((provider) =>
+        fetch(`${env.url}/auth/v1/admin/users/${userId}/identities`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${env.key}`,
+            apikey: env.key,
+            'Content-Type': 'application/json',
           },
-        }),
-        cache: 'no-store',
-      }).catch(() => undefined),
-    ),
-  );
+          body: JSON.stringify({
+            provider,
+            identity_data: {
+              sub: profile.id,
+              email: email ?? undefined,
+              name: profile.name,
+              email_verified: Boolean(email),
+              iss: 'https://nid.naver.com',
+              provider: 'naver',
+            },
+          }),
+          cache: 'no-store',
+        }).catch(() => undefined),
+      ),
+    );
+  } catch (error) {
+    console.warn('[SponsorAuction] 네이버 identity 연결 예외', error);
+  }
 }
 
 export async function findAccountForNaverProfile(
@@ -276,7 +280,11 @@ async function defaultMerge(admin: AdminClient, incoming: User, canonical: User)
     p_to: canonical.id,
   });
   if (moved.error && moved.error.code !== 'PGRST202') {
-    throw new Error(`identity 이전 실패: ${moved.error.message}`);
+    console.warn(
+      '[SponsorAuction] identity 이전 실패, 대상 계정에 네이버를 붙입니다',
+      moved.error.message,
+    );
+    return canonical;
   }
   await Promise.all([
     admin.from('profiles').delete().eq('id', incoming.id),
@@ -303,9 +311,13 @@ export async function linkNaverProfile(
     const extras = matches.filter((item) => item.id !== target.id);
     if (extras.length > 0) {
       await Promise.all(
-        extras.map((extra) =>
-          mergeUsers ? mergeUsers(extra, target) : defaultMerge(admin, extra, target),
-        ),
+        extras.map(async (extra) => {
+          try {
+            await (mergeUsers ? mergeUsers(extra, target) : defaultMerge(admin, extra, target));
+          } catch (error) {
+            console.warn('[SponsorAuction] 계정 병합 예외', error);
+          }
+        }),
       );
     }
     return stampNaverOnUser(admin, target, profile);

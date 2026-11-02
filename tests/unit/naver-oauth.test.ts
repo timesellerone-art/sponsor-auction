@@ -2,10 +2,13 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import {
   buildNaverAuthorizeUrl,
+  cookieOptions,
   getNaverOAuthEnv,
   missingNaverOAuthEnvKeys,
   parseNaverProfilePayload,
+  shouldAcceptNaverOAuthCallback,
 } from '../../src/lib/naver-oauth';
+import { isOAuthStateLost } from '../../src/lib/auth-guard';
 
 const KEYS = [
   'NAVER_CLIENT_ID',
@@ -102,5 +105,59 @@ describe('네이버 OAuth 환경변수', () => {
     assert.equal(url.origin + url.pathname, 'https://nid.naver.com/oauth2.0/authorize');
     assert.equal(url.searchParams.get('client_id'), 'y4kW0zBJCewRYyWibzH2');
     assert.equal(url.searchParams.get('auth_type'), null);
+  });
+
+  it('state 쿠키는 SameSite=Lax, Path=/, Secure(https)로 심는다', () => {
+    const httpsCookies = cookieOptions(true);
+    assert.equal(httpsCookies.sameSite, 'lax');
+    assert.equal(httpsCookies.path, '/');
+    assert.equal(httpsCookies.secure, true);
+    assert.equal(httpsCookies.maxAge, 10 * 60);
+    assert.equal(cookieOptions(false).secure, false);
+  });
+
+  it('state 쿠키가 없어도 URL의 code·state면 콜백을 받는다', () => {
+    assert.equal(
+      shouldAcceptNaverOAuthCallback({
+        code: 'naver-code',
+        state: 'url-state',
+        expectedState: '',
+        signedIdp: false,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldAcceptNaverOAuthCallback({
+        code: 'naver-code',
+        state: 'url-state',
+        expectedState: 'other-state',
+        signedIdp: false,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldAcceptNaverOAuthCallback({
+        code: 'naver-code',
+        state: 'idp-state',
+        expectedState: '',
+        signedIdp: true,
+      }),
+      true,
+    );
+    assert.equal(
+      shouldAcceptNaverOAuthCallback({
+        code: '',
+        state: 'url-state',
+        expectedState: '',
+        signedIdp: false,
+      }),
+      false,
+    );
+  });
+
+  it('PKCE verifier 유실은 재시도 가능한 OAuth 상태 손실로 본다', () => {
+    assert.equal(isOAuthStateLost(null, 'invalid code verifier'), true);
+    assert.equal(isOAuthStateLost('bad_oauth_state', ''), true);
+    assert.equal(isOAuthStateLost(null, 'invalid grant'), false);
   });
 });

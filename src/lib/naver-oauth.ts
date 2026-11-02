@@ -118,14 +118,33 @@ export function createNaverState() {
   return randomBytes(24).toString('base64url');
 }
 
-export function cookieOptions() {
+export function cookieOptions(secure = false) {
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
-    secure: process.env.NODE_ENV === 'production',
+    secure,
     path: '/',
     maxAge: 10 * 60,
   };
+}
+
+/** 쿠키가 유실돼도 URL의 code·state로 토큰 교환과 계정 병합을 이어간다. */
+export function shouldAcceptNaverOAuthCallback(params: {
+  code: string;
+  state: string;
+  expectedState: string;
+  signedIdp: boolean;
+}) {
+  if (!params.code || !params.state) {
+    return false;
+  }
+  if (params.signedIdp) {
+    return true;
+  }
+  if (!params.expectedState) {
+    return true;
+  }
+  return params.state === params.expectedState;
 }
 
 export function buildNaverAuthorizeUrl(params: {

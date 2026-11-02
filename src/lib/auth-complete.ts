@@ -9,7 +9,12 @@ import {
   postSocialAuthPath,
   sanitizeNextPath,
 } from '@/lib/auth-guard';
-import { createCookieBag, expireAuthDebrisCookies, writeCookies } from '@/lib/auth-paths';
+import {
+  createCookieBag,
+  expireAuthDebrisCookies,
+  sessionCookieOptions,
+  writeCookies,
+} from '@/lib/auth-paths';
 import { sessionUserFromAuthUser } from '@/lib/auth-session';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import { needsRoleOnboarding } from '@/types/auth';
@@ -34,7 +39,9 @@ export async function completeMagicLinkSession(params: {
   }
 
   const cookieBag = createCookieBag();
+  const secure = params.origin.startsWith('https://');
   const supabase = createServerClient(env.url, env.anonKey, {
+    cookieOptions: sessionCookieOptions(secure),
     cookies: {
       getAll() {
         return params.request.cookies.getAll();
@@ -54,11 +61,13 @@ export async function completeMagicLinkSession(params: {
   });
   const authUser = verified.data.user;
   if (verified.error || !verified.data.session || !authUser) {
-    return completeLoginError(
-      params.request,
-      params.origin,
-      verified.error?.message || '로그인 세션이 저장되지 않았습니다. 다시 로그인해 주세요.',
-    );
+    const fallback = new URL('/auth/oauth', params.origin);
+    fallback.searchParams.set('token_hash', params.tokenHash);
+    fallback.searchParams.set('type', params.type);
+    fallback.searchParams.set('next', params.next);
+    fallback.searchParams.set('client', '1');
+    fallback.searchParams.set('linked', '1');
+    return NextResponse.redirect(fallback);
   }
 
   const sessionLike = sessionUserFromAuthUser(authUser);
@@ -67,8 +76,8 @@ export async function completeMagicLinkSession(params: {
     needsOnboarding: needsRoleOnboarding(sessionLike),
   });
   const redirect = NextResponse.redirect(new URL(destination, params.origin));
-  writeCookies(redirect.cookies, cookieBag.getAll(), { secure: params.origin.startsWith('https://') });
-  expireAuthDebrisCookies(params.request, redirect);
+  writeCookies(redirect.cookies, cookieBag.getAll(), { secure });
+  expireAuthDebrisCookies(params.request, redirect, { secure });
   applyAuthCookies(redirect.cookies, {
     present: true,
     roles: destination === ROLE_SELECT_PATH ? [] : sessionLike.roles,

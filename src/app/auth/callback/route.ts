@@ -18,6 +18,7 @@ import {
   createCookieBag,
   expireAuthDebrisCookies,
   isPkceVerifierCookieName,
+  sessionCookieOptions,
   writeCookies,
 } from '@/lib/auth-paths';
 import { getSupabaseEnv } from '@/lib/supabase/env';
@@ -134,7 +135,9 @@ export async function GET(request: NextRequest) {
   }
 
   const cookieBag = createCookieBag();
+  const secure = origin.startsWith('https://');
   const supabase = createServerClient(env.url, env.anonKey, {
+    cookieOptions: sessionCookieOptions(secure),
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -150,8 +153,9 @@ export async function GET(request: NextRequest) {
 
   const exchanged = await supabase.auth.exchangeCodeForSession(code);
   if (exchanged.error || !exchanged.data.session) {
-    return failRedirect(origin, 'exchange', {
-      message: exchanged.error?.message || '세션이 발급되지 않았습니다.',
+    const message = exchanged.error?.message || '세션이 발급되지 않았습니다.';
+    return failRedirect(origin, isOAuthStateLost(exchanged.error?.code, message) ? 'provider' : 'exchange', {
+      message,
       code: exchanged.error?.code,
       status: exchanged.error?.status,
     });
@@ -194,10 +198,15 @@ export async function GET(request: NextRequest) {
         isPkceVerifierCookieName(cookie.name) && !issued.some((item) => item.name === cookie.name),
     )
     .forEach((cookie) => {
-      redirect.cookies.set(cookie.name, '', { path: '/', maxAge: 0, sameSite: 'lax' });
+      redirect.cookies.set(cookie.name, '', {
+        path: '/',
+        maxAge: 0,
+        sameSite: 'lax',
+        secure,
+      });
     });
-  writeCookies(redirect.cookies, issued, { secure: origin.startsWith('https://') });
-  expireAuthDebrisCookies(request, redirect);
+  writeCookies(redirect.cookies, issued, { secure });
+  expireAuthDebrisCookies(request, redirect, { secure });
   redirect.cookies.delete(OAUTH_NEXT_COOKIE);
   redirect.cookies.delete(OAUTH_PROVIDER_COOKIE);
   redirect.cookies.delete(LEGACY_PENDING_MERGE_COOKIE);

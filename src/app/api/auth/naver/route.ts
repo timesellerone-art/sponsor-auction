@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     });
 
     const response = NextResponse.redirect(authorize);
-    const cookies = cookieOptions();
+    const cookies = cookieOptions(origin.startsWith('https://'));
     response.cookies.set(NAVER_STATE_COOKIE, state, cookies);
     response.cookies.set(NAVER_NEXT_COOKIE, next, cookies);
     return response;
