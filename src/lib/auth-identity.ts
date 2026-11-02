@@ -3,7 +3,12 @@ import 'server-only';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { collectAuthEmails } from '@/lib/auth-emails';
 import { lookupUsersByContact } from '@/lib/auth-lookup';
-import { normalizeContactEmail, normalizePhone } from '@/lib/contact';
+import {
+  collectPhoneValues,
+  hasMatchingPhone,
+  normalizeContactEmail,
+  normalizePhone,
+} from '@/lib/contact';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 import type { Database } from '@/types/database';
@@ -112,12 +117,7 @@ export async function findExistingAccountByContact(input: {
     if (email && (collectAuthEmails(item).includes(email) || contactEmail === email)) {
       return true;
     }
-    const itemPhones = [
-      item.phone,
-      typeof item.app_metadata?.contact_phone === 'string' ? item.app_metadata.contact_phone : '',
-      typeof item.user_metadata?.phone === 'string' ? item.user_metadata.phone : '',
-    ].map((value) => normalizePhone(value));
-    return Boolean(phone) && itemPhones.includes(phone);
+    return hasMatchingPhone(item, phone);
   });
   return pickCanonicalUser(matches);
 }
@@ -218,8 +218,19 @@ export async function mergeUserInto(
     : (keptRoles.find(isMemberRole) ?? options.roles?.[0] ?? null);
   const phone =
     normalizePhone(options.phone) ||
-    (typeof canonical.user_metadata?.phone === 'string' ? canonical.user_metadata.phone : '') ||
+    collectPhoneValues(canonical)[0] ||
+    collectPhoneValues(incoming)[0] ||
     null;
+  const providers = [
+    ...new Set([
+      ...stringList(canonical.app_metadata?.providers),
+      ...stringList(incoming.app_metadata?.providers),
+      typeof canonical.app_metadata?.provider === 'string' ? canonical.app_metadata.provider : '',
+      typeof incoming.app_metadata?.provider === 'string' ? incoming.app_metadata.provider : '',
+      ...(canonical.identities ?? []).map((item) => item.provider),
+      ...(incoming.identities ?? []).map((item) => item.provider),
+    ]),
+  ].filter((item) => item && item !== 'email');
 
   const updated = await admin.auth.admin.updateUserById(canonical.id, {
     user_metadata: {
@@ -232,8 +243,19 @@ export async function mergeUserInto(
       phone,
     },
     app_metadata: {
+      ...(incoming.app_metadata ?? {}),
+      ...(canonical.app_metadata ?? {}),
+      providers,
       naver_ids: [...new Set([...naverIdsOf(canonical), ...naverIdsOf(incoming)])],
-      contact_email: canonical.app_metadata?.contact_email ?? incoming.app_metadata?.contact_email ?? null,
+      contact_email:
+        normalizeContactEmail(
+          typeof canonical.app_metadata?.contact_email === 'string'
+            ? canonical.app_metadata.contact_email
+            : '',
+        ) ||
+        collectAuthEmails(canonical)[0] ||
+        collectAuthEmails(incoming)[0] ||
+        null,
       contact_phone: phone,
     },
   });
@@ -263,16 +285,25 @@ export async function reconcileSocialIdentities(user: User): Promise<LinkedSocia
   }
 
   const emails = collectAuthEmails(user);
-  const phone = normalizePhone(
-    user.phone ||
-      (typeof user.app_metadata?.contact_phone === 'string' ? user.app_metadata.contact_phone : '') ||
-      (typeof user.user_metadata?.phone === 'string' ? user.user_metadata.phone : ''),
-  );
+  const phone = collectPhoneValues(user)[0] || '';
   const matches = await lookupUsersByContact(admin, {
     emails,
     phone: phone || null,
   });
-  const canonical = pickCanonicalUser(matches.filter((item) => item.id !== user.id));
+  const canonical = pickCanonicalUser(
+    matches.filter((item) => {
+      if (item.id === user.id) {
+        return false;
+      }
+      const contactEmail = normalizeContactEmail(
+        typeof item.app_metadata?.contact_email === 'string' ? item.app_metadata.contact_email : '',
+      );
+      const emailHit = emails.some(
+        (email) => collectAuthEmails(item).includes(email) || contactEmail === email,
+      );
+      return emailHit || hasMatchingPhone(item, phone);
+    }),
+  );
 
   if (!canonical || canonical.id === user.id) {
     return { user, switched: false, tokenHash: null };
@@ -283,7 +314,7 @@ export async function reconcileSocialIdentities(user: User): Promise<LinkedSocia
     const tokenHash = await generateMagicLinkHash(admin, merged);
     return { user: merged, switched: true, tokenHash };
   } catch (error) {
-    console.error('[SponsorAuction] 동일 이메일 계정 자동 통합 실패', error);
+    console.error('[SponsorAuction] 동일 연락처 계정 자동 통합 실패', error);
     await upsertAppProfile(admin, {
       id: user.id,
       email: emails[0] ?? user.email,

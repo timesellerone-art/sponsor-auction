@@ -1,7 +1,7 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { collectAuthEmails } from './auth-emails';
 import { lookupUsersByContact } from './auth-lookup';
-import { normalizeContactEmail, normalizePhone } from './contact';
+import { hasMatchingPhone, normalizeContactEmail, normalizePhone } from './contact';
 import { linkProviderIdentity, userHasProviderIdentity } from './auth-identities';
 import type { NaverProfile } from './naver-oauth';
 
@@ -38,16 +38,6 @@ function pickCanonicalUser(users: User[]): User | null {
     return Number.isFinite(diff) && diff !== 0 ? diff : left.id.localeCompare(right.id);
   });
   return sorted[0] ?? null;
-}
-
-function phonesOf(user: User): string[] {
-  return [
-    user.phone,
-    typeof user.app_metadata?.contact_phone === 'string' ? user.app_metadata.contact_phone : '',
-    typeof user.user_metadata?.phone === 'string' ? user.user_metadata.phone : '',
-  ]
-    .map((value) => normalizePhone(value))
-    .filter(Boolean);
 }
 
 export function userHasNaverIdentity(user: User | null | undefined, naverId?: string | null) {
@@ -111,7 +101,7 @@ async function collectNaverMatches(
     if (email && (collectAuthEmails(item).includes(email) || contactEmail === email)) {
       return true;
     }
-    return Boolean(phone) && phonesOf(item).includes(phone);
+    return hasMatchingPhone(item, phone);
   });
 
   return { byNaver, byContact };

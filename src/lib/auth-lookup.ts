@@ -1,5 +1,5 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
-import { normalizeContactEmail, normalizePhone } from './contact';
+import { normalizeContactEmail, normalizePhone, phoneSearchKeys } from './contact';
 
 type AdminClient = SupabaseClient;
 
@@ -73,6 +73,7 @@ export async function lookupUsersByContact(
     (input.emails ?? []).map((value) => normalizeContactEmail(value) || (value?.trim().toLowerCase() ?? '')),
   ).filter((email) => email.includes('@'));
   const phone = normalizePhone(input.phone);
+  const phoneKeys = phoneSearchKeys(input.phone);
   const naverId = input.naverId?.trim() ?? '';
   const placeholder = naverId ? `naver.${naverId}@oauth.sponsor-auction.local` : '';
   const lookupEmails = uniqueIds([...emails, placeholder]);
@@ -84,11 +85,17 @@ export async function lookupUsersByContact(
   const tasks: Array<Promise<string[]>> = [
     rpcUserIds(admin, { emails: lookupEmails, phone, naverId }),
   ];
+  for (const key of phoneKeys) {
+    if (key === phone) {
+      continue;
+    }
+    tasks.push(rpcUserIds(admin, { emails: [], phone: key, naverId: '' }));
+  }
   for (const email of lookupEmails) {
     tasks.push(profileIdsByEmail(admin, email));
   }
-  if (phone) {
-    tasks.push(profileIdsByPhone(admin, phone));
+  for (const key of phoneKeys) {
+    tasks.push(profileIdsByPhone(admin, key));
   }
 
   const groups = await Promise.all(tasks);
