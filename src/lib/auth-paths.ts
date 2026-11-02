@@ -16,7 +16,12 @@ export function isAuthPassthroughPath(pathname: string) {
 }
 
 export function isAuthCallbackPath(pathname: string) {
-  return pathname === '/auth/callback' || pathname.startsWith('/auth/callback/');
+  return (
+    pathname === '/auth/callback' ||
+    pathname.startsWith('/auth/callback/') ||
+    pathname.startsWith('/api/auth/naver') ||
+    pathname === '/api/auth/session/complete'
+  );
 }
 
 export type CookieToSet = {

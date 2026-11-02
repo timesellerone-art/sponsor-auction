@@ -16,6 +16,8 @@ import { resolveActiveMemberRole, switchableMemberRoles } from '../../src/types/
 describe('auth path helpers', () => {
   it('콜백과 온보딩은 공개 통과 경로이다', () => {
     assert.equal(isAuthCallbackPath('/auth/callback'), true);
+    assert.equal(isAuthCallbackPath('/api/auth/naver/callback'), true);
+    assert.equal(isAuthCallbackPath('/api/auth/session/complete'), true);
     assert.equal(isAuthPassthroughPath('/onboarding/role-select'), true);
     assert.equal(isAuthPassthroughPath('/auth/oauth'), true);
     assert.equal(isAuthPassthroughPath('/my'), false);

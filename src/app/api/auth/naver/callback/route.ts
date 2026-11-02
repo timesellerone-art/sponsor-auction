@@ -4,6 +4,7 @@ import { completeMagicLinkSession } from '@/lib/auth-complete';
 import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
 import { mergeUserInto } from '@/lib/auth-identity';
 import { expireAuthDebrisCookies } from '@/lib/auth-paths';
+import { readNaverIdpState, signNaverIdpTicket } from '@/lib/naver-idp';
 import { linkNaverProfile } from '@/lib/naver-link';
 import {
   NAVER_NEXT_COOKIE,
@@ -49,8 +50,9 @@ export async function GET(request: NextRequest) {
 
     const expectedState = request.cookies.get(NAVER_STATE_COOKIE)?.value ?? '';
     const next = readStoredNext(request.cookies.get(NAVER_NEXT_COOKIE)?.value);
+    const idpState = readNaverIdpState(state);
 
-    if (!code || !state || !expectedState || state !== expectedState) {
+    if (!code || !state || (!idpState && (!expectedState || state !== expectedState))) {
       return loginError(request, origin, '네이버 로그인 검증에 실패했습니다. 다시 시도해 주세요.');
     }
 
@@ -62,14 +64,28 @@ export async function GET(request: NextRequest) {
       return loginError(request, origin, '네이버 로그인 설정이 없습니다.');
     }
 
-    const accessToken = await exchangeNaverCode({
-      clientId: env.clientId,
-      clientSecret: env.clientSecret,
-      code,
-      state,
-      redirectUri: naverCallbackUrl(origin),
-    });
-    const profile = await fetchNaverProfile(accessToken);
+    const callbackOrigin = idpState?.o || origin;
+    const profile = await fetchNaverProfile(
+      await exchangeNaverCode({
+        clientId: env.clientId,
+        clientSecret: env.clientSecret,
+        code,
+        state,
+        redirectUri: naverCallbackUrl(callbackOrigin),
+      }),
+    );
+
+    if (idpState) {
+      const ticket = signNaverIdpTicket(profile);
+      const redirect = new URL(idpState.r);
+      redirect.searchParams.set('code', ticket);
+      redirect.searchParams.set('state', idpState.s);
+      const response = NextResponse.redirect(redirect);
+      response.cookies.delete(NAVER_STATE_COOKIE);
+      response.cookies.delete(NAVER_NEXT_COOKIE);
+      expireAuthDebrisCookies(request, response);
+      return response;
+    }
 
     const admin = createAdminClient();
     if (!admin) {

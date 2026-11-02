@@ -38,5 +38,16 @@ describe('네이버 계정 연결 헬퍼', () => {
       true,
     );
     assert.equal(userHasNaverIdentity({ identities: [{ provider: 'google' }] } as never), false);
+    assert.equal(
+      userHasNaverIdentity(
+        {
+          identities: [
+            { provider: 'custom:naver', id: 'naver-sub-2', identity_data: { sub: 'naver-sub-2' } },
+          ],
+        } as never,
+        'naver-sub-2',
+      ),
+      true,
+    );
   });
 });

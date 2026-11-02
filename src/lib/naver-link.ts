@@ -2,6 +2,7 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { collectAuthEmails } from './auth-emails';
 import { lookupUsersByContact } from './auth-lookup';
 import { normalizeContactEmail, normalizePhone } from './contact';
+import { isNaverIdentityProvider } from './naver-idp';
 import type { NaverProfile } from './naver-oauth';
 
 type AdminClient = SupabaseClient;
@@ -65,7 +66,7 @@ export function userHasNaverIdentity(user: User | null | undefined, naverId?: st
   }
   const wanted = naverId?.trim() ?? '';
   return (user.identities ?? []).some((identity) => {
-    if (identity.provider !== 'naver') {
+    if (!isNaverIdentityProvider(identity.provider)) {
       return false;
     }
     return (
@@ -127,26 +128,30 @@ async function attachNaverIdentity(admin: AdminClient, userId: string, profile: 
   if (!env) {
     return;
   }
-  await fetch(`${env.url}/auth/v1/admin/users/${userId}/identities`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.key}`,
-      apikey: env.key,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      provider: 'naver',
-      identity_data: {
-        sub: profile.id,
-        email: email ?? undefined,
-        name: profile.name,
-        email_verified: Boolean(email),
-        iss: 'https://nid.naver.com',
-        provider: 'naver',
-      },
-    }),
-    cache: 'no-store',
-  }).catch(() => undefined);
+  await Promise.all(
+    (['naver', 'custom:naver'] as const).map((provider) =>
+      fetch(`${env.url}/auth/v1/admin/users/${userId}/identities`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.key}`,
+          apikey: env.key,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider,
+          identity_data: {
+            sub: profile.id,
+            email: email ?? undefined,
+            name: profile.name,
+            email_verified: Boolean(email),
+            iss: 'https://nid.naver.com',
+            provider: 'naver',
+          },
+        }),
+        cache: 'no-store',
+      }).catch(() => undefined),
+    ),
+  );
 }
 
 export async function findAccountForNaverProfile(

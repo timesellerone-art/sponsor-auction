@@ -348,6 +348,28 @@ export async function signInWithNaver(nextPath?: string | null) {
   }
   rememberOAuthStart('naver', nextPath);
   const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
+  const supabase = createClient();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'custom:naver' as 'google',
+        options: {
+          redirectTo: buildAppOAuthCallbackUrl(window.location.origin),
+          skipBrowserRedirect: true,
+          queryParams: { app_origin: window.location.origin },
+        },
+      });
+      if (!error && data.url) {
+        const authorize = new URL(data.url);
+        authorize.searchParams.set('app_origin', window.location.origin);
+        window.location.assign(authorize.toString());
+        return ok(true);
+      }
+      console.warn('[SponsorAuction] 네이버 GoTrue 로그인 실패, 직접 콜백으로 전환', error?.message);
+    } catch (error) {
+      console.warn('[SponsorAuction] 네이버 GoTrue 로그인 예외, 직접 콜백으로 전환', error);
+    }
+  }
   const naverStart = `${window.location.origin}/api/auth/naver?next=${encodeURIComponent(next)}`;
   // 네이버는 라우터 전환이 아니라 전체 문서 이동이 필요합니다.
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination

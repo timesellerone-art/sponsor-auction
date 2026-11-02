@@ -94,6 +94,12 @@ export default function AuthOAuthCompletePage() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('token_hash')) {
+      window.location.replace(`/api/auth/session/complete?${params.toString()}`);
+      return;
+    }
+
     let cancelled = false;
     let finished = false;
 
@@ -115,13 +121,7 @@ export default function AuthOAuthCompletePage() {
     }, AUTH_BOOT_TIMEOUT_MS + 500);
 
     const finish = async () => {
-      const params = new URLSearchParams(window.location.search);
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      const tokenHash = params.get('token_hash');
-      if (tokenHash) {
-        window.location.replace(`/api/auth/session/complete?${params.toString()}`);
-        return;
-      }
       const next = sanitizeNextPath(params.get('next')) ?? ROLE_SELECT_PATH;
       const errorDescription =
         params.get('error_description') ||

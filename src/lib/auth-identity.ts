@@ -37,7 +37,14 @@ function stringList(value: unknown): string[] {
 }
 
 function naverIdsOf(user: User): string[] {
-  return stringList(user.app_metadata?.naver_ids);
+  const fromIdentities = (user.identities ?? []).flatMap((identity) => {
+    if (identity.provider !== 'naver' && identity.provider !== 'custom:naver') {
+      return [] as string[];
+    }
+    const sub = identity.identity_data?.sub;
+    return typeof sub === 'string' && sub.trim() ? [sub.trim()] : [];
+  });
+  return [...new Set([...stringList(user.app_metadata?.naver_ids), ...fromIdentities])];
 }
 
 function displayNameOf(user: User): string | null {
