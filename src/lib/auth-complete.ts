@@ -3,6 +3,7 @@ import 'server-only';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { applyAuthCookies } from '@/lib/access';
+import { writeAccountLinkCookie } from '@/lib/account-link';
 import {
   ROLE_SELECT_PATH,
   oauthFailedLoginPath,
@@ -78,6 +79,7 @@ export async function completeMagicLinkSession(params: {
   const redirect = NextResponse.redirect(new URL(destination, params.origin));
   writeCookies(redirect.cookies, cookieBag.getAll(), { secure });
   expireAuthDebrisCookies(params.request, redirect, { secure });
+  writeAccountLinkCookie(redirect.cookies, authUser.id, secure);
   applyAuthCookies(redirect.cookies, {
     present: true,
     roles: destination === ROLE_SELECT_PATH ? [] : sessionLike.roles,

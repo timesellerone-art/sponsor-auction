@@ -1,6 +1,11 @@
 import { connection } from 'next/server';
 import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
+import {
+  ACCOUNT_LINK_COOKIE,
+  readAccountLinkUserId,
+  writeAccountLinkCookie,
+} from '@/lib/account-link';
 import { reconcileSocialIdentities } from '@/lib/auth-identity';
 import { expireAuthDebrisCookies } from '@/lib/auth-paths';
 import { createClient } from '@/lib/supabase/server';
@@ -9,7 +14,7 @@ const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
 } as const;
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     await connection();
 
@@ -26,7 +31,11 @@ export async function POST() {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401, headers: NO_STORE });
     }
 
-    const linked = await reconcileSocialIdentities(data.user);
+    const cookieStore = await cookies();
+    const linked = await reconcileSocialIdentities(
+      data.user,
+      readAccountLinkUserId(cookieStore.get(ACCOUNT_LINK_COOKIE)?.value),
+    );
     if (linked.switched && linked.tokenHash) {
       const verified = await supabase.auth.verifyOtp({
         token_hash: linked.tokenHash,
@@ -38,11 +47,14 @@ export async function POST() {
     }
 
     const current = await supabase.auth.getUser();
-    const cookieStore = await cookies();
+    const mergedId = current.data.user?.id ?? linked.user.id;
+    const secure =
+      request.nextUrl.protocol === 'https:' ||
+      request.headers.get('x-forwarded-proto') === 'https';
     const response = NextResponse.json(
       {
         data: {
-          id: current.data.user?.id ?? linked.user.id,
+          id: mergedId,
           email: current.data.user?.email ?? linked.user.email ?? null,
           merged: linked.switched,
         },
@@ -50,6 +62,7 @@ export async function POST() {
       { headers: NO_STORE },
     );
     expireAuthDebrisCookies({ cookies: cookieStore }, response);
+    writeAccountLinkCookie(response.cookies, mergedId, secure);
     return response;
   } catch (error) {
     console.error('[SponsorAuction] 소셜 계정 통합 중 예외가 발생했습니다.', error);

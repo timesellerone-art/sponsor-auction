@@ -21,6 +21,11 @@ import {
   sessionCookieOptions,
   writeCookies,
 } from '@/lib/auth-paths';
+import {
+  ACCOUNT_LINK_COOKIE,
+  readAccountLinkUserId,
+  writeAccountLinkCookie,
+} from '@/lib/account-link';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import { reconcileSocialIdentities } from '@/lib/auth-identity';
 import {
@@ -162,7 +167,10 @@ export async function GET(request: NextRequest) {
   }
 
   let authUser = exchanged.data.user ?? exchanged.data.session.user;
-  const linked = await reconcileSocialIdentities(authUser);
+  const linked = await reconcileSocialIdentities(
+    authUser,
+    readAccountLinkUserId(request.cookies.get(ACCOUNT_LINK_COOKIE)?.value),
+  );
   if (linked.switched) {
     if (!linked.tokenHash) {
       return failRedirect(origin, 'account-merge', {
@@ -210,6 +218,7 @@ export async function GET(request: NextRequest) {
   redirect.cookies.delete(OAUTH_NEXT_COOKIE);
   redirect.cookies.delete(OAUTH_PROVIDER_COOKIE);
   redirect.cookies.delete(LEGACY_PENDING_MERGE_COOKIE);
+  writeAccountLinkCookie(redirect.cookies, authUser.id, secure);
   applyAuthCookies(redirect.cookies, {
     present: true,
     roles: destination === ROLE_SELECT_PATH ? [] : sessionLike.roles,

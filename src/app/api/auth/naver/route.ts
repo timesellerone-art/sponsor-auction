@@ -1,6 +1,8 @@
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
+import { writeAccountLinkCookie } from '@/lib/account-link';
 import { ROLE_SELECT_PATH, oauthFailedLoginPath, sanitizeNextPath } from '@/lib/auth-guard';
+import { createClient } from '@/lib/supabase/server';
 import {
   NAVER_NEXT_COOKIE,
   NAVER_STATE_COOKIE,
@@ -53,6 +55,11 @@ export async function GET(request: Request) {
     const cookies = cookieOptions(origin.startsWith('https://'));
     response.cookies.set(NAVER_STATE_COOKIE, state, cookies);
     response.cookies.set(NAVER_NEXT_COOKIE, next, cookies);
+    const supabase = await createClient();
+    const sessionUser = supabase ? (await supabase.auth.getUser()).data.user : null;
+    if (sessionUser?.id) {
+      writeAccountLinkCookie(response.cookies, sessionUser.id, origin.startsWith('https://'));
+    }
     return response;
   } catch (error) {
     console.warn('[SponsorAuction] 네이버 로그인 시작에 실패했습니다.', error);

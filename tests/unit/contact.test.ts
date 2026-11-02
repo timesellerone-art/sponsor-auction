@@ -42,5 +42,13 @@ describe('contact helpers', () => {
       true,
     );
     assert.deepEqual(collectPhoneValues({ phone: '82 10 7762 5258' }), ['01077625258']);
+    assert.deepEqual(
+      collectPhoneValues({
+        identities: [
+          { provider: 'kakao', identity_data: { phone_number: '+82 10-7762-5258' } },
+        ],
+      }),
+      ['01077625258'],
+    );
   });
 });

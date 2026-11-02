@@ -312,6 +312,24 @@ export async function signInWithOAuth(
       oauthOptions.queryParams = { access_type: 'offline', prompt: 'consent' };
     }
 
+    const session = await supabase.auth.getSession();
+    if (session.data.session?.user) {
+      const linked = await supabase.auth.linkIdentity({
+        provider: provider as 'google',
+        options: oauthOptions,
+      });
+      if (!linked.error && linked.data.url) {
+        window.location.assign(authorizeUrlForProvider(provider, linked.data.url));
+        return ok(true);
+      }
+      if (linked.error) {
+        console.warn(
+          '[SponsorAuction] 로그인된 계정에 소셜 연결을 바로 붙이지 못해 기존 로그인으로 이어갑니다',
+          linked.error.message,
+        );
+      }
+    }
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: provider as 'apple',
       options: oauthOptions,

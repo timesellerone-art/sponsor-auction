@@ -51,6 +51,21 @@ export function phoneSearchKeys(value: string | null | undefined) {
   return [...keys].filter((item) => item.length >= 10);
 }
 
+export function toE164Kr(phone: string | null | undefined) {
+  const normalized = normalizePhone(phone);
+  if (!normalized) {
+    return '';
+  }
+  if (normalized.startsWith('0')) {
+    return `+82${normalized.slice(1)}`;
+  }
+  return `+${normalized}`;
+}
+
+function stringPhone(value: unknown) {
+  return typeof value === 'string' ? value : '';
+}
+
 type PhoneIdentity = {
   provider?: string | null;
   id?: string | null;
@@ -63,18 +78,27 @@ export function collectPhoneValues(source: {
   user_metadata?: Record<string, unknown> | null;
   identities?: PhoneIdentity[] | null;
 }) {
+  const meta = source.user_metadata ?? {};
+  const app = source.app_metadata ?? {};
   const raw: Array<string | null | undefined> = [
     source.phone,
-    typeof source.app_metadata?.contact_phone === 'string' ? source.app_metadata.contact_phone : '',
-    typeof source.user_metadata?.phone === 'string' ? source.user_metadata.phone : '',
+    stringPhone(app.contact_phone),
+    stringPhone(meta.phone),
+    stringPhone(meta.phone_number),
+    stringPhone(meta.mobile),
+    stringPhone(meta.mobile_e164),
   ];
   for (const identity of source.identities ?? []) {
-    if (identity.provider !== 'phone') {
-      continue;
+    const data = identity.identity_data ?? {};
+    raw.push(
+      stringPhone(data.phone),
+      stringPhone(data.phone_number),
+      stringPhone(data.mobile),
+      stringPhone(data.mobile_e164),
+    );
+    if (identity.provider === 'phone') {
+      raw.push(stringPhone(identity.id), stringPhone(data.sub));
     }
-    const phone = identity.identity_data?.phone;
-    const sub = identity.identity_data?.sub;
-    raw.push(typeof phone === 'string' ? phone : '', typeof sub === 'string' ? sub : '');
   }
   return [...new Set(raw.map((item) => normalizePhone(item)).filter(Boolean))];
 }

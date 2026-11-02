@@ -28,8 +28,11 @@ async function profileIdsByEmail(admin: AdminClient, email: string) {
   return (result.data ?? []).map((row) => row.id);
 }
 
-async function profileIdsByPhone(admin: AdminClient, phone: string) {
-  const result = await admin.from('profiles').select('id').eq('phone', phone);
+async function profileIdsByPhone(admin: AdminClient, phones: string[]) {
+  if (phones.length === 0) {
+    return [] as string[];
+  }
+  const result = await admin.from('profiles').select('id').in('phone', phones);
   return (result.data ?? []).map((row) => row.id);
 }
 
@@ -94,9 +97,7 @@ export async function lookupUsersByContact(
   for (const email of lookupEmails) {
     tasks.push(profileIdsByEmail(admin, email));
   }
-  for (const key of phoneKeys) {
-    tasks.push(profileIdsByPhone(admin, key));
-  }
+  tasks.push(profileIdsByPhone(admin, phoneKeys));
 
   const groups = await Promise.all(tasks);
   return usersByIds(admin, uniqueIds(groups.flat()));

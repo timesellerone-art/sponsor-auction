@@ -1,7 +1,8 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { collectAuthEmails } from './auth-emails';
 import { lookupUsersByContact } from './auth-lookup';
-import { hasMatchingPhone, normalizeContactEmail, normalizePhone } from './contact';
+import { isAuthUserId, pickPreferredMergeUser } from './account-link';
+import { hasMatchingPhone, normalizeContactEmail, normalizePhone, toE164Kr } from './contact';
 import { linkProviderIdentity, userHasProviderIdentity } from './auth-identities';
 import type { NaverProfile } from './naver-oauth';
 
@@ -44,16 +45,7 @@ export function userHasNaverIdentity(user: User | null | undefined, naverId?: st
   return userHasProviderIdentity(user, 'naver', naverId);
 }
 
-export function toE164Kr(phone: string | null | undefined) {
-  const normalized = normalizePhone(phone);
-  if (!normalized) {
-    return '';
-  }
-  if (normalized.startsWith('0')) {
-    return `+82${normalized.slice(1)}`;
-  }
-  return `+${normalized}`;
-}
+export { toE164Kr } from './contact';
 
 async function attachNaverIdentity(admin: AdminClient, userId: string, profile: NaverProfile) {
   try {
@@ -213,10 +205,17 @@ export async function linkNaverProfile(
   profile: NaverProfile,
   mergeUsers?: (incoming: User, canonical: User) => Promise<User>,
   prepareSession?: (email: string) => Promise<string | null>,
+  options?: { preferredUserId?: string | null },
 ): Promise<NaverLinkResult> {
-  const { byNaver, byContact } = await collectNaverMatches(admin, profile);
-  const matches = uniqueUsers([...byNaver, ...byContact]);
-  const canonical = pickCanonicalUser(matches);
+  const preferredId = isAuthUserId(options?.preferredUserId) ? options?.preferredUserId ?? '' : '';
+  const [matchPack, preferredResult] = await Promise.all([
+    collectNaverMatches(admin, profile),
+    preferredId ? admin.auth.admin.getUserById(preferredId) : Promise.resolve(null),
+  ]);
+  const preferred = preferredResult && 'data' in preferredResult ? preferredResult.data.user : null;
+  const { byNaver, byContact } = matchPack;
+  const matches = uniqueUsers([...byNaver, ...byContact, ...(preferred ? [preferred] : [])]);
+  const canonical = pickPreferredMergeUser('__incoming__', matches, preferred?.id) ?? pickCanonicalUser(matches);
 
   const mergeExtras = async (target: User) => {
     const extras = matches.filter((item) => item.id !== target.id);
@@ -240,7 +239,11 @@ export async function linkNaverProfile(
       mergeExtras(canonical),
       sessionEmail && prepareSession ? prepareSession(sessionEmail) : Promise.resolve(null),
     ]);
-    return { user, merged: byContact.length > 0 || matches.length > 1, tokenHash };
+    return {
+      user,
+      merged: Boolean(preferred) || byContact.length > 0 || matches.length > 1,
+      tokenHash,
+    };
   }
 
   const email = normalizeContactEmail(profile.email) || profile.email;

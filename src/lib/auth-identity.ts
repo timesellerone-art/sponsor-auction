@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient, User } from '@supabase/supabase-js';
+import { isAuthUserId, pickPreferredMergeUser } from '@/lib/account-link';
 import { collectAuthEmails } from '@/lib/auth-emails';
 import { lookupUsersByContact } from '@/lib/auth-lookup';
 import {
@@ -8,6 +9,7 @@ import {
   hasMatchingPhone,
   normalizeContactEmail,
   normalizePhone,
+  toE164Kr,
 } from '@/lib/contact';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { upsertAppProfile } from '@/lib/supabase/profile-sync';
@@ -231,8 +233,8 @@ export async function mergeUserInto(
       ...(incoming.identities ?? []).map((item) => item.provider),
     ]),
   ].filter((item) => item && item !== 'email');
-
-  const updated = await admin.auth.admin.updateUserById(canonical.id, {
+  const e164 = toE164Kr(phone);
+  const metadata = {
     user_metadata: {
       ...(incoming.user_metadata ?? {}),
       ...(canonical.user_metadata ?? {}),
@@ -240,7 +242,7 @@ export async function mergeUserInto(
       role: primaryAuthRole(roles),
       current_mode: currentMode,
       onboarding_complete: roles.length > 0,
-      phone,
+      phone: phone || canonical.user_metadata?.phone || incoming.user_metadata?.phone,
     },
     app_metadata: {
       ...(incoming.app_metadata ?? {}),
@@ -258,27 +260,40 @@ export async function mergeUserInto(
         null,
       contact_phone: phone,
     },
-  });
+  };
 
   await reassignOwnedRows(admin, incoming.id, canonical.id);
   await Promise.all([
     admin.from('profiles').delete().eq('id', incoming.id),
     deleteUserOrThrow(admin, incoming.id),
-    upsertAppProfile(admin, {
-      id: canonical.id,
-      email: collectAuthEmails(canonical)[0] ?? canonical.email,
-      name: displayNameOf(canonical) || displayNameOf(incoming),
-      phone,
-      roles,
-      role: primaryAuthRole(roles),
-    }),
   ]);
 
-  return updated.data.user ?? canonical;
+  const withPhone = await admin.auth.admin.updateUserById(canonical.id, {
+    ...metadata,
+    ...(e164 ? { phone: e164 } : {}),
+  });
+  const updated =
+    withPhone.error && e164
+      ? await admin.auth.admin.updateUserById(canonical.id, metadata)
+      : withPhone;
+
+  await upsertAppProfile(admin, {
+    id: canonical.id,
+    email: collectAuthEmails(canonical)[0] ?? canonical.email,
+    name: displayNameOf(canonical) || displayNameOf(incoming),
+    phone,
+    roles,
+    role: primaryAuthRole(roles),
+  });
+
+  return updated.data.user ?? (await admin.auth.admin.getUserById(canonical.id)).data.user ?? canonical;
 }
 
-/** 같은 검증 이메일·전화번호를 가진 기존 계정이 있으면 지금 로그인한 계정을 그쪽으로 합치고 세션 전환 토큰을 돌려준다. */
-export async function reconcileSocialIdentities(user: User): Promise<LinkedSocialUser> {
+/** 같은 검증 이메일·전화번호이거나, 방금 로그인된 UID 쿠키가 있으면 지금 계정을 그쪽으로 합친다. */
+export async function reconcileSocialIdentities(
+  user: User,
+  preferredUserId?: string | null,
+): Promise<LinkedSocialUser> {
   const admin = createAdminClient();
   if (!admin) {
     return { user, switched: false, tokenHash: null };
@@ -286,23 +301,33 @@ export async function reconcileSocialIdentities(user: User): Promise<LinkedSocia
 
   const emails = collectAuthEmails(user);
   const phone = collectPhoneValues(user)[0] || '';
-  const matches = await lookupUsersByContact(admin, {
-    emails,
-    phone: phone || null,
-  });
-  const canonical = pickCanonicalUser(
-    matches.filter((item) => {
-      if (item.id === user.id) {
-        return false;
-      }
-      const contactEmail = normalizeContactEmail(
-        typeof item.app_metadata?.contact_email === 'string' ? item.app_metadata.contact_email : '',
-      );
-      const emailHit = emails.some(
-        (email) => collectAuthEmails(item).includes(email) || contactEmail === email,
-      );
-      return emailHit || hasMatchingPhone(item, phone);
+  const preferredId = isAuthUserId(preferredUserId) ? preferredUserId : '';
+  const [matches, preferredResult] = await Promise.all([
+    lookupUsersByContact(admin, {
+      emails,
+      phone: phone || null,
     }),
+    preferredId && preferredId !== user.id
+      ? admin.auth.admin.getUserById(preferredId)
+      : Promise.resolve(null),
+  ]);
+  const preferred = preferredResult && 'data' in preferredResult ? preferredResult.data.user : null;
+  const contactHits = matches.filter((item) => {
+    if (item.id === user.id) {
+      return false;
+    }
+    const contactEmail = normalizeContactEmail(
+      typeof item.app_metadata?.contact_email === 'string' ? item.app_metadata.contact_email : '',
+    );
+    const emailHit = emails.some(
+      (email) => collectAuthEmails(item).includes(email) || contactEmail === email,
+    );
+    return emailHit || hasMatchingPhone(item, phone);
+  });
+  const canonical = pickPreferredMergeUser(
+    user.id,
+    [...contactHits, ...(preferred ? [preferred] : [])],
+    preferred?.id,
   );
 
   if (!canonical || canonical.id === user.id) {

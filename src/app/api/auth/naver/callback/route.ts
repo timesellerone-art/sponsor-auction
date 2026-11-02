@@ -1,5 +1,9 @@
 import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
+import {
+  ACCOUNT_LINK_COOKIE,
+  readAccountLinkUserId,
+} from '@/lib/account-link';
 import { completeMagicLinkSession } from '@/lib/auth-complete';
 import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
 import { mergeUserInto } from '@/lib/auth-identity';
@@ -123,6 +127,9 @@ export async function GET(request: NextRequest) {
             return null;
           }
           return link.data.properties.hashed_token;
+        },
+        {
+          preferredUserId: readAccountLinkUserId(request.cookies.get(ACCOUNT_LINK_COOKIE)?.value),
         },
       );
       tokenHash = linked.tokenHash;
