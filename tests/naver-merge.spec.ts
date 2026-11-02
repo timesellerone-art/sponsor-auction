@@ -172,35 +172,15 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
         expect.arrayContaining([naverEmailId, naverPhoneId]),
       );
       expect(mergedUser?.app_metadata?.providers).toEqual(expect.arrayContaining(['naver']));
-      const customNaver = await admin.auth.admin.customProviders.listProviders();
-      expect(customNaver.error, customNaver.error?.message).toBeNull();
-      expect(customNaver.data.providers.some((item) => item.identifier === 'custom:naver')).toBe(
-        true,
-      );
-      const identityRpc = await admin.rpc('link_naver_identity', {
-        p_user_id: googleId,
-        p_naver_id: naverEmailId,
-        p_email: googleEmail,
-        p_name: 'E2E 구글',
-      });
-      if (!identityRpc.error) {
-        await admin.rpc('link_naver_identity', {
-          p_user_id: googleId,
-          p_naver_id: naverPhoneId,
-          p_email: googleEmail,
-          p_name: 'E2E 구글',
-        });
-      }
       const withIdentities = (await admin.auth.admin.getUserById(googleId)).data.user;
-      if (identityRpc.error?.code === 'PGRST202') {
-        expect(userHasNaverIdentity(withIdentities, naverEmailId) || Boolean(withIdentities)).toBe(
-          true,
-        );
-      } else {
-        expect(identityRpc.error, identityRpc.error?.message).toBeNull();
-        expect(userHasNaverIdentity(withIdentities, naverEmailId)).toBe(true);
-        expect(userHasNaverIdentity(withIdentities, naverPhoneId)).toBe(true);
-      }
+      expect(
+        userHasNaverIdentity(withIdentities, naverEmailId),
+        'auth.identities에 provider=naver(이메일 매칭)가 없습니다. link_naver_identity SQL과 NOTIFY pgrst를 확인하세요.',
+      ).toBe(true);
+      expect(
+        userHasNaverIdentity(withIdentities, naverPhoneId),
+        'auth.identities에 provider=naver(전화 매칭)가 없습니다. link_naver_identity SQL과 NOTIFY pgrst를 확인하세요.',
+      ).toBe(true);
 
       const delayToast = page.getByText('로그인 확인이 지연');
       const link = await admin.auth.admin.generateLink({ type: 'magiclink', email: googleEmail });

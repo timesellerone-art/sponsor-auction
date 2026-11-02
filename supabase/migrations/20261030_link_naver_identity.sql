@@ -48,10 +48,9 @@ begin
   end if;
 
   begin
+    -- 현재 GoTrue: id uuid PK, provider_id text NOT NULL, identity_id 컬럼 없음
     insert into auth.identities (
-      id,
       user_id,
-      identity_id,
       provider,
       provider_id,
       identity_data,
@@ -60,9 +59,7 @@ begin
       updated_at
     )
     values (
-      gen_random_uuid(),
       p_user_id,
-      gen_random_uuid(),
       'naver',
       trim(p_naver_id),
       v_data,
@@ -86,26 +83,44 @@ begin
          )
       returning id into v_id;
       return v_id;
-    when undefined_column then
-      insert into auth.identities (
-        id,
-        user_id,
-        identity_data,
-        provider,
-        last_sign_in_at,
-        created_at,
-        updated_at
-      )
-      values (
-        trim(p_naver_id),
-        p_user_id,
-        v_data,
-        'naver',
-        now(),
-        now(),
-        now()
-      );
-      return null;
+    when undefined_column or not_null_violation or datatype_mismatch then
+      begin
+        insert into auth.identities (
+          id,
+          user_id,
+          identity_id,
+          provider,
+          provider_id,
+          identity_data,
+          last_sign_in_at,
+          created_at,
+          updated_at
+        )
+        values (
+          gen_random_uuid(),
+          p_user_id,
+          gen_random_uuid(),
+          'naver',
+          trim(p_naver_id),
+          v_data,
+          now(),
+          now(),
+          now()
+        )
+        returning id into v_id;
+        return v_id;
+      exception
+        when unique_violation then
+          update auth.identities
+             set user_id = p_user_id,
+                 identity_data = coalesce(identity_data, '{}'::jsonb) || v_data,
+                 last_sign_in_at = now(),
+                 updated_at = now()
+           where provider = 'naver'
+             and identity_data ->> 'sub' = trim(p_naver_id)
+          returning id into v_id;
+          return v_id;
+      end;
   end;
 end;
 $$;
