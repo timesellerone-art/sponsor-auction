@@ -484,6 +484,16 @@ export type Database = {
         };
         Returns: string;
       };
+      link_provider_identity: {
+        Args: {
+          p_user_id: string;
+          p_provider: string;
+          p_provider_id: string;
+          p_email?: string | null;
+          p_name?: string | null;
+        };
+        Returns: string;
+      };
     };
     Enums: {
       platform_type:

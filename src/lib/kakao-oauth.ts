@@ -1,7 +1,20 @@
 const KAKAO_BLOCKED_SCOPE_RE =
-  /email|account_ci|phone_number|gender|age_range|birthday|birthyear|talk_message|^friends$/i;
+  /account_ci|phone_number|gender|age_range|birthday|birthyear|talk_message|^friends$/i;
 
-export const KAKAO_PROFILE_SCOPES = ['profile_nickname', 'profile_image'] as const;
+export const KAKAO_EMAIL_SCOPE = 'account_email';
+export const KAKAO_PROFILE_SCOPES = [
+  'profile_nickname',
+  'profile_image',
+  KAKAO_EMAIL_SCOPE,
+] as const;
+
+export function normalizeKakaoScope(scope: string) {
+  const value = scope.trim();
+  if (value === 'email') {
+    return KAKAO_EMAIL_SCOPE;
+  }
+  return value;
+}
 
 export function kakaoOAuthScopesOption() {
   return KAKAO_PROFILE_SCOPES.join(',');
@@ -31,10 +44,20 @@ export function isKakaoBlockedScope(scope: string) {
 
 export function sanitizeKakaoScopes(scopes: string[]) {
   const allowed = new Set<string>(KAKAO_PROFILE_SCOPES);
-  return scopes.filter((scope) => allowed.has(scope) && !isKakaoBlockedScope(scope));
+  const kept: string[] = [];
+  for (const scope of scopes) {
+    const normalized = normalizeKakaoScope(scope);
+    if (!normalized || !allowed.has(normalized) || isKakaoBlockedScope(normalized)) {
+      continue;
+    }
+    if (!kept.includes(normalized)) {
+      kept.push(normalized);
+    }
+  }
+  return kept;
 }
 
-/** KOE205 방지: 닉네임·프로필 이미지만 남기고 이메일 등 미승인 스코프는 제거합니다. */
+/** 비즈 앱에서 연 카카오계정(이메일)은 유지하고, 미승인 스코프만 제거합니다. */
 export function sanitizeKakaoAuthorizeUrl(
   url: string,
   supabaseCallbackUrl?: string | null,

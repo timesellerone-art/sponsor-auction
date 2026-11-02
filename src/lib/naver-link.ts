@@ -2,7 +2,7 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { collectAuthEmails } from './auth-emails';
 import { lookupUsersByContact } from './auth-lookup';
 import { normalizeContactEmail, normalizePhone } from './contact';
-import { isNaverIdentityProvider } from './naver-idp';
+import { linkProviderIdentity, userHasProviderIdentity } from './auth-identities';
 import type { NaverProfile } from './naver-oauth';
 
 type AdminClient = SupabaseClient;
@@ -12,8 +12,6 @@ export type NaverLinkResult = {
   merged: boolean;
   tokenHash: string | null;
 };
-
-let linkIdentityRpcAvailable = true;
 
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
@@ -52,31 +50,8 @@ function phonesOf(user: User): string[] {
     .filter(Boolean);
 }
 
-function identitySub(identity: {
-  id?: string;
-  identity_data?: Record<string, unknown> | null;
-}) {
-  const sub = identity.identity_data?.sub;
-  return typeof sub === 'string' && sub.trim() ? sub.trim() : (identity.id?.trim() ?? '');
-}
-
 export function userHasNaverIdentity(user: User | null | undefined, naverId?: string | null) {
-  if (!user) {
-    return false;
-  }
-  const wanted = naverId?.trim() ?? '';
-  return (user.identities ?? []).some((identity) => {
-    if (!isNaverIdentityProvider(identity.provider)) {
-      return false;
-    }
-    return (
-      !wanted ||
-      identitySub({
-        id: identity.id,
-        identity_data: (identity.identity_data ?? null) as Record<string, unknown> | null,
-      }) === wanted
-    );
-  });
+  return userHasProviderIdentity(user, 'naver', naverId);
 }
 
 export function toE164Kr(phone: string | null | undefined) {
@@ -90,69 +65,15 @@ export function toE164Kr(phone: string | null | undefined) {
   return `+${normalized}`;
 }
 
-function adminRestEnv() {
-  const url = (
-    process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    process.env.SUPABASE_URL ||
-    ''
-  )
-    .trim()
-    .replace(/\/$/, '');
-  const key = (
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_SERVICE_KEY ||
-    process.env.SUPABASE_SECRET_KEY ||
-    ''
-  ).trim();
-  return url && key.length >= 20 ? { url, key } : null;
-}
-
 async function attachNaverIdentity(admin: AdminClient, userId: string, profile: NaverProfile) {
   try {
-    const email = normalizeContactEmail(profile.email) || null;
-    if (linkIdentityRpcAvailable) {
-      const linked = await admin.rpc('link_naver_identity', {
-        p_user_id: userId,
-        p_naver_id: profile.id,
-        p_email: email,
-        p_name: profile.name,
-      });
-      if (!linked.error) {
-        return;
-      }
-      if (linked.error.code === 'PGRST202') {
-        linkIdentityRpcAvailable = false;
-      }
-    }
-
-    const env = adminRestEnv();
-    if (!env) {
-      return;
-    }
-    await Promise.all(
-      (['naver', 'custom:naver'] as const).map((provider) =>
-        fetch(`${env.url}/auth/v1/admin/users/${userId}/identities`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${env.key}`,
-            apikey: env.key,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            provider,
-            identity_data: {
-              sub: profile.id,
-              email: email ?? undefined,
-              name: profile.name,
-              email_verified: Boolean(email),
-              iss: 'https://nid.naver.com',
-              provider: 'naver',
-            },
-          }),
-          cache: 'no-store',
-        }).catch(() => undefined),
-      ),
-    );
+    await linkProviderIdentity(admin, {
+      userId,
+      provider: 'naver',
+      providerId: profile.id,
+      email: normalizeContactEmail(profile.email) || null,
+      name: profile.name,
+    });
   } catch (error) {
     console.warn('[SponsorAuction] 네이버 identity 연결 예외', error);
   }
