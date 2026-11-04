@@ -236,16 +236,23 @@ export async function linkNaverProfile(
     return stampNaverOnUser(admin, target, profile);
   };
 
+  const issueSession = async (user: User) => {
+    const sessionEmail =
+      collectAuthEmails(user)[0] ||
+      normalizeContactEmail(user.email) ||
+      normalizeContactEmail(profile.email);
+    if (!sessionEmail || !prepareSession) {
+      return null;
+    }
+    return prepareSession(sessionEmail);
+  };
+
   if (canonical) {
-    const sessionEmail = collectAuthEmails(canonical)[0] ?? canonical.email ?? profile.email;
-    const [user, tokenHash] = await Promise.all([
-      mergeExtras(canonical),
-      sessionEmail && prepareSession ? prepareSession(sessionEmail) : Promise.resolve(null),
-    ]);
+    const user = await mergeExtras(canonical);
     return {
       user,
       merged: Boolean(preferred) || byContact.length > 0 || matches.length > 1,
-      tokenHash,
+      tokenHash: await issueSession(user),
     };
   }
 
@@ -278,12 +285,8 @@ export async function linkNaverProfile(
     if (!fallback) {
       throw new Error(created.error?.message || '네이버 계정으로 가입하지 못했습니다.');
     }
-    const sessionEmail = collectAuthEmails(fallback)[0] ?? fallback.email ?? email;
-    const [user, tokenHash] = await Promise.all([
-      stampNaverOnUser(admin, fallback, profile),
-      sessionEmail && prepareSession ? prepareSession(sessionEmail) : Promise.resolve(null),
-    ]);
-    return { user, merged: true, tokenHash };
+    const user = await stampNaverOnUser(admin, fallback, profile);
+    return { user, merged: true, tokenHash: await issueSession(user) };
   }
 
   const duplicate = await findAccountForNaverProfile(admin, profile, incoming.id);
@@ -291,18 +294,10 @@ export async function linkNaverProfile(
     const merged = mergeUsers
       ? await mergeUsers(incoming, duplicate)
       : await defaultMerge(admin, incoming, duplicate);
-    const sessionEmail = collectAuthEmails(merged)[0] ?? merged.email ?? email;
-    const [user, tokenHash] = await Promise.all([
-      stampNaverOnUser(admin, merged, profile),
-      sessionEmail && prepareSession ? prepareSession(sessionEmail) : Promise.resolve(null),
-    ]);
-    return { user, merged: true, tokenHash };
+    const user = await stampNaverOnUser(admin, merged, profile);
+    return { user, merged: true, tokenHash: await issueSession(user) };
   }
 
-  const sessionEmail = collectAuthEmails(incoming)[0] ?? incoming.email ?? email;
-  const [user, tokenHash] = await Promise.all([
-    stampNaverOnUser(admin, incoming, profile),
-    sessionEmail && prepareSession ? prepareSession(sessionEmail) : Promise.resolve(null),
-  ]);
-  return { user, merged: false, tokenHash };
+  const user = await stampNaverOnUser(admin, incoming, profile);
+  return { user, merged: false, tokenHash: await issueSession(user) };
 }

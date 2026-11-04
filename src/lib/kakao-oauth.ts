@@ -1,12 +1,8 @@
 const KAKAO_BLOCKED_SCOPE_RE =
-  /account_ci|phone_number|gender|age_range|birthday|birthyear|talk_message|^friends$/i;
+  /account_ci|account_email|^email$|phone_number|gender|age_range|birthday|birthyear|talk_message|^friends$/i;
 
 export const KAKAO_EMAIL_SCOPE = 'account_email';
-export const KAKAO_PROFILE_SCOPES = [
-  'profile_nickname',
-  'profile_image',
-  KAKAO_EMAIL_SCOPE,
-] as const;
+export const KAKAO_PROFILE_SCOPES = ['profile_nickname', 'profile_image'] as const;
 
 export function normalizeKakaoScope(scope: string) {
   const value = scope.trim();
@@ -57,7 +53,7 @@ export function sanitizeKakaoScopes(scopes: string[]) {
   return kept;
 }
 
-/** 비즈 앱에서 연 카카오계정(이메일)은 유지하고, 미승인 스코프만 제거합니다. */
+/** 카카오 인가에는 닉네임·프로필만 보냅니다. account_email은 미동의 앱에서 invalid_scope가 됩니다. */
 export function sanitizeKakaoAuthorizeUrl(
   url: string,
   supabaseCallbackUrl?: string | null,

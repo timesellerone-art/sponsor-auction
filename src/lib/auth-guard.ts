@@ -78,6 +78,9 @@ export function describeOAuthError(raw?: string | null) {
   if (/access_denied|cancel/i.test(text)) {
     return '소셜 로그인이 취소되었습니다.';
   }
+  if (/invalid_scope|account_email/i.test(text)) {
+    return '카카오 로그인 동의 항목을 확인하지 못했습니다. 다시 시도해 주세요.';
+  }
   return text || '소셜 로그인에 실패했습니다. 다시 시도해 주세요.';
 }
 

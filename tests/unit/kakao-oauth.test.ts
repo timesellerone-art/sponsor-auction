@@ -9,14 +9,14 @@ import {
 } from '../../src/lib/kakao-oauth';
 
 describe('Kakao 이메일 동의 스코프', () => {
-  it('카카오계정 이메일은 유지하고 미승인 스코프만 제거한다', () => {
+  it('미승인 이메일·메시지 스코프는 제거하고 프로필만 남긴다', () => {
     assert.deepEqual(
       sanitizeKakaoScopes(['profile_nickname', 'email', 'profile_image', 'talk_message']),
-      ['profile_nickname', 'account_email', 'profile_image'],
+      ['profile_nickname', 'profile_image'],
     );
   });
 
-  it('인가 URL의 이메일을 account_email로 정규화하고 프로필을 유지한다', () => {
+  it('인가 URL에서 account_email을 빼고 프로필만 요청한다', () => {
     const raw =
       'https://kauth.kakao.com/oauth/authorize?client_id=abc&redirect_uri=https://wrong.example/callback&scope=email+profile_nickname';
     const cleaned = sanitizeKakaoAuthorizeUrl(
@@ -24,25 +24,25 @@ describe('Kakao 이메일 동의 스코프', () => {
       'https://project.supabase.co/auth/v1/callback',
     );
     const parsed = new URL(cleaned);
-    assert.equal(parsed.searchParams.get('scope'), 'account_email profile_nickname');
+    assert.equal(parsed.searchParams.get('scope'), 'profile_nickname');
     assert.equal(
       parsed.searchParams.get('redirect_uri'),
       'https://project.supabase.co/auth/v1/callback',
     );
   });
 
-  it('미승인 스코프만 있으면 닉네임·프로필·이메일을 요청한다', () => {
+  it('미승인 스코프만 있으면 닉네임·프로필만 요청한다', () => {
     const cleaned = sanitizeKakaoAuthorizeUrl(
-      'https://kauth.kakao.com/oauth/authorize?scope=talk_message',
+      'https://kauth.kakao.com/oauth/authorize?scope=talk_message+account_email',
     );
     const parsed = new URL(cleaned);
     assert.equal(parsed.searchParams.get('scope'), kakaoOAuthScopeQuery());
   });
 
-  it('OAuth options는 닉네임·프로필·이메일을 요청한다', () => {
-    assert.equal(kakaoOAuthScopesOption(), 'profile_nickname,profile_image,account_email');
-    assert.equal(kakaoOAuthScopeQuery(), 'profile_nickname profile_image account_email');
-    assert.equal(/account_email/.test(kakaoOAuthScopesOption()), true);
+  it('OAuth options는 닉네임·프로필만 요청한다', () => {
+    assert.equal(kakaoOAuthScopesOption(), 'profile_nickname,profile_image');
+    assert.equal(kakaoOAuthScopeQuery(), 'profile_nickname profile_image');
+    assert.equal(/account_email/.test(kakaoOAuthScopesOption()), false);
     assert.equal(/talk_message/.test(kakaoOAuthScopesOption()), false);
   });
 });

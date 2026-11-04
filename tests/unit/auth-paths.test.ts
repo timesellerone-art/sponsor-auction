@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { AUTH_PRESENT_COOKIE_NAME } from '../../src/lib/access';
-import { postAuthPath, postSocialAuthPath } from '../../src/lib/auth-guard';
+import { describeOAuthError, postAuthPath, postSocialAuthPath } from '../../src/lib/auth-guard';
 import {
   expirePkceVerifierCookies,
   hasAuthPresence,
@@ -27,6 +27,10 @@ describe('auth path helpers', () => {
     assert.equal(isAuthPassthroughPath('/my'), false);
     assert.equal(onboardingCanonicalPath('/select-role'), '/onboarding/role-select');
     assert.equal(onboardingCanonicalPath('/onboarding'), '/onboarding/role-select');
+    assert.match(
+      describeOAuthError('Invalid scope: account_email'),
+      /카카오 로그인 동의 항목/,
+    );
   });
 
   it('Supabase 세션 쿠키 또는 auth present 쿠키를 로그인으로 본다', () => {
