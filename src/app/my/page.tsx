@@ -3,6 +3,7 @@
 import { AccessGuard } from '@/components/AccessGuard';
 import { AdvertiserDashboard } from '@/components/AdvertiserDashboard';
 import { CreatorDashboard } from '@/components/CreatorDashboard';
+import { LinkedAccountsPanel } from '@/components/LinkedAccountsPanel';
 import { useAuth } from '@/components/AuthProvider';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +15,7 @@ export default function MyPage() {
 
   return (
     <AccessGuard allow={DASHBOARD_ROLES}>
+      <LinkedAccountsPanel />
       <div
         className={cn('flex min-h-0 w-full min-w-0 flex-1 flex-col', showCreator && 'hidden')}
         aria-hidden={showCreator}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, X } from 'lucide-react';
 
@@ -12,6 +12,7 @@ type ConfirmModalProps = {
   busyLabel?: string;
   cancelLabel?: string;
   busy?: boolean;
+  danger?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 };
@@ -24,20 +25,18 @@ export function ConfirmModal({
   busyLabel = '처리 중...',
   cancelLabel = '취소',
   busy = false,
+  danger = false,
   onConfirm,
   onClose,
 }: ConfirmModalProps) {
   const titleId = useId();
-  const [localBusy, setLocalBusy] = useState(false);
-  const isBusy = busy || localBusy;
 
   const handleClose = useCallback(() => {
-    if (isBusy) {
+    if (busy) {
       return;
     }
-    setLocalBusy(false);
     onClose();
-  }, [isBusy, onClose]);
+  }, [busy, onClose]);
 
   useEffect(() => {
     if (!open) {
@@ -48,7 +47,7 @@ export function ConfirmModal({
     document.body.style.overflow = 'hidden';
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isBusy) {
+      if (event.key === 'Escape' && !busy) {
         handleClose();
       }
     };
@@ -58,7 +57,7 @@ export function ConfirmModal({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [handleClose, open, isBusy]);
+  }, [handleClose, open, busy]);
 
 
   if (!open || typeof document === 'undefined') {
@@ -68,7 +67,7 @@ export function ConfirmModal({
   return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-zinc-950/50 p-4"
-      onClick={isBusy ? undefined : handleClose}
+      onClick={busy ? undefined : handleClose}
     >
       <div
         role="dialog"
@@ -85,7 +84,7 @@ export function ConfirmModal({
             type="button"
             className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 disabled:opacity-50"
             aria-label="닫기"
-            disabled={isBusy}
+            disabled={busy}
             onClick={handleClose}
           >
             <X className="size-5" />
@@ -95,7 +94,7 @@ export function ConfirmModal({
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
-            disabled={isBusy}
+            disabled={busy}
             onClick={handleClose}
             className="inline-flex h-10 items-center justify-center rounded-full border border-zinc-200 px-4 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
           >
@@ -103,18 +102,21 @@ export function ConfirmModal({
           </button>
           <button
             type="button"
-            disabled={isBusy}
+            disabled={busy}
             onClick={() => {
-              if (isBusy) {
+              if (busy) {
                 return;
               }
-              setLocalBusy(true);
               onConfirm();
             }}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+            className={
+              danger
+                ? 'inline-flex h-10 items-center justify-center gap-2 rounded-full bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-zinc-300'
+                : 'inline-flex h-10 items-center justify-center gap-2 rounded-full bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300'
+            }
           >
-            {isBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-            {isBusy ? busyLabel : confirmLabel}
+            {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

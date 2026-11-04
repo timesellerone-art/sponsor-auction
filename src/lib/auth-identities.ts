@@ -1,4 +1,5 @@
-import type { SupabaseClient, User } from '@supabase/supabase-js';
+import type { SupabaseClient, User, UserIdentity } from '@supabase/supabase-js';
+import { normalizePhone } from './contact';
 
 export const SOCIAL_IDENTITY_PROVIDERS = ['google', 'kakao', 'naver', 'phone'] as const;
 export type SocialIdentityProvider = (typeof SOCIAL_IDENTITY_PROVIDERS)[number];
@@ -57,6 +58,97 @@ export function userHasBundledSocialIdentities(user: User | null | undefined) {
     userHasProviderIdentity(user, 'naver') &&
     userHasProviderIdentity(user, 'phone')
   );
+}
+
+export const SOCIAL_IDENTITY_LABELS: Record<SocialIdentityProvider, string> = {
+  google: 'Google',
+  kakao: 'Kakao',
+  naver: 'Naver',
+  phone: 'Phone',
+};
+
+export type LinkedAccountStatus = {
+  provider: SocialIdentityProvider;
+  label: string;
+  linked: boolean;
+  canUnlink: boolean;
+  hint: string | null;
+};
+
+function identityHint(identity: UserIdentity | undefined, provider: SocialIdentityProvider) {
+  const data = (identity?.identity_data ?? {}) as Record<string, unknown>;
+  if (provider === 'phone') {
+    const phone =
+      (typeof data.phone === 'string' && data.phone) ||
+      (typeof data.sub === 'string' && data.sub) ||
+      '';
+    return normalizePhone(phone) || null;
+  }
+  if (typeof data.email === 'string' && data.email.includes('@')) {
+    return data.email;
+  }
+  return null;
+}
+
+export function userHasPhoneLogin(user: User | null | undefined) {
+  if (!user) {
+    return false;
+  }
+  return userHasProviderIdentity(user, 'phone') || Boolean(normalizePhone(user.phone));
+}
+
+function metadataProviders(user: User | null | undefined) {
+  const fromApp = user?.app_metadata?.providers;
+  const fromUser = user?.user_metadata?.linked_providers;
+  const values = [
+    ...(Array.isArray(fromApp) ? fromApp : []),
+    ...(Array.isArray(fromUser) ? fromUser : []),
+  ];
+  return values.filter((item): item is string => typeof item === 'string');
+}
+
+export function isProviderLinked(user: User | null | undefined, provider: SocialIdentityProvider) {
+  if (provider === 'phone') {
+    return userHasPhoneLogin(user);
+  }
+  if (userHasProviderIdentity(user, provider)) {
+    return true;
+  }
+  const providers = metadataProviders(user);
+  if (provider === 'naver') {
+    return providers.some((item) => isNaverIdentityProvider(item));
+  }
+  return providers.includes(provider);
+}
+
+export function linkedSocialProviderCount(user: User | null | undefined) {
+  return SOCIAL_IDENTITY_PROVIDERS.filter((provider) => isProviderLinked(user, provider)).length;
+}
+
+export function findProviderIdentity(user: User | null | undefined, provider: SocialIdentityProvider) {
+  return (user?.identities ?? []).find((identity) =>
+    matchesIdentityProvider(identity.provider, provider),
+  );
+}
+
+export function canUnlinkProvider(user: User | null | undefined, provider: SocialIdentityProvider) {
+  return isProviderLinked(user, provider) && linkedSocialProviderCount(user) >= 2;
+}
+
+export function listLinkedAccountStatuses(user: User | null | undefined): LinkedAccountStatus[] {
+  const unlinkable = linkedSocialProviderCount(user) >= 2;
+  return SOCIAL_IDENTITY_PROVIDERS.map((provider) => {
+    const linked = isProviderLinked(user, provider);
+    const identity = findProviderIdentity(user, provider);
+    const phoneHint = provider === 'phone' ? normalizePhone(user?.phone) : null;
+    return {
+      provider,
+      label: SOCIAL_IDENTITY_LABELS[provider],
+      linked,
+      canUnlink: linked && unlinkable,
+      hint: identityHint(identity, provider) || phoneHint,
+    };
+  });
 }
 
 let providerRpcAvailable = true;

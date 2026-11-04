@@ -494,6 +494,14 @@ export type Database = {
         };
         Returns: string;
       };
+      unlink_provider_identity: {
+        Args: { p_user_id: string; p_provider: string };
+        Returns: boolean;
+      };
+      delete_own_account: {
+        Args: { p_user_id?: string | null };
+        Returns: undefined;
+      };
     };
     Enums: {
       platform_type:
