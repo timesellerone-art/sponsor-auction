@@ -5,6 +5,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
 export default defineConfig({
   testDir: '.',
   testMatch: ['e2e/**/*.spec.ts', 'tests/**/*.spec.ts'],
+  globalTeardown: './tests/helpers/e2e-teardown.ts',
   fullyParallel: false,
   workers: 1,
   timeout: 90_000,

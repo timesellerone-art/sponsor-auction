@@ -1,0 +1,94 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+
+export function readE2EEnv() {
+  const values: Record<string, string> = { ...process.env } as Record<string, string>;
+  try {
+    const raw = readFileSync(join(process.cwd(), '.env.local'), 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const index = line.indexOf('=');
+      if (index <= 0 || line.trim().startsWith('#')) {
+        continue;
+      }
+      const key = line.slice(0, index).trim();
+      const value = line.slice(index + 1).trim().replace(/^"|"$/g, '');
+      if (!values[key]) {
+        values[key] = value;
+      }
+    }
+  } catch {
+    // process.env만 사용한다.
+  }
+  return values;
+}
+
+export function e2eAdminClient(): SupabaseClient | null {
+  const env = readE2EEnv();
+  const url = env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? '';
+  const key = (
+    env.SUPABASE_SERVICE_ROLE_KEY ||
+    env.SUPABASE_SERVICE_KEY ||
+    env.SUPABASE_SECRET_KEY ||
+    ''
+  ).trim();
+  if (!/^https?:\/\//i.test(url) || key.length < 20) {
+    return null;
+  }
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+export function isE2EEmail(email: string | null | undefined) {
+  const value = email?.trim().toLowerCase() ?? '';
+  if (!value) {
+    return false;
+  }
+  return (
+    value.endsWith('@sponsor-auction.test') ||
+    value.startsWith('e2e.') ||
+    /^naver\.e2e\./.test(value) ||
+    /^kakao\.[a-z0-9-]+@oauth\.sponsor-auction\.local$/.test(value)
+  );
+}
+
+function isDummyKakaoOnly(user: User) {
+  const providers = [
+    ...(user.identities ?? []).map((item) => item.provider),
+    ...(Array.isArray(user.app_metadata?.providers) ? user.app_metadata.providers : []),
+  ].filter((item): item is string => typeof item === 'string' && item.length > 0);
+  const hasKakao = providers.includes('kakao');
+  const hasOtherSocial =
+    providers.includes('google') || providers.includes('naver') || providers.includes('custom:naver');
+  const noEmail =
+    !user.email ||
+    !user.email.includes('@') ||
+    user.email.endsWith('@oauth.sponsor-auction.local');
+  const noPhone = !(user.phone && String(user.phone).replace(/\D/g, '').length >= 10);
+  return hasKakao && !hasOtherSocial && noEmail && noPhone;
+}
+
+export async function deleteAuthUser(admin: SupabaseClient, userId: string) {
+  await admin.auth.admin.deleteUser(userId);
+  await admin.from('profiles').delete().eq('id', userId);
+}
+
+export async function cleanupE2EUsers(admin?: SupabaseClient | null) {
+  const client = admin ?? e2eAdminClient();
+  if (!client) {
+    return 0;
+  }
+  let removed = 0;
+  const listed = await client.auth.admin.listUsers({ page: 1, perPage: 200 });
+  for (const row of listed.data.users ?? []) {
+    const user = (await client.auth.admin.getUserById(row.id)).data.user;
+    if (!user) {
+      continue;
+    }
+    if (!isE2EEmail(user.email) && !isDummyKakaoOnly(user)) {
+      continue;
+    }
+    await deleteAuthUser(client, user.id);
+    removed += 1;
+  }
+  return removed;
+}

@@ -84,6 +84,11 @@ async function liveHasBundledIdentities(admin: SupabaseClient) {
 }
 
 test.describe('다른 이메일·같은 전화 계정 병합', () => {
+  test.afterAll(async () => {
+    const { cleanupE2EUsers } = await import('./helpers/e2e-users');
+    await cleanupE2EUsers();
+  });
+
   test('gmail 구글(전화 없음) 후 naver.com+Phone은 세션 연동으로 한 UID가 된다', async ({
     browser,
   }) => {

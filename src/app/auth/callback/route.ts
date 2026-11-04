@@ -8,6 +8,7 @@ import {
   ROLE_SELECT_PATH,
   describeOAuthError,
   isOAuthStateLost,
+  isUsedOrExpiredOAuthCode,
   oauthFailedLoginPath,
   oauthRetryLoginPath,
   postSocialAuthPath,
@@ -26,6 +27,8 @@ import {
   readAccountLinkUserId,
   writeAccountLinkCookie,
 } from '@/lib/account-link';
+import { redirectExistingAuthUser } from '@/lib/auth-complete';
+import { shareOAuthAttempt } from '@/lib/oauth-once';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import { reconcileSocialIdentities } from '@/lib/auth-identity';
 import {
@@ -156,49 +159,84 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const exchanged = await supabase.auth.exchangeCodeForSession(code);
-  if (exchanged.error || !exchanged.data.session) {
-    const message = exchanged.error?.message || '세션이 발급되지 않았습니다.';
-    return failRedirect(origin, isOAuthStateLost(exchanged.error?.code, message) ? 'provider' : 'exchange', {
-      message,
-      code: exchanged.error?.code,
-      status: exchanged.error?.status,
+  const nextPath = readNext(request, requestUrl);
+  const preferredUserId = readAccountLinkUserId(request.cookies.get(ACCOUNT_LINK_COOKIE)?.value);
+  const once = await shareOAuthAttempt(`supabase-code:${code}`, async () => {
+    const exchanged = await supabase.auth.exchangeCodeForSession(code);
+    if (exchanged.error || !exchanged.data.session) {
+      const message = exchanged.error?.message || '세션이 발급되지 않았습니다.';
+      return {
+        kind: 'error' as const,
+        stage: isOAuthStateLost(exchanged.error?.code, message) ? 'provider' : 'exchange',
+        message,
+        code: exchanged.error?.code ?? null,
+        status: exchanged.error?.status ?? null,
+      };
+    }
+
+    let authUser = exchanged.data.user ?? exchanged.data.session.user;
+    const linked = await reconcileSocialIdentities(authUser, preferredUserId);
+    if (linked.switched) {
+      if (!linked.tokenHash) {
+        return {
+          kind: 'error' as const,
+          stage: 'account-merge',
+          message: '통합 계정 세션 링크를 만들지 못했습니다.',
+          code: null,
+          status: null,
+        };
+      }
+      const verified = await supabase.auth.verifyOtp({
+        token_hash: linked.tokenHash,
+        type: 'magiclink',
+      });
+      if (verified.error || !verified.data.user) {
+        if (
+          authUser &&
+          isUsedOrExpiredOAuthCode(verified.error?.message, verified.error?.code)
+        ) {
+          return { kind: 'ok' as const, user: linked.user ?? authUser, cookies: cookieBag.getAll() };
+        }
+        return {
+          kind: 'error' as const,
+          stage: 'account-merge',
+          message: verified.error?.message || '통합 계정 세션 전환에 실패했습니다.',
+          code: verified.error?.code ?? null,
+          status: verified.error?.status ?? null,
+        };
+      }
+      authUser = verified.data.user;
+    } else {
+      authUser = linked.user;
+    }
+    return { kind: 'ok' as const, user: authUser, cookies: cookieBag.getAll() };
+  });
+
+  if (once.kind === 'error') {
+    const resumed = await redirectExistingAuthUser({
+      request,
+      origin,
+      next: nextPath,
+    });
+    if (resumed) {
+      resumed.cookies.delete(OAUTH_NEXT_COOKIE);
+      resumed.cookies.delete(OAUTH_PROVIDER_COOKIE);
+      return resumed;
+    }
+    return failRedirect(origin, once.stage, {
+      message: once.message,
+      code: once.code,
+      status: once.status,
     });
   }
 
-  let authUser = exchanged.data.user ?? exchanged.data.session.user;
-  const linked = await reconcileSocialIdentities(
-    authUser,
-    readAccountLinkUserId(request.cookies.get(ACCOUNT_LINK_COOKIE)?.value),
-  );
-  if (linked.switched) {
-    if (!linked.tokenHash) {
-      return failRedirect(origin, 'account-merge', {
-        message: '통합 계정 세션 링크를 만들지 못했습니다.',
-      });
-    }
-    const verified = await supabase.auth.verifyOtp({
-      token_hash: linked.tokenHash,
-      type: 'magiclink',
-    });
-    if (verified.error || !verified.data.user) {
-      return failRedirect(origin, 'account-merge', {
-        message: verified.error?.message || '통합 계정 세션 전환에 실패했습니다.',
-        code: verified.error?.code,
-        status: verified.error?.status,
-      });
-    }
-    authUser = verified.data.user;
-  } else {
-    authUser = linked.user;
-  }
-
+  const authUser = once.user;
   const sessionLike = await sessionLikeFor(supabase, authUser);
-  const destination = postSocialAuthPath(sessionLike, readNext(request, requestUrl), {
+  const destination = postSocialAuthPath(sessionLike, nextPath, {
     needsOnboarding: needsRoleOnboarding(sessionLike),
   });
   const redirect = NextResponse.redirect(new URL(destination, origin));
-  const issued = cookieBag.getAll();
+  const issued = once.cookies.length > 0 ? once.cookies : cookieBag.getAll();
   request.cookies
     .getAll()
     .filter(

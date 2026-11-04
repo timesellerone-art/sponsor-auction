@@ -33,6 +33,15 @@ export function isOAuthStateLost(code?: string | null, message?: string | null) 
   );
 }
 
+/** 이미 성공한 교환을 한 번 더 시도했을 때 GoTrue/네이버가 주는 만료·재사용 오류. */
+export function isUsedOrExpiredOAuthCode(message?: string | null, code?: string | null) {
+  const text = `${code ?? ''} ${message ?? ''}`.trim();
+  if (!text || isOAuthStateLost(code, message)) {
+    return false;
+  }
+  return /invalid.*(grant|code)|already.?used|otp_expired|flow state not found|expired/i.test(text);
+}
+
 export function oauthRetryLoginPath() {
   return `/login?error=${OAUTH_RETRY_ERROR}`;
 }
@@ -63,7 +72,7 @@ export function describeOAuthError(raw?: string | null) {
   if (isOAuthStateLost(null, text)) {
     return '소셜 로그인 확인이 중복 처리되었습니다. 다시 로그인해 주세요.';
   }
-  if (/invalid.*(grant|code)|expired|flow state/i.test(text)) {
+  if (isUsedOrExpiredOAuthCode(text)) {
     return '로그인 코드가 만료되었거나 이미 사용되었습니다. 다시 로그인해 주세요.';
   }
   if (/access_denied|cancel/i.test(text)) {

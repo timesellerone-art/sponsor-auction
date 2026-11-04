@@ -102,6 +102,11 @@ async function deleteDummyKakaoAccounts(admin: SupabaseClient) {
 }
 
 test.describe('카카오 이메일 계정 병합', () => {
+  test.afterAll(async () => {
+    const { cleanupE2EUsers } = await import('./helpers/e2e-users');
+    await cleanupE2EUsers();
+  });
+
   test('구글 가입 후 같은 이메일 카카오 로그인은 Google·Kakao·Naver·Phone을 한 UID로 묶는다', async ({
     browser,
   }) => {

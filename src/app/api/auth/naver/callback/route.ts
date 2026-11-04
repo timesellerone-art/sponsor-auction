@@ -4,10 +4,14 @@ import {
   ACCOUNT_LINK_COOKIE,
   readAccountLinkUserId,
 } from '@/lib/account-link';
-import { completeMagicLinkSession } from '@/lib/auth-complete';
+import {
+  completeMagicLinkSessionDetailed,
+  redirectExistingAuthUser,
+} from '@/lib/auth-complete';
 import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
 import { mergeUserInto } from '@/lib/auth-identity';
 import { expireAuthDebrisCookies } from '@/lib/auth-paths';
+import { shareOAuthAttempt } from '@/lib/oauth-once';
 import { readNaverIdpState, signNaverIdpTicket } from '@/lib/naver-idp';
 import { linkNaverProfile } from '@/lib/naver-link';
 import {
@@ -35,6 +39,16 @@ function loginError(request: NextRequest, origin: string, message: string) {
   return response;
 }
 
+async function resumeOrLoginError(request: NextRequest, origin: string, next: string, message: string) {
+  const resumed = await redirectExistingAuthUser({ request, origin, next });
+  if (resumed) {
+    resumed.cookies.delete(NAVER_STATE_COOKIE);
+    resumed.cookies.delete(NAVER_NEXT_COOKIE);
+    return resumed;
+  }
+  return loginError(request, origin, message);
+}
+
 export async function GET(request: NextRequest) {
   try {
     await connection();
@@ -50,7 +64,12 @@ export async function GET(request: NextRequest) {
     const naverError = url.searchParams.get('error_description') || url.searchParams.get('error');
 
     if (naverError) {
-      return loginError(request, origin, decodeURIComponent(naverError.replace(/\+/g, ' ')));
+      return resumeOrLoginError(
+        request,
+        origin,
+        readStoredNext(request.cookies.get(NAVER_NEXT_COOKIE)?.value),
+        decodeURIComponent(naverError.replace(/\+/g, ' ')),
+      );
     }
 
     const expectedState = request.cookies.get(NAVER_STATE_COOKIE)?.value ?? '';
@@ -65,7 +84,7 @@ export async function GET(request: NextRequest) {
         signedIdp: Boolean(idpState),
       })
     ) {
-      return loginError(request, origin, '네이버 로그인 검증에 실패했습니다. 다시 시도해 주세요.');
+      return resumeOrLoginError(request, origin, next, '네이버 로그인 검증에 실패했습니다. 다시 시도해 주세요.');
     }
     if (!expectedState && !idpState) {
       console.warn('[SponsorAuction] 네이버 state 쿠키가 없어 URL state로 병합을 이어갑니다.');
@@ -80,38 +99,30 @@ export async function GET(request: NextRequest) {
     }
 
     const callbackOrigin = idpState?.o || origin;
-    const profile = await fetchNaverProfile(
-      await exchangeNaverCode({
-        clientId: env.clientId,
-        clientSecret: env.clientSecret,
-        code,
-        state,
-        redirectUri: naverCallbackUrl(callbackOrigin),
-      }),
-    );
-
-    if (idpState) {
-      const ticket = signNaverIdpTicket(profile);
-      const redirect = new URL(idpState.r);
-      redirect.searchParams.set('code', ticket);
-      redirect.searchParams.set('state', idpState.s);
-      const response = NextResponse.redirect(redirect);
-      response.cookies.delete(NAVER_STATE_COOKIE);
-      response.cookies.delete(NAVER_NEXT_COOKIE);
-      return response;
-    }
-
-    const admin = createAdminClient();
-    if (!admin) {
-      return loginError(
-        request,
-        origin,
-        'Supabase 서비스 키가 없어 네이버 계정을 연결할 수 없습니다.',
+    const once = await shareOAuthAttempt(`naver:${code}`, async () => {
+      const profile = await fetchNaverProfile(
+        await exchangeNaverCode({
+          clientId: env.clientId,
+          clientSecret: env.clientSecret,
+          code,
+          state,
+          redirectUri: naverCallbackUrl(callbackOrigin),
+        }),
       );
-    }
 
-    let tokenHash: string | null = null;
-    try {
+      if (idpState) {
+        const ticket = signNaverIdpTicket(profile);
+        return { kind: 'idp' as const, ticket, redirect: idpState.r, gotrueState: idpState.s };
+      }
+
+      const admin = createAdminClient();
+      if (!admin) {
+        return {
+          kind: 'error' as const,
+          message: 'Supabase 서비스 키가 없어 네이버 계정을 연결할 수 없습니다.',
+        };
+      }
+
       const linked = await linkNaverProfile(
         admin,
         profile,
@@ -132,36 +143,49 @@ export async function GET(request: NextRequest) {
           preferredUserId: readAccountLinkUserId(request.cookies.get(ACCOUNT_LINK_COOKIE)?.value),
         },
       );
-      tokenHash = linked.tokenHash;
-    } catch (error) {
-      console.warn('[SponsorAuction] 네이버 계정 병합 예외', error);
-      return loginError(
-        request,
-        origin,
-        error instanceof Error ? error.message : '네이버 계정 병합에 실패했습니다.',
-      );
+      if (!linked.tokenHash) {
+        return { kind: 'error' as const, message: '네이버 로그인 세션을 만들지 못했습니다.' };
+      }
+      return { kind: 'login' as const, tokenHash: linked.tokenHash, next };
+    });
+
+    if (once.kind === 'idp') {
+      const redirect = new URL(once.redirect);
+      redirect.searchParams.set('code', once.ticket);
+      redirect.searchParams.set('state', once.gotrueState);
+      const response = NextResponse.redirect(redirect);
+      response.cookies.delete(NAVER_STATE_COOKIE);
+      response.cookies.delete(NAVER_NEXT_COOKIE);
+      return response;
     }
-    if (!tokenHash) {
-      return loginError(request, origin, '네이버 로그인 세션을 만들지 못했습니다.');
+
+    if (once.kind === 'error') {
+      return resumeOrLoginError(request, origin, next, once.message);
     }
 
     try {
-      const redirect = await completeMagicLinkSession({
+      const completed = await completeMagicLinkSessionDetailed({
         request,
         origin,
-        tokenHash,
+        tokenHash: once.tokenHash,
         type: 'magiclink',
-        next,
+        next: once.next,
       });
-      redirect.cookies.delete(NAVER_STATE_COOKIE);
-      redirect.cookies.delete(NAVER_NEXT_COOKIE);
-      return redirect;
+      completed.response.cookies.delete(NAVER_STATE_COOKIE);
+      completed.response.cookies.delete(NAVER_NEXT_COOKIE);
+      return completed.response;
     } catch (error) {
+      const resumed = await redirectExistingAuthUser({ request, origin, next: once.next });
+      if (resumed) {
+        resumed.cookies.delete(NAVER_STATE_COOKIE);
+        resumed.cookies.delete(NAVER_NEXT_COOKIE);
+        return resumed;
+      }
       console.warn('[SponsorAuction] 네이버 세션 쿠키 발급 예외, 클라이언트 교환으로 전환', error);
       const fallback = new URL('/auth/oauth', origin);
-      fallback.searchParams.set('token_hash', tokenHash);
+      fallback.searchParams.set('token_hash', once.tokenHash);
       fallback.searchParams.set('type', 'magiclink');
-      fallback.searchParams.set('next', next);
+      fallback.searchParams.set('next', once.next);
       fallback.searchParams.set('client', '1');
       fallback.searchParams.set('linked', '1');
       const response = NextResponse.redirect(fallback);
@@ -172,6 +196,8 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : '네이버 로그인에 실패했습니다.';
     console.warn('[SponsorAuction] 네이버 콜백 처리 예외', error);
-    return loginError(request, requestOrigin(request), detail);
+    const origin = requestOrigin(request);
+    const next = readStoredNext(request.cookies.get(NAVER_NEXT_COOKIE)?.value);
+    return resumeOrLoginError(request, origin, next, detail);
   }
 }

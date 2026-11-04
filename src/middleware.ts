@@ -50,7 +50,7 @@ export async function middleware(request: NextRequest) {
   ) {
     const complete = request.nextUrl.clone();
     complete.pathname = '/api/auth/session/complete';
-    return NextResponse.rewrite(complete);
+    return NextResponse.redirect(complete);
   }
 
   if (request.nextUrl.searchParams.has('error_code')) {

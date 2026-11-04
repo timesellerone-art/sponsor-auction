@@ -54,26 +54,15 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const error = params.get('error');
-    if (error === 'oauth_failed') {
-      showToast(params.get('error_description') || '소셜 로그인에 실패했습니다. 다시 시도해 주세요.');
-    } else if (error === OAUTH_RETRY_ERROR) {
-      void retryLostOAuthOnce().then((retrying) => {
-        if (!retrying) {
-          showToast(describeOAuthError('bad_oauth_state'));
-        }
-      });
-    }
-  }, []);
-
-  useEffect(() => {
     let cancelled = false;
     const timeoutId = window.setTimeout(() => {
       if (!cancelled) {
         setIsLoading(false);
       }
     }, 2500);
+
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
 
     const checkSession = async () => {
       try {
@@ -84,6 +73,15 @@ export default function LoginPage() {
         const sessionUser = result.data;
         if (sessionUser) {
           router.replace(destinationAfterLogin(sessionUser));
+          return;
+        }
+        if (error === 'oauth_failed') {
+          showToast(params.get('error_description') || '소셜 로그인에 실패했습니다. 다시 시도해 주세요.');
+        } else if (error === OAUTH_RETRY_ERROR) {
+          const retrying = await retryLostOAuthOnce();
+          if (!cancelled && !retrying) {
+            showToast(describeOAuthError('bad_oauth_state'));
+          }
         }
       } catch (sessionError) {
         console.warn('[SponsorAuction] 로그인 페이지 세션 확인에 실패했습니다.', sessionError);

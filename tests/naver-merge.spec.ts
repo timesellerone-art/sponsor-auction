@@ -64,6 +64,11 @@ async function deleteMatchingUsers(admin: SupabaseClient, matches: (email: strin
 }
 
 test.describe('네이버 로그인 즉시 계정 병합', () => {
+  test.afterAll(async () => {
+    const { cleanupE2EUsers } = await import('./helpers/e2e-users');
+    await cleanupE2EUsers();
+  });
+
   test('구글 계정과 같은 이메일·전화의 네이버 로그인은 한 UID로 /my에 들어간다', async ({
     page,
     context,
