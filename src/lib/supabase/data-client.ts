@@ -1,4 +1,4 @@
-import { mockGetSession } from '@/lib/auth-mock';
+import { isDemoAccountEmail, mockGetSession } from '@/lib/auth-mock';
 import { getSupabaseClient, type SponsorAuctionClient } from '@/lib/supabase';
 
 async function withTimeout<T>(promise: PromiseLike<T>, ms: number): Promise<T> {
@@ -42,6 +42,9 @@ export async function getDataClient(): Promise<SponsorAuctionClient | null> {
       console.warn('[SponsorAuction] 데이터 클라이언트 세션 확인 경고', error.message);
     }
     if (!error && data.session?.user) {
+      if (isDemoAccountEmail(data.session.user.email)) {
+        return null;
+      }
       return supabase;
     }
   } catch {

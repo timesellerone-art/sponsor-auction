@@ -9,7 +9,9 @@ import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { isDemoAccountEmail } from '@/lib/auth-mock';
 import { INSERT_FAIL_MESSAGE, createBid, getAuctionById } from '@/lib/auctions';
+import { isUuid } from '@/lib/uuid';
 import { advertiserPayableAmount, creatorPayoutAmount } from '@/lib/fees';
 import { rememberMyBid } from '@/lib/my-bids';
 import { getAuctionOwnerId, pushNotification } from '@/lib/notifications';
@@ -156,28 +158,33 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         };
 
         let result: Awaited<ReturnType<typeof createBid>>;
-        try {
-          const response = await fetch('/api/bids', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          const json = (await response.json().catch(() => null)) as {
-            data?: Awaited<ReturnType<typeof createBid>>['data'];
-            error?: string;
-            errorMessage?: string;
-          } | null;
-          if (response.ok && json?.data) {
-            result = { data: json.data, error: null };
-          } else {
-            result = {
-              data: null,
-              error: json?.errorMessage ?? json?.error ?? INSERT_FAIL_MESSAGE,
-            };
-          }
-        } catch {
+        const localOnly = isDemoAccountEmail(user.email) || !isUuid(auctionId);
+        if (localOnly) {
           result = await createBid(payload);
+        } else {
+          try {
+            const response = await fetch('/api/bids', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            const json = (await response.json().catch(() => null)) as {
+              data?: Awaited<ReturnType<typeof createBid>>['data'];
+              error?: string;
+              errorMessage?: string;
+            } | null;
+            if (response.ok && json?.data) {
+              result = { data: json.data, error: null };
+            } else {
+              result = {
+                data: null,
+                error: json?.errorMessage ?? json?.error ?? INSERT_FAIL_MESSAGE,
+              };
+            }
+          } catch {
+            result = await createBid(payload);
+          }
         }
 
         if (result.error || !result.data) {

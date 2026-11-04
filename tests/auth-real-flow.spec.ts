@@ -256,11 +256,7 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
     await form.getByPlaceholder('6자 이상').fill('demo1234');
     await form.locator('button[type=submit]').click();
 
-    try {
-      await expect(page).toHaveURL(/\/admin(\?|$)/, { timeout: 15000 });
-    } catch {
-      test.skip(true, 'admin@demo.com이 없어 이 시나리오를 건너뜁니다.');
-    }
+    await expect(page).toHaveURL(/\/admin(\?|$)/, { timeout: 15000 });
     expect(passwordGrant).toEqual([200]);
     const header = page.locator('header');
     await expect(header.getByRole('link', { name: '관리자', exact: true }).first()).toBeVisible();

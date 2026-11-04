@@ -1,9 +1,12 @@
 import {
+  isDemoAccountEmail,
+  isDemoCredentials,
   mockGetSession,
   mockSaveMemberRole,
   mockSignIn,
   mockSignOut,
   mockSignUp,
+  rememberDemoSession,
 } from '@/lib/auth-mock';
 import {
   AUTH_PRESENT_COOKIE_NAME,
@@ -478,15 +481,41 @@ async function readBrowserAuthUser(
   return null;
 }
 
+async function readMockSessionSafe(): Promise<DataResult<SessionUser | null> | null> {
+  try {
+    const mock = await mockGetSession();
+    if (mock.data) {
+      return mock;
+    }
+  } catch (error) {
+    console.warn('[SponsorAuction] Mock 세션 조회에 실패했습니다.', error);
+  }
+  return null;
+}
+
 export async function getSessionUser(): Promise<DataResult<SessionUser | null>> {
   const supabase = createClient();
-  if (!supabase) {
+  if (supabase) {
     try {
-      return await mockGetSession();
-    } catch (error) {
-      console.warn('[SponsorAuction] Mock 세션 조회에 실패했습니다.', error);
-      return ok(null);
+      const user = await readBrowserAuthUser(supabase);
+      if (user && isDemoAccountEmail(user.email)) {
+        const demo = rememberDemoSession(user.email);
+        if (demo) {
+          return ok(demo);
+        }
+      }
+    } catch {
+      // 데모 매핑에 실패하면 Mock/일반 세션으로 이어갑니다.
     }
+  }
+
+  const mockSession = await readMockSessionSafe();
+  if (mockSession) {
+    return mockSession;
+  }
+
+  if (!supabase) {
+    return ok(null);
   }
 
   try {
@@ -496,6 +525,11 @@ export async function getSessionUser(): Promise<DataResult<SessionUser | null>> 
     }
 
     const email = user.email?.trim() || '';
+    const demo = isDemoAccountEmail(email) ? rememberDemoSession(email) : null;
+    if (demo) {
+      return ok(demo);
+    }
+
     const name =
       (typeof user.user_metadata?.name === 'string'
         ? user.user_metadata.name
@@ -587,24 +621,33 @@ export async function signUp(input: {
   }
 }
 
+async function completeMockSignIn(input: {
+  email: string;
+  password: string;
+}): Promise<DataResult<SessionUser | null>> {
+  const result = await mockSignIn(input);
+  if (!result.error) {
+    applyKnownSession(result.data);
+    notifyAuthChanged();
+  }
+  return result;
+}
+
 export async function signIn(input: {
   email: string;
   password: string;
 }): Promise<DataResult<SessionUser | null>> {
+  const email = input.email.trim().toLowerCase();
+  const demoLogin = isDemoCredentials(email, input.password);
   const supabase = createClient();
   if (!supabase) {
-    const result = await mockSignIn(input);
-    if (!result.error) {
-      applyKnownSession(result.data);
-      notifyAuthChanged();
-    }
-    return result;
+    return completeMockSignIn(input);
   }
 
   try {
     const { data, error } = await withTimeout(
       supabase.auth.signInWithPassword({
-        email: input.email.trim().toLowerCase(),
+        email,
         password: input.password,
       }),
       4000,
@@ -612,32 +655,42 @@ export async function signIn(input: {
     );
 
     if (error || !data.user || !data.session) {
+      if (demoLogin) {
+        return completeMockSignIn(input);
+      }
       return fail(null, publicAuthErrorMessage(error));
     }
 
+    if (demoLogin) {
+      return completeMockSignIn(input);
+    }
+
     const user = data.user;
-    const email = user.email?.trim() || input.email.trim().toLowerCase();
+    const sessionEmail = user.email?.trim() || email;
     const name =
       (typeof user.user_metadata?.name === 'string'
         ? user.user_metadata.name
-        : '') || email.split('@')[0] || '회원';
-    const session = await loadProfile(supabase, user.id, email, name, user);
+        : '') || sessionEmail.split('@')[0] || '회원';
+    const session = await loadProfile(supabase, user.id, sessionEmail, name, user);
     applyKnownSession(session);
     return ok(session);
   } catch (error) {
+    if (demoLogin) {
+      return completeMockSignIn(input);
+    }
     return fail(null, publicAuthErrorMessage(error));
   }
 }
 
 export async function signOut(): Promise<DataResult<boolean>> {
+  const mockResult = await mockSignOut();
   const supabase = createClient();
   if (!supabase) {
     applyKnownSession(null);
-    const result = await mockSignOut();
-    if (!result.error) {
+    if (!mockResult.error) {
       notifyAuthChanged();
     }
-    return result;
+    return mockResult;
   }
 
   try {
@@ -651,6 +704,8 @@ export async function signOut(): Promise<DataResult<boolean>> {
     return ok(true);
   } catch (error) {
     console.warn('[SponsorAuction] 로그아웃 중 예외가 발생했습니다.', error);
+    applyKnownSession(null);
+    notifyAuthChanged();
     return fail(false, AUTH_FAIL_MESSAGE);
   }
 }

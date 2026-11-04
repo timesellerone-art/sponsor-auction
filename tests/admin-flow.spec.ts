@@ -168,7 +168,7 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await page.getByRole('button', { name: '지급 완료', exact: true }).click();
     await expect(page.getByText(CLOSED_AUCTION).first()).toBeVisible();
     await expect(page.getByText('낙찰 / 지급 완료').first()).toBeVisible();
-    await expect(page.getByText(ACTIVE_AUCTION)).toHaveCount(0);
+    await expect(page.locator('tbody').getByText('제안/대기')).toHaveCount(0);
   });
 
   test('정산 관리에 시드 정산과 결제 완료 캠페인이 함께 표시된다', async ({ page }) => {
@@ -213,9 +213,13 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await unlockAdmin(page);
     await page.getByRole('button', { name: '정산 관리' }).click();
 
+    const seedCampaign = new RegExp(
+      [ACTIVE_AUCTION, CLOSED_AUCTION, '비건 스킨케어', '러닝화 언박싱'].join('|'),
+    );
     const pendingRow = page
       .locator('tbody tr')
       .filter({ has: page.getByRole('button', { name: '지급 처리' }) })
+      .filter({ hasText: seedCampaign })
       .first();
     await expect(pendingRow).toBeVisible();
     await expect(pendingRow.getByText('지급 대기')).toBeVisible();

@@ -90,7 +90,7 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
     await paymentDialog.getByRole('button', { name: '결제하기' }).click();
     await expect(page).toHaveURL(/\/payments\/success/);
     await expect(
-      page.getByRole('heading', { name: '결제 및 낙찰이 완료되었습니다' }),
+      page.getByRole('heading', { name: '계약이 확정되었습니다' }),
     ).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText('주문번호')).toBeVisible();
     await expect(page.getByText('결제금액')).toBeVisible();

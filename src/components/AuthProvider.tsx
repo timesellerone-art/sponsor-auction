@@ -104,9 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = subscribeAuthState(() => {
       void refresh();
     });
-    if (!createClient()) {
-      void refresh();
-    }
+    void refresh();
     return () => {
       window.clearTimeout(failSafe);
       unsubKnown();

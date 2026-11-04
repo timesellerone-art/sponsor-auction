@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 export const ADVERTISER = {
   email: 'brand@demo.com',
@@ -59,10 +59,22 @@ export async function signIn(
   await expect(page.getByRole('heading', { name: '로그인' })).toBeVisible();
   const form = await fillLoginForm(page, account.email, account.password);
   await form.getByRole('button', { name: '로그인' }).click();
-  try {
-    await expect(page).not.toHaveURL(/\/login/, { timeout: 12_000 });
-  } catch {
-    test.skip(true, `데모 계정(${account.email})이 없어 이 시나리오를 건너뜁니다.`);
+  await expect(
+    page,
+    `데모 계정(${account.email}) 로그인에 실패했습니다.`,
+  ).not.toHaveURL(/\/login/, { timeout: 12_000 });
+
+  const wantedMode =
+    account.email === CREATOR.email
+      ? '크리에이터 모드'
+      : account.email === ADVERTISER.email
+        ? '광고주 모드'
+        : null;
+  if (wantedMode) {
+    const modeButton = page.getByRole('button', { name: wantedMode });
+    if (await modeButton.isVisible()) {
+      await modeButton.click();
+    }
   }
 
   if (await isMobileNav(page)) {

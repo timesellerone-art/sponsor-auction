@@ -17,44 +17,72 @@ type MockAccount = {
 const STORAGE_KEY = 'sponsor-auction-auth-session';
 
 export const DEMO_ADVERTISER_ID = 'usr-demo-advertiser';
+export const DEMO_PASSWORD = 'demo1234';
+
+const DEMO_EMAILS = new Set(['brand@demo.com', 'creator@demo.com', 'admin@demo.com']);
+
+export function isDemoAccountEmail(email?: string | null) {
+  return DEMO_EMAILS.has(email?.trim().toLowerCase() ?? '');
+}
+
+export function isDemoCredentials(email: string, password: string) {
+  return isDemoAccountEmail(email) && password === DEMO_PASSWORD;
+}
+
+export function demoSessionUser(email?: string | null) {
+  return accounts.get(normalizeEmail(email ?? ''))?.user ?? null;
+}
+
+export function rememberDemoSession(email?: string | null) {
+  const user = demoSessionUser(email);
+  if (user) {
+    persistSession(user);
+  }
+  return user;
+}
 
 const accounts = new Map<string, MockAccount>([
   [
     'brand@demo.com',
     {
-      password: 'demo1234',
+      password: DEMO_PASSWORD,
       user: {
         id: DEMO_ADVERTISER_ID,
         email: 'brand@demo.com',
         name: '데모 광고주',
         role: 'advertiser',
         roles: ['advertiser', 'creator'],
+        currentMode: 'advertiser',
+        onboardingComplete: true,
       },
     },
   ],
   [
     'creator@demo.com',
     {
-      password: 'demo1234',
+      password: DEMO_PASSWORD,
       user: {
         id: 'usr-demo-creator',
         email: 'creator@demo.com',
         name: '데모 크리에이터',
         role: 'creator',
         roles: ['creator'],
+        currentMode: 'creator',
+        onboardingComplete: true,
       },
     },
   ],
   [
     'admin@demo.com',
     {
-      password: 'demo1234',
+      password: DEMO_PASSWORD,
       user: {
         id: 'usr-demo-admin',
         email: 'admin@demo.com',
         name: '데모 관리자',
         role: 'admin',
         roles: ['admin'],
+        onboardingComplete: true,
       },
     },
   ],

@@ -4,6 +4,7 @@ import {
   readPaymentSupabaseConfig,
   type PaymentSupabaseConfig,
 } from '@/lib/supabase/payment-config';
+import { isUuid } from '@/lib/uuid';
 import type { Database } from '@/types/database';
 import type { PaymentIntent, PaymentIntentStatus } from '@/types/payment';
 
@@ -145,6 +146,15 @@ export async function persistPayment(
       errorMessage: supabaseError.message,
       supabaseError,
     };
+  }
+
+  if (!isUuid(row.auction_id) || !isUuid(row.bid_id)) {
+    console.info('[SponsorAuction] payments 저장 생략: mock ID는 UUID 컬럼에 쓰지 않습니다.', {
+      order_id: row.order_id,
+      auction_id: row.auction_id,
+      bid_id: row.bid_id,
+    });
+    return { ok: true };
   }
 
   if (!Number.isInteger(row.amount) || row.amount <= 0) {

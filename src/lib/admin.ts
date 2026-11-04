@@ -9,7 +9,7 @@ import {
 } from '@/lib/mock-data';
 import { withExclusiveAction } from '@/lib/action-lock';
 import { mockGetSession } from '@/lib/auth-mock';
-import { markPayoutPaid, overlayDbPayoutStatus, updatePayoutMemo as persistPayoutMemo } from '@/lib/payouts';
+import { markPayoutPaid, updatePayoutMemo as persistPayoutMemo } from '@/lib/payouts';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { RATE_LIMIT_MESSAGE } from '@/lib/rate-limit';
 import { VALIDATION } from '@/lib/validation';
@@ -263,11 +263,11 @@ export async function getPayouts(seedFromServer: PayoutItem[] = []): Promise<Dat
   const mock = await mockGetSession();
   if (mock.data) {
     const mockResult = await getMockPayouts();
-    const merged = overlayDbPayoutStatus(fromDb, asPayoutItems(mockResult.data));
-    if (merged.length === 0) {
+    const mockItems = asPayoutItems(mockResult.data);
+    if (mockItems.length === 0) {
       return fail([], '정산 요청이 없습니다.');
     }
-    return ok(merged);
+    return ok(mockItems);
   }
 
   if (fromDb.length > 0) {
