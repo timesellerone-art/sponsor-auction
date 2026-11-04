@@ -1,6 +1,10 @@
 import { connection } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { completeLoginError, completeMagicLinkSession } from '@/lib/auth-complete';
+import {
+  completeLoginError,
+  completeMagicLinkSession,
+  redirectExistingAuthUser,
+} from '@/lib/auth-complete';
 import { requestOrigin } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 
@@ -22,6 +26,10 @@ export async function GET(request: NextRequest) {
     const next = url.searchParams.get('next') ?? '';
     const type = url.searchParams.get('type') === 'email' ? 'email' : 'magiclink';
     if (!tokenHash) {
+      const resumed = await redirectExistingAuthUser({ request, origin, next });
+      if (resumed) {
+        return resumed;
+      }
       return completeLoginError(request, origin, '로그인 세션이 저장되지 않았습니다. 다시 로그인해 주세요.');
     }
 
@@ -35,6 +43,12 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const detail = error instanceof Error ? error.message : '로그인 세션을 만들지 못했습니다.';
     console.warn('[SponsorAuction] 세션 완료 처리 예외', error);
-    return completeLoginError(request, requestOrigin(request), detail);
+    const origin = requestOrigin(request);
+    const next = new URL(request.url).searchParams.get('next') ?? '';
+    const resumed = await redirectExistingAuthUser({ request, origin, next });
+    if (resumed) {
+      return resumed;
+    }
+    return completeLoginError(request, origin, detail);
   }
 }

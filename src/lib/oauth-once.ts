@@ -10,17 +10,23 @@ export function shareOAuthAttempt<T>(key: string, run: () => Promise<T>, ttlMs =
   }
   const pending = run();
   inflight.set(key, pending);
-  const release = () => {
-    const timer = setTimeout(() => {
+  pending.then(
+    () => {
+      const timer = setTimeout(() => {
+        if (inflight.get(key) === pending) {
+          inflight.delete(key);
+        }
+      }, ttlMs);
+      if (typeof timer === 'object' && timer && 'unref' in timer) {
+        timer.unref();
+      }
+    },
+    () => {
       if (inflight.get(key) === pending) {
         inflight.delete(key);
       }
-    }, ttlMs);
-    if (typeof timer === 'object' && timer && 'unref' in timer) {
-      timer.unref();
-    }
-  };
-  pending.then(release, release);
+    },
+  );
   return pending;
 }
 

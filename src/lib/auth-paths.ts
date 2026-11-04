@@ -128,6 +128,40 @@ export function isPkceVerifierCookieName(name: string) {
   return name.includes('-auth-token') && name.endsWith('-code-verifier');
 }
 
+/** 실패한 OAuth 교환이 빈 세션 쿠키를 심어 기존 로그인을 지우지 않게 한다. */
+export function shouldApplyRequestCookie(name: string, value: string) {
+  if (value) {
+    return true;
+  }
+  return !isSupabaseAuthCookieName(name);
+}
+
+export function expirePkceVerifierCookies(
+  request: { cookies: { getAll: () => Array<{ name: string }> } },
+  response: {
+    cookies: {
+      set: (
+        name: string,
+        value: string,
+        options: { path: string; maxAge: number; sameSite: 'lax'; secure?: boolean },
+      ) => void;
+    };
+  },
+  defaults: { secure?: boolean } = {},
+) {
+  for (const cookie of request.cookies.getAll()) {
+    if (!isPkceVerifierCookieName(cookie.name)) {
+      continue;
+    }
+    response.cookies.set(cookie.name, '', {
+      path: '/',
+      maxAge: 0,
+      sameSite: 'lax',
+      ...(defaults.secure ? { secure: true } : {}),
+    });
+  }
+}
+
 /** 예전 본인 확인 병합 플로우가 남긴 쿠키. 지금은 즉시 병합하므로 만료시킨다. */
 export const LEGACY_PENDING_MERGE_COOKIE = 'sponsor-auction-merge-from';
 

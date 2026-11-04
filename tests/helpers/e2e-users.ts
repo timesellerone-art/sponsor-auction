@@ -47,24 +47,37 @@ export function isE2EEmail(email: string | null | undefined) {
     value.endsWith('@sponsor-auction.test') ||
     value.startsWith('e2e.') ||
     /^naver\.e2e\./.test(value) ||
+    /^naver\.[a-z0-9._-]+@oauth\.sponsor-auction\.local$/.test(value) ||
     /^kakao\.[a-z0-9-]+@oauth\.sponsor-auction\.local$/.test(value)
   );
 }
 
-function isDummyKakaoOnly(user: User) {
-  const providers = [
+function providerNames(user: User) {
+  return [
     ...(user.identities ?? []).map((item) => item.provider),
     ...(Array.isArray(user.app_metadata?.providers) ? user.app_metadata.providers : []),
   ].filter((item): item is string => typeof item === 'string' && item.length > 0);
+}
+
+function isPlaceholderIdentityEmail(email: string | null | undefined) {
+  const value = email?.trim().toLowerCase() ?? '';
+  return !value || !value.includes('@') || value.endsWith('@oauth.sponsor-auction.local');
+}
+
+function isDummySocialOnly(user: User) {
+  const providers = providerNames(user);
   const hasKakao = providers.includes('kakao');
-  const hasOtherSocial =
-    providers.includes('google') || providers.includes('naver') || providers.includes('custom:naver');
-  const noEmail =
-    !user.email ||
-    !user.email.includes('@') ||
-    user.email.endsWith('@oauth.sponsor-auction.local');
+  const hasNaver = providers.includes('naver') || providers.includes('custom:naver');
+  const hasGoogle = providers.includes('google');
+  const noEmail = isPlaceholderIdentityEmail(user.email);
   const noPhone = !(user.phone && String(user.phone).replace(/\D/g, '').length >= 10);
-  return hasKakao && !hasOtherSocial && noEmail && noPhone;
+  if (!noEmail || !noPhone) {
+    return false;
+  }
+  if (hasKakao && !hasGoogle && !hasNaver) {
+    return true;
+  }
+  return hasNaver && !hasGoogle && !hasKakao;
 }
 
 export async function deleteAuthUser(admin: SupabaseClient, userId: string) {
@@ -84,7 +97,7 @@ export async function cleanupE2EUsers(admin?: SupabaseClient | null) {
     if (!user) {
       continue;
     }
-    if (!isE2EEmail(user.email) && !isDummyKakaoOnly(user)) {
+    if (!isE2EEmail(user.email) && !isDummySocialOnly(user)) {
       continue;
     }
     await deleteAuthUser(client, user.id);

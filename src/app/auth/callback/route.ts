@@ -20,6 +20,7 @@ import {
   expireAuthDebrisCookies,
   isPkceVerifierCookieName,
   sessionCookieOptions,
+  shouldApplyRequestCookie,
   writeCookies,
 } from '@/lib/auth-paths';
 import {
@@ -126,6 +127,13 @@ export async function GET(request: NextRequest) {
   const providerError = requestUrl.searchParams.get('error');
 
   if (providerError) {
+    const nextPath = readNext(request, requestUrl);
+    const resumed = await redirectExistingAuthUser({ request, origin, next: nextPath });
+    if (resumed) {
+      resumed.cookies.delete(OAUTH_NEXT_COOKIE);
+      resumed.cookies.delete(OAUTH_PROVIDER_COOKIE);
+      return resumed;
+    }
     return failRedirect(origin, 'provider', {
       message: requestUrl.searchParams.get('error_description') || providerError,
       code: requestUrl.searchParams.get('error_code') || providerError,
@@ -151,10 +159,13 @@ export async function GET(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
+        cookieBag.remember(cookiesToSet);
         cookiesToSet.forEach(({ name, value }) => {
+          if (!shouldApplyRequestCookie(name, value)) {
+            return;
+          }
           request.cookies.set(name, value);
         });
-        cookieBag.remember(cookiesToSet);
       },
     },
   });

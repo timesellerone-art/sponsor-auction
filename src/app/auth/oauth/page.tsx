@@ -8,7 +8,6 @@ import { applyKnownSession, notifyAuthChanged } from '@/lib/auth';
 import {
   ROLE_SELECT_PATH,
   describeOAuthError,
-  isUsedOrExpiredOAuthCode,
   oauthFailedLoginPath,
   postSocialAuthPath,
   sanitizeNextPath,
@@ -39,8 +38,11 @@ async function verifyAndFinish(
   if (tokenHash) {
     const verified = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
     if (verified.error || !verified.data.user) {
-      if (authUser && isUsedOrExpiredOAuthCode(verified.error?.message, verified.error?.code)) {
-        console.warn('[SponsorAuction] 매직링크가 이미 사용되어 기존 세션으로 이어갑니다');
+      if (authUser) {
+        console.warn(
+          '[SponsorAuction] 매직링크 교환 실패, 기존 세션으로 이어갑니다',
+          verified.error?.message,
+        );
       } else {
         console.warn('[SponsorAuction] 매직링크 세션 교환에 실패했습니다.', verified.error?.message);
         return {
@@ -150,7 +152,7 @@ export default function AuthOAuthCompletePage() {
         const result = await completeOnce(supabase, tokenHash, otpType, next, alreadyLinked);
         if (result.error || !result.destination) {
           const existing = (await supabase?.auth.getSession())?.data.session?.user;
-          if (existing && isUsedOrExpiredOAuthCode(result.error)) {
+          if (existing) {
             go(
               postSocialAuthPath(sessionUserFromAuthUser(existing), next, {
                 needsOnboarding: needsRoleOnboarding(sessionUserFromAuthUser(existing)),

@@ -74,6 +74,16 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  const loginError = request.nextUrl.searchParams.get('error');
+  if (
+    pathname.startsWith('/login') &&
+    loggedIn &&
+    (loginError === 'oauth_failed' || loginError === 'oauth_retry')
+  ) {
+    const destination = hasAdmin ? '/admin' : hasMemberRole ? '/my' : ROLE_SELECT_PATH;
+    return finish(request, withSessionCookies(session, redirectTo(request, destination)));
+  }
+
   const onboardingPath = onboardingCanonicalPath(pathname);
   if (onboardingPath) {
     return finish(request, withSessionCookies(session, redirectTo(request, onboardingPath)));

@@ -6,6 +6,7 @@ import {
 } from '@/lib/account-link';
 import {
   completeMagicLinkSessionDetailed,
+  readRequestAuthUser,
   redirectExistingAuthUser,
 } from '@/lib/auth-complete';
 import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
@@ -95,58 +96,70 @@ export async function GET(request: NextRequest) {
       console.warn('[SponsorAuction] 네이버 OAuth 환경변수 없음', {
         missing: missingNaverOAuthEnvKeys(),
       });
-      return loginError(request, origin, '네이버 로그인 설정이 없습니다.');
+      return resumeOrLoginError(request, origin, next, '네이버 로그인 설정이 없습니다.');
     }
 
+    const sessionUser = await readRequestAuthUser(request, origin);
+    const preferredUserId =
+      readAccountLinkUserId(request.cookies.get(ACCOUNT_LINK_COOKIE)?.value) ??
+      sessionUser?.id ??
+      null;
     const callbackOrigin = idpState?.o || origin;
     const once = await shareOAuthAttempt(`naver:${code}`, async () => {
-      const profile = await fetchNaverProfile(
-        await exchangeNaverCode({
-          clientId: env.clientId,
-          clientSecret: env.clientSecret,
-          code,
-          state,
-          redirectUri: naverCallbackUrl(callbackOrigin),
-        }),
-      );
+      try {
+        const profile = await fetchNaverProfile(
+          await exchangeNaverCode({
+            clientId: env.clientId,
+            clientSecret: env.clientSecret,
+            code,
+            state,
+            redirectUri: naverCallbackUrl(callbackOrigin),
+          }),
+        );
 
-      if (idpState) {
-        const ticket = signNaverIdpTicket(profile);
-        return { kind: 'idp' as const, ticket, redirect: idpState.r, gotrueState: idpState.s };
-      }
+        if (idpState) {
+          const ticket = signNaverIdpTicket(profile);
+          return { kind: 'idp' as const, ticket, redirect: idpState.r, gotrueState: idpState.s };
+        }
 
-      const admin = createAdminClient();
-      if (!admin) {
-        return {
-          kind: 'error' as const,
-          message: 'Supabase 서비스 키가 없어 네이버 계정을 연결할 수 없습니다.',
-        };
-      }
+        const admin = createAdminClient();
+        if (!admin) {
+          return {
+            kind: 'error' as const,
+            message: 'Supabase 서비스 키가 없어 네이버 계정을 연결할 수 없습니다.',
+          };
+        }
 
-      const linked = await linkNaverProfile(
-        admin,
-        profile,
-        (incoming, canonical) => mergeUserInto(incoming, canonical, { phone: profile.phone }),
-        async (email) => {
-          const link = await admin.auth.admin.generateLink({
-            type: 'magiclink',
-            email,
-            options: { redirectTo: `${origin}${next}` },
-          });
-          if (link.error || !link.data.properties?.hashed_token) {
-            console.warn('[SponsorAuction] 네이버 세션 링크 생성 실패', link.error?.message);
-            return null;
+        const linked = await linkNaverProfile(
+          admin,
+          profile,
+          (incoming, canonical) => mergeUserInto(incoming, canonical, { phone: profile.phone }),
+          async (email) => {
+            const link = await admin.auth.admin.generateLink({
+              type: 'magiclink',
+              email,
+              options: { redirectTo: `${origin}${next}` },
+            });
+            if (link.error || !link.data.properties?.hashed_token) {
+              console.warn('[SponsorAuction] 네이버 세션 링크 생성 실패', link.error?.message);
+              return null;
+            }
+            return link.data.properties.hashed_token;
+          },
+          { preferredUserId },
+        );
+        if (!linked.tokenHash) {
+          if (sessionUser) {
+            return { kind: 'resume' as const, next };
           }
-          return link.data.properties.hashed_token;
-        },
-        {
-          preferredUserId: readAccountLinkUserId(request.cookies.get(ACCOUNT_LINK_COOKIE)?.value),
-        },
-      );
-      if (!linked.tokenHash) {
-        return { kind: 'error' as const, message: '네이버 로그인 세션을 만들지 못했습니다.' };
+          return { kind: 'error' as const, message: '네이버 로그인 세션을 만들지 못했습니다.' };
+        }
+        return { kind: 'login' as const, tokenHash: linked.tokenHash, next };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : '네이버 로그인에 실패했습니다.';
+        return { kind: 'error' as const, message };
       }
-      return { kind: 'login' as const, tokenHash: linked.tokenHash, next };
     });
 
     if (once.kind === 'idp') {
@@ -159,8 +172,13 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    if (once.kind === 'error') {
-      return resumeOrLoginError(request, origin, next, once.message);
+    if (once.kind === 'error' || once.kind === 'resume') {
+      return resumeOrLoginError(
+        request,
+        origin,
+        next,
+        once.kind === 'error' ? once.message : '네이버 로그인을 이어서 진행합니다.',
+      );
     }
 
     try {

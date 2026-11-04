@@ -20,6 +20,7 @@ import {
 import {
   OAUTH_RETRY_ERROR,
   describeOAuthError,
+  isUsedOrExpiredOAuthCode,
   postSocialAuthPath,
   sanitizeNextPath,
 } from '@/lib/auth-guard';
@@ -76,7 +77,10 @@ export default function LoginPage() {
           return;
         }
         if (error === 'oauth_failed') {
-          showToast(params.get('error_description') || '소셜 로그인에 실패했습니다. 다시 시도해 주세요.');
+          const detail = params.get('error_description') || '';
+          if (!isUsedOrExpiredOAuthCode(detail)) {
+            showToast(detail || '소셜 로그인에 실패했습니다. 다시 시도해 주세요.');
+          }
         } else if (error === OAUTH_RETRY_ERROR) {
           const retrying = await retryLostOAuthOnce();
           if (!cancelled && !retrying) {

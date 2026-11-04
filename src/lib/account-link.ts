@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto';
+import { isSupabaseAuthCookieName } from '@/lib/auth-paths';
 import { readServerEnv } from '@/lib/naver-oauth';
 
 export const ACCOUNT_LINK_COOKIE = 'sa_account_link';
@@ -9,6 +10,27 @@ const USER_ID_RE =
 
 export function isAuthUserId(value: string | null | undefined) {
   return Boolean(value && USER_ID_RE.test(value));
+}
+
+export function readAuthUserIdFromCookies(
+  cookies: Array<{ name: string; value?: string }>,
+): string | null {
+  const chunks = cookies
+    .filter((cookie) => isSupabaseAuthCookieName(cookie.name) && cookie.value)
+    .sort((left, right) => left.name.localeCompare(right.name, 'en', { numeric: true }));
+  const raw = chunks.map((cookie) => cookie.value ?? '').join('');
+  if (!raw) {
+    return null;
+  }
+  try {
+    const json = raw.startsWith('base64-')
+      ? Buffer.from(raw.slice('base64-'.length), 'base64url').toString('utf8')
+      : decodeURIComponent(raw);
+    const session = JSON.parse(json) as { user?: { id?: string } };
+    return isAuthUserId(session.user?.id) ? session.user?.id ?? null : null;
+  } catch {
+    return null;
+  }
 }
 
 function signingSecret() {

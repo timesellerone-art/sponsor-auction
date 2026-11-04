@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import {
   createCookieBag,
   sessionCookieOptions,
+  shouldApplyRequestCookie,
   writeCookies,
   type CookieToSet,
 } from '@/lib/auth-paths';
@@ -30,12 +31,13 @@ export async function updateSession(request: NextRequest): Promise<SessionMiddle
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        bag.remember(cookiesToSet);
-        cookiesToSet.forEach(({ name, value }) => {
+        const keepers = cookiesToSet.filter(({ name, value }) => shouldApplyRequestCookie(name, value));
+        bag.remember(keepers);
+        keepers.forEach(({ name, value }) => {
           request.cookies.set(name, value);
         });
         supabaseResponse = NextResponse.next({ request });
-        writeCookies(supabaseResponse.cookies, cookiesToSet, { secure });
+        writeCookies(supabaseResponse.cookies, keepers, { secure });
       },
     },
   });

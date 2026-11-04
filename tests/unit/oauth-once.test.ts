@@ -35,4 +35,23 @@ describe('OAuth 코드 멱등 처리', () => {
     assert.equal(b.ok, true);
     resetOAuthAttempts();
   });
+
+  it('실패한 교환은 캐시하지 않아 다음 요청이 세션 복구를 시도할 수 있다', async () => {
+    resetOAuthAttempts();
+    let runs = 0;
+    await assert.rejects(
+      shareOAuthAttempt('code-fail', async () => {
+        runs += 1;
+        throw new Error('invalid_grant');
+      }),
+      /invalid_grant/,
+    );
+    const recovered = await shareOAuthAttempt('code-fail', async () => {
+      runs += 1;
+      return { ok: true };
+    });
+    assert.equal(runs, 2);
+    assert.equal(recovered.ok, true);
+    resetOAuthAttempts();
+  });
 });

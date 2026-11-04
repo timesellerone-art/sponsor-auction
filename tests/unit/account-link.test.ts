@@ -4,6 +4,7 @@ import {
   isAuthUserId,
   pickPreferredMergeUser,
   readAccountLinkUserId,
+  readAuthUserIdFromCookies,
   signAccountLinkValue,
 } from '../../src/lib/account-link';
 
@@ -19,6 +20,11 @@ describe('account link cookie', () => {
     assert.equal(readAccountLinkUserId(`${userId}.9999999999.tampered`, now), null);
     assert.equal(isAuthUserId(userId), true);
     assert.equal(isAuthUserId('not-a-user'), false);
+    const packed = Buffer.from(JSON.stringify({ user: { id: userId } }), 'utf8').toString('base64url');
+    assert.equal(
+      readAuthUserIdFromCookies([{ name: 'sb-xxxx-auth-token', value: `base64-${packed}` }]),
+      userId,
+    );
   });
 
   it('세션 UID가 있으면 이메일이 달라도 그 계정으로 합친다', () => {

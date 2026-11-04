@@ -3,13 +3,16 @@ import { describe, it } from 'node:test';
 import { AUTH_PRESENT_COOKIE_NAME } from '../../src/lib/access';
 import { postAuthPath, postSocialAuthPath } from '../../src/lib/auth-guard';
 import {
+  expirePkceVerifierCookies,
   hasAuthPresence,
   isAuthCallbackPath,
   isAuthDebrisCookieName,
   isAuthPassthroughPath,
+  isPkceVerifierCookieName,
   isSupabaseAuthCookieName,
   onboardingCanonicalPath,
   sessionCookieOptions,
+  shouldApplyRequestCookie,
   writeCookies,
 } from '../../src/lib/auth-paths';
 import { resolveActiveMemberRole, switchableMemberRoles } from '../../src/types/auth';
@@ -95,6 +98,29 @@ describe('post-auth destination', () => {
       hasAuthPresence([{ name: 'sb-xxxx-auth-token-code-verifier', value: 'verifier' }]),
       false,
     );
+    assert.equal(shouldApplyRequestCookie('sb-xxxx-auth-token', ''), false);
+    assert.equal(shouldApplyRequestCookie('sb-xxxx-auth-token', 'jwt'), true);
+    assert.equal(shouldApplyRequestCookie('sb-xxxx-auth-token-code-verifier', ''), true);
+    assert.equal(isPkceVerifierCookieName('sb-xxxx-auth-token-code-verifier'), true);
+    const expired: string[] = [];
+    expirePkceVerifierCookies(
+      {
+        cookies: {
+          getAll: () => [
+            { name: 'sb-xxxx-auth-token-code-verifier' },
+            { name: 'sb-xxxx-auth-token' },
+          ],
+        },
+      },
+      {
+        cookies: {
+          set: (name) => {
+            expired.push(name);
+          },
+        },
+      },
+    );
+    assert.deepEqual(expired, ['sb-xxxx-auth-token-code-verifier']);
   });
 
   it('https 응답의 세션 쿠키에는 Secure와 SameSite=Lax를 명시한다', () => {

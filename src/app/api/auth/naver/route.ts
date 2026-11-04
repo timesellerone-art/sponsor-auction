@@ -1,7 +1,8 @@
 import { connection } from 'next/server';
-import { NextResponse } from 'next/server';
-import { writeAccountLinkCookie } from '@/lib/account-link';
+import { NextResponse, type NextRequest } from 'next/server';
+import { readAuthUserIdFromCookies, writeAccountLinkCookie } from '@/lib/account-link';
 import { ROLE_SELECT_PATH, oauthFailedLoginPath, sanitizeNextPath } from '@/lib/auth-guard';
+import { expirePkceVerifierCookies } from '@/lib/auth-paths';
 import { createClient } from '@/lib/supabase/server';
 import {
   NAVER_NEXT_COOKIE,
@@ -16,7 +17,7 @@ import {
 } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     await connection();
     const limited = consumeRateLimit(clientIp(request), '/api/auth/naver');
@@ -52,13 +53,16 @@ export async function GET(request: Request) {
     });
 
     const response = NextResponse.redirect(authorize);
-    const cookies = cookieOptions(origin.startsWith('https://'));
+    const secure = origin.startsWith('https://');
+    const cookies = cookieOptions(secure);
     response.cookies.set(NAVER_STATE_COOKIE, state, cookies);
     response.cookies.set(NAVER_NEXT_COOKIE, next, cookies);
+    expirePkceVerifierCookies(request, response, { secure });
     const supabase = await createClient();
     const sessionUser = supabase ? (await supabase.auth.getUser()).data.user : null;
-    if (sessionUser?.id) {
-      writeAccountLinkCookie(response.cookies, sessionUser.id, origin.startsWith('https://'));
+    const userId = sessionUser?.id || readAuthUserIdFromCookies(request.cookies.getAll());
+    if (userId) {
+      writeAccountLinkCookie(response.cookies, userId, secure);
     }
     return response;
   } catch (error) {

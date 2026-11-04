@@ -4,7 +4,11 @@ import { createServerClient } from '@supabase/ssr';
 import type { User } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 import { applyAuthCookies } from '@/lib/access';
-import { writeAccountLinkCookie } from '@/lib/account-link';
+import {
+  ACCOUNT_LINK_COOKIE,
+  readAccountLinkUserId,
+  writeAccountLinkCookie,
+} from '@/lib/account-link';
 import {
   ROLE_SELECT_PATH,
   isUsedOrExpiredOAuthCode,
@@ -16,11 +20,14 @@ import { shareOAuthAttempt } from '@/lib/oauth-once';
 import {
   createCookieBag,
   expireAuthDebrisCookies,
+  isSupabaseAuthCookieName,
   sessionCookieOptions,
+  shouldApplyRequestCookie,
   writeCookies,
   type CookieToSet,
 } from '@/lib/auth-paths';
 import { sessionUserFromAuthUser } from '@/lib/auth-session';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import { needsRoleOnboarding } from '@/types/auth';
 
@@ -56,10 +63,13 @@ function createRequestSupabase(request: NextRequest, origin: string) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
+        cookieBag.remember(cookiesToSet);
         cookiesToSet.forEach(({ name, value }) => {
+          if (!shouldApplyRequestCookie(name, value)) {
+            return;
+          }
           request.cookies.set(name, value);
         });
-        cookieBag.remember(cookiesToSet);
       },
     },
   });
@@ -90,6 +100,15 @@ export function finishAuthUserRedirect(params: {
   const secure = params.origin.startsWith('https://');
   const cookies = [...(params.extraCookies ?? [])];
   const redirect = NextResponse.redirect(new URL(destination, params.origin));
+  params.request.cookies.getAll().forEach((cookie) => {
+    if (!isSupabaseAuthCookieName(cookie.name) || !cookie.value) {
+      return;
+    }
+    if (cookies.some((item) => item.name === cookie.name && item.value)) {
+      return;
+    }
+    cookies.push({ name: cookie.name, value: cookie.value });
+  });
   writeCookies(redirect.cookies, cookies, { secure });
   expireAuthDebrisCookies(params.request, redirect, { secure });
   writeAccountLinkCookie(redirect.cookies, params.user.id, secure);
@@ -102,22 +121,76 @@ export function finishAuthUserRedirect(params: {
   return { response: redirect, destination, cookies };
 }
 
-/** 세션 쿠키가 이미 있으면 코드 재교환 없이 마이페이지(또는 온보딩)로 보낸다. */
-export async function redirectExistingAuthUser(params: {
+async function restoreFromAccountLinkCookie(params: {
   request: NextRequest;
   origin: string;
   next?: string;
 }): Promise<NextResponse | null> {
-  const user = await readRequestAuthUser(params.request, params.origin);
-  if (!user) {
+  const linkedId = readAccountLinkUserId(params.request.cookies.get(ACCOUNT_LINK_COOKIE)?.value);
+  if (!linkedId) {
     return null;
   }
+  const admin = createAdminClient();
+  if (!admin) {
+    return null;
+  }
+  const linked = await admin.auth.admin.getUserById(linkedId);
+  const user = linked.data.user;
+  const email = user?.email?.trim() ?? '';
+  if (!user || !email.includes('@')) {
+    return null;
+  }
+
+  const created = createRequestSupabase(params.request, params.origin);
+  const link = await admin.auth.admin.generateLink({
+    type: 'magiclink',
+    email,
+    options: { redirectTo: `${params.origin}${sanitizeNextPath(params.next) ?? ROLE_SELECT_PATH}` },
+  });
+  const tokenHash = link.data.properties?.hashed_token ?? '';
+  if (created && tokenHash) {
+    const verified = await created.supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: 'magiclink',
+    });
+    const authUser = verified.data.user ?? user;
+    return finishAuthUserRedirect({
+      request: params.request,
+      origin: params.origin,
+      user: authUser,
+      next: params.next,
+      extraCookies: created.cookieBag.getAll().filter((cookie) => Boolean(cookie.value)),
+    }).response;
+  }
+
   return finishAuthUserRedirect({
     request: params.request,
     origin: params.origin,
     user,
     next: params.next,
   }).response;
+}
+
+/** 세션 쿠키 또는 15분 연동 쿠키가 있으면 코드 재교환 없이 마이페이지로 보낸다. */
+export async function redirectExistingAuthUser(params: {
+  request: NextRequest;
+  origin: string;
+  next?: string;
+  allowAccountLink?: boolean;
+}): Promise<NextResponse | null> {
+  const user = await readRequestAuthUser(params.request, params.origin);
+  if (user) {
+    return finishAuthUserRedirect({
+      request: params.request,
+      origin: params.origin,
+      user,
+      next: params.next,
+    }).response;
+  }
+  if (params.allowAccountLink === false) {
+    return null;
+  }
+  return restoreFromAccountLinkCookie(params);
 }
 
 function replayCachedAuth(
