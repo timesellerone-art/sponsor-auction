@@ -4,7 +4,6 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, Smartphone, X } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { PageContainer } from '@/components/PageContainer';
 import { showToast } from '@/components/Toast';
 import { signInWithOAuth } from '@/lib/auth';
 import {
@@ -125,7 +124,7 @@ export function LinkedAccountsPanel() {
     }
     setBusyProvider(provider);
     try {
-      const result = await signInWithOAuth(provider, '/my');
+      const result = await signInWithOAuth(provider, '/my/settings');
       if (result.error) {
         showToast(result.error);
       }
@@ -216,7 +215,7 @@ export function LinkedAccountsPanel() {
   };
 
   return (
-    <PageContainer className="w-full min-w-0 pt-6 pb-4 sm:pt-10">
+    <div className="mt-8 flex min-w-0 flex-1 flex-col">
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
         <h2 className="text-lg font-bold text-zinc-950">연동된 계정</h2>
         <p className="mt-1 text-sm text-zinc-500">
@@ -285,20 +284,17 @@ export function LinkedAccountsPanel() {
           </ul>
         )}
 
-        <div className="mt-6 border-t border-zinc-100 pt-5">
-          <h3 className="text-sm font-semibold text-zinc-950">회원 탈퇴</h3>
-          <p className="mt-1 text-xs leading-5 text-zinc-500">
-            탈퇴하면 로그인 계정과 프로필 데이터가 삭제되며 되돌릴 수 없습니다.
-          </p>
-          <button
-            type="button"
-            onClick={() => setDeleteOpen(true)}
-            className="mt-3 inline-flex h-10 items-center justify-center rounded-full border border-red-200 px-4 text-sm font-semibold text-red-700 hover:bg-red-50"
-          >
-            회원 탈퇴
-          </button>
-        </div>
       </section>
+
+      <div className="mt-auto flex justify-center pt-16 pb-2">
+        <button
+          type="button"
+          onClick={() => setDeleteOpen(true)}
+          className="text-[11px] font-medium text-zinc-400 underline-offset-2 hover:text-zinc-500 hover:underline"
+        >
+          회원 탈퇴
+        </button>
+      </div>
 
       <ConfirmModal
         key={unlinkTarget ? `unlink-${unlinkTarget}` : 'unlink-closed'}
@@ -405,6 +401,6 @@ export function LinkedAccountsPanel() {
             document.body,
           )
         : null}
-    </PageContainer>
+    </div>
   );
 }

@@ -388,25 +388,38 @@ async function loadProfile(
     user_metadata?: Record<string, unknown>;
   } | null,
 ): Promise<SessionUser> {
-  const { data, error } = await withTimeout(
-    supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle(),
-    2000,
-    '프로필 조회',
-  );
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle(),
+      2000,
+      '프로필 조회',
+    );
 
-  if (error) {
-    console.warn('[SponsorAuction] 프로필 조회에 실패했습니다.', error.message);
+    if (error) {
+      console.warn('[SponsorAuction] 프로필 조회에 실패했습니다.', error.message);
+    }
+
+    const row = (data ?? null) as ProfileRow | null;
+    return mapSessionUser(
+      userId,
+      row?.email?.trim() || fallbackEmail,
+      row?.name?.trim() || fallbackName || fallbackEmail.split('@')[0] || '회원',
+      row?.role,
+      authUser,
+      row?.roles,
+    );
+  } catch (error) {
+    console.warn('[SponsorAuction] 프로필 조회가 지연되어 세션 메타데이터를 사용합니다.', error);
+    const meta = authUser?.user_metadata ?? {};
+    return mapSessionUser(
+      userId,
+      fallbackEmail,
+      fallbackName || fallbackEmail.split('@')[0] || '회원',
+      typeof meta.role === 'string' ? meta.role : undefined,
+      authUser,
+      meta.roles,
+    );
   }
-
-  const row = (data ?? null) as ProfileRow | null;
-  return mapSessionUser(
-    userId,
-    row?.email?.trim() || fallbackEmail,
-    row?.name?.trim() || fallbackName || fallbackEmail.split('@')[0] || '회원',
-    row?.role,
-    authUser,
-    row?.roles,
-  );
 }
 
 function sleep(ms: number) {

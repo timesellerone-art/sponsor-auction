@@ -8,7 +8,7 @@ import {
   readE2EEnv,
 } from './helpers/e2e-users';
 
-test.describe('마이페이지 연동 계정과 회원 탈퇴', () => {
+test.describe('마이페이지와 계정 설정', () => {
   test.beforeAll(() => {
     const values = readE2EEnv();
     process.env.NEXT_PUBLIC_SUPABASE_URL ||= values.NEXT_PUBLIC_SUPABASE_URL;
@@ -86,9 +86,16 @@ test.describe('마이페이지 연동 계정과 회원 탈퇴', () => {
         { waitUntil: 'domcontentloaded' },
       );
       await expect(page).toHaveURL((url) => url.pathname === '/my', { timeout: 20000 });
-      await expect(page.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible({
-        timeout: 15000,
+      await expect(page.getByRole('heading', { name: '내 역경매' })).toBeVisible({
+        timeout: 20000,
       });
+      await expect(page.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '연동된 계정' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '회원 탈퇴' })).toHaveCount(0);
+
+      await page.getByRole('link', { name: '계정 설정' }).click();
+      await expect(page).toHaveURL((url) => url.pathname === '/my/settings', { timeout: 8000 });
+      await expect(page.getByRole('heading', { name: '계정 설정' })).toBeVisible();
 
       const panel = page.getByRole('heading', { name: '연동된 계정' });
       await panel.scrollIntoViewIfNeeded();
@@ -100,7 +107,6 @@ test.describe('마이페이지 연동 계정과 회원 탈퇴', () => {
       await expect(page.getByText('Phone', { exact: true })).toBeVisible();
       await expect(page.getByText('연동됨').first()).toBeVisible();
       await expect(page.getByRole('button', { name: '연동하기' }).first()).toBeVisible();
-      await expect(page.getByRole('button', { name: '회원 탈퇴' })).toBeVisible();
 
       const kakaoRow = page.locator('li').filter({ hasText: 'Kakao' });
       if (await kakaoRow.getByRole('button', { name: '연동 해제' }).isEnabled()) {
@@ -108,6 +114,12 @@ test.describe('마이페이지 연동 계정과 회원 탈퇴', () => {
         await page.getByRole('dialog', { name: '연동을 해제할까요?' }).getByRole('button', { name: '연동 해제' }).click();
         await expect(kakaoRow.getByRole('button', { name: '연동하기' })).toBeVisible({ timeout: 8000 });
       }
+
+      await page.getByRole('link', { name: '마이페이지' }).click();
+      await expect(page).toHaveURL((url) => url.pathname === '/my', { timeout: 8000 });
+      await expect(page.getByRole('heading', { name: '내 역경매' })).toBeVisible();
+      await page.getByRole('link', { name: '계정 설정' }).click();
+      await expect(page).toHaveURL((url) => url.pathname === '/my/settings');
 
       await page.getByRole('button', { name: '회원 탈퇴' }).click();
       await page.getByRole('dialog', { name: '정말 탈퇴할까요?' }).getByRole('button', { name: '회원 탈퇴' }).click();
