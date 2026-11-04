@@ -363,6 +363,18 @@ export default function LoginPage() {
             Apple로 계속하기
           </button>
         </div>
+
+        <p className="mt-4 text-center text-xs leading-5 text-zinc-500">
+          로그인 시 SponsorAuction의{' '}
+          <Link href="/terms" className="font-semibold text-teal-800 hover:underline">
+            이용약관
+          </Link>
+          {' 및 '}
+          <Link href="/privacy" className="font-semibold text-teal-800 hover:underline">
+            개인정보 처리방침
+          </Link>
+          에 동의하는 것으로 간주됩니다.
+        </p>
       </form>
 
       <p className="mt-4 text-center text-sm text-zinc-500">

@@ -2,6 +2,22 @@ import { expect, test } from '@playwright/test';
 import { ADVERTISER, signIn } from '../e2e/helpers';
 
 test.describe('전자상거래 약관 및 동의 UI', () => {
+  test('로그인 화면에서 이용약관·개인정보 처리방침에 동의 안내가 연결된다', async ({ page }) => {
+    await page.goto('/login');
+    await expect(
+      page.getByText('로그인 시 SponsorAuction의 이용약관 및 개인정보 처리방침에 동의하는 것으로 간주됩니다.'),
+    ).toBeVisible();
+
+    await page.getByRole('link', { name: '이용약관', exact: true }).click();
+    await expect(page).toHaveURL(/\/terms/);
+    await expect(page.getByRole('heading', { name: '서비스 이용약관' })).toBeVisible();
+
+    await page.goto('/login');
+    await page.getByRole('link', { name: '개인정보 처리방침' }).first().click();
+    await expect(page).toHaveURL(/\/privacy/);
+    await expect(page.getByRole('heading', { name: '개인정보 처리방침' })).toBeVisible();
+  });
+
   test('푸터에서 이용약관·개인정보·환불 규정 페이지로 이동한다', async ({ page }) => {
     await page.goto('/');
     const footer = page.getByRole('contentinfo');
