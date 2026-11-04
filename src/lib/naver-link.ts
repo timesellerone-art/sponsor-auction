@@ -119,6 +119,9 @@ async function stampNaverOnUser(admin: AdminClient, user: User, profile: NaverPr
       avatar_url: user.user_metadata?.avatar_url || profile.avatarUrl,
       naver_id: profile.id,
       phone: phone || user.user_metadata?.phone,
+      linked_providers: [
+        ...new Set([...stringList(user.user_metadata?.linked_providers), 'naver']),
+      ],
     },
     app_metadata: {
       providers,

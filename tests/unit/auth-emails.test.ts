@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { collectAuthEmails } from '../../src/lib/auth-emails';
+import { collectAuthEmails, magicLinkEmailFor } from '../../src/lib/auth-emails';
 
 describe('collectAuthEmails', () => {
   it('placeholder 로컬 이메일은 제외하고 실제 이메일만 모은다', () => {
@@ -25,6 +25,30 @@ describe('collectAuthEmails', () => {
         app_metadata: { contact_email: 'owner@example.com' },
       }),
       ['owner@example.com'],
+    );
+    assert.deepEqual(
+      collectAuthEmails({
+        email: 'user.abc@oauth.sponsor-auction.local',
+        user_metadata: { contact_email: 'kept@example.com' },
+      }),
+      ['kept@example.com'],
+    );
+  });
+
+  it('매직링크는 auth.users.email(placeholder 포함)을 우선한다', () => {
+    assert.equal(
+      magicLinkEmailFor({
+        email: 'user.abc@oauth.sponsor-auction.local',
+        user_metadata: { contact_email: 'owner@example.com' },
+      }),
+      'user.abc@oauth.sponsor-auction.local',
+    );
+    assert.equal(
+      magicLinkEmailFor({
+        email: '',
+        app_metadata: { contact_email: 'owner@example.com' },
+      }),
+      'owner@example.com',
     );
   });
 

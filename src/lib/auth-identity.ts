@@ -2,7 +2,7 @@ import 'server-only';
 
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { isAuthUserId, pickPreferredMergeUser } from '@/lib/account-link';
-import { collectAuthEmails } from '@/lib/auth-emails';
+import { collectAuthEmails, magicLinkEmailFor } from '@/lib/auth-emails';
 import { lookupUsersByContact } from '@/lib/auth-lookup';
 import {
   collectPhoneValues,
@@ -116,10 +116,20 @@ export async function findExistingAccountByContact(input: {
     const contactEmail = normalizeContactEmail(
       typeof item.app_metadata?.contact_email === 'string' ? item.app_metadata.contact_email : '',
     );
-    if (email && (collectAuthEmails(item).includes(email) || contactEmail === email)) {
+    const metaContact = normalizeContactEmail(
+      typeof item.user_metadata?.contact_email === 'string' ? item.user_metadata.contact_email : '',
+    );
+    if (
+      email &&
+      (collectAuthEmails(item).includes(email) || contactEmail === email || metaContact === email)
+    ) {
       return true;
     }
-    return hasMatchingPhone(item, phone);
+    if (phone && hasMatchingPhone(item, phone)) {
+      return true;
+    }
+    // profiles.email 조회로만 잡힌 경우(매직링크가 app_metadata.contact_email을 지운 뒤)
+    return Boolean(email);
   });
   return pickCanonicalUser(matches);
 }
@@ -148,7 +158,7 @@ async function reassignOwnedRows(admin: AdminClient, fromId: string, toId: strin
 }
 
 export async function generateMagicLinkHash(admin: AdminClient, user: User) {
-  const email = collectAuthEmails(user)[0] ?? user.email;
+  const email = magicLinkEmailFor(user);
   if (!email) {
     return null;
   }
@@ -233,6 +243,20 @@ export async function mergeUserInto(
       ...(incoming.identities ?? []).map((item) => item.provider),
     ]),
   ].filter((item) => item && item !== 'email');
+  const linkedProviders = [
+    ...new Set(
+      [
+        ...stringList(canonical.user_metadata?.linked_providers),
+        ...stringList(incoming.user_metadata?.linked_providers),
+        ...providers,
+      ]
+        .map((item) => (item === 'custom:naver' ? 'naver' : item))
+        .filter(
+          (item) =>
+            item === 'google' || item === 'kakao' || item === 'naver' || item === 'phone',
+        ),
+    ),
+  ];
   const e164 = toE164Kr(phone);
   const metadata = {
     user_metadata: {
@@ -243,6 +267,7 @@ export async function mergeUserInto(
       current_mode: currentMode,
       onboarding_complete: roles.length > 0,
       phone: phone || canonical.user_metadata?.phone || incoming.user_metadata?.phone,
+      linked_providers: linkedProviders,
     },
     app_metadata: {
       ...(incoming.app_metadata ?? {}),
@@ -319,8 +344,14 @@ export async function reconcileSocialIdentities(
     const contactEmail = normalizeContactEmail(
       typeof item.app_metadata?.contact_email === 'string' ? item.app_metadata.contact_email : '',
     );
+    const metaContact = normalizeContactEmail(
+      typeof item.user_metadata?.contact_email === 'string' ? item.user_metadata.contact_email : '',
+    );
     const emailHit = emails.some(
-      (email) => collectAuthEmails(item).includes(email) || contactEmail === email,
+      (email) =>
+        collectAuthEmails(item).includes(email) ||
+        contactEmail === email ||
+        metaContact === email,
     );
     return emailHit || hasMatchingPhone(item, phone);
   });

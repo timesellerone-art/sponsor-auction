@@ -244,9 +244,13 @@ export default function LoginPage() {
           </label>
         ) : null}
 
-        <label className={cn('block text-sm font-medium text-zinc-800', mode === 'signup' ? 'mt-4' : '')}>
+        <label
+          htmlFor="login-email"
+          className={cn('block text-sm font-medium text-zinc-800', mode === 'signup' ? 'mt-4' : '')}
+        >
           이메일
           <input
+            id="login-email"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -256,9 +260,10 @@ export default function LoginPage() {
           />
         </label>
 
-        <label className="mt-4 block text-sm font-medium text-zinc-800">
+        <label htmlFor="login-password" className="mt-4 block text-sm font-medium text-zinc-800">
           비밀번호
           <input
+            id="login-password"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}

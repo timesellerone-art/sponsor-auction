@@ -172,13 +172,18 @@ export async function GET(request: NextRequest) {
 
   const nextPath = readNext(request, requestUrl);
   const preferredUserId = readAccountLinkUserId(request.cookies.get(ACCOUNT_LINK_COOKIE)?.value);
+  const oauthInProgress = Boolean(request.cookies.get(OAUTH_PROVIDER_COOKIE)?.value);
   const once = await shareOAuthAttempt(`supabase-code:${code}`, async () => {
     const exchanged = await supabase.auth.exchangeCodeForSession(code);
     if (exchanged.error || !exchanged.data.session) {
       const message = exchanged.error?.message || '세션이 발급되지 않았습니다.';
+      // PKCE/state 유실은 진행 중인 소셜 로그인에만 retry로 본다.
+      // 쿠키 없는 임의 code 교환 실패(invalid-oauth-code)는 oauth_failed 로 남긴다.
+      const lostInFlight =
+        oauthInProgress && isOAuthStateLost(exchanged.error?.code, message);
       return {
         kind: 'error' as const,
-        stage: isOAuthStateLost(exchanged.error?.code, message) ? 'provider' : 'exchange',
+        stage: lostInFlight ? 'provider' : 'exchange',
         message,
         code: exchanged.error?.code ?? null,
         status: exchanged.error?.status ?? null,

@@ -48,7 +48,9 @@ export function isE2EEmail(email: string | null | undefined) {
     value.startsWith('e2e.') ||
     /^naver\.e2e\./.test(value) ||
     /^naver\.[a-z0-9._-]+@oauth\.sponsor-auction\.local$/.test(value) ||
-    /^kakao\.[a-z0-9-]+@oauth\.sponsor-auction\.local$/.test(value)
+    /^kakao\.[a-z0-9-]+@oauth\.sponsor-auction\.local$/.test(value) ||
+    /^google\.[a-z0-9-]+@oauth\.sponsor-auction\.local$/.test(value) ||
+    /^user\.[0-9a-f]+k@oauth\.sponsor-auction\.local$/.test(value)
   );
 }
 
@@ -77,7 +79,10 @@ function isDummySocialOnly(user: User) {
   if (hasKakao && !hasGoogle && !hasNaver) {
     return true;
   }
-  return hasNaver && !hasGoogle && !hasKakao;
+  if (hasNaver && !hasGoogle && !hasKakao) {
+    return true;
+  }
+  return hasGoogle && !hasKakao && !hasNaver;
 }
 
 export async function deleteAuthUser(admin: SupabaseClient, userId: string) {
@@ -90,18 +95,29 @@ export async function cleanupE2EUsers(admin?: SupabaseClient | null) {
   if (!client) {
     return 0;
   }
-  let removed = 0;
-  const listed = await client.auth.admin.listUsers({ page: 1, perPage: 200 });
-  for (const row of listed.data.users ?? []) {
-    const user = (await client.auth.admin.getUserById(row.id)).data.user;
-    if (!user) {
-      continue;
+  const ids: string[] = [];
+  for (let page = 1; page <= 20; page += 1) {
+    const listed = await client.auth.admin.listUsers({ page, perPage: 200 });
+    const rows = listed.data.users ?? [];
+    if (rows.length === 0) {
+      break;
     }
-    if (!isE2EEmail(user.email) && !isDummySocialOnly(user)) {
-      continue;
+    for (const row of rows) {
+      const user = (await client.auth.admin.getUserById(row.id)).data.user;
+      if (!user) {
+        continue;
+      }
+      if (!isE2EEmail(user.email) && !isDummySocialOnly(user)) {
+        continue;
+      }
+      ids.push(user.id);
     }
-    await deleteAuthUser(client, user.id);
-    removed += 1;
+    if (rows.length < 200) {
+      break;
+    }
   }
-  return removed;
+  for (const id of [...new Set(ids)]) {
+    await deleteAuthUser(client, id);
+  }
+  return ids.length;
 }

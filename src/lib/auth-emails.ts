@@ -36,6 +36,10 @@ export function collectAuthEmails(user: EmailUserLike | null | undefined): strin
   if (metaEmail) {
     emails.add(metaEmail);
   }
+  const metaContact = asEmail(user.user_metadata?.contact_email);
+  if (metaContact) {
+    emails.add(metaContact);
+  }
   const contactEmail = asEmail(user.app_metadata?.contact_email);
   if (contactEmail) {
     emails.add(contactEmail);
@@ -49,4 +53,13 @@ export function collectAuthEmails(user: EmailUserLike | null | undefined): strin
   }
 
   return [...emails];
+}
+
+/** generateLink용 로그인 이메일. placeholder(@oauth.sponsor-auction.local)도 실제 auth.users.email이다. */
+export function magicLinkEmailFor(user: EmailUserLike | null | undefined): string {
+  const authEmail = user?.email?.trim() ?? '';
+  if (authEmail.includes('@')) {
+    return authEmail;
+  }
+  return collectAuthEmails(user)[0] ?? '';
 }
