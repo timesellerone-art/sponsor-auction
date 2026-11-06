@@ -127,3 +127,14 @@ export function pickPreferredMergeUser<T extends { id: string; created_at: strin
     });
   return others[0] ?? null;
 }
+
+/** 설정에서 전화를 등록할 때는 현재 세션 UID를 유지하고, 같은 번호의 다른 계정만 합친다. */
+export function pickPhoneLinkMergePair<T extends { id: string }>(
+  current: T,
+  existing: T | null,
+) {
+  if (!existing || existing.id === current.id) {
+    return { canonical: current, incoming: null as T | null };
+  }
+  return { canonical: current, incoming: existing };
+}

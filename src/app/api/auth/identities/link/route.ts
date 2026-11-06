@@ -6,9 +6,9 @@ import {
   readAccountLinkUserId,
   writeAccountLinkCookie,
 } from '@/lib/account-link';
+import { getApiAuthUser } from '@/lib/auth-api-user';
 import { reconcileSocialIdentities } from '@/lib/auth-identity';
 import { expireAuthDebrisCookies } from '@/lib/auth-paths';
-import { createClient } from '@/lib/supabase/server';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -18,22 +18,20 @@ export async function POST(request: NextRequest) {
   try {
     await connection();
 
-    const supabase = await createClient();
-    if (!supabase) {
+    const { supabase, user, error } = await getApiAuthUser(request);
+    if (error === 'unconfigured' || !supabase) {
       return NextResponse.json(
         { error: 'Supabase가 설정되지 않았습니다.' },
         { status: 503, headers: NO_STORE },
       );
     }
-
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
+    if (!user) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401, headers: NO_STORE });
     }
 
     const cookieStore = await cookies();
     const linked = await reconcileSocialIdentities(
-      data.user,
+      user,
       readAccountLinkUserId(cookieStore.get(ACCOUNT_LINK_COOKIE)?.value),
     );
     if (linked.switched && linked.tokenHash) {

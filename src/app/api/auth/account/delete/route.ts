@@ -2,10 +2,10 @@ import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { applyAuthCookies } from '@/lib/access';
 import { deleteAccountCompletely } from '@/lib/account-delete';
+import { getApiAuthUser } from '@/lib/auth-api-user';
 import { expireAuthDebrisCookies } from '@/lib/auth-paths';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -22,16 +22,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
-    if (!supabase) {
+    const { supabase, user, error } = await getApiAuthUser(request);
+    if (error === 'unconfigured' || !supabase) {
       return NextResponse.json(
         { error: 'Supabase가 설정되지 않았습니다.' },
         { status: 503, headers: NO_STORE },
       );
     }
-
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
+    if (!user) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401, headers: NO_STORE });
     }
 
@@ -43,7 +41,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await deleteAccountCompletely(admin, data.user.id);
+    await deleteAccountCompletely(admin, user.id);
     await supabase.auth.signOut().catch(() => undefined);
 
     const response = NextResponse.json({ data: { deleted: true } }, { headers: NO_STORE });

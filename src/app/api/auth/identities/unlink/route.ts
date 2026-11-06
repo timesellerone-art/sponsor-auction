@@ -1,6 +1,7 @@
 import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { unlinkSocialProvider } from '@/lib/account-delete';
+import { getApiAuthUser } from '@/lib/auth-api-user';
 import {
   SOCIAL_IDENTITY_PROVIDERS,
   canUnlinkProvider,
@@ -10,7 +11,6 @@ import {
 } from '@/lib/auth-identities';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -37,26 +37,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '해제할 계정을 선택해 주세요.' }, { status: 400, headers: NO_STORE });
     }
 
-    const supabase = await createClient();
-    if (!supabase) {
+    const { supabase, user, error } = await getApiAuthUser(request);
+    if (error === 'unconfigured' || !supabase) {
       return NextResponse.json(
         { error: 'Supabase가 설정되지 않았습니다.' },
         { status: 503, headers: NO_STORE },
       );
     }
-
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
+    if (!user) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401, headers: NO_STORE });
     }
-    if (!canUnlinkProvider(data.user, provider)) {
+    if (!canUnlinkProvider(user, provider)) {
       return NextResponse.json(
         { error: '마지막 로그인 수단은 해제할 수 없습니다.' },
         { status: 400, headers: NO_STORE },
       );
     }
 
-    const identity = findProviderIdentity(data.user, provider);
+    const identity = findProviderIdentity(user, provider);
     if (identity) {
       const unlinked = await supabase.auth.unlinkIdentity(identity);
       if (unlinked.error) {
@@ -72,7 +70,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const updated = await unlinkSocialProvider(admin, data.user, provider);
+    const updated = await unlinkSocialProvider(admin, user, provider);
     return NextResponse.json(
       { data: { accounts: listLinkedAccountStatuses(updated) } },
       { headers: NO_STORE },

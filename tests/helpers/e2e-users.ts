@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 
@@ -141,6 +142,15 @@ export async function ensureDemoAccounts(admin?: SupabaseClient | null) {
   }
 }
 
+export function isE2EAuctionTitle(title: string | null | undefined) {
+  return /^E2E\s/i.test((title ?? '').trim());
+}
+
+export function isE2EPaymentOrderId(orderId: string | null | undefined) {
+  const value = orderId?.trim() ?? '';
+  return /^ord_unauthorized/i.test(value);
+}
+
 export function isE2EEmail(email: string | null | undefined) {
   const value = email?.trim().toLowerCase() ?? '';
   if (!value) {
@@ -223,6 +233,52 @@ export async function cleanupE2EUsers(admin?: SupabaseClient | null) {
     await deleteAuthUser(client, id);
   }
   return ids.length;
+}
+
+export async function cleanupE2EDataRecords(admin?: SupabaseClient | null) {
+  const client = admin ?? e2eAdminClient();
+  if (!client) {
+    return 0;
+  }
+
+  try {
+    const auctions = await client.from('auctions').select('id, title');
+    const auctionIds = (auctions.data ?? [])
+      .filter((row) => isE2EAuctionTitle(row.title))
+      .map((row) => row.id);
+    if (auctionIds.length > 0) {
+      await Promise.all([
+        client.from('chat_messages').delete().in('auction_id', auctionIds),
+        client.from('compliance_logs').delete().in('auction_id', auctionIds),
+        client.from('tax_invoice_logs').delete().in('auction_id', auctionIds),
+        client.from('payouts').delete().in('auction_id', auctionIds),
+        client.from('payments').delete().in('auction_id', auctionIds),
+        client.from('bids').delete().in('auction_id', auctionIds),
+      ]);
+      await client.from('auctions').delete().in('id', auctionIds);
+    }
+
+    const payments = await client.from('payments').select('order_id');
+    const dummyOrderIds = (payments.data ?? [])
+      .map((row) => row.order_id)
+      .filter((orderId) => isE2EPaymentOrderId(orderId));
+    if (dummyOrderIds.length > 0) {
+      await Promise.all([
+        client.from('tax_invoice_logs').delete().in('payment_order_id', dummyOrderIds),
+        client.from('payouts').delete().in('payment_order_id', dummyOrderIds),
+        client.from('payments').delete().in('order_id', dummyOrderIds),
+      ]);
+    }
+
+    return auctionIds.length + dummyOrderIds.length;
+  } catch (error) {
+    console.warn('[SponsorAuction] E2E 더미 레코드 정리 실패', error);
+    return 0;
+  }
+}
+
+export async function cleanupSupabaseTemp() {
+  await rm(join(process.cwd(), 'supabase', '.temp'), { recursive: true, force: true });
 }
 
 export async function cleanupDemoAccounts(admin?: SupabaseClient | null) {

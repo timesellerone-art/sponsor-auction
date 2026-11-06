@@ -4,6 +4,8 @@ import {
   isNaverIdentityProvider,
   type SocialIdentityProvider,
 } from '@/lib/auth-identities';
+import { pickPhoneLinkMergePair } from '@/lib/account-link';
+import { findExistingAccountByContact, mergeUserInto } from '@/lib/auth-identity';
 import { normalizePhone, toE164Kr } from '@/lib/contact';
 
 type AdminClient = SupabaseClient;
@@ -105,16 +107,31 @@ export async function linkPhoneToAccount(admin: AdminClient, user: User, rawPhon
     throw new Error('올바른 휴대전화 번호를 입력해 주세요.');
   }
 
-  const withPhone = await admin.auth.admin.updateUserById(user.id, {
+  const existing = await findExistingAccountByContact({
+    phone,
+    excludeUserId: user.id,
+  });
+  const pair = pickPhoneLinkMergePair(user, existing);
+  let target = user;
+  if (pair.incoming) {
+    try {
+      target = await mergeUserInto(pair.incoming, pair.canonical, { phone });
+    } catch (error) {
+      console.warn('[SponsorAuction] 휴대전화 계정 통합 실패, 현재 계정에만 등록합니다', error);
+      target = user;
+    }
+  }
+
+  const withPhone = await admin.auth.admin.updateUserById(target.id, {
     phone: e164,
     user_metadata: {
-      ...(user.user_metadata ?? {}),
+      ...(target.user_metadata ?? {}),
       phone,
-      linked_providers: [...new Set([...stringList(user.user_metadata?.linked_providers), 'phone'])],
+      linked_providers: [...new Set([...stringList(target.user_metadata?.linked_providers), 'phone'])],
     },
     app_metadata: {
-      ...(user.app_metadata ?? {}),
-      providers: [...new Set([...stringList(user.app_metadata?.providers), 'phone'])],
+      ...(target.app_metadata ?? {}),
+      providers: [...new Set([...stringList(target.app_metadata?.providers), 'phone'])],
       contact_phone: phone,
     },
   });
@@ -123,19 +140,19 @@ export async function linkPhoneToAccount(admin: AdminClient, user: User, rawPhon
   }
 
   const linked = await admin.rpc('link_provider_identity', {
-    p_user_id: user.id,
+    p_user_id: target.id,
     p_provider: 'phone',
     p_provider_id: e164.replace(/^\+/, ''),
-    p_email: user.email ?? null,
-    p_name: typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : null,
+    p_email: target.email ?? null,
+    p_name: typeof target.user_metadata?.name === 'string' ? target.user_metadata.name : null,
   });
   if (linked.error && linked.error.code !== 'PGRST202') {
     console.warn('[SponsorAuction] 휴대전화 identity 연결 실패', linked.error.message);
   }
 
-  const profile = await admin.from('profiles').update({ phone }).eq('id', user.id);
+  const profile = await admin.from('profiles').update({ phone }).eq('id', target.id);
   if (profile.error) {
     console.warn('[SponsorAuction] 프로필 휴대전화 저장 실패', profile.error.message);
   }
-  return (await admin.auth.admin.getUserById(user.id)).data.user ?? withPhone.data.user ?? user;
+  return (await admin.auth.admin.getUserById(target.id)).data.user ?? withPhone.data.user ?? target;
 }

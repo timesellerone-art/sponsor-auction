@@ -1,10 +1,10 @@
 import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { linkPhoneToAccount } from '@/lib/account-delete';
+import { getApiAuthUser } from '@/lib/auth-api-user';
 import { listLinkedAccountStatuses } from '@/lib/auth-identities';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -24,16 +24,14 @@ export async function POST(request: NextRequest) {
     const body = (await request.json().catch(() => null)) as { phone?: string } | null;
     const phone = body?.phone?.trim() ?? '';
 
-    const supabase = await createClient();
-    if (!supabase) {
+    const { user, error } = await getApiAuthUser(request);
+    if (error === 'unconfigured') {
       return NextResponse.json(
         { error: 'Supabase가 설정되지 않았습니다.' },
         { status: 503, headers: NO_STORE },
       );
     }
-
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
+    if (!user) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401, headers: NO_STORE });
     }
 
@@ -45,7 +43,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const updated = await linkPhoneToAccount(admin, data.user, phone);
+    const updated = await linkPhoneToAccount(admin, user, phone);
     return NextResponse.json(
       { data: { accounts: listLinkedAccountStatuses(updated) } },
       { headers: NO_STORE },

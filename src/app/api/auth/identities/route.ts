@@ -1,9 +1,8 @@
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
+import { getApiAuthUser } from '@/lib/auth-api-user';
 import { listLinkedAccountStatuses } from '@/lib/auth-identities';
-import { readBearerToken } from '@/lib/auth-request';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
-import { createClient } from '@/lib/supabase/server';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -20,28 +19,23 @@ export async function GET(request: Request) {
       );
     }
 
-    const supabase = await createClient();
-    if (!supabase) {
+    const { user, error } = await getApiAuthUser(request);
+    if (error === 'unconfigured') {
       return NextResponse.json(
         { error: 'Supabase가 설정되지 않았습니다.' },
         { status: 503, headers: NO_STORE },
       );
     }
-
-    const bearer = readBearerToken(request.headers.get('authorization'));
-    const { data, error } = bearer
-      ? await supabase.auth.getUser(bearer)
-      : await supabase.auth.getUser();
-    if (error || !data.user) {
+    if (!user) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401, headers: NO_STORE });
     }
 
     return NextResponse.json(
       {
         data: {
-          id: data.user.id,
-          email: data.user.email ?? null,
-          accounts: listLinkedAccountStatuses(data.user),
+          id: user.id,
+          email: user.email ?? null,
+          accounts: listLinkedAccountStatuses(user),
         },
       },
       { headers: NO_STORE },
