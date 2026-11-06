@@ -47,6 +47,19 @@ export function isMyAuction(id: string, userId?: string | null) {
   return getMyAuctionIds(userId).includes(id.trim());
 }
 
+export function isCampaignAuthor(
+  auction: Pick<AuctionItem, 'id' | 'authorId'> | null | undefined,
+  userId?: string | null,
+) {
+  if (!auction?.id || !userId?.trim()) {
+    return false;
+  }
+  if (auction.authorId && auction.authorId === userId) {
+    return true;
+  }
+  return userId === DEMO_ADVERTISER_ID && DEMO_CAMPAIGN_IDS.includes(auction.id);
+}
+
 export function isOwnedAuction(
   auction: Pick<AuctionItem, 'id' | 'authorId' | 'authorName'> | null | undefined,
   user: Pick<SessionUser, 'id' | 'name'> | null | undefined,
@@ -54,7 +67,7 @@ export function isOwnedAuction(
   if (!auction?.id || !user?.id) {
     return false;
   }
-  if (auction.authorId && auction.authorId === user.id) {
+  if (isCampaignAuthor(auction, user.id)) {
     return true;
   }
   return isMyAuction(auction.id, user.id);

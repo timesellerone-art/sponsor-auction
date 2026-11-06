@@ -13,6 +13,7 @@ import {
 } from '@/lib/mock-data';
 import { withExclusiveAction } from '@/lib/action-lock';
 import { DEMO_ADVERTISER_ID } from '@/lib/auth-mock';
+import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { notifyLifecycleEvent } from '@/lib/notification';
 import { type SponsorAuctionClient } from '@/lib/supabase';
 import { getDataClient } from '@/lib/supabase/data-client';
@@ -406,6 +407,11 @@ export async function createBid(
     const auction = auctionResult.data;
     if (!auction) {
       return fail(null, auctionResult.error ?? '해당 경매를 찾을 수 없습니다.');
+    }
+
+    const bidderId = (input.creatorId ?? '').trim();
+    if (bidderId && isCampaignAuthor(auction, bidderId)) {
+      return fail(null, VALIDATION.selfCampaignBid);
     }
 
     const bidError = validateBidPayload({

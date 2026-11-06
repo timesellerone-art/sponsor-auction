@@ -4,6 +4,7 @@ import type {
   ProfileStatus,
 } from '@/types/admin';
 import { creatorPayoutAmount } from '@/lib/fees';
+import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { mergePayoutLists } from '@/lib/payouts';
 import {
   isAuctionClosed,
@@ -564,6 +565,10 @@ export async function createBid(
     const auction = auctionsStore.find((item) => item.id === data.auctionId);
     if (!auction) {
       return fail(null, '해당 경매를 찾을 수 없습니다.');
+    }
+
+    if (data.creatorId && isCampaignAuthor(auction, data.creatorId)) {
+      return fail(null, VALIDATION.selfCampaignBid);
     }
 
     const bidError = validateBidPayload({

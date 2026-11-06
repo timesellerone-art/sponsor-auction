@@ -19,7 +19,8 @@ import { ACCESS_REASON } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
 import { buildFallbackReport } from '@/lib/ai-report';
 import { getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
-import { isOwnedAuction } from '@/lib/my-campaigns';
+import { isCampaignAuthor, isOwnedAuction } from '@/lib/my-campaigns';
+import { VALIDATION } from '@/lib/validation';
 import { formatWon } from '@/lib/utils';
 import type { AiAnalyzeResponse, AiReport } from '@/types/ai';
 import { isAuctionClosed, type AuctionItem, type BidItem } from '@/types/auction';
@@ -160,7 +161,8 @@ export function AuctionDetail({ id }: { id: string }) {
 
   const title = auction?.title || '제목 없음';
   const auctionOpen = auction?.status === 'active' && !auction.isBlind;
-  const canBid = Boolean(auctionOpen && canPlaceBid);
+  const ownCampaign = Boolean(auction && isCampaignAuthor(auction, user?.id));
+  const canBid = Boolean(auctionOpen && canPlaceBid && !ownCampaign);
 
   const handleBidCreated = () => {
     setAuction((current) =>
@@ -282,7 +284,20 @@ export function AuctionDetail({ id }: { id: string }) {
                 </span>
               ) : null}
             </div>
-            {canBid ? (
+            {ownCampaign && auctionOpen ? (
+              <div className="mt-6">
+                <button
+                  type="button"
+                  disabled
+                  title={VALIDATION.selfCampaignHint}
+                  aria-label={VALIDATION.selfCampaignHint}
+                  className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-full bg-zinc-300 text-sm font-semibold text-zinc-500"
+                >
+                  제안하기
+                </button>
+                <p className="mt-2 text-center text-xs text-zinc-500">{VALIDATION.selfCampaignHint}</p>
+              </div>
+            ) : canBid ? (
               <button
                 type="button"
                 onClick={() => setBidOpen(true)}
@@ -342,6 +357,7 @@ export function AuctionDetail({ id }: { id: string }) {
             budget: auction.budget,
             status: auction.status,
             isBlind: auction.isBlind,
+            authorId: auction.authorId,
           }}
           onClose={() => setBidOpen(false)}
           onCreated={handleBidCreated}

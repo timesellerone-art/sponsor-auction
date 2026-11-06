@@ -63,9 +63,7 @@ function persistCurrentMode(role: MemberRole) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
-  const [roleOverride, setRoleOverride] = useState<MemberRole | null>(() =>
-    readActiveRoleCookie(),
-  );
+  const [roleOverride, setRoleOverride] = useState<MemberRole | null>(null);
 
   const latestRequest = useRef(0);
 
@@ -83,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       console.warn('[SponsorAuction] 인증 상태를 갱신하지 못했습니다.', error);
       setUser(null);
+      setRoleOverride(null);
     } finally {
       if (request === latestRequest.current) {
         setReady(true);
@@ -97,9 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubKnown = onKnownSession((session) => {
       setUser(session);
       setReady(true);
-      if (!session) {
-        setRoleOverride(null);
-      }
+      setRoleOverride(session ? readActiveRoleCookie() : null);
     });
     const unsubscribe = subscribeAuthState(() => {
       void refresh();

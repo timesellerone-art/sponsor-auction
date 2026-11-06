@@ -151,12 +151,15 @@ export async function issueTaxInvoice(
   }
 
   if (!secret) {
+    console.warn('[SponsorAuction] POPBILL_SECRECT_KEY가 없어 세금계산서를 임시 기록으로 우회했습니다.', {
+      mgtKey,
+    });
     const result: TaxInvoiceIssueResult = {
       ok: true,
       fallback: true,
       status: 'fallback',
       mgtKey,
-      message: 'POPBILL_SECRECT_KEY가 없어 세금계산서를 임시 기록으로 우회했습니다.',
+      message: '',
     };
     console.info('[SponsorAuction] 팝빌 키 없음, 세금계산서 fallback', {
       mgtKey,
@@ -215,7 +218,7 @@ export async function issueTaxInvoice(
       fallback: true,
       status: 'fallback',
       mgtKey,
-      message: `팝빌 발행 실패로 임시 기록: ${message}`,
+      message: '',
     };
     await persistFallbackLog({ ...baseLog, ...result });
     return result;

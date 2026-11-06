@@ -14,10 +14,12 @@ import { INSERT_FAIL_MESSAGE, createBid, getAuctionById } from '@/lib/auctions';
 import { isUuid } from '@/lib/uuid';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { rememberMyBid } from '@/lib/my-bids';
+import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { getAuctionOwnerId, pushNotification } from '@/lib/notifications';
 import { cn, formatWon } from '@/lib/utils';
 import {
   MIN_PROPOSAL_LENGTH,
+  VALIDATION,
   getBidBlockReason,
   validateBidForm,
   type BidFieldErrors,
@@ -28,7 +30,7 @@ type FieldErrors = BidFieldErrors;
 
 type BidModalProps = {
   open: boolean;
-  auction: Pick<AuctionItem, 'id' | 'title' | 'budget' | 'status' | 'isBlind'> | null;
+  auction: Pick<AuctionItem, 'id' | 'title' | 'budget' | 'status' | 'isBlind' | 'authorId'> | null;
   onClose: () => void;
   onCreated?: () => void;
 };
@@ -115,6 +117,11 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         if (blocked) {
           setSubmitError(blocked);
           showToast(blocked);
+          return;
+        }
+        if (isCampaignAuthor(currentAuction, user.id)) {
+          setSubmitError(VALIDATION.selfCampaignBid);
+          showToast(VALIDATION.selfCampaignBid);
           return;
         }
 

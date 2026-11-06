@@ -36,6 +36,8 @@ export const VALIDATION = {
   offPlatformContact:
     '전화번호, 이메일, 카카오 ID, 외부 링크 등 플랫폼 우회 연락처는 사용할 수 없습니다.',
   auctionClosed: '마감된 역경매에는 제안할 수 없습니다.',
+  selfCampaignBid: '본인이 등록한 캠페인에는 제안할 수 없습니다.',
+  selfCampaignHint: '본인이 등록한 캠페인입니다',
   duplicateBid: '이미 이 역경매에 제안을 제출했습니다.',
   alreadyAwarded: '이미 낙찰 완료된 역경매입니다.',
   alreadyProcessed: '이미 처리된 요청입니다.',

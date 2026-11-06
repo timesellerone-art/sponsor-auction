@@ -19,6 +19,17 @@ import { formatWon } from '@/lib/utils';
 import { VALIDATION } from '@/lib/validation';
 import type { ConfirmPaymentResult } from '@/types/payment';
 
+function publicTaxInvoiceMessage(message: string | undefined) {
+  const text = (message ?? '').trim();
+  if (!text) {
+    return '';
+  }
+  if (/POPBILL|우회|임시 기록/i.test(text)) {
+    return '';
+  }
+  return text;
+}
+
 function SuccessFallback() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-16">
@@ -140,8 +151,9 @@ function PaymentSuccessContent() {
         setOrderId(confirmPayload.orderId || confirmedOrderId);
         setAmountLabel(formatWon(confirmPayload.amount));
         setAuctionHref(recoverAuctionHref(confirmPayload.auctionId));
-        if (confirmPayload.taxInvoice?.message) {
-          setTaxMessage(confirmPayload.taxInvoice.message);
+        const taxNotice = publicTaxInvoiceMessage(confirmPayload.taxInvoice?.message);
+        if (taxNotice) {
+          setTaxMessage(taxNotice);
         }
 
         const [auctionResult, bidsResult] = await Promise.all([

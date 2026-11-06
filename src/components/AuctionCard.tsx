@@ -22,7 +22,8 @@ import { showToast } from '@/components/Toast';
 import { ACCESS_REASON } from '@/lib/access';
 import { isOpenForBid } from '@/lib/auction-browse';
 import { loginPath } from '@/lib/auth-guard';
-import { isOwnedAuction } from '@/lib/my-campaigns';
+import { isCampaignAuthor } from '@/lib/my-campaigns';
+import { VALIDATION } from '@/lib/validation';
 import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
 import { PLATFORM_LABELS } from '@/lib/platforms';
 import { cn, formatWon } from '@/lib/utils';
@@ -131,19 +132,18 @@ export function AuctionCard({
     status,
     isBlind: Boolean(auction.isBlind),
   });
-  const canBid = auctionOpen && canPlaceBid;
   const owned = Boolean(
     user &&
       auction.id &&
-      isOwnedAuction(
+      isCampaignAuthor(
         {
           id: auction.id,
           authorId: auction.authorId ?? null,
-          authorName: auction.authorName ?? '',
         },
-        user,
+        user.id,
       ),
   );
+  const canBid = auctionOpen && canPlaceBid && !owned;
   const isAdvertiser = Boolean(ready && user && canCreateAuction);
 
   return (
@@ -204,7 +204,20 @@ export function AuctionCard({
         </span>
       </div>
 
-      {hideBidAction ? null : canBid ? (
+      {hideBidAction ? null : owned && auctionOpen && canPlaceBid ? (
+        <div className="mt-4">
+          <button
+            type="button"
+            disabled
+            title={VALIDATION.selfCampaignHint}
+            aria-label={VALIDATION.selfCampaignHint}
+            className="inline-flex h-10 min-h-10 w-full min-w-0 cursor-not-allowed items-center justify-center rounded-full border border-zinc-200 bg-zinc-100 px-3 text-sm font-semibold text-zinc-400"
+          >
+            제안하기
+          </button>
+          <p className="mt-1.5 text-center text-xs text-zinc-500">{VALIDATION.selfCampaignHint}</p>
+        </div>
+      ) : canBid ? (
         <button
           type="button"
           onClick={() => setBidOpen(true)}
@@ -255,6 +268,7 @@ export function AuctionCard({
             budget: auction.budget ?? 0,
             status: auction.status ?? 'active',
             isBlind: Boolean(auction.isBlind),
+            authorId: auction.authorId ?? null,
           }}
           onClose={() => setBidOpen(false)}
           onCreated={() => {

@@ -1,6 +1,8 @@
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
-import { createBid } from '@/lib/auctions';
+import { createBid, getAuctionById } from '@/lib/auctions';
+import { isCampaignAuthor } from '@/lib/my-campaigns';
+import { VALIDATION } from '@/lib/validation';
 import {
   forbiddenJson,
   getPaymentActor,
@@ -55,6 +57,19 @@ export async function POST(request: Request) {
     if (!auctionId) {
       return NextResponse.json(
         { error: '경매 ID가 필요합니다.', errorMessage: '경매 ID가 필요합니다.' },
+        { status: 400, headers: NO_STORE },
+      );
+    }
+
+    const auctionResult = await getAuctionById(auctionId);
+    const bidderId = actor.userId || asText(body?.creatorId);
+    if (auctionResult.data && isCampaignAuthor(auctionResult.data, bidderId)) {
+      return NextResponse.json(
+        {
+          error: VALIDATION.selfCampaignBid,
+          errorMessage: VALIDATION.selfCampaignBid,
+          errorCode: 'SELF_CAMPAIGN_BID',
+        },
         { status: 400, headers: NO_STORE },
       );
     }
