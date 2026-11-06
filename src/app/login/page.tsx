@@ -227,6 +227,9 @@ export default function LoginPage() {
       </div>
 
       <form
+        method="post"
+        action="/login"
+        autoComplete="on"
         onSubmit={handleSubmit}
         className="mt-5 rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6"
         noValidate
@@ -235,6 +238,7 @@ export default function LoginPage() {
           <label className="block text-sm font-medium text-zinc-800">
             이름
             <input
+              name="name"
               value={name}
               onChange={(event) => setName(event.target.value)}
               className="mt-1.5 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
@@ -245,18 +249,20 @@ export default function LoginPage() {
         ) : null}
 
         <label
-          htmlFor="login-email"
+          htmlFor={mode === 'signup' ? 'login-email' : 'login-username'}
           className={cn('block text-sm font-medium text-zinc-800', mode === 'signup' ? 'mt-4' : '')}
         >
-          이메일
+          {mode === 'signup' ? '이메일' : '이메일 또는 전화번호'}
           <input
-            id="login-email"
-            type="email"
+            id={mode === 'signup' ? 'login-email' : 'login-username'}
+            name={mode === 'signup' ? 'email' : 'username'}
+            type={mode === 'signup' ? 'email' : 'text'}
+            inputMode={mode === 'signup' ? 'email' : 'text'}
+            autoComplete={mode === 'signup' ? 'email' : 'username'}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             className="mt-1.5 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
             placeholder="you@example.com"
-            autoComplete="email"
           />
         </label>
 
@@ -264,6 +270,7 @@ export default function LoginPage() {
           비밀번호
           <input
             id="login-password"
+            name="password"
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}

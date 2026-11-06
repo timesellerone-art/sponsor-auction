@@ -37,6 +37,7 @@ import {
   type MemberRole,
   type SessionUser,
 } from '@/types/auth';
+import { isValidPhone, toE164Kr } from '@/lib/contact';
 import type { DataResult } from '@/types/auction';
 
 export const AUTH_FAIL_MESSAGE = '요청을 처리하지 못했습니다. 다시 시도해 주세요.';
@@ -68,7 +69,7 @@ function isInvalidLoginCredentials(error: unknown) {
 function publicAuthErrorMessage(error: unknown) {
   const text = errorText(error);
   if (isInvalidLoginCredentials(error)) {
-    return '이메일 또는 비밀번호가 올바르지 않습니다.';
+    return '이메일(또는 전화번호) 또는 비밀번호가 올바르지 않습니다.';
   }
   if (/email not confirmed/i.test(text)) {
     return '이메일 인증 후 로그인해 주세요.';
@@ -629,23 +630,35 @@ async function completeMockSignIn(input: {
   return result;
 }
 
+function signInCredentials(
+  identifier: string,
+  password: string,
+): { email: string; password: string } | { phone: string; password: string } {
+  const trimmed = identifier.trim();
+  if (!trimmed.includes('@') && isValidPhone(trimmed)) {
+    const phone = toE164Kr(trimmed);
+    if (phone) {
+      return { phone, password };
+    }
+  }
+  return { email: trimmed.toLowerCase(), password };
+}
+
 export async function signIn(input: {
   email: string;
   password: string;
 }): Promise<DataResult<SessionUser | null>> {
-  const email = input.email.trim().toLowerCase();
+  const credentials = signInCredentials(input.email, input.password);
+  const email = 'email' in credentials ? credentials.email : input.email.trim().toLowerCase();
   const demoLogin = isDemoCredentials(email, input.password);
   const supabase = createClient();
   if (!supabase) {
-    return completeMockSignIn(input);
+    return completeMockSignIn({ email: email || input.email, password: input.password });
   }
 
   try {
     const { data, error } = await withTimeout(
-      supabase.auth.signInWithPassword({
-        email,
-        password: input.password,
-      }),
+      supabase.auth.signInWithPassword(credentials),
       4000,
       '로그인',
     );
@@ -662,7 +675,7 @@ export async function signIn(input: {
     }
 
     const user = data.user;
-    const sessionEmail = user.email?.trim() || email;
+    const sessionEmail = user.email?.trim() || email || '회원';
     const name =
       (typeof user.user_metadata?.name === 'string'
         ? user.user_metadata.name

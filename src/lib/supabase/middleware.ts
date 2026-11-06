@@ -18,6 +18,7 @@ export type SessionMiddlewareResult = {
 export async function updateSession(request: NextRequest): Promise<SessionMiddlewareResult> {
   const bag = createCookieBag();
   const secure = request.nextUrl.protocol === 'https:';
+  const cookieOptions = sessionCookieOptions(secure);
   let supabaseResponse = NextResponse.next({ request });
   const env = getSupabaseEnv();
   if (!env) {
@@ -25,24 +26,30 @@ export async function updateSession(request: NextRequest): Promise<SessionMiddle
   }
 
   const supabase = createServerClient(env.url, env.anonKey, {
-    cookieOptions: sessionCookieOptions(secure),
+    cookieOptions,
     cookies: {
       getAll() {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        const keepers = cookiesToSet.filter(({ name, value }) => shouldApplyRequestCookie(name, value));
+        const keepers = cookiesToSet.filter(({ name, value }) =>
+          shouldApplyRequestCookie(name, value),
+        );
         bag.remember(keepers);
         keepers.forEach(({ name, value }) => {
           request.cookies.set(name, value);
         });
         supabaseResponse = NextResponse.next({ request });
-        writeCookies(supabaseResponse.cookies, keepers, { secure });
+        writeCookies(supabaseResponse.cookies, keepers, {
+          secure,
+          maxAge: cookieOptions.maxAge,
+        });
       },
     },
   });
 
   try {
+    // getUser() validates the JWT and rotates refreshed tokens onto setAll cookies.
     await supabase.auth.getUser();
   } catch (error) {
     console.warn('[SponsorAuction] 미들웨어 세션 갱신에 실패했습니다.', error);
@@ -55,6 +62,9 @@ export function withSessionCookies(
   session: SessionMiddlewareResult,
   outgoing: NextResponse,
 ) {
-  writeCookies(outgoing.cookies, session.cookies, { secure: session.secure });
+  writeCookies(outgoing.cookies, session.cookies, {
+    secure: session.secure,
+    maxAge: sessionCookieOptions(session.secure).maxAge,
+  });
   return outgoing;
 }

@@ -1,4 +1,4 @@
-import { AUTH_PRESENT_COOKIE_NAME } from '@/lib/access';
+import { AUTH_COOKIE_MAX_AGE, AUTH_PRESENT_COOKIE_NAME } from '@/lib/access';
 import { ROLE_SELECT_PATH } from '@/lib/auth-guard';
 
 export function isAuthPassthroughPath(pathname: string) {
@@ -103,7 +103,7 @@ export function writeCookies(
     ) => void;
   },
   cookiesToSet: CookieToSet[],
-  defaults: { secure?: boolean } = {},
+  defaults: { secure?: boolean; maxAge?: number } = {},
 ) {
   cookiesToSet.forEach(({ name, value, options }) => {
     const sameSite =
@@ -116,7 +116,7 @@ export function writeCookies(
       domain: options?.domain,
       path: options?.path ?? '/',
       expires: options?.expires,
-      maxAge: options?.maxAge,
+      maxAge: options?.maxAge ?? defaults.maxAge,
       httpOnly: options?.httpOnly,
       secure: options?.secure ?? defaults.secure,
       sameSite,
@@ -173,6 +173,7 @@ export function sessionCookieOptions(secure?: boolean) {
   return {
     path: '/' as const,
     sameSite: 'lax' as const,
+    maxAge: AUTH_COOKIE_MAX_AGE,
     ...(typeof secure === 'boolean' ? { secure } : {}),
   };
 }

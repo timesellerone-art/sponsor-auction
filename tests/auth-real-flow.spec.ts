@@ -58,6 +58,11 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
     await expect(page.getByRole('button', { name: '카카오로 계속하기' })).toBeVisible();
     await expect(page.getByRole('button', { name: '네이버로 계속하기' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Apple/ })).toHaveCount(0);
+    await expect(page.locator('input[name="username"]')).toHaveAttribute('autocomplete', 'username');
+    await expect(page.locator('input[name="password"]')).toHaveAttribute(
+      'autocomplete',
+      'current-password',
+    );
   });
 
   test('a) Google 로그인은 쿼리 없는 redirect_to와 PKCE verifier 쿠키로 실제 인가 서버에 간다', async ({

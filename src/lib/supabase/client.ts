@@ -24,9 +24,11 @@ export function createClient(): SupabaseClient<Database> | null {
   }
 
   try {
+    const secure =
+      typeof window !== 'undefined' ? window.location.protocol === 'https:' : undefined;
     browserClient = createBrowserClient<Database>(env.url, env.anonKey, {
       isSingleton: true,
-      cookieOptions: sessionCookieOptions(),
+      cookieOptions: sessionCookieOptions(secure),
       auth: {
         flowType: 'pkce',
         persistSession: true,

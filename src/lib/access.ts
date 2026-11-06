@@ -35,7 +35,7 @@ export function accessReasonMessage(reason: string | null | undefined) {
   return ACCESS_REASON[reason];
 }
 
-const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+export const AUTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
 export function roleCookieValue(...sources: unknown[]) {
   return parseAuthRoles(...sources).join(',');

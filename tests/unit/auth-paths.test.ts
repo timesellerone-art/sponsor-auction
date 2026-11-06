@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { AUTH_PRESENT_COOKIE_NAME } from '../../src/lib/access';
+import { AUTH_COOKIE_MAX_AGE, AUTH_PRESENT_COOKIE_NAME } from '../../src/lib/access';
 import { describeOAuthError, postAuthPath, postSocialAuthPath } from '../../src/lib/auth-guard';
 import {
   expirePkceVerifierCookies,
@@ -140,6 +140,6 @@ describe('post-auth destination', () => {
     assert.equal(options.path, '/');
     assert.equal(options.sameSite, 'lax');
     assert.equal(options.secure, true);
-    assert.equal('maxAge' in options, false);
+    assert.equal(options.maxAge, AUTH_COOKIE_MAX_AGE);
   });
 });
