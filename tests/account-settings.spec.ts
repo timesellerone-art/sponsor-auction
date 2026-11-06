@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { collectAuthConsoleNoise } from '../e2e/helpers';
 import { linkProviderIdentity } from '../src/lib/auth-identities';
 import {
   cleanupE2EUsers,
@@ -30,6 +31,7 @@ test.describe('마이페이지와 계정 설정', () => {
     const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3000';
     const context = await browser.newContext({ locale: 'ko-KR', baseURL });
     const page = await context.newPage();
+    const consoleNoise = collectAuthConsoleNoise(page);
     const stamp = Date.now().toString();
     const email = `e2e.account.${stamp}@sponsor-auction.test`;
     const googleSub = `google-account-${stamp}`;
@@ -107,6 +109,7 @@ test.describe('마이페이지와 계정 설정', () => {
       await expect(page.getByText('Phone', { exact: true })).toBeVisible();
       await expect(page.getByText('연동됨').first()).toBeVisible();
       await expect(page.getByRole('button', { name: '연동하기' }).first()).toBeVisible();
+      expect(consoleNoise, consoleNoise.join('\n')).toEqual([]);
 
       const kakaoRow = page.locator('li').filter({ hasText: 'Kakao' });
       if (await kakaoRow.getByRole('button', { name: '연동 해제' }).isEnabled()) {

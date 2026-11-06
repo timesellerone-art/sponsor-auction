@@ -2,15 +2,20 @@
 
 import { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { Loader2, Smartphone, X } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { signInWithOAuth } from '@/lib/auth';
+import { loginPath } from '@/lib/auth-guard';
 import {
   listLinkedAccountStatuses,
   type LinkedAccountStatus,
   type SocialIdentityProvider,
 } from '@/lib/auth-identities';
+import { isDemoAccountEmail } from '@/lib/auth-mock';
+import { authRequestInit } from '@/lib/auth-request';
 import { cn } from '@/lib/utils';
 
 type AccountsResponse = {
@@ -79,6 +84,8 @@ function ProviderMark({ provider }: { provider: SocialIdentityProvider }) {
 
 export function LinkedAccountsPanel() {
   const titleId = useId();
+  const router = useRouter();
+  const { user, ready, refresh } = useAuth();
   const [accounts, setAccounts] = useState<LinkedAccountStatus[]>(() =>
     listLinkedAccountStatuses(null),
   );
@@ -92,8 +99,31 @@ export function LinkedAccountsPanel() {
   const [phoneBusy, setPhoneBusy] = useState(false);
 
   const loadAccounts = useCallback(async () => {
+    if (!ready) {
+      return;
+    }
+    if (!user) {
+      setLoading(false);
+      router.replace(loginPath('advertiser-auth', '/my/settings'));
+      return;
+    }
+    if (isDemoAccountEmail(user.email)) {
+      setAccounts(listLinkedAccountStatuses(null));
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await fetch('/api/auth/identities', { credentials: 'include' });
+      let response = await fetch('/api/auth/identities', await authRequestInit());
+      if (response.status === 401) {
+        await refresh();
+        response = await fetch('/api/auth/identities', await authRequestInit());
+      }
+      if (response.status === 401) {
+        setAccounts(listLinkedAccountStatuses(null));
+        setLoading(false);
+        return;
+      }
       const payload = (await response.json().catch(() => null)) as AccountsResponse | null;
       if (!response.ok) {
         throw new Error(payload?.error || '연동 계정을 불러오지 못했습니다.');
@@ -105,14 +135,17 @@ export function LinkedAccountsPanel() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [ready, refresh, router, user]);
 
   useEffect(() => {
+    if (!ready) {
+      return;
+    }
     const timer = window.setTimeout(() => {
       void loadAccounts();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [loadAccounts]);
+  }, [loadAccounts, ready]);
 
   const handleLink = async (provider: SocialIdentityProvider) => {
     if (busyProvider) {
@@ -142,12 +175,13 @@ export function LinkedAccountsPanel() {
     }
     setBusyProvider(unlinkTarget);
     try {
-      const response = await fetch('/api/auth/identities/unlink', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: unlinkTarget }),
-      });
+      const response = await fetch(
+        '/api/auth/identities/unlink',
+        await authRequestInit({
+          method: 'POST',
+          body: JSON.stringify({ provider: unlinkTarget }),
+        }),
+      );
       const payload = (await response.json().catch(() => null)) as AccountsResponse | null;
       if (!response.ok) {
         throw new Error(payload?.error || '연동을 해제하지 못했습니다.');
@@ -169,12 +203,13 @@ export function LinkedAccountsPanel() {
     }
     setPhoneBusy(true);
     try {
-      const response = await fetch('/api/auth/identities/phone', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
-      });
+      const response = await fetch(
+        '/api/auth/identities/phone',
+        await authRequestInit({
+          method: 'POST',
+          body: JSON.stringify({ phone }),
+        }),
+      );
       const payload = (await response.json().catch(() => null)) as AccountsResponse | null;
       if (!response.ok) {
         throw new Error(payload?.error || '휴대전화를 연동하지 못했습니다.');
@@ -197,10 +232,10 @@ export function LinkedAccountsPanel() {
     }
     setDeleting(true);
     try {
-      const response = await fetch('/api/auth/account/delete', {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const response = await fetch(
+        '/api/auth/account/delete',
+        await authRequestInit({ method: 'POST' }),
+      );
       const payload = (await response.json().catch(() => null)) as { error?: string } | null;
       if (!response.ok) {
         throw new Error(payload?.error || '회원 탈퇴를 완료하지 못했습니다.');

@@ -1,6 +1,7 @@
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { listLinkedAccountStatuses } from '@/lib/auth-identities';
+import { readBearerToken } from '@/lib/auth-request';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createClient } from '@/lib/supabase/server';
 
@@ -27,7 +28,10 @@ export async function GET(request: Request) {
       );
     }
 
-    const { data, error } = await supabase.auth.getUser();
+    const bearer = readBearerToken(request.headers.get('authorization'));
+    const { data, error } = bearer
+      ? await supabase.auth.getUser(bearer)
+      : await supabase.auth.getUser();
     if (error || !data.user) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401, headers: NO_STORE });
     }

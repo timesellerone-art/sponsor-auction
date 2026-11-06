@@ -122,3 +122,22 @@ export async function acceptNextConfirm(page: Page) {
     await dialog.accept();
   });
 }
+
+const AUTH_CONSOLE_NOISE =
+  /CHANNEL_ERROR|연동 계정 조회|로그인이 필요합니다|Failed to load resource:.*401/;
+
+export function collectAuthConsoleNoise(page: Page) {
+  const messages: string[] = [];
+  page.on('console', (msg) => {
+    const text = msg.text();
+    if (AUTH_CONSOLE_NOISE.test(text)) {
+      messages.push(`${msg.type()}: ${text}`);
+    }
+  });
+  page.on('pageerror', (error) => {
+    if (AUTH_CONSOLE_NOISE.test(error.message)) {
+      messages.push(`pageerror: ${error.message}`);
+    }
+  });
+  return messages;
+}

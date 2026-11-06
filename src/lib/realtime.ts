@@ -1,10 +1,14 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import { isDemoAccountEmail } from '@/lib/auth-mock';
+import { isUuid } from '@/lib/uuid';
 import type { Database } from '@/types/database';
 import {
   REALTIME_TABLES,
   type RealtimeChange,
   type RealtimeTable,
 } from '@/types/realtime';
+
+export const REALTIME_MAX_RETRIES = 3;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -15,6 +19,23 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function isRealtimeTable(value: string): value is RealtimeTable {
   return (REALTIME_TABLES as readonly string[]).includes(value);
+}
+
+export function canSubscribeRealtime(userId?: string | null, email?: string | null) {
+  return isUuid(userId) && !isDemoAccountEmail(email);
+}
+
+export function isRealtimeSessionReady(input: {
+  userId?: string | null;
+  email?: string | null;
+  accessToken?: string | null;
+}) {
+  return canSubscribeRealtime(input.userId, input.email) && Boolean(input.accessToken?.trim());
+}
+
+export function realtimeRetryDelayMs(attempt: number) {
+  const safeAttempt = Math.max(0, attempt);
+  return Math.min(1000 * 2 ** safeAttempt, 8000);
 }
 
 export function parseRealtimePayload(payload: {
@@ -53,7 +74,21 @@ export function subscribeRealtimeTables(
   channelName = 'sponsor-auction-ops',
 ): () => void {
   let channel: RealtimeChannel | null = null;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let attempts = 0;
+  let stopped = false;
+  let loggedGiveUp = false;
+
+  const clearRetry = () => {
+    if (!retryTimer) {
+      return;
+    }
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  };
+
   const teardown = () => {
+    clearRetry();
     if (!channel) {
       return;
     }
@@ -65,35 +100,65 @@ export function subscribeRealtimeTables(
     channel = null;
   };
 
-  try {
-    channel = client.channel(channelName);
-    for (const table of REALTIME_TABLES) {
-      channel = channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table },
-        (payload) => {
-          const change = parseRealtimePayload({
-            table,
-            eventType: payload.eventType,
-            new: payload.new,
-            old: payload.old,
-          });
-          if (change) {
-            onChange(change);
-          }
-        },
-      );
+  const start = () => {
+    if (stopped) {
+      return;
     }
-    channel.subscribe((status) => {
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        console.warn('[SponsorAuction] Realtime 구독이 불안정합니다.', status);
-      }
-    });
-  } catch (error) {
-    console.warn('[SponsorAuction] Realtime 구독을 시작하지 못했습니다.', error);
     teardown();
-    return () => undefined;
-  }
+    try {
+      channel = client.channel(channelName);
+      for (const table of REALTIME_TABLES) {
+        channel = channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table },
+          (payload) => {
+            const change = parseRealtimePayload({
+              table,
+              eventType: payload.eventType,
+              new: payload.new,
+              old: payload.old,
+            });
+            if (change) {
+              onChange(change);
+            }
+          },
+        );
+      }
+      channel.subscribe((status) => {
+        if (stopped) {
+          return;
+        }
+        if (status === 'SUBSCRIBED') {
+          attempts = 0;
+          loggedGiveUp = false;
+          return;
+        }
+        if (status !== 'CHANNEL_ERROR' && status !== 'TIMED_OUT') {
+          return;
+        }
+        if (attempts >= REALTIME_MAX_RETRIES) {
+          if (!loggedGiveUp) {
+            loggedGiveUp = true;
+            console.warn('[SponsorAuction] Realtime 구독을 중단합니다.', status);
+          }
+          teardown();
+          return;
+        }
+        const delay = realtimeRetryDelayMs(attempts);
+        attempts += 1;
+        clearRetry();
+        retryTimer = setTimeout(start, delay);
+      });
+    } catch (error) {
+      console.warn('[SponsorAuction] Realtime 구독을 시작하지 못했습니다.', error);
+      teardown();
+    }
+  };
 
-  return teardown;
+  start();
+
+  return () => {
+    stopped = true;
+    teardown();
+  };
 }

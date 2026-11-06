@@ -11,13 +11,14 @@ test.describe('역경매 검색·필터와 광고주 메인 노출', () => {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { name: '진행 중인 역경매' })).toBeVisible();
-    await expect(page.getByPlaceholder('캠페인 제목 또는 설명 검색')).toBeVisible();
+    const search = page.getByRole('searchbox', { name: '캠페인 제목 또는 설명 검색' }).first();
+    await expect(search).toBeVisible();
 
-    await page.getByPlaceholder('캠페인 제목 또는 설명 검색').fill('무알콜');
+    await search.fill('무알콜');
     await expect(page.getByRole('link', { name: ACTIVE_SHORTS })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_REELS })).toHaveCount(0);
 
-    await page.getByPlaceholder('캠페인 제목 또는 설명 검색').fill('');
+    await search.fill('');
     await expect(page.getByRole('button', { name: 'YouTube Shorts' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'YouTube', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Threads' })).toBeVisible();
