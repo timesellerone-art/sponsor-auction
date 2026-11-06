@@ -13,7 +13,8 @@ import {
   type AdminBidLifecycle,
 } from '@/lib/admin-bid-status';
 import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
-import { platformFeeFromAmount } from '@/lib/fees';
+import { DELETED_CAMPAIGN_LABEL } from '@/lib/admin-integrity';
+import { creatorCombinedFeeAmount, floorToTenWon, platformNetFeeFromBid } from '@/lib/fees';
 import { cn, formatAdminTimestamp, formatWon } from '@/lib/utils';
 import type { BidAdminFilter, PayoutItem, ProfileItem } from '@/types/admin';
 import type { AuctionItem, BidItem } from '@/types/auction';
@@ -110,7 +111,7 @@ export function AdminBidTable({
           bid.creatorName,
           profile?.email || payout?.creatorEmail || '',
           payout?.bankAccount || '',
-          auction?.title || '',
+          auction?.title || DELETED_CAMPAIGN_LABEL,
           auction?.authorName || '',
           ADMIN_BID_STATUS_LABEL[lifecycle],
           bid.bidAmount,
@@ -180,7 +181,7 @@ export function AdminBidTable({
               {filtered.map((bid) => {
                 const auction = auctionById.get(bid.auctionId);
                 const lifecycle = resolveAdminBidStatus(bid, auction, payouts);
-                const campaign = auction?.title || '연결된 캠페인 없음';
+                const campaign = auction?.title || DELETED_CAMPAIGN_LABEL;
                 const advertiser = auction?.authorName || '미상';
                 const payout = payouts.find((item) => payoutLinkedToBid(item, bid, auction));
                 const profile =
@@ -188,6 +189,8 @@ export function AdminBidTable({
                   profileByKey.get(bid.creatorName || '');
                 const email = profile?.email || payout?.creatorEmail || '';
                 const account = payout?.bankAccount || '';
+                const creatorFee = floorToTenWon(creatorCombinedFeeAmount(bid.bidAmount));
+                const platformNet = platformNetFeeFromBid(bid.bidAmount);
 
                 return (
                   <tr key={bid.id} className="border-b border-zinc-100 last:border-0">
@@ -227,8 +230,14 @@ export function AdminBidTable({
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top font-medium whitespace-nowrap text-zinc-950">
                       {formatWon(bid.bidAmount)}
                     </td>
-                    <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
-                      {formatWon(platformFeeFromAmount(bid.bidAmount))}
+                    <td
+                      className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600"
+                      title={`크리에이터 공제 20% ${formatWon(creatorFee)} · 플랫폼 순수익 26.7% ${formatWon(platformNet)}`}
+                    >
+                      <span className="block truncate">{formatWon(platformNet)}</span>
+                      <span className="block truncate text-[10px] text-zinc-400">
+                        공제 {formatWon(creatorFee)}
+                      </span>
                     </td>
                     <td className="min-w-0 max-w-[120px] overflow-hidden px-1 py-1.5 align-top sm:px-2">
                       {bid.creatorChannelUrl ? (

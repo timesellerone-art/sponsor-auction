@@ -21,6 +21,7 @@ import {
   savePayoutMemo,
   updateProfileStatus,
 } from '@/lib/admin';
+import { applyAdminPayoutIntegrity } from '@/lib/admin-integrity';
 import { applyPaidPayoutLocal } from '@/lib/payouts';
 import { VALIDATION } from '@/lib/validation';
 import {
@@ -171,6 +172,16 @@ export function AdminDashboard({
       window.clearTimeout(timer);
     };
   }, [load]);
+
+  const reconciledPayouts = useMemo(
+    () =>
+      applyAdminPayoutIntegrity(
+        asPayoutList(payouts),
+        asAuctionList(auctions),
+        asBidList(bids),
+      ),
+    [auctions, bids, payouts],
+  );
 
   const stats = useMemo(() => {
     const safeAuctions = asAuctionList(auctions);
@@ -385,7 +396,19 @@ export function AdminDashboard({
       return null;
     }
 
-    const latest = payouts.find((item) => item.id === payout.id) ?? payout;
+    const latest = reconciledPayouts.find((item) => item.id === payout.id) ?? payout;
+    if (latest.status === 'cancelled') {
+      if (!options?.silent) {
+        showToast(VALIDATION.payoutCancelled);
+      }
+      return null;
+    }
+    if (!latest.creatorEmail?.trim() || !latest.bankAccount?.trim()) {
+      if (!options?.silent) {
+        showToast(VALIDATION.payoutMissingContact);
+      }
+      return null;
+    }
     if (latest.status !== 'pending') {
       if (!options?.silent) {
         showToast(VALIDATION.payoutAlready);
@@ -405,7 +428,7 @@ export function AdminDashboard({
     let paidItem: PayoutItem | null = null;
     await run(payout.id, async () => {
       try {
-        const current = payouts.find((item) => item.id === payout.id) ?? latest;
+        const current = reconciledPayouts.find((item) => item.id === payout.id) ?? latest;
         if (current.status !== 'pending') {
           showToast(VALIDATION.payoutAlready);
           return;
@@ -549,11 +572,11 @@ export function AdminDashboard({
             />
           )
         ) : tab === 'payouts' ? (
-          asPayoutList(payouts).length === 0 ? (
+          reconciledPayouts.length === 0 ? (
             <AdminEmptyState message={loadError ?? undefined} />
           ) : (
             <AdminPayoutTable
-              payouts={asPayoutList(payouts)}
+              payouts={reconciledPayouts}
               busyId={busyId}
               onApprove={handleApprovePayout}
               onSaveMemo={handleSavePayoutMemo}
@@ -572,7 +595,7 @@ export function AdminDashboard({
           <AdminBidTable
             bids={asBidList(bids)}
             auctions={asAuctionList(auctions)}
-            payouts={asPayoutList(payouts)}
+            payouts={reconciledPayouts}
             profiles={asProfileList(profiles)}
           />
         )}

@@ -7,7 +7,7 @@ import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
 import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
 import { formatAdminTimestamp } from '@/lib/utils';
 import type { ProfileAdminFilter, ProfileItem, ProfileStatus } from '@/types/admin';
-import { isAdmin, memberRolesLabel } from '@/types/auth';
+import { isAdmin, memberPrimaryRoleLabel } from '@/types/auth';
 
 const STATUS_LABEL: Record<ProfileStatus, string> = {
   active: '정상',
@@ -85,7 +85,7 @@ export function AdminUserTable({
                 filtered.map((profile) => [
                   profile.name,
                   profile.email,
-                  memberRolesLabel(profile),
+                  memberPrimaryRoleLabel(profile),
                   STATUS_LABEL[profile.status] ?? profile.status,
                   formatAdminTimestamp(profile.createdAt),
                 ]),
@@ -146,7 +146,9 @@ export function AdminUserTable({
                       </p>
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
-                      {memberRolesLabel(profile)}
+                      <span className="inline-flex max-w-full truncate rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700">
+                        {memberPrimaryRoleLabel(profile)}
+                      </span>
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
                       {formatAdminTimestamp(profile.createdAt)}

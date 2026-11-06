@@ -423,6 +423,8 @@ export async function createBid(
       isBlind: auction.isBlind,
       winnerBidId: auction.winnerBidId,
       deadline: auction.deadline,
+      creatorEmail: input.creatorEmail,
+      bankAccount: input.bankAccount,
     });
     if (bidError) {
       return fail(null, bidError);

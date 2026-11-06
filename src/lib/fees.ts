@@ -7,6 +7,8 @@ import {
 
 export const ADVERTISER_FEE_RATE = 0.1;
 export const CREATOR_FEE_RATE = CREATOR_COMBINED_DEDUCTION_RATE;
+export const PG_FEE_RATE = 0.033;
+export const PLATFORM_NET_RATE = 0.267;
 
 export { bidAmountFromCreatorPayout, creatorCombinedFeeAmount };
 
@@ -16,6 +18,23 @@ function asWon(value: number) {
   }
 
   return Math.round(value);
+}
+
+export function floorToTenWon(value: number) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+
+  return Math.floor(value / 10) * 10;
+}
+
+export function platformNetFeeFromBid(bidAmount: number) {
+  const won = asWon(bidAmount);
+  if (won <= 0) {
+    return 0;
+  }
+
+  return floorToTenWon(won * PLATFORM_NET_RATE);
 }
 
 export function advertiserFeeFromBid(bidAmount: number) {

@@ -47,16 +47,53 @@ export const VALIDATION = {
   unblindAlready: '이미 블라인드가 해제된 게시글입니다.',
   sanctionAlready: '이미 같은 제재 상태입니다.',
   payoutAlready: '이미 승인된 정산입니다.',
+  payoutCancelled: '취소된 캠페인의 정산은 지급할 수 없습니다.',
+  payoutMissingContact: '정산 계좌와 이메일이 있어야 지급할 수 있습니다.',
+  settlementEmailRequired:
+    '정산용 이메일이 없어 제안할 수 없습니다. 계정 설정에서 이메일을 등록해 주세요.',
+  settlementAccountRequired: '정산 계좌를 입력해 주세요.',
   termsRequired: '서비스 이용약관에 동의해 주세요.',
   privacyRequired: '개인정보처리방침에 동의해 주세요.',
   refundRequired: '구매 조건 확인 및 환불 규정에 동의해 주세요.',
 } as const;
 
-const CHANNEL_URL_PATTERN =
-  /^https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_+.~#?&/=]*)$/;
-
 export function isValidChannelUrl(value: string) {
-  return CHANNEL_URL_PATTERN.test(value.trim());
+  const trimmed = value.trim();
+  if (!trimmed || /\s/.test(trimmed)) {
+    return false;
+  }
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return false;
+    }
+    return url.hostname.includes('.');
+  } catch {
+    return false;
+  }
+}
+
+export function isValidSettlementEmail(value: string) {
+  const email = value.trim().toLowerCase();
+  return Boolean(email.includes('@') && !email.endsWith('@oauth.sponsor-auction.local'));
+}
+
+export function isValidBankAccount(value: string) {
+  const account = value.trim();
+  return account.length >= 6 && /\d/.test(account);
+}
+
+export function validateSettlementContact(input: {
+  email?: string | null;
+  bankAccount?: string | null;
+}): string | null {
+  if (!isValidSettlementEmail(input.email ?? '')) {
+    return VALIDATION.settlementEmailRequired;
+  }
+  if (!isValidBankAccount(input.bankAccount ?? '')) {
+    return VALIDATION.settlementAccountRequired;
+  }
+  return null;
 }
 
 export function parseAmount(raw: string): { empty: boolean; value: number } {
@@ -90,6 +127,8 @@ export type BidFieldErrors = {
   creatorChannelUrl?: string;
   bidAmount?: string;
   proposalText?: string;
+  bankAccount?: string;
+  settlementEmail?: string;
   agreeTerms?: string;
   agreePrivacy?: string;
 };
@@ -176,6 +215,8 @@ export function validateBidForm(values: {
   bidAmount: string;
   proposalText: string;
   auctionBudget?: number;
+  creatorEmail?: string;
+  bankAccount?: string;
   agreeTerms?: boolean;
   agreePrivacy?: boolean;
 }): BidFieldErrors {
@@ -209,6 +250,13 @@ export function validateBidForm(values: {
     errors.creatorChannelUrl = VALIDATION.channelRequired;
   } else if (!isValidChannelUrl(values.creatorChannelUrl)) {
     errors.creatorChannelUrl = VALIDATION.channelInvalid;
+  }
+
+  if (!isValidSettlementEmail(values.creatorEmail ?? '')) {
+    errors.settlementEmail = VALIDATION.settlementEmailRequired;
+  }
+  if (!isValidBankAccount(values.bankAccount ?? '')) {
+    errors.bankAccount = VALIDATION.settlementAccountRequired;
   }
 
   if (!values.agreeTerms) {
@@ -383,6 +431,8 @@ export function validateBidPayload(input: {
   isBlind?: boolean;
   winnerBidId?: string | null;
   deadline?: string;
+  creatorEmail?: string | null;
+  bankAccount?: string | null;
 }): string | null {
   const closedReason = getBidBlockReason({
     status: input.auctionStatus,
@@ -421,6 +471,13 @@ export function validateBidPayload(input: {
   }
   if (!isValidChannelUrl(input.creatorChannelUrl)) {
     return VALIDATION.channelInvalid;
+  }
+  const settlementError = validateSettlementContact({
+    email: input.creatorEmail,
+    bankAccount: input.bankAccount,
+  });
+  if (settlementError) {
+    return settlementError;
   }
 
   return null;

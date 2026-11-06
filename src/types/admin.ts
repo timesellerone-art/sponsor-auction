@@ -2,7 +2,7 @@ export type ProfileRole = 'advertiser' | 'creator' | 'admin';
 
 export type ProfileStatus = 'active' | 'suspended';
 
-export type PayoutStatus = 'pending' | 'paid';
+export type PayoutStatus = 'pending' | 'paid' | 'cancelled';
 
 export interface ProfileItem {
   id: string;
@@ -40,6 +40,7 @@ export interface PayoutItem {
   vatAmount?: number;
   withholdingAmount?: number;
   netPayoutAmount?: number;
+  platformNetFee?: number;
 }
 
 export type PayoutPeriodFilter = 'all' | 'today' | '7d' | 'month' | 'range';
@@ -48,6 +49,6 @@ export type AuctionAdminFilter = 'all' | 'active' | 'awarded' | 'ended';
 
 export type ProfileAdminFilter = 'all' | 'active' | 'suspended';
 
-export type PayoutAdminFilter = 'all' | 'pending' | 'paid';
+export type PayoutAdminFilter = 'all' | 'pending' | 'paid' | 'cancelled';
 
 export type BidAdminFilter = 'all' | 'pending' | 'awarded' | 'paid' | 'rejected';

@@ -177,3 +177,7 @@ export function memberRolesLabel(source: unknown): string {
   }
   return roles.map((role) => memberRoleLabel(role)).join(' · ');
 }
+
+export function memberPrimaryRoleLabel(source: unknown): string {
+  return memberRoleLabel(primaryAuthRole(source));
+}

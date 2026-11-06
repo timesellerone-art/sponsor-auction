@@ -70,6 +70,8 @@ export type CreateAuctionInput = Omit<
 export type CreateBidInput = Omit<BidItem, 'id' | 'createdAt' | 'status' | 'creatorId'> & {
   status?: BidStatus;
   creatorId?: string | null;
+  creatorEmail?: string | null;
+  bankAccount?: string | null;
 };
 
 export interface DataResult<T> {

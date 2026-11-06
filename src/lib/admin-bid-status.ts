@@ -42,16 +42,22 @@ export function resolveAdminBidStatus(
   auction: AuctionItem | undefined,
   payouts: PayoutItem[],
 ): AdminBidLifecycle {
-  const paid = payouts.some((item) => payoutMatchesBid(item, bid, auction));
+  if (!auction) {
+    return 'rejected';
+  }
+
+  const paid = payouts.some(
+    (item) => item.status !== 'cancelled' && payoutMatchesBid(item, bid, auction),
+  );
   if (paid) {
     return 'paid';
   }
 
-  if (bid.status === 'selected') {
+  if (bid.status === 'selected' && auction.status !== 'cancelled') {
     return 'awarded';
   }
 
-  const auctionStatus = auction?.status;
+  const auctionStatus = auction.status;
   if (
     auctionStatus === 'closed' ||
     auctionStatus === 'cancelled' ||

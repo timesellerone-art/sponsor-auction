@@ -26,12 +26,14 @@ import type {
 const STATUS_LABEL: Record<PayoutStatus, string> = {
   pending: '지급 대기',
   paid: '지급 완료',
+  cancelled: '취소/무효',
 };
 
 const STATUS_FILTERS: { id: PayoutAdminFilter; label: string }[] = [
   { id: 'all', label: '전체' },
   { id: 'pending', label: '지급 대기' },
   { id: 'paid', label: '지급 완료' },
+  { id: 'cancelled', label: '취소/무효' },
 ];
 
 const PERIODS: { id: PayoutPeriodFilter; label: string }[] = [
@@ -208,7 +210,7 @@ export function AdminPayoutTable({
         item.withholdingAmount ?? '',
         item.platformFee ?? '',
         item.netPayoutAmount ?? item.amount,
-        item.amount,
+        item.netPayoutAmount ?? item.amount,
         item.bidAmount ?? '',
         STATUS_LABEL[item.status],
         memoDrafts[item.id] ?? item.adminMemo ?? '',
@@ -245,21 +247,21 @@ export function AdminPayoutTable({
   return (
     <div className="flex w-full min-w-0 flex-col gap-4">
       <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <article className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4">
-          <p className="text-xs font-medium text-zinc-500">총 결제/입찰 금액</p>
-          <p className="mt-2 truncate text-lg font-bold text-zinc-950">{formatWon(stats.volume)}</p>
+        <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4">
+          <p className="truncate text-xs font-medium text-zinc-500">총 결제/입찰 금액</p>
+          <p className="mt-2 min-w-0 break-all text-lg font-bold text-zinc-950">{formatWon(stats.volume)}</p>
         </article>
-        <article className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4">
-          <p className="text-xs font-medium text-zinc-500">플랫폼 총 수수료 수익</p>
-          <p className="mt-2 truncate text-lg font-bold text-teal-800">{formatWon(stats.fees)}</p>
+        <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4">
+          <p className="truncate text-xs font-medium text-zinc-500">플랫폼 총 수수료 수익</p>
+          <p className="mt-2 min-w-0 break-all text-lg font-bold text-teal-800">{formatWon(stats.fees)}</p>
         </article>
-        <article className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4">
-          <p className="text-xs font-medium text-zinc-500">크리에이터 지급 완료액</p>
-          <p className="mt-2 truncate text-lg font-bold text-emerald-800">{formatWon(stats.paid)}</p>
+        <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4">
+          <p className="truncate text-xs font-medium text-zinc-500">크리에이터 지급 완료액</p>
+          <p className="mt-2 min-w-0 break-all text-lg font-bold text-emerald-800">{formatWon(stats.paid)}</p>
         </article>
-        <article className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4">
-          <p className="text-xs font-medium text-zinc-500">크리에이터 지급 대기액</p>
-          <p className="mt-2 truncate text-lg font-bold text-amber-800">{formatWon(stats.pending)}</p>
+        <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4">
+          <p className="truncate text-xs font-medium text-zinc-500">크리에이터 지급 대기액</p>
+          <p className="mt-2 min-w-0 break-all text-lg font-bold text-amber-800">{formatWon(stats.pending)}</p>
         </article>
       </div>
 
@@ -396,8 +398,10 @@ export function AdminPayoutTable({
                 {filtered.map((payout) => {
                   const row = enrichPayout(payout);
                   const pending = row.status === 'pending';
+                  const cancelled = row.status === 'cancelled';
                   const busy = busyId === payout.id || busyId === 'bulk';
                   const anyBusy = Boolean(busyId);
+                  const payoutAmount = row.netPayoutAmount ?? row.amount;
 
                   return (
                     <tr
@@ -444,9 +448,9 @@ export function AdminPayoutTable({
                       >
                         <span
                           className="block min-w-0 max-w-[120px] truncate"
-                          title={row.auctionTitle || '연결된 캠페인 없음'}
+                          title={row.auctionTitle || '(삭제된 캠페인)'}
                         >
-                          {row.auctionTitle || '연결된 캠페인 없음'}
+                          {row.auctionTitle || '(삭제된 캠페인)'}
                         </span>
                       </td>
                       <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
@@ -468,14 +472,16 @@ export function AdminPayoutTable({
                         {formatWon(row.platformFee ?? 0)}
                       </td>
                       <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top font-medium tabular-nums text-ellipsis whitespace-nowrap text-zinc-950">
-                        {formatWon(row.amount)}
+                        {formatWon(payoutAmount)}
                       </td>
                       <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top">
                         <span
                           className={
-                            pending
-                              ? 'inline-block max-w-full truncate rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800'
-                              : 'inline-block max-w-full truncate rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800'
+                            cancelled
+                              ? 'inline-block max-w-full truncate rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600'
+                              : pending
+                                ? 'inline-block max-w-full truncate rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800'
+                                : 'inline-block max-w-full truncate rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800'
                           }
                         >
                           {STATUS_LABEL[row.status] ?? row.status}
@@ -495,6 +501,8 @@ export function AdminPayoutTable({
                               {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
                               {busy ? '처리 중...' : '지급 처리'}
                             </button>
+                          ) : cancelled ? (
+                            <span className="text-xs font-semibold text-zinc-400">지급 불가</span>
                           ) : (
                             <span className="text-xs font-semibold text-zinc-400">지급 완료</span>
                           )}

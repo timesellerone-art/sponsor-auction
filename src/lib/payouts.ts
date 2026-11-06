@@ -1,3 +1,4 @@
+import { applyAdminPayoutIntegrity } from '@/lib/admin-integrity';
 import {
   advertiserPayableAmount,
   bidAmountFromCreatorPayout,
@@ -5,6 +6,7 @@ import {
   creatorPayoutFromCharge,
   platformFeeFromAmount,
 } from '@/lib/fees';
+import { VALIDATION } from '@/lib/validation';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { isInvalidUuidError, isUuid, uuidIds } from '@/lib/uuid';
 import type { PayoutItem, PayoutStatus } from '@/types/admin';
@@ -171,6 +173,18 @@ export function mergePayoutLists(...lists: PayoutItem[][]) {
       if (!existing) {
         rememberKeys(item);
         merged.push(item);
+        continue;
+      }
+      if (existing.status === 'cancelled' && item.status !== 'paid') {
+        continue;
+      }
+      if (item.status === 'cancelled' && existing.status !== 'paid') {
+        const index = merged.findIndex((row) => row === existing);
+        const replaced = { ...existing, ...item, id: existing.id, status: 'cancelled' as const };
+        if (index >= 0) {
+          merged[index] = replaced;
+        }
+        rememberKeys(replaced);
         continue;
       }
       if (existing.status === 'paid' && item.status !== 'paid') {
@@ -576,6 +590,9 @@ export async function listPayoutsFromDatabase(
   for (const payment of payments) {
     const bid = bidMap.get(payment.bidId);
     const auction = auctionMap.get(payment.auctionId);
+    if (auction?.status === 'cancelled') {
+      continue;
+    }
     const profile = bid?.creator_id ? profileMap.get(bid.creator_id) : undefined;
     const amount =
       bid && bid.bid_amount > 0
@@ -643,13 +660,40 @@ export async function listPayoutsFromDatabase(
 
     try {
       const latest = await selectPayouts(client);
-      return overlayDbPayoutStatus(latest, mergePayoutLists(latest, virtual));
+      return applyAdminPayoutIntegrity(
+        overlayDbPayoutStatus(latest, mergePayoutLists(latest, virtual)),
+        [...auctionMap.values()],
+        [...bidMap.values()].map((item) => ({
+          id: item.id,
+          auctionId: item.auction_id,
+          bidAmount: item.bid_amount,
+          status: item.status === 'selected' ? 'selected' : 'pending',
+        })),
+      );
     } catch {
-      return overlayDbPayoutStatus(existing, mergePayoutLists(existing, virtual));
+      return applyAdminPayoutIntegrity(
+        overlayDbPayoutStatus(existing, mergePayoutLists(existing, virtual)),
+        [...auctionMap.values()],
+        [...bidMap.values()].map((item) => ({
+          id: item.id,
+          auctionId: item.auction_id,
+          bidAmount: item.bid_amount,
+          status: item.status === 'selected' ? 'selected' : 'pending',
+        })),
+      );
     }
   }
 
-  return overlayDbPayoutStatus(existing, mergePayoutLists(existing, virtual));
+  return applyAdminPayoutIntegrity(
+    overlayDbPayoutStatus(existing, mergePayoutLists(existing, virtual)),
+    [...auctionMap.values()],
+    [...bidMap.values()].map((item) => ({
+      id: item.id,
+      auctionId: item.auction_id,
+      bidAmount: item.bid_amount,
+      status: item.status === 'selected' ? 'selected' : 'pending',
+    })),
+  );
 }
 
 export type MarkPayoutPaidInput = {
@@ -903,6 +947,9 @@ export async function markPayoutPaid(
   ]);
 
   const auction = auctions[0];
+  if (auction?.status === 'cancelled') {
+    return { ok: false, message: VALIDATION.payoutCancelled };
+  }
   let bid: BidLookup | undefined = bids[0];
   if (!bid && auction?.winner_bid_id) {
     const winners = await loadByIds<BidLookup>(

@@ -101,6 +101,8 @@ export async function POST(request: Request) {
         creatorChannelUrl: asText(body?.creatorChannelUrl),
         bidAmount: asNumber(body?.bidAmount),
         proposalText,
+        creatorEmail: asText(body?.creatorEmail),
+        bankAccount: asText(body?.bankAccount),
       },
       { client: supabase },
     );

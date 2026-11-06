@@ -1,9 +1,4 @@
-import {
-  advertiserPayableAmount,
-  bidAmountFromCreatorPayout,
-  platformFeeFromAmount,
-} from '@/lib/fees';
-import { describeSettlementTax } from '@/lib/tax';
+import { enrichPayoutAmounts } from '@/lib/admin-integrity';
 import type { PayoutItem, PayoutPeriodFilter } from '@/types/admin';
 
 function startOfLocalDay(date: Date) {
@@ -17,21 +12,7 @@ function payoutTime(item: PayoutItem) {
 }
 
 export function enrichPayout(item: PayoutItem): PayoutItem {
-  const bidAmount =
-    item.bidAmount && item.bidAmount > 0
-      ? item.bidAmount
-      : bidAmountFromCreatorPayout(item.amount);
-  const tax = describeSettlementTax(bidAmount);
-  return {
-    ...item,
-    bidAmount,
-    platformFee: item.platformFee ?? platformFeeFromAmount(bidAmount),
-    advertiserCharge: item.advertiserCharge ?? advertiserPayableAmount(bidAmount),
-    supplyAmount: item.supplyAmount ?? tax.advertiser.supplyAmount,
-    vatAmount: item.vatAmount ?? tax.advertiser.vatAmount,
-    withholdingAmount: item.withholdingAmount ?? tax.creator.withholdingAmount,
-    netPayoutAmount: item.netPayoutAmount ?? tax.creator.netPayout,
-  };
+  return enrichPayoutAmounts(item);
 }
 
 export function filterPayoutsByPeriod(
@@ -75,12 +56,16 @@ export function summarizePayouts(payouts: PayoutItem[]) {
   return payouts.reduce(
     (acc, item) => {
       const row = enrichPayout(item);
+      if (row.status === 'cancelled') {
+        return acc;
+      }
       acc.volume += row.advertiserCharge ?? 0;
-      acc.fees += row.platformFee ?? 0;
+      acc.fees += row.platformNetFee ?? 0;
+      const payoutAmount = row.netPayoutAmount ?? row.amount;
       if (row.status === 'paid') {
-        acc.paid += row.amount;
+        acc.paid += payoutAmount;
       } else {
-        acc.pending += row.amount;
+        acc.pending += payoutAmount;
       }
       return acc;
     },

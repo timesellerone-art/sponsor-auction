@@ -292,6 +292,12 @@ export async function approvePayout(
       : (target.paymentOrderId || target.id).trim();
 
   return withExclusiveAction(`payout:${id}`, fail(null, VALIDATION.actionInFlight), async () => {
+  if (payout?.status === 'cancelled') {
+    return fail(null, VALIDATION.payoutCancelled);
+  }
+  if (payout && (!payout.creatorEmail?.trim() || !payout.bankAccount?.trim())) {
+    return fail(null, VALIDATION.payoutMissingContact);
+  }
   if (await useDemoAdminStore()) {
     return approveMockPayout(typeof target === 'string' ? id : target.id);
   }

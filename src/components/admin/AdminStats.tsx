@@ -50,16 +50,20 @@ export function AdminStats({
       {cards.map((card) => (
         <article
           key={card.label}
-          className="min-w-0 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm"
+          className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm"
         >
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium text-zinc-500">{card.label}</p>
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <p className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-500" title={card.label}>
+              {card.label}
+            </p>
             <card.icon className="size-4 shrink-0 text-teal-700" aria-hidden />
           </div>
-          <p className="mt-3 text-xl font-bold tracking-tight text-zinc-950 sm:text-2xl">
+          <p className="mt-3 min-w-0 truncate text-xl font-bold tracking-tight text-zinc-950 sm:text-2xl" title={card.value}>
             {card.value}
           </p>
-          <p className="mt-1 truncate text-xs text-zinc-500">{card.hint}</p>
+          <p className="mt-1 min-w-0 break-keep text-xs leading-5 text-zinc-500" title={card.hint}>
+            {card.hint}
+          </p>
         </article>
       ))}
     </section>

@@ -43,6 +43,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
   const [creatorChannelUrl, setCreatorChannelUrl] = useState('');
   const [bidAmount, setBidAmount] = useState('');
   const [proposalText, setProposalText] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -61,6 +62,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
     setCreatorChannelUrl('');
     setBidAmount('');
     setProposalText('');
+    setBankAccount('');
     setErrors({});
     setSubmitError(null);
     setAgreeTerms(false);
@@ -75,6 +77,15 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
     const frame = window.requestAnimationFrame(() => {
       firstFieldRef.current?.focus({ preventScroll: true });
     });
+    const fillBank = window.setTimeout(() => {
+      setBankAccount((current) =>
+        current.trim()
+          ? current
+          : isDemoAccountEmail(user?.email)
+            ? '카카오뱅크 3333-00-0000000'
+            : current,
+      );
+    }, 0);
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -88,10 +99,11 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
     document.addEventListener('keydown', onKeyDown);
     return () => {
       window.cancelAnimationFrame(frame);
+      window.clearTimeout(fillBank);
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [open, onClose, isSubmitting]);
+  }, [open, onClose, isSubmitting, user?.email]);
 
   if (!open || !auction) {
     return null;
@@ -125,11 +137,17 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
           return;
         }
 
+        const settlementEmail = user.email?.trim() ?? '';
+        const resolvedBank =
+          bankAccount.trim() ||
+          (isDemoAccountEmail(user.email) ? '카카오뱅크 3333-00-0000000' : '');
         const nextErrors = validateBidForm({
           creatorChannelUrl,
           bidAmount,
           proposalText,
           auctionBudget: currentAuction.budget,
+          creatorEmail: settlementEmail,
+          bankAccount: resolvedBank,
           agreeTerms,
           agreePrivacy,
         });
@@ -144,7 +162,11 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
                 ? 'bid-proposal'
                 : nextErrors.creatorChannelUrl
                   ? 'bid-url'
-                  : 'bid-agreements';
+                  : nextErrors.settlementEmail
+                    ? 'bid-settlement-email'
+                    : nextErrors.bankAccount
+                      ? 'bid-bank-account'
+                      : 'bid-agreements';
           window.requestAnimationFrame(() => {
             document.getElementById(focusId)?.scrollIntoView({ block: 'nearest' });
           });
@@ -158,6 +180,8 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
           creatorChannelUrl: creatorChannelUrl.trim(),
           bidAmount: Number(bidAmount),
           proposalText: proposalText.trim(),
+          creatorEmail: settlementEmail,
+          bankAccount: resolvedBank,
         };
 
         let result: Awaited<ReturnType<typeof createBid>>;
@@ -321,6 +345,39 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
                 onChange={(event) => setCreatorChannelUrl(event.target.value)}
                 className={inputClass(Boolean(errors.creatorChannelUrl))}
                 placeholder="https://www.youtube.com/@channel"
+              />
+            </Field>
+
+            <Field
+              label="정산 이메일"
+              htmlFor="bid-settlement-email"
+              error={errors.settlementEmail}
+            >
+              <input
+                id="bid-settlement-email"
+                type="email"
+                value={user?.email ?? ''}
+                readOnly
+                title={user?.email || '이메일 없음'}
+                className={inputClass(Boolean(errors.settlementEmail))}
+                placeholder="계정 이메일이 정산 연락처로 사용됩니다"
+              />
+            </Field>
+
+            <Field
+              label="정산 계좌"
+              htmlFor="bid-bank-account"
+              error={errors.bankAccount}
+              hint="은행명 + 계좌번호"
+            >
+              <input
+                id="bid-bank-account"
+                type="text"
+                value={bankAccount}
+                onChange={(event) => setBankAccount(event.target.value)}
+                className={inputClass(Boolean(errors.bankAccount))}
+                placeholder="예: 카카오뱅크 3333-00-0000000"
+                autoComplete="off"
               />
             </Field>
 

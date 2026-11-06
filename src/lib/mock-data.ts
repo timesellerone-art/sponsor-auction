@@ -3,6 +3,7 @@ import type {
   ProfileItem,
   ProfileStatus,
 } from '@/types/admin';
+import { applyAdminPayoutIntegrity, DELETED_CAMPAIGN_LABEL } from '@/lib/admin-integrity';
 import { creatorPayoutAmount } from '@/lib/fees';
 import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { mergePayoutLists } from '@/lib/payouts';
@@ -277,7 +278,7 @@ export const mockPayouts: PayoutItem[] = [
     creatorId: 'usr-006',
     creatorName: '민지쇼츠',
     creatorEmail: 'minji@shorts.creator',
-    amount: 833_000,
+    amount: creatorPayoutAmount(980_000),
     status: 'pending',
     bankAccount: '카카오뱅크 3333-01-1234567',
     adminMemo: '',
@@ -285,13 +286,15 @@ export const mockPayouts: PayoutItem[] = [
     requestedAt: '2026-10-11T09:20:00+09:00',
     paymentOrderId: 'payout-auction-auc-001',
     auctionId: 'auc-001',
+    bidId: 'bid-001',
+    bidAmount: 980_000,
   },
   {
     id: 'payout-auction-auc-002',
     creatorId: 'usr-007',
     creatorName: '피부일기 하연',
     creatorEmail: 'hayeon@skindiary.kr',
-    amount: 612_000,
+    amount: creatorPayoutAmount(720_000),
     status: 'pending',
     bankAccount: '토스뱅크 1000-0001-2345',
     adminMemo: '',
@@ -299,13 +302,15 @@ export const mockPayouts: PayoutItem[] = [
     requestedAt: '2026-10-10T18:05:00+09:00',
     paymentOrderId: 'payout-auction-auc-002',
     auctionId: 'auc-002',
+    bidId: 'bid-003',
+    bidAmount: 720_000,
   },
   {
     id: 'payout-auction-auc-003',
     creatorId: 'usr-008',
     creatorName: '나이트러너 준',
     creatorEmail: 'jun@nightrunner.kr',
-    amount: 1_785_000,
+    amount: creatorPayoutAmount(2_100_000),
     status: 'pending',
     bankAccount: '국민 123456-01-234567',
     adminMemo: '',
@@ -314,13 +319,14 @@ export const mockPayouts: PayoutItem[] = [
     paymentOrderId: 'payout-auction-auc-003',
     auctionId: 'auc-003',
     bidId: 'bid-004',
+    bidAmount: 2_100_000,
   },
   {
     id: 'payout-auction-auc-004',
     creatorId: 'usr-009',
     creatorName: '머니노트 세린',
     creatorEmail: 'serin@moneynote.x',
-    amount: 331_500,
+    amount: creatorPayoutAmount(390_000),
     status: 'paid',
     bankAccount: '신한 110-234-567890',
     adminMemo: '1차 정산 완료',
@@ -329,20 +335,22 @@ export const mockPayouts: PayoutItem[] = [
     paymentOrderId: 'payout-auction-auc-004',
     auctionId: 'auc-004',
     bidId: 'bid-005',
+    bidAmount: 390_000,
   },
   {
     id: 'payout-auction-auc-005',
     creatorId: 'usr-006',
     creatorName: '민지쇼츠',
     creatorEmail: 'minji@shorts.creator',
-    amount: 255_000,
-    status: 'paid',
+    amount: creatorPayoutAmount(300_000),
+    status: 'cancelled',
     bankAccount: '카카오뱅크 3333-01-1234567',
     adminMemo: '',
     auctionTitle: '로컬 카페 브이로그 스폰서십',
     requestedAt: '2026-09-22T11:36:00+09:00',
     paymentOrderId: 'payout-auction-auc-005',
     auctionId: 'auc-005',
+    bidAmount: 300_000,
   },
 ];
 
@@ -580,6 +588,8 @@ export async function createBid(
       isBlind: auction.isBlind,
       winnerBidId: auction.winnerBidId,
       deadline: auction.deadline,
+      creatorEmail: data.creatorEmail,
+      bankAccount: data.bankAccount,
     });
     if (bidError) {
       return fail(null, bidError);
@@ -800,7 +810,13 @@ export async function deleteAuction(
 
     auctionsStore = auctionsStore.filter((item) => item.id !== id);
     bidsStore = bidsStore.filter((item) => item.auctionId !== id);
+    payoutsStore = payoutsStore.map((item) =>
+      item.auctionId === id
+        ? { ...item, status: 'cancelled', auctionTitle: DELETED_CAMPAIGN_LABEL }
+        : item,
+    );
     persistCampaignStores();
+    persistAdminStores();
     return ok(true);
   } catch (error) {
     const message =
@@ -827,6 +843,12 @@ export async function updateAuctionStatus(
     auctionsStore = auctionsStore.map((item) =>
       item.id === id ? updated : item,
     );
+    if (status === 'cancelled') {
+      payoutsStore = payoutsStore.map((item) =>
+        item.auctionId === id ? { ...item, status: 'cancelled' } : item,
+      );
+      persistAdminStores();
+    }
     persistCampaignStores();
     return ok(updated);
   } catch (error) {
@@ -1007,9 +1029,13 @@ function payoutsFromClosedCampaigns(): PayoutItem[] {
 
 export async function getPayouts(): Promise<DataResult<PayoutItem[]>> {
   try {
-    const payouts = mergePayoutLists(
-      guardPayoutList(payoutsStore),
-      payoutsFromClosedCampaigns(),
+    const payouts = applyAdminPayoutIntegrity(
+      mergePayoutLists(
+        guardPayoutList(payoutsStore),
+        payoutsFromClosedCampaigns(),
+      ),
+      guardAuctionList(auctionsStore),
+      Array.isArray(bidsStore) ? bidsStore : [],
     );
     if (payouts.length === 0) {
       return fail([], '정산 요청이 없습니다.');
@@ -1038,8 +1064,16 @@ export async function approvePayout(
       return fail(null, '해당 정산 요청을 찾을 수 없습니다.');
     }
 
+    if (current.status === 'cancelled') {
+      return fail(null, VALIDATION.payoutCancelled);
+    }
+
     if (current.status === 'paid') {
       return fail(null, VALIDATION.payoutAlready);
+    }
+
+    if (!current.creatorEmail?.trim() || !current.bankAccount?.trim()) {
+      return fail(null, VALIDATION.payoutMissingContact);
     }
 
     const updated: PayoutItem = {
