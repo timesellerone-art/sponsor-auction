@@ -361,16 +361,6 @@ export default function LoginPage() {
             )}
             네이버로 계속하기
           </button>
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            title="Apple 로그인은 잠시 비활성화되어 있습니다."
-            className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-full bg-zinc-950 text-sm font-semibold text-white opacity-50"
-          >
-            <AppleMark />
-            Apple로 계속하기
-          </button>
         </div>
 
         <p className="mt-4 text-center text-xs leading-5 text-zinc-500">
@@ -437,10 +427,3 @@ function NaverMark() {
   );
 }
 
-function AppleMark() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-4 fill-white" aria-hidden>
-      <path d="M16.37 12.64c-.03-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.71-3.18-1.73-1.35-.14-2.64.79-3.33.79-.69 0-1.75-.77-2.88-.75-1.48.02-2.85.86-3.61 2.19-1.54 2.67-.39 6.61 1.11 8.77.73 1.06 1.6 2.24 2.74 2.2 1.1-.04 1.52-.71 2.85-.71 1.33 0 1.71.71 2.88.68 1.19-.02 1.94-1.08 2.66-2.14.84-1.23 1.18-2.42 1.2-2.48-.03-.01-2.3-.88-2.32-3.51zM14.6 6.3c.6-.73 1.01-1.74.9-2.75-.87.03-1.92.58-2.54 1.31-.56.65-1.05 1.7-.92 2.69 1.03.08 2.08-.52 2.56-1.25z" />
-    </svg>
-  );
-}

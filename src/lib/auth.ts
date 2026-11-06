@@ -228,7 +228,7 @@ export function subscribeAuthState(listener: (event?: string) => void) {
   };
 }
 
-export type SocialOAuthProvider = 'google' | 'kakao' | 'naver' | 'apple';
+export type SocialOAuthProvider = 'google' | 'kakao' | 'naver';
 
 function rememberOAuthStart(provider: SocialOAuthProvider | null, nextPath?: string | null) {
   const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
@@ -261,7 +261,7 @@ export async function retryLostOAuthOnce(): Promise<boolean> {
     return true;
   }
   const provider = readCookie(OAUTH_PROVIDER_COOKIE);
-  if (provider !== 'google' && provider !== 'kakao' && provider !== 'naver' && provider !== 'apple') {
+  if (provider !== 'google' && provider !== 'kakao' && provider !== 'naver') {
     return false;
   }
   const retriedAt = Number(window.sessionStorage.getItem(OAUTH_RETRY_STORAGE_KEY) || 0);
@@ -318,7 +318,7 @@ export async function signInWithOAuth(
     const session = await supabase.auth.getSession();
     if (session.data.session?.user) {
       const linked = await supabase.auth.linkIdentity({
-        provider: provider as 'google',
+        provider,
         options: oauthOptions,
       });
       if (!linked.error && linked.data.url) {
@@ -334,7 +334,7 @@ export async function signInWithOAuth(
     }
 
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: provider as 'apple',
+      provider,
       options: oauthOptions,
     });
 
@@ -374,10 +374,6 @@ export async function signInWithNaver(nextPath?: string | null) {
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign(naverStart);
   return ok(true);
-}
-
-export async function signInWithApple(nextPath?: string | null) {
-  return signInWithOAuth('apple', nextPath);
 }
 
 async function loadProfile(
