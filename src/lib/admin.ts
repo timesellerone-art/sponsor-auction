@@ -277,6 +277,11 @@ export async function getPayouts(seedFromServer: PayoutItem[] = []): Promise<Dat
   return getMockPayouts();
 }
 
+async function useDemoAdminStore() {
+  const mock = await mockGetSession();
+  return Boolean(mock.data);
+}
+
 export async function approvePayout(
   target: string | PayoutItem,
 ): Promise<DataResult<PayoutItem | null>> {
@@ -287,6 +292,10 @@ export async function approvePayout(
       : (target.paymentOrderId || target.id).trim();
 
   return withExclusiveAction(`payout:${id}`, fail(null, VALIDATION.actionInFlight), async () => {
+  if (await useDemoAdminStore()) {
+    return approveMockPayout(typeof target === 'string' ? id : target.id);
+  }
+
   try {
     const response = await fetch('/api/admin/payouts', {
       method: 'POST',
@@ -353,6 +362,10 @@ export async function savePayoutMemo(
 ): Promise<DataResult<PayoutItem | null>> {
   const id = (payout.paymentOrderId || payout.id).trim();
   return withExclusiveAction(`payout-memo:${id}`, fail(null, VALIDATION.actionInFlight), async () => {
+    if (await useDemoAdminStore()) {
+      return updateMockPayoutMemo(payout.id, adminMemo);
+    }
+
     try {
       const response = await fetch('/api/admin/payouts/memo', {
         method: 'POST',

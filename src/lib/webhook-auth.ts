@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'crypto';
+import { isProductionRuntime } from '@/lib/launch-env';
 
 export function webhookSecret() {
   return (
@@ -24,6 +25,9 @@ function headerSecret(request: Request) {
 export function verifyWebhookSecret(request: Request) {
   const expected = webhookSecret();
   if (!expected) {
+    if (isProductionRuntime()) {
+      return { ok: false, mocked: false as const, missingSecret: true as const };
+    }
     return { ok: true, mocked: true as const };
   }
   const provided = headerSecret(request);

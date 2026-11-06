@@ -238,9 +238,13 @@ test.describe('관리자 페이지 핵심 기능', () => {
       page.getByRole('alert').filter({ hasText: '지급 처리했습니다.' }),
     ).toBeVisible();
 
-    const updatedRow = page.locator('tbody tr').filter({ hasText: campaign }).first();
+    const updatedRow = page
+      .locator('tbody tr')
+      .filter({ hasText: campaign })
+      .filter({ hasText: '지급 완료' })
+      .first();
+    await expect(updatedRow).toBeVisible();
     await expect(updatedRow.getByRole('button', { name: '지급 처리' })).toHaveCount(0);
-    await expect(updatedRow.getByText('지급 완료').first()).toBeVisible();
     await expect(pinnedRow).toHaveCount(0);
 
     await page.getByRole('button', { name: '입찰 관리' }).click();

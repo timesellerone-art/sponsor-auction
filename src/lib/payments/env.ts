@@ -47,5 +47,12 @@ export function isTossSecretConfigured() {
 }
 
 export function getPaymentSigningSecret() {
-  return getTossSecretKey() || 'sponsor-auction-demo-payment';
+  const configured =
+    getTossSecretKey() ||
+    trimEnv(process.env.SUPABASE_SERVICE_ROLE_KEY) ||
+    trimEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  if (configured) {
+    return configured;
+  }
+  return process.env.NODE_ENV === 'production' ? '' : 'sponsor-auction-demo-payment';
 }

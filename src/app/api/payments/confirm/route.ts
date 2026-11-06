@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { isTossSecretConfigured } from '@/lib/payments/env';
+import { describeTossSecret, getTossSecretKey, isTossSecretConfigured } from '@/lib/payments/env';
+import { isProductionRuntime, isTestTossSecret } from '@/lib/launch-env';
 import {
   PAYMENT_INTENT_COOKIE,
   getIntent,
@@ -107,6 +108,11 @@ export async function POST(request: Request) {
       supabaseAnonKey: parsed.supabaseAnonKey,
     });
 
+    const tossSecretKind = describeTossSecret(getTossSecretKey()).kind;
+    if (isProductionRuntime() && isTestTossSecret(getTossSecretKey())) {
+      console.warn('[SponsorAuction] 운영 환경에서 Toss test 시크릿이 사용되고 있습니다.');
+    }
+
     console.info('[SponsorAuction] 결제 승인 요청', {
       orderId: parsed.orderId,
       amount: parsed.amount,
@@ -114,6 +120,7 @@ export async function POST(request: Request) {
       bidId: parsed.bidId,
       paymentKeyPrefix: parsed.paymentKey.slice(0, 8),
       tossSecretConfigured: isTossSecretConfigured(),
+      tossSecretKind,
       supabase: {
         hasUrl: Boolean(dbConfig.url),
         hasServiceKey: Boolean(dbConfig.serviceKey),

@@ -37,7 +37,7 @@ export async function getPaymentActor(): Promise<PaymentActor | null> {
     // 데모/로컬은 역할 쿠키만으로 API 가드를 통과시킨다.
   }
 
-  if (cookieRole) {
+  if (cookieRole && process.env.NODE_ENV !== 'production') {
     return { role: cookieRole, roles: cookieRoles };
   }
 
