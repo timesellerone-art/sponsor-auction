@@ -12,7 +12,7 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { isDemoAccountEmail } from '@/lib/auth-mock';
 import { INSERT_FAIL_MESSAGE, createBid, getAuctionById } from '@/lib/auctions';
 import { isUuid } from '@/lib/uuid';
-import { advertiserPayableAmount, creatorPayoutAmount } from '@/lib/fees';
+import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { rememberMyBid } from '@/lib/my-bids';
 import { getAuctionOwnerId, pushNotification } from '@/lib/notifications';
 import { cn, formatWon } from '@/lib/utils';
@@ -47,16 +47,12 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const { isBusy: isSubmitting, run } = useActionLock();
 
-  const fees = useMemo(() => {
-    const bidValue = Number(bidAmount);
-    if (!Number.isFinite(bidValue) || bidValue <= 0) {
-      return null;
+  const bidValue = useMemo(() => {
+    const parsed = Number(bidAmount);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return 0;
     }
-
-    return {
-      advertiserPays: advertiserPayableAmount(bidValue),
-      creatorPayout: creatorPayoutAmount(bidValue),
-    };
+    return parsed;
   }, [bidAmount]);
 
   const resetForm = () => {
@@ -276,31 +272,16 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
               />
             </Field>
 
-            <div className="rounded-xl border border-teal-100 bg-teal-50 px-3 py-3 text-sm text-teal-950">
-              {fees ? (
-                <ul className="space-y-1.5">
-                  <li>
-                    광고주 최종 결제액{' '}
-                    <strong>{formatWon(fees.advertiserPays)}</strong>
-                    <span className="block text-xs text-teal-800">
-                      제안 금액 + (제안 금액 × 10% 안전결제 수수료)
-                    </span>
-                  </li>
-                  <li>
-                    크리에이터 최종 정산액{' '}
-                    <strong>{formatWon(fees.creatorPayout)}</strong>
-                    <span className="block text-xs text-teal-800">
-                      제안 금액 − (제안 금액 × 15% 플랫폼 수수료)
-                    </span>
-                  </li>
-                </ul>
-              ) : (
+            {bidValue > 0 ? (
+              <FeeBreakdownCard role="creator" amount={bidValue} />
+            ) : (
+              <div className="rounded-xl border border-teal-100 bg-teal-50 px-3 py-3 text-sm text-teal-950">
                 <p className="text-xs text-teal-800">
-                  제안 금액을 입력하면 광고주 결제액과 크리에이터 정산액이 실시간으로
+                  제안 금액을 입력하면 통합 수수료(20%) 공제 후 최종 입금액이 실시간으로
                   계산됩니다.
                 </p>
-              )}
-            </div>
+              </div>
+            )}
 
             <Field
               label="제안 내용/소개글"

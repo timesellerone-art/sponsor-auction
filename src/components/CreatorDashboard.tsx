@@ -6,17 +6,14 @@ import { AuctionCardSkeleton } from '@/components/AuctionCard';
 import { CreateTimeslotModal } from '@/components/CreateTimeslotModal';
 import { PageContainer } from '@/components/PageContainer';
 import { useAuth } from '@/components/AuthProvider';
+import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { getCreatorDashboard } from '@/lib/dashboard';
 import { closeTimeSlot, listTimeSlots } from '@/lib/timeslots';
-import { CREATOR_FEE_RATE } from '@/lib/fees';
+import { creatorPayoutAmount } from '@/lib/fees';
 import { auctionStatusLabel, bidStatusLabel } from '@/lib/status-labels';
 import { cn, formatDateTime, formatWon } from '@/lib/utils';
 import type { TimeSlotItem } from '@/types/timeslot';
 import type { CreatorDeal } from '@/types/dashboard';
-
-function creatorPayout(amount: number) {
-  return Math.round(amount * (1 - CREATOR_FEE_RATE));
-}
 
 export function CreatorDashboard() {
   const { user } = useAuth();
@@ -242,7 +239,7 @@ function DealCard({ deal, highlight = false }: { deal: CreatorDeal; highlight?: 
           </Link>
           <p className="mt-1 text-sm text-zinc-500">
             제안 금액 {formatWon(deal.bid.bidAmount)}
-            {paid ? ` · 예상 정산 ${formatWon(creatorPayout(deal.bid.bidAmount))}` : ''}
+            {paid ? ` · 예상 정산 ${formatWon(creatorPayoutAmount(deal.bid.bidAmount))}` : ''}
           </p>
         </div>
         <span
@@ -254,6 +251,11 @@ function DealCard({ deal, highlight = false }: { deal: CreatorDeal; highlight?: 
           {bidStatusLabel(deal.bid.status, paid)}
         </span>
       </div>
+      {paid ? (
+        <div className="mt-3">
+          <FeeBreakdownCard role="creator" amount={deal.bid.bidAmount} />
+        </div>
+      ) : null}
       {deal.bid.proposalText ? (
         <p className="mt-3 line-clamp-3 text-sm leading-6 text-zinc-600">
           {deal.bid.proposalText}

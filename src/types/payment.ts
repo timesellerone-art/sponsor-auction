@@ -9,6 +9,7 @@ export type PaymentIntent = {
   auctionId: string;
   bidId: string;
   amount: number;
+  bidAmount?: number;
   orderName: string;
   status: PaymentIntentStatus;
   paymentKey: string | null;
@@ -20,6 +21,7 @@ export type PreparePaymentInput = {
   auctionId: string;
   bidId: string;
   amount: number;
+  bidAmount?: number;
   orderName: string;
   customerKey?: string;
   supabaseUrl?: string;
@@ -29,6 +31,7 @@ export type PreparePaymentInput = {
 export type PreparePaymentResult = {
   orderId: string;
   amount: number;
+  bidAmount?: number;
   orderName: string;
   customerKey: string;
   clientKey: string | null;

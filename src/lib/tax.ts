@@ -1,4 +1,4 @@
-import { CREATOR_FEE_RATE } from './fees';
+import { CREATOR_FEE_RATE, creatorPayoutAmount } from './fees';
 
 export const VAT_RATE = 0.1;
 export const WITHHOLDING_RATE = 0.033;
@@ -55,7 +55,7 @@ export function splitCreatorSettlement(bidAmount: number): CreatorTaxSplit {
   const awardAmount = asWon(bidAmount);
   const platformFee = asWon(awardAmount * CREATOR_FEE_RATE);
   const withholdingAmount = asWon(awardAmount * WITHHOLDING_RATE);
-  const netPayout = Math.max(0, awardAmount - platformFee - withholdingAmount);
+  const netPayout = creatorPayoutAmount(awardAmount);
   return {
     awardAmount,
     platformFee,

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AuctionCard, AuctionCardSkeleton } from '@/components/AuctionCard';
 import { PageContainer } from '@/components/PageContainer';
 import { BidProposalList } from '@/components/BidProposalList';
+import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { PaymentCheckoutModal } from '@/components/PaymentCheckoutModal';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useAwardCheckout } from '@/hooks/useAwardCheckout';
@@ -203,6 +204,11 @@ export function AdvertiserDashboard() {
                         {auctionStatusLabel(deal.auction.status)}
                       </span>
                     </div>
+                    {deal.bid ? (
+                      <div className="mt-3">
+                        <FeeBreakdownCard role="advertiser" amount={deal.bid.bidAmount} />
+                      </div>
+                    ) : null}
                     <dl className="mt-3 grid grid-cols-1 gap-2 text-sm text-zinc-600 sm:grid-cols-3">
                       <div>
                         <dt className="text-xs text-zinc-400">결제 금액</dt>

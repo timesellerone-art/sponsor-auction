@@ -48,6 +48,7 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
     const bidDialog = page.getByRole('dialog', { name: '제안하기' });
     await expect(bidDialog).toBeVisible();
     await bidDialog.getByLabel('제안 금액(단가)').fill('120000');
+    await expect(bidDialog.getByText('타 플랫폼/MCN(평균 50% 공제) 대비 추가 정산')).toBeVisible();
     await bidDialog.getByLabel('제안 내용/소개글').fill(proposal);
     await bidDialog
       .getByLabel('채널 URL 또는 포트폴리오 링크')
@@ -84,6 +85,7 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
 
     const paymentDialog = page.getByRole('dialog', { name: '안전결제' });
     await expect(paymentDialog).toBeVisible();
+    await expect(paymentDialog.getByText('기존 광고 대행사(마크업 25%) 대비 약 15% 절감')).toBeVisible();
     await paymentDialog
       .getByRole('checkbox', { name: '구매 조건 확인 및 환불 규정에 동의합니다' })
       .check();

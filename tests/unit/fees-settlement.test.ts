@@ -1,14 +1,20 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
-  ADVERTISER_FEE_RATE,
   CREATOR_FEE_RATE,
+  advertiserChargeMatchesBid,
+  advertiserFeeFromBid,
   advertiserPayableAmount,
   bidAmountFromCreatorPayout,
   creatorPayoutAmount,
   creatorPayoutFromCharge,
   platformFeeFromAmount,
 } from '../../src/lib/fees';
+import {
+  calculateCreatorPayout,
+  creatorCombinedFeeAmount,
+  CREATOR_COMBINED_DEDUCTION_RATE,
+} from '../../src/lib/payments/payout';
 import {
   VAT_RATE,
   WITHHOLDING_RATE,
@@ -32,19 +38,33 @@ describe('fees: 가드 및 기본 금액', () => {
       assert.equal(creatorPayoutAmount(invalid), 0);
       assert.equal(bidAmountFromCreatorPayout(invalid), 0);
       assert.equal(creatorPayoutFromCharge(invalid), 0);
+      assert.equal(calculateCreatorPayout(invalid), 0);
     }
   });
 
   it('10,000원 입찰의 광고주 결제·크리에이터 지급·플랫폼 수수료가 정책과 일치한다', () => {
     assert.equal(advertiserPayableAmount(10_000), 11_000);
-    assert.equal(creatorPayoutAmount(10_000), 8_500);
-    assert.equal(platformFeeFromAmount(10_000), 2_500);
+    assert.equal(creatorPayoutAmount(10_000), 8_000);
+    assert.equal(calculateCreatorPayout(10_000), 8_000);
+    assert.equal(creatorCombinedFeeAmount(10_000), 2_000);
+    assert.equal(platformFeeFromAmount(10_000), 3_000);
+    assert.equal(CREATOR_FEE_RATE, 0.2);
+    assert.equal(CREATOR_COMBINED_DEDUCTION_RATE, 0.2);
   });
 
   it('1,500,000원 입찰의 광고주 결제·크리에이터 지급·플랫폼 수수료가 정책과 일치한다', () => {
     assert.equal(advertiserPayableAmount(1_500_000), 1_650_000);
-    assert.equal(creatorPayoutAmount(1_500_000), 1_275_000);
-    assert.equal(platformFeeFromAmount(1_500_000), 375_000);
+    assert.equal(creatorPayoutAmount(1_500_000), 1_200_000);
+    assert.equal(platformFeeFromAmount(1_500_000), 450_000);
+  });
+
+  it('광고주 결제액은 낙찰가 + Math.round(낙찰가 * 0.1)이다', () => {
+    for (const bid of [1, 10_000, 120_000, 1_500_000]) {
+      const expected = bid + Math.round(bid * 0.1);
+      assert.equal(advertiserPayableAmount(bid), expected);
+      assert.equal(advertiserChargeMatchesBid(bid, expected), true);
+      assert.equal(advertiserChargeMatchesBid(bid, expected + 1), false);
+    }
   });
 });
 
@@ -58,9 +78,9 @@ describe('tax: 공급가액·부가세·원천징수·최종 정산금', () => {
     });
     assert.deepEqual(tax.creator, {
       awardAmount: 10_000,
-      platformFee: 1_500,
+      platformFee: 2_000,
       withholdingAmount: 330,
-      netPayout: 8_170,
+      netPayout: 8_000,
     });
   });
 
@@ -69,9 +89,9 @@ describe('tax: 공급가액·부가세·원천징수·최종 정산금', () => {
     assert.equal(tax.advertiser.supplyAmount, 1_500_000);
     assert.equal(tax.advertiser.vatAmount, 150_000);
     assert.equal(tax.advertiser.totalAmount, 1_650_000);
-    assert.equal(tax.creator.platformFee, 225_000);
+    assert.equal(tax.creator.platformFee, 300_000);
     assert.equal(tax.creator.withholdingAmount, 49_500);
-    assert.equal(tax.creator.netPayout, 1_225_500);
+    assert.equal(tax.creator.netPayout, 1_200_000);
   });
 
   it('0원 입찰은 세금 분해가 모두 0이다', () => {
@@ -102,16 +122,13 @@ describe('정산 항등식: 입찰가 스위프', () => {
 
       assert.equal(creator.platformFee, roundWon(creator.awardAmount * CREATOR_FEE_RATE));
       assert.equal(creator.withholdingAmount, roundWon(creator.awardAmount * WITHHOLDING_RATE));
-      assert.equal(
-        creator.netPayout,
-        Math.max(0, creator.awardAmount - creator.platformFee - creator.withholdingAmount),
-      );
-      assert.equal(creatorGross, Math.max(0, creator.awardAmount - creator.platformFee));
+      assert.equal(creator.netPayout, Math.max(0, creator.awardAmount - creator.platformFee));
+      assert.equal(creatorGross, creator.netPayout);
       assert.equal(
         platform,
-        roundWon(invoice.supplyAmount * ADVERTISER_FEE_RATE) + creator.platformFee,
+        advertiserFeeFromBid(invoice.supplyAmount) + creator.platformFee,
       );
-      assert.equal(creator.netPayout, Math.max(0, creatorGross - creator.withholdingAmount));
+      assert.equal(creator.netPayout + creator.platformFee, creator.awardAmount);
     });
   }
 });
@@ -131,10 +148,9 @@ describe('부동소수점·반올림 예외', () => {
     assert.equal(splitAdvertiserInvoice(1.5).supplyAmount, 2);
   });
 
-  it('0.15B가 .5로 떨어지는 금액에서 곱 한 번 반올림과 성분 합이 어긋나지 않는다', () => {
-    // 10원: 10 * 0.85 = 8.5 → 곱 반올림 9원, 10-round(1.5)=8원. 성분 합(8원)이 정답.
+  it('0.20B가 .5로 떨어지는 금액에서 곱 한 번 반올림과 성분 합이 어긋나지 않는다', () => {
     assert.equal(creatorPayoutAmount(10), 8);
-    assert.equal(roundWon(10 * 0.15), 2);
+    assert.equal(roundWon(10 * 0.2), 2);
     assert.equal(platformFeeFromAmount(10), 1 + 2);
     assert.equal(advertiserPayableAmount(10), 11);
   });
@@ -151,7 +167,7 @@ describe('부동소수점·반올림 예외', () => {
         `platform ${bid}`,
       );
       assert.equal(
-        creator.netPayout + creator.platformFee + creator.withholdingAmount,
+        creator.netPayout + creator.platformFee,
         bid,
         `creator identity ${bid}`,
       );

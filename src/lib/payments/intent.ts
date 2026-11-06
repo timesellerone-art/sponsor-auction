@@ -60,6 +60,7 @@ export function encodeIntentCookie(intent: PaymentIntent) {
       auctionId: intent.auctionId,
       bidId: intent.bidId,
       amount: intent.amount,
+      bidAmount: intent.bidAmount,
       orderName: intent.orderName,
       createdAt: intent.createdAt,
     }),
@@ -102,6 +103,10 @@ export function decodeIntentCookie(value: string | undefined): PaymentIntent | n
       auctionId: parsed.auctionId,
       bidId: parsed.bidId,
       amount: parsed.amount,
+      bidAmount:
+        typeof parsed.bidAmount === 'number' && Number.isFinite(parsed.bidAmount) && parsed.bidAmount > 0
+          ? Math.round(parsed.bidAmount)
+          : undefined,
       orderName: parsed.orderName,
       createdAt: parsed.createdAt,
       status: 'pending',

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { advertiserPayableAmount } from '@/lib/fees';
+import { advertiserChargeMatchesBid, advertiserPayableAmount } from '@/lib/fees';
 import { getTossClientKey, isTossClientConfigured } from '@/lib/payments/env';
 import {
   PAYMENT_INTENT_COOKIE,
@@ -29,6 +29,7 @@ function parseBody(value: unknown): PreparePaymentInput | null {
   const auctionId = typeof body.auctionId === 'string' ? body.auctionId.trim() : '';
   const bidId = typeof body.bidId === 'string' ? body.bidId.trim() : '';
   const amount = typeof body.amount === 'number' ? body.amount : Number.NaN;
+  const bidAmount = typeof body.bidAmount === 'number' ? body.bidAmount : Number.NaN;
   const orderName = typeof body.orderName === 'string' ? body.orderName.trim() : '';
   const customerKey = typeof body.customerKey === 'string' ? body.customerKey : '';
   const supabaseUrl = typeof body.supabaseUrl === 'string' ? body.supabaseUrl.trim() : '';
@@ -38,7 +39,16 @@ function parseBody(value: unknown): PreparePaymentInput | null {
     return null;
   }
 
-  return { auctionId, bidId, amount, orderName, customerKey, supabaseUrl, supabaseAnonKey };
+  return {
+    auctionId,
+    bidId,
+    amount,
+    bidAmount: Number.isInteger(bidAmount) && bidAmount > 0 ? bidAmount : undefined,
+    orderName,
+    customerKey,
+    supabaseUrl,
+    supabaseAnonKey,
+  };
 }
 
 export async function POST(request: Request) {
@@ -66,11 +76,23 @@ export async function POST(request: Request) {
       );
     }
 
+    if (
+      typeof parsed.bidAmount === 'number' &&
+      parsed.bidAmount > 0 &&
+      !advertiserChargeMatchesBid(parsed.bidAmount, parsed.amount)
+    ) {
+      return NextResponse.json(
+        { error: '결제 금액이 낙찰가와 수수료 정책에 맞지 않습니다.' },
+        { status: 400 },
+      );
+    }
+
     const intent = {
       orderId: createOrderId(),
       auctionId: parsed.auctionId,
       bidId: parsed.bidId,
       amount: parsed.amount,
+      bidAmount: parsed.bidAmount,
       orderName: parsed.orderName.slice(0, 100),
       status: 'pending' as const,
       paymentKey: null,
@@ -90,6 +112,7 @@ export async function POST(request: Request) {
     const result: PreparePaymentResult = {
       orderId: intent.orderId,
       amount: intent.amount,
+      bidAmount: intent.bidAmount,
       orderName: intent.orderName,
       customerKey: sanitizeCustomerKey(parsed.customerKey),
       clientKey: getTossClientKey() || null,

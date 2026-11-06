@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, X } from 'lucide-react';
 import { EscrowNotice } from '@/components/EscrowNotice';
+import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { showToast } from '@/components/Toast';
 import { REFUND_REQUIRED } from '@/lib/legal';
 import { rememberCheckoutContext } from '@/lib/payments/client';
@@ -17,8 +18,8 @@ import {
   serializePaymentError,
   type PaymentErrorInfo,
 } from '@/lib/payments/errors';
-import { splitAdvertiserInvoiceFromTotal } from '@/lib/tax';
-import { cn, formatWon } from '@/lib/utils';
+import { bidAmountFromAdvertiserCharge } from '@/lib/fees';
+import { cn } from '@/lib/utils';
 import type { TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
 import type { PaymentMethod, PreparePaymentResult } from '@/types/payment';
 
@@ -146,7 +147,10 @@ export function PaymentCheckoutModal({
   const clientKey = resolveClientKey(checkout);
   const isDemoCheckout = !clientKey;
   const useToss = ready && !isDemoCheckout && !loadError;
-  const advertiserInvoice = splitAdvertiserInvoiceFromTotal(checkout.amount);
+  const bidAmount =
+    checkout.bidAmount && checkout.bidAmount > 0
+      ? checkout.bidAmount
+      : bidAmountFromAdvertiserCharge(checkout.amount);
 
   const handlePay = async () => {
     if (busy || !ready) {
@@ -261,16 +265,8 @@ export function PaymentCheckoutModal({
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
-          <div className="rounded-xl bg-teal-50 px-4 py-3">
-            <p className="text-xs font-semibold text-teal-800">광고주 결제 금액</p>
-            <p className="mt-1 text-2xl font-bold tracking-tight text-zinc-950">
-              {formatWon(checkout.amount)}
-            </p>
-            <p className="mt-1 text-xs text-zinc-500">
-              공급가액 {formatWon(advertiserInvoice.supplyAmount)} + 부가세 10%{' '}
-              {formatWon(advertiserInvoice.vatAmount)}. 결제 완료 후에만 계약이 확정됩니다.
-            </p>
-          </div>
+          <FeeBreakdownCard role="advertiser" amount={bidAmount} />
+          <p className="text-xs text-zinc-500">결제 완료 후에만 계약이 확정됩니다.</p>
           <EscrowNotice />
 
           {payError ? (

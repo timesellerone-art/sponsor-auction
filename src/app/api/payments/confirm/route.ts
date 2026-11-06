@@ -9,6 +9,7 @@ import {
   resolveIntent,
   updateIntent,
 } from '@/lib/payments/intent';
+import { getBidsByAuctionId } from '@/lib/auctions';
 import { bidAmountFromAdvertiserCharge } from '@/lib/fees';
 import { applyPaidAuctionStatus } from '@/lib/payments/apply-paid-status';
 import { issueTaxInvoice } from '@/lib/popbill';
@@ -60,6 +61,24 @@ function jsonError(
     },
     { status },
   );
+}
+
+async function resolveAwardBidAmount(auctionId: string, bidId: string): Promise<number | null> {
+  if (!auctionId.trim() || !bidId.trim()) {
+    return null;
+  }
+
+  try {
+    const result = await getBidsByAuctionId(auctionId);
+    const bid = (result.data ?? []).find((item) => item.id === bidId);
+    if (bid && bid.bidAmount > 0) {
+      return Math.round(bid.bidAmount);
+    }
+  } catch (error) {
+    console.warn('[SponsorAuction] 낙찰가 조회에 실패했습니다.', error);
+  }
+
+  return null;
 }
 
 function parseBody(value: unknown): ConfirmPaymentInput | null {
@@ -245,6 +264,31 @@ export async function POST(request: Request) {
       );
     }
 
+    const lookedUpBidAmount = await resolveAwardBidAmount(intent.auctionId, intent.bidId);
+    const storedBidAmount =
+      typeof intent.bidAmount === 'number' && intent.bidAmount > 0 ? intent.bidAmount : null;
+    const bidAmount = lookedUpBidAmount ?? storedBidAmount;
+
+    if (typeof bidAmount === 'number' && bidAmount > 0) {
+      const expectedAmount = bidAmount + Math.round(bidAmount * 0.1);
+      if (parsed.amount !== expectedAmount || intent.amount !== expectedAmount) {
+        console.error('[SponsorAuction] 결제 승인 실패: 낙찰가 수수료 금액 불일치', {
+          orderId: parsed.orderId,
+          requestedAmount: parsed.amount,
+          intentAmount: intent.amount,
+          bidAmount,
+          expectedAmount,
+        });
+        updateIntent(intent.orderId, { status: 'failed' });
+        await persistPayment(intent, 'failed', parsed.paymentKey, dbConfig);
+        return jsonError(
+          400,
+          'AMOUNT_MISMATCH',
+          '결제 금액이 낙찰가와 수수료 정책에 맞지 않습니다. 낙찰은 진행되지 않았습니다.',
+        );
+      }
+    }
+
     if (intent.amount !== parsed.amount) {
       console.error('[SponsorAuction] 결제 승인 실패: 금액 불일치', {
         orderId: parsed.orderId,
@@ -254,7 +298,7 @@ export async function POST(request: Request) {
       updateIntent(intent.orderId, { status: 'failed' });
       await persistPayment(intent, 'failed', parsed.paymentKey, dbConfig);
       return jsonError(
-        409,
+        400,
         'AMOUNT_MISMATCH',
         '결제 금액이 주문 정보와 일치하지 않습니다. 낙찰은 진행되지 않았습니다.',
       );
