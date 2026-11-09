@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import {
   ADMIN,
@@ -7,6 +8,12 @@ import {
   signIn,
   unlockAdmin,
 } from '../e2e/helpers';
+import { floorToTenWon } from '../src/lib/fees';
+import { calculateCreatorPayout } from '../src/lib/payments/payout';
+import {
+  TRANSFER_XLSX_HEADERS,
+  parsePayoutTransferXlsx,
+} from '../src/lib/payout-transfer-xlsx';
 
 const ACTIVE_AUCTION = '여름 무알콜 맥주 숏폼 캠페인';
 const CLOSED_AUCTION = '핀테크 앱 X 스레드 체험단';
@@ -253,9 +260,48 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(page.getByText('낙찰 / 지급 완료').first()).toBeVisible();
   });
 
+  test('지급 대기 대량이체 엑셀은 계좌 0과 10원 절사 금액만 담는다', async ({ page }) => {
+    await unlockAdmin(page);
+    await page.getByRole('button', { name: '정산 관리' }).click();
+    await expect(page.getByRole('button', { name: '엑셀/CSV 다운로드' })).toBeVisible();
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: '엑셀/CSV 다운로드' }).click(),
+    ]);
+    expect(download.suggestedFilename()).toMatch(/payout-transfer-.*\.xlsx$/);
+    const filePath = await download.path();
+    expect(filePath).toBeTruthy();
+    const parsed = parsePayoutTransferXlsx(await readFile(filePath!));
+    expect(parsed.headers).toEqual([...TRANSFER_XLSX_HEADERS]);
+    expect(parsed.rows.length).toBeGreaterThan(0);
+    expect(parsed.xml.includes('<f>')).toBe(false);
+    expect(parsed.rows.every((row) => /^\d+$/.test(row.accountNumber))).toBe(true);
+    expect(parsed.rows.every((row) => Number.isInteger(row.amount) && row.amount % 10 === 0)).toBe(
+      true,
+    );
+    expect(parsed.rows.some((row) => row.accountNumber === '01012345678')).toBe(true);
+    expect(parsed.rows.some((row) => row.accountNumber === '02123456789')).toBe(true);
+    expect(parsed.rows.map((row) => row.amount)).toContain(
+      floorToTenWon(calculateCreatorPayout(980_000)),
+    );
+    expect(parsed.rows.map((row) => row.amount)).not.toContain(
+      floorToTenWon(calculateCreatorPayout(390_000)),
+    );
+    expect(parsed.rows.map((row) => row.amount)).not.toContain(
+      floorToTenWon(calculateCreatorPayout(300_000)),
+    );
+  });
+
   test('정산 일괄 지급, 메모 저장, CSV 다운로드가 동작한다', async ({ page }) => {
     await unlockAdmin(page);
     await page.getByRole('button', { name: '정산 관리' }).click();
+
+    const [payoutDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: '엑셀/CSV 다운로드' }).click(),
+    ]);
+    expect(payoutDownload.suggestedFilename()).toMatch(/payout-transfer-.*\.xlsx$/);
 
     const pendingRow = page
       .locator('tbody tr')
@@ -272,12 +318,6 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await memoBox.fill('운영 확인 메모');
     await page.getByRole('button', { name: '메모 저장' }).first().click();
     await expect(page.getByRole('alert').filter({ hasText: '메모를 저장했습니다.' })).toBeVisible();
-
-    const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      page.getByRole('button', { name: '엑셀/CSV 다운로드' }).click(),
-    ]);
-    expect(download.suggestedFilename()).toMatch(/payouts-.*\.csv$/);
 
     await page.getByRole('button', { name: '입찰 관리' }).click();
     await expect(page.getByRole('combobox')).toBeVisible();

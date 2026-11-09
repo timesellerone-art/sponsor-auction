@@ -33,17 +33,17 @@ function csvCell(value: string | number | null | undefined) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
-export function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number | null | undefined>>) {
+export function downloadBytes(
+  filename: string,
+  bytes: Uint8Array,
+  mime = 'application/octet-stream',
+) {
   if (typeof window === 'undefined') {
     return;
   }
-  const lines = [
-    headers.map(csvCell).join(','),
-    ...rows.map((row) => row.map(csvCell).join(',')),
-  ];
-  const blob = new Blob([`\uFEFF${lines.join('\r\n')}`], {
-    type: 'text/csv;charset=utf-8;',
-  });
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  const blob = new Blob([copy], { type: mime });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -52,4 +52,16 @@ export function downloadCsv(filename: string, headers: string[], rows: Array<Arr
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+export function downloadCsv(filename: string, headers: string[], rows: Array<Array<string | number | null | undefined>>) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const lines = [
+    headers.map(csvCell).join(','),
+    ...rows.map((row) => row.map(csvCell).join(',')),
+  ];
+  const encoded = new TextEncoder().encode(`\uFEFF${lines.join('\r\n')}`);
+  downloadBytes(filename, encoded, 'text/csv;charset=utf-8;');
 }

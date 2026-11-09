@@ -8,7 +8,8 @@ import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
 import { AdminPayoutTaxModal } from '@/components/admin/AdminPayoutTaxModal';
 import { showToast } from '@/components/Toast';
-import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
+import { sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
+import { downloadPayoutTransferXlsx } from '@/lib/payout-transfer-xlsx';
 import {
   enrichPayout,
   filterPayoutsByPeriod,
@@ -179,43 +180,23 @@ export function AdminPayoutTable({
   };
 
   const handleExport = () => {
-    downloadCsv(
-      `payouts-${new Date().toISOString().slice(0, 10)}.csv`,
-      [
-        '크리에이터',
-        '이메일',
-        '계좌',
-        '캠페인',
-        '처리일시',
-        '공급가액',
-        '부가세',
-        '원천징수액',
-        '3.3% 공제액',
-        '플랫폼수수료',
-        '최종정산액',
-        '실지급액',
-        '입찰금액',
-        '상태',
-        '메모',
-      ],
-      filtered.map((item) => [
-        item.creatorName,
-        item.creatorEmail,
-        item.bankAccount || '',
-        item.auctionTitle,
-        formatAdminTimestamp(item.paidAt || item.requestedAt),
-        item.supplyAmount ?? '',
-        item.vatAmount ?? '',
-        item.withholdingAmount ?? '',
-        item.withholdingAmount ?? '',
-        item.platformFee ?? '',
-        item.netPayoutAmount ?? item.amount,
-        item.netPayoutAmount ?? item.amount,
-        item.bidAmount ?? '',
-        STATUS_LABEL[item.status],
-        memoDrafts[item.id] ?? item.adminMemo ?? '',
-      ]),
-    );
+    const result = downloadPayoutTransferXlsx(rows);
+    if (result.rowCount === 0) {
+      showToast(
+        result.skipped.length > 0
+          ? '내려받을 지급 대기 정산이 없습니다. 계좌 누락·지급 완료·취소 건은 제외했습니다.'
+          : '지급 대기 중인 정산이 없습니다.',
+      );
+      return;
+    }
+    if (result.skipped.length > 0) {
+      showToast(
+        `지급 대기 ${result.rowCount}건을 내려받았습니다. ${result.skipped.length}건은 제외했습니다.`,
+        'success',
+      );
+      return;
+    }
+    showToast(`지급 대기 ${result.rowCount}건을 내려받았습니다.`, 'success');
   };
 
   const handleSaveMemo = async (payout: PayoutItem) => {
