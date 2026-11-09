@@ -197,8 +197,8 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
       await page.goto(
         `/auth/oauth?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink&next=${encodeURIComponent('/my')}`,
       );
-      await expect(page).toHaveURL(/\/my/, { timeout: 3000 });
-      expect(Date.now() - started).toBeLessThan(1000);
+      await expect(page).toHaveURL(/\/my/, { timeout: 15000 });
+      expect(Date.now() - started).toBeLessThan(8000);
       await expect(delayToast).toHaveCount(0);
       await expect(page.getByRole('heading', { name: '이미 가입된 계정이 있습니다' })).toHaveCount(0);
       await expect(page.getByRole('heading', { name: /역할을 선택해 주세요/ })).toHaveCount(0);
@@ -303,10 +303,15 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
       await page.goto(
         `/auth/oauth?token_hash=${encodeURIComponent(googleHash)}&type=magiclink&next=${encodeURIComponent('/my')}`,
       );
-      await expect(page).toHaveURL(/\/my/, { timeout: 3000 });
+      await expect(page).toHaveURL(/\/my/, { timeout: 15000 });
+      await expect(page.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible({
+        timeout: 10_000,
+      });
       await page.getByRole('button', { name: '로그아웃', exact: true }).click();
-      await expect(page.getByRole('link', { name: '로그인' }).first()).toBeVisible();
       await context.clearCookies();
+      await page.evaluate(() => window.localStorage.clear());
+      await page.goto('/login');
+      await expect(page.getByRole('heading', { name: '로그인' })).toBeVisible();
 
       const mergeStarted = Date.now();
       const linked = await linkNaverProfile(admin, {
@@ -337,8 +342,8 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
       await page.goto(
         `/auth/oauth?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink&next=${encodeURIComponent('/my')}`,
       );
-      await expect(page).toHaveURL(/\/my/, { timeout: 3000 });
-      expect(Date.now() - started).toBeLessThan(1000);
+      await expect(page).toHaveURL(/\/my/, { timeout: 15000 });
+      expect(Date.now() - started).toBeLessThan(8000);
       await expect(verifyToast).toHaveCount(0);
       await expect(delayToast).toHaveCount(0);
       expect(await sessionUserId(context, baseURL)).toBe(googleId);

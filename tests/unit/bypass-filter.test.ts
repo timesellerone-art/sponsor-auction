@@ -71,7 +71,7 @@ describe('우회 방지 필터: 메신저·직거래', () => {
   });
 
   it('유튜브 포트폴리오 링크는 허용하고 오픈카톡 링크는 막는다', () => {
-    const youtube = validateBypassContent('https://www.youtube.com/@e2ecreator', {
+    const youtube = validateBypassContent('https://youtube.com/@test', {
       allowPortfolioUrl: true,
     });
     const kakao = validateBypassContent('https://open.kakao.com/o/abc123', {

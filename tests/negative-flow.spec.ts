@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
-import { ADVERTISER, CREATOR, acceptAgreements, signIn, signOut } from '../e2e/helpers';
+import {
+  ADVERTISER,
+  CREATOR,
+  VALID_CHANNEL_URL,
+  acceptAgreements,
+  openCreateAuction,
+  signIn,
+  signOut,
+} from '../e2e/helpers';
 
 const CLOSED_AUCTION = '러닝화 언박싱 틱톡 챌린지';
 const AWARDED_AUCTION = '핀테크 앱 X 스레드 체험단';
@@ -7,29 +15,20 @@ const OPEN_AUCTION = '여름 무알콜 맥주 숏폼 캠페인';
 const DUPLICATE_AUCTION = '비건 스킨케어 릴스 리뷰';
 const VALID_PROPOSAL =
   '채널 톤에 맞춰 3초 훅과 제품 클로즈업을 넣은 숏폼 1편을 제작하겠습니다.';
-const VALID_CHANNEL = 'https://www.youtube.com/@e2ecreator';
+const VALID_CHANNEL = VALID_CHANNEL_URL;
 const BYPASS_BLOCK_MESSAGE =
   '안전한 거래를 위해 연락처(전화번호, 계좌번호, 카카오톡 등) 및 직거래 유도 표현은 입력할 수 없습니다.';
-
-async function openCreateAuction(page: import('@playwright/test').Page) {
-  await page.goto('/');
-  await page
-    .getByRole('navigation', { name: '주요' })
-    .getByRole('button', { name: '역경매 등록' })
-    .click();
-  const dialog = page.getByRole('dialog', { name: '역경매 요청하기' });
-  await expect(dialog).toBeVisible();
-  return dialog;
-}
 
 async function openBidModal(page: import('@playwright/test').Page, title: string) {
   await page.goto('/');
   await page.getByRole('link', { name: title }).click();
   await expect(page).toHaveURL(/\/auctions\//);
   await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
-  await page.getByRole('button', { name: '제안하기' }).click();
+  const bidButton = page.getByRole('button', { name: '제안하기' });
+  await expect(bidButton).toBeEnabled({ timeout: 15_000 });
+  await bidButton.click();
   const dialog = page.getByRole('dialog', { name: '제안하기' });
-  await expect(dialog).toBeVisible();
+  await expect(dialog).toBeVisible({ timeout: 12_000 });
   return dialog;
 }
 
@@ -99,9 +98,9 @@ test.describe('입력 유효성 및 예외 시나리오', () => {
     await createDialog.getByRole('button', { name: '역경매 등록' }).click();
     await expect(createDialog.getByText('예산은 0원 이하일 수 없습니다.')).toBeVisible();
 
-    await createDialog.getByLabel('예산').fill('200000000');
+    await createDialog.locator('#auction-budget').fill('200000000');
     await createDialog.getByRole('button', { name: '역경매 등록' }).click();
-    await expect(createDialog.getByText('예산은 1억 원을 초과할 수 없습니다.')).toBeVisible();
+    await expect(createDialog.getByRole('alert').filter({ hasText: '1억' })).toBeVisible();
     await expect(createDialog).toBeVisible();
     await createDialog.getByRole('button', { name: '닫기' }).click();
 

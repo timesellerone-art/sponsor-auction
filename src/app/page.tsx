@@ -90,7 +90,7 @@ export default function Home() {
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
             <button
               type="button"
-              disabled={ready && Boolean(user) && !canCreateAuction}
+              disabled={!ready || Boolean(user && !canCreateAuction)}
               onClick={() =>
                 window.dispatchEvent(new Event('create-auction:open'))
               }

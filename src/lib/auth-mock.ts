@@ -18,6 +18,8 @@ const STORAGE_KEY = 'sponsor-auction-auth-session';
 
 export const DEMO_ADVERTISER_ID = 'usr-demo-advertiser';
 export const DEMO_PASSWORD = 'demo1234';
+export const DEMO_CREATOR_SETTLEMENT_EMAIL = 'creator@demo.com';
+export const DEMO_CREATOR_BANK_ACCOUNT = '신한은행 110-123-456789';
 
 const DEMO_EMAILS = new Set(['brand@demo.com', 'creator@demo.com', 'admin@demo.com']);
 

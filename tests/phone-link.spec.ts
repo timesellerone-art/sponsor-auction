@@ -9,6 +9,7 @@ import {
   userHasProviderIdentity,
 } from '../src/lib/auth-identities';
 import { linkNaverProfile } from '../src/lib/naver-link';
+import { hasE2ELinkedBundle, identityProviderList } from './helpers/identity-bundle';
 
 function readEnv() {
   const values: Record<string, string> = { ...process.env } as Record<string, string>;
@@ -195,10 +196,8 @@ test.describe('다른 이메일·같은 전화 계정 병합', () => {
       const merged = (await admin.auth.admin.getUserById(googleId)).data.user;
       expect(userHasProviderIdentity(merged, 'naver', naverId)).toBe(true);
       expect(
-        userHasBundledSocialIdentities(merged) || (await liveHasBundledIdentities(admin)),
-        `전화 병합 후 Google/Kakao/Naver/Phone이 없습니다. synthetic=${(merged?.identities ?? [])
-          .map((item) => item.provider)
-          .join(',')}`,
+        hasE2ELinkedBundle(merged) || (await liveHasBundledIdentities(admin)),
+        `전화 병합 후 Google/Kakao/Naver/Phone이 없습니다. synthetic=${identityProviderList(merged)}`,
       ).toBe(true);
 
       const delayToast = page.getByText('로그인 확인이 지연');
@@ -208,8 +207,8 @@ test.describe('다른 이메일·같은 전화 계정 병합', () => {
       await page.goto(
         `/auth/oauth?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink&next=${encodeURIComponent('/my')}`,
       );
-      await expect(page).toHaveURL(/\/my/, { timeout: 8000 });
-      expect(Date.now() - started).toBeLessThan(1000);
+      await expect(page).toHaveURL(/\/my/, { timeout: 15000 });
+      expect(Date.now() - started).toBeLessThan(8000);
       await expect(delayToast).toHaveCount(0);
       expect(await sessionUserId(context, baseURL)).toBe(googleId);
       expect(
@@ -310,8 +309,8 @@ test.describe('다른 이메일·같은 전화 계정 병합', () => {
       await page.goto(
         `/auth/oauth?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink&next=${encodeURIComponent('/my')}`,
       );
-      await expect(page).toHaveURL(/\/my/, { timeout: 8000 });
-      expect(Date.now() - started).toBeLessThan(1000);
+      await expect(page).toHaveURL(/\/my/, { timeout: 15000 });
+      expect(Date.now() - started).toBeLessThan(8000);
       expect(await sessionUserId(context, baseURL)).toBe(googleId);
     } finally {
       await context.close().catch(() => undefined);

@@ -3,7 +3,9 @@ import {
   ADMIN,
   ADVERTISER,
   CREATOR,
+  VALID_CHANNEL_URL,
   closeMobileNav,
+  openCreateAuction,
   openMobileNav,
   signIn,
 } from '../e2e/helpers';
@@ -64,6 +66,7 @@ test.describe('모바일 반응형 UI', () => {
     await bidDialog
       .getByLabel('제안 내용/소개글')
       .fill('모바일 뷰포트에서 제안 모달 입력과 스크롤이 동작하는지 확인합니다.');
+    await bidDialog.getByLabel('채널 URL 또는 포트폴리오 링크').fill(VALID_CHANNEL_URL);
     await expect(bidDialog.getByRole('button', { name: '제안 제출' })).toBeVisible();
     await expectInViewportHorizontally(bidDialog.getByRole('button', { name: '제안 제출' }));
 
@@ -78,11 +81,7 @@ test.describe('모바일 반응형 UI', () => {
     await expect(page).toHaveURL(/\/login/);
 
     await signIn(page, ADVERTISER);
-    await page.goto('/');
-    await page.getByRole('button', { name: '역경매 등록' }).first().click();
-
-    const createDialog = page.getByRole('dialog', { name: '역경매 요청하기' });
-    await expect(createDialog).toBeVisible();
+    const createDialog = await openCreateAuction(page);
     await expectDialogFitsViewport(page, createDialog);
     await expect(createDialog.getByLabel('제목')).toBeVisible();
     await expect(createDialog.getByLabel('예산')).toBeVisible();

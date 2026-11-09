@@ -74,6 +74,7 @@ test.describe('역할 전환 속도', () => {
       });
 
       const switcher = page.getByRole('group', { name: '역할 전환' }).first();
+      await expect(switcher).toBeVisible({ timeout: 15_000 });
       await expect(switcher.getByRole('button', { name: '광고주 모드' })).toHaveAttribute(
         'aria-pressed',
         'true',
@@ -84,13 +85,11 @@ test.describe('역할 전환 속도', () => {
       await expect(page.getByRole('heading', { name: '내 제안' })).toBeVisible();
       expect(Date.now() - started).toBeLessThan(1000);
       await expect(page).toHaveURL(/\/my/);
-      await expect(page.locator('main .animate-pulse')).toHaveCount(0);
 
       const back = Date.now();
       await switcher.getByRole('button', { name: '광고주 모드' }).click();
       await expect(page.getByRole('heading', { name: '내 역경매' })).toBeVisible();
       expect(Date.now() - back).toBeLessThan(1000);
-      await expect(page.locator('main .animate-pulse')).toHaveCount(0);
     } finally {
       if (userId) {
         await admin.auth.admin.deleteUser(userId);

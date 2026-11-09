@@ -9,7 +9,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
-import { isDemoAccountEmail } from '@/lib/auth-mock';
+import { DEMO_CREATOR_BANK_ACCOUNT, isDemoAccountEmail } from '@/lib/auth-mock';
 import { INSERT_FAIL_MESSAGE, createBid, getAuctionById } from '@/lib/auctions';
 import { isUuid } from '@/lib/uuid';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
@@ -82,7 +82,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         current.trim()
           ? current
           : isDemoAccountEmail(user?.email)
-            ? '카카오뱅크 3333-00-0000000'
+            ? DEMO_CREATOR_BANK_ACCOUNT
             : current,
       );
     }, 0);
@@ -140,7 +140,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         const settlementEmail = user.email?.trim() ?? '';
         const resolvedBank =
           bankAccount.trim() ||
-          (isDemoAccountEmail(user.email) ? '카카오뱅크 3333-00-0000000' : '');
+          (isDemoAccountEmail(user.email) ? DEMO_CREATOR_BANK_ACCOUNT : '');
         const nextErrors = validateBidForm({
           creatorChannelUrl,
           bidAmount,
@@ -380,7 +380,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
                 value={bankAccount}
                 onChange={(event) => setBankAccount(event.target.value)}
                 className={inputClass(Boolean(errors.bankAccount))}
-                placeholder="예: 카카오뱅크 3333-00-0000000"
+                placeholder="예: 신한은행 110-123-456789"
                 autoComplete="off"
               />
             </Field>

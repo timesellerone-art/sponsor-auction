@@ -11,10 +11,16 @@ test.describe('역경매 검색·필터와 광고주 메인 노출', () => {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { name: '진행 중인 역경매' })).toBeVisible();
+    await expect(page.locator('#auctions [aria-busy="true"]')).toHaveCount(0, { timeout: 15_000 });
     const search = page.getByRole('searchbox', { name: '캠페인 제목 또는 설명 검색' }).first();
     await expect(search).toBeVisible();
+    await expect(page.getByRole('link', { name: ACTIVE_SHORTS })).toBeVisible();
+    await expect(page.getByRole('link', { name: ACTIVE_REELS })).toBeVisible();
 
-    await search.fill('무알콜');
+    await expect(async () => {
+      await search.fill('무알콜');
+      await expect(search).toHaveValue('무알콜');
+    }).toPass({ timeout: 15_000 });
     await expect(page.getByRole('link', { name: ACTIVE_SHORTS })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_REELS })).toHaveCount(0);
 

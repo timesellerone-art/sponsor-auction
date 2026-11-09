@@ -159,7 +159,7 @@ export function Navbar() {
           )}
           <button
             type="button"
-            disabled={ready && Boolean(user) && !canCreateAuction}
+            disabled={!ready || Boolean(user && !canCreateAuction)}
             onClick={requestCreateAuction}
             className="inline-flex h-10 items-center gap-1.5 rounded-full bg-teal-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
           >
@@ -173,7 +173,7 @@ export function Navbar() {
           <NotificationBell />
           <button
             type="button"
-            disabled={ready && Boolean(user) && !canCreateAuction}
+            disabled={!ready || Boolean(user && !canCreateAuction)}
             onClick={requestCreateAuction}
             className="inline-flex h-9 max-w-[38vw] shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-700 px-3 text-xs font-semibold whitespace-nowrap text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
           >
@@ -271,7 +271,7 @@ export function Navbar() {
           <button
             type="button"
             className="rounded-lg px-3 py-3 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:text-zinc-400"
-            disabled={ready && Boolean(user) && !canCreateAuction}
+            disabled={!ready || Boolean(user && !canCreateAuction)}
             onClick={requestCreateAuction}
           >
             역경매 등록

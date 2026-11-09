@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  DEMO_CREATOR_BANK_ACCOUNT,
+  DEMO_CREATOR_SETTLEMENT_EMAIL,
   DEMO_PASSWORD,
   demoSessionUser,
   isDemoAccountEmail,
@@ -28,6 +30,9 @@ describe('데모 계정 헬퍼', () => {
     assert.equal(brand?.id, 'usr-demo-advertiser');
     assert.deepEqual(brand?.roles, ['advertiser', 'creator']);
     assert.equal(brand?.currentMode, 'advertiser');
-    assert.equal(demoSessionUser('creator@demo.com')?.currentMode, 'creator');
+    const creator = demoSessionUser('creator@demo.com');
+    assert.equal(creator?.currentMode, 'creator');
+    assert.equal(creator?.email, DEMO_CREATOR_SETTLEMENT_EMAIL);
+    assert.equal(DEMO_CREATOR_BANK_ACCOUNT, '신한은행 110-123-456789');
   });
 });

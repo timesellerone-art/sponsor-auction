@@ -2,10 +2,12 @@ import { expect, test } from '@playwright/test';
 import {
   ADVERTISER,
   CREATOR,
+  VALID_CHANNEL_URL,
+  acceptAgreements,
+  openCreateAuction,
   signIn,
   signOut,
   uniqueCampaignTitle,
-  acceptAgreements,
 } from './helpers';
 
 test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매칭이 완료된다', async ({
@@ -19,14 +21,7 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
 
   await test.step('광고주가 역경매를 등록한다', async () => {
     await signIn(page, ADVERTISER);
-    await page.goto('/');
-    await page
-      .getByRole('navigation', { name: '주요' })
-      .getByRole('button', { name: '역경매 등록' })
-      .click();
-
-    const createDialog = page.getByRole('dialog', { name: '역경매 요청하기' });
-    await expect(createDialog).toBeVisible();
+    const createDialog = await openCreateAuction(page);
     await createDialog.getByLabel('제목').fill(title);
     await createDialog.getByLabel('플랫폼').selectOption('youtube_shorts');
     await createDialog.getByLabel('예산').fill('150000');
@@ -52,7 +47,7 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
     await bidDialog.getByLabel('제안 내용/소개글').fill(proposal);
     await bidDialog
       .getByLabel('채널 URL 또는 포트폴리오 링크')
-      .fill('https://www.youtube.com/@e2ecreator');
+      .fill(VALID_CHANNEL_URL);
     await acceptAgreements(bidDialog);
     await bidDialog.getByRole('button', { name: '제안 제출' }).click();
 

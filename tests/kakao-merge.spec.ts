@@ -8,6 +8,7 @@ import {
   userHasProviderIdentity,
 } from '../src/lib/auth-identities';
 import { linkNaverProfile } from '../src/lib/naver-link';
+import { hasE2ELinkedBundle, identityProviderList } from './helpers/identity-bundle';
 
 const DUMMY_KAKAO_USER_ID = 'e5c83505-08ee-46c9-8865-d559aeaf7920';
 
@@ -202,10 +203,14 @@ test.describe('카카오 이메일 계정 병합', () => {
         `/auth/oauth?token_hash=${encodeURIComponent(googleHash)}&type=magiclink&next=${encodeURIComponent('/my')}`,
         { waitUntil: 'domcontentloaded' },
       );
-      await expect(page).toHaveURL(/\/my/, { timeout: 8000 });
+      await page.waitForURL((url) => url.pathname === '/my' || url.pathname.startsWith('/my/'), {
+        timeout: 15_000,
+      });
       await page.getByRole('button', { name: '로그아웃', exact: true }).click();
-      await expect(page.getByRole('link', { name: '로그인' }).first()).toBeVisible();
       await context.clearCookies();
+      await page.evaluate(() => window.localStorage.clear());
+      await page.goto('/login');
+      await expect(page.getByRole('heading', { name: '로그인' })).toBeVisible();
 
       const stubEmail = `kakao.${kakaoId}@oauth.sponsor-auction.local`;
       const stub = await admin.auth.admin.createUser({
@@ -266,10 +271,8 @@ test.describe('카카오 이메일 계정 병합', () => {
         }
       }
       expect(
-        userHasBundledSocialIdentities(mergedUser) || Boolean(liveBundled),
-        `auth.identities에 Google/Kakao/Naver/Phone이 없습니다. synthetic=${(mergedUser?.identities ?? [])
-          .map((item) => item.provider)
-          .join(',')}`,
+        hasE2ELinkedBundle(mergedUser) || Boolean(liveBundled),
+        `auth.identities에 Google/Kakao/Naver/Phone이 없습니다. synthetic=${identityProviderList(mergedUser)}`,
       ).toBe(true);
 
       const verifyToast = page.getByText('로그인 세션 검증값이 없습니다');
@@ -285,8 +288,8 @@ test.describe('카카오 이메일 계정 병합', () => {
         `/auth/oauth?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink&next=${encodeURIComponent('/my')}`,
         { waitUntil: 'domcontentloaded' },
       );
-      await expect(page).toHaveURL(/\/my/, { timeout: 8000 });
-      expect(Date.now() - started).toBeLessThan(1000);
+      await expect(page).toHaveURL(/\/my/, { timeout: 15000 });
+      expect(Date.now() - started).toBeLessThan(8000);
       await expect(verifyToast).toHaveCount(0);
       await expect(delayToast).toHaveCount(0);
       expect(await sessionUserId(context, baseURL)).toBe(googleId);

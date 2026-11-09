@@ -14,6 +14,7 @@ import {
   isE2EEmail,
   readE2EEnv,
 } from './helpers/e2e-users';
+import { hasE2ELinkedBundle, identityProviderList } from './helpers/identity-bundle';
 
 test.describe('네이버 OAuth 중복 코드 교환', () => {
   test.beforeAll(() => {
@@ -254,10 +255,8 @@ test.describe('네이버 OAuth 중복 코드 교환', () => {
         }
       }
       expect(
-        userHasBundledSocialIdentities(bundled) || liveBundled,
-        `Google/Kakao/Naver/Phone 묶음이 없습니다. synthetic=${(bundled?.identities ?? [])
-          .map((item) => item.provider)
-          .join(',')}`,
+        hasE2ELinkedBundle(bundled) || liveBundled,
+        `Google/Kakao/Naver/Phone 묶음이 없습니다. synthetic=${identityProviderList(bundled)}`,
       ).toBe(true);
     } finally {
       await context.close().catch(() => undefined);
