@@ -11,10 +11,8 @@ import {
 import { createClient } from '@/lib/supabase/server';
 import { hasAuthRole } from '@/types/auth';
 import { recordBypassIfNeeded } from '@/lib/compliance';
-import {
-  OffPlatformContactError,
-  assertNoOffPlatformContact,
-} from '@/utils/filter';
+import { validateBypassContent } from '@/lib/moderation/bypassFilter';
+import { OffPlatformContactError } from '@/utils/filter';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -54,6 +52,8 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const auctionId = asText(body?.auctionId);
     const proposalText = asText(body?.proposalText);
+    const creatorChannelUrl = asText(body?.creatorChannelUrl);
+    const creatorName = asText(body?.creatorName);
     if (!auctionId) {
       return NextResponse.json(
         { error: '경매 ID가 필요합니다.', errorMessage: '경매 ID가 필요합니다.' },
@@ -79,13 +79,12 @@ export async function POST(request: Request) {
       actorId: actor.userId,
       auctionId,
     });
-    try {
-      assertNoOffPlatformContact(proposalText);
-    } catch (error) {
-      const message =
-        error instanceof OffPlatformContactError
-          ? error.message
-          : '플랫폼 우회 연락처는 사용할 수 없습니다.';
+    const proposalCheck = validateBypassContent(proposalText);
+    const channelCheck = validateBypassContent(creatorChannelUrl, { allowPortfolioUrl: true });
+    const nameCheck = validateBypassContent(creatorName);
+    const bypassCheck = [proposalCheck, channelCheck, nameCheck].find((item) => !item.isValid);
+    if (bypassCheck) {
+      const message = bypassCheck.reason ?? VALIDATION.offPlatformContact;
       return NextResponse.json(
         { error: message, errorMessage: message, errorCode: 'OFF_PLATFORM_CONTACT' },
         { status: 400, headers: NO_STORE },
@@ -98,7 +97,7 @@ export async function POST(request: Request) {
         auctionId,
         creatorId: (actor.userId ?? asText(body?.creatorId)) || null,
         creatorName: asText(body?.creatorName) || '크리에이터',
-        creatorChannelUrl: asText(body?.creatorChannelUrl),
+        creatorChannelUrl,
         bidAmount: asNumber(body?.bidAmount),
         proposalText,
         creatorEmail: asText(body?.creatorEmail),

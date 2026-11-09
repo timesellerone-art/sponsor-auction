@@ -8,6 +8,8 @@ const DUPLICATE_AUCTION = '비건 스킨케어 릴스 리뷰';
 const VALID_PROPOSAL =
   '채널 톤에 맞춰 3초 훅과 제품 클로즈업을 넣은 숏폼 1편을 제작하겠습니다.';
 const VALID_CHANNEL = 'https://www.youtube.com/@e2ecreator';
+const BYPASS_BLOCK_MESSAGE =
+  '안전한 거래를 위해 연락처(전화번호, 계좌번호, 카카오톡 등) 및 직거래 유도 표현은 입력할 수 없습니다.';
 
 async function openCreateAuction(page: import('@playwright/test').Page) {
   await page.goto('/');
@@ -57,6 +59,28 @@ test.describe('입력 유효성 및 예외 시나리오', () => {
     ).toBeVisible();
     await expect(bidDialog.getByText('서비스 이용약관에 동의해 주세요.')).toBeVisible();
     await expect(bidDialog.getByText('개인정보처리방침에 동의해 주세요.')).toBeVisible();
+  });
+
+  test('제안서에 전화번호·카톡을 입력하면 직거래 우회가 차단된다', async ({ page }) => {
+    await signIn(page, CREATOR);
+    const dialog = await openBidModal(page, OPEN_AUCTION);
+    await dialog.getByLabel('제안 금액(단가)').fill('280000');
+    await dialog
+      .getByLabel('제안 내용/소개글')
+      .fill('촬영 일정은 010-1234-5678로 연락 주시면 바로 조율하겠습니다.');
+    await dialog.getByLabel('채널 URL 또는 포트폴리오 링크').fill(VALID_CHANNEL);
+    await acceptAgreements(dialog);
+    await dialog.getByRole('button', { name: '제안 제출' }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(BYPASS_BLOCK_MESSAGE).first()).toBeVisible();
+    await expect(page.getByRole('alert').filter({ hasText: BYPASS_BLOCK_MESSAGE }).first()).toBeVisible();
+
+    await dialog
+      .getByLabel('제안 내용/소개글')
+      .fill('카톡으로 따로 연락 주시면 직거래로 진행하겠습니다. 촬영은 가능합니다.');
+    await dialog.getByRole('button', { name: '제안 제출' }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(BYPASS_BLOCK_MESSAGE).first()).toBeVisible();
   });
 
   test('0원 이하, 음수, 허용 범위 초과 금액은 등록되지 않는다', async ({ page }) => {

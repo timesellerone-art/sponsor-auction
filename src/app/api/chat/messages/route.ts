@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { listChatMessages, sendChatMessage } from '@/lib/chat';
 import { recordBypassIfNeeded } from '@/lib/compliance';
 import { unauthorizedJson, getPaymentActor } from '@/lib/payments/guard';
+import { VALIDATION } from '@/lib/validation';
 import {
   OffPlatformContactError,
   assertNoOffPlatformContact,
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
       const message =
         error instanceof OffPlatformContactError
           ? error.message
-          : '플랫폼 우회 연락처는 사용할 수 없습니다.';
+          : VALIDATION.offPlatformContact;
       return NextResponse.json(
         { error: message, errorMessage: message, errorCode: 'OFF_PLATFORM_CONTACT' },
         { status: 400, headers: NO_STORE },

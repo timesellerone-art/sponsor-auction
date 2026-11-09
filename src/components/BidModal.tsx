@@ -155,6 +155,10 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         setSubmitError(null);
 
         if (Object.keys(nextErrors).length > 0) {
+          const bypassMessage = nextErrors.proposalText || nextErrors.creatorChannelUrl;
+          if (bypassMessage === VALIDATION.offPlatformContact) {
+            showToast(bypassMessage);
+          }
           const focusId =
             nextErrors.bidAmount
               ? 'bid-amount'

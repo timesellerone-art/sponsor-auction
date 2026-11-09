@@ -11,7 +11,7 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { nextInventoryMinBid } from '@/lib/auction-engine';
 import { placeTimeSlotBid } from '@/lib/timeslots';
 import { formatWon } from '@/lib/utils';
-import { MIN_PROPOSAL_LENGTH } from '@/lib/validation';
+import { MIN_PROPOSAL_LENGTH, VALIDATION } from '@/lib/validation';
 import { hasOffPlatformContact } from '@/utils/filter';
 import type { TimeSlotItem } from '@/types/timeslot';
 
@@ -69,7 +69,7 @@ function TimeslotBidForm({
         return;
       }
       if (hasOffPlatformContact(message)) {
-        setError('플랫폼 우회 연락처는 사용할 수 없습니다.');
+        setError(VALIDATION.offPlatformContact);
         return;
       }
 

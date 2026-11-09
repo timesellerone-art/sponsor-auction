@@ -8,6 +8,7 @@ import {
 import { recordBypassIfNeeded } from '@/lib/compliance';
 import { listTimeSlotBids, placeTimeSlotBid } from '@/lib/timeslots';
 import { hasAuthRole } from '@/types/auth';
+import { VALIDATION } from '@/lib/validation';
 import { OffPlatformContactError, assertNoOffPlatformContact } from '@/utils/filter';
 
 const NO_STORE = {
@@ -90,7 +91,7 @@ export async function POST(
       const text =
         error instanceof OffPlatformContactError
           ? error.message
-          : '플랫폼 우회 연락처는 사용할 수 없습니다.';
+          : VALIDATION.offPlatformContact;
       return NextResponse.json(
         { error: text, errorMessage: text, errorCode: 'OFF_PLATFORM_CONTACT' },
         { status: 400, headers: NO_STORE },

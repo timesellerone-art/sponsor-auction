@@ -5,6 +5,7 @@ import { Loader2, Send } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
+import { VALIDATION } from '@/lib/validation';
 import { maskOffPlatformContact, hasOffPlatformContact } from '@/utils/filter';
 import { CHAT_INSERTED_EVENT, type ChatInsertedDetail } from '@/types/realtime';
 import type { ChatMessage } from '@/types/chat';
@@ -120,7 +121,7 @@ export function AuctionChat({ auctionId }: { auctionId: string }) {
       return;
     }
     if (hasOffPlatformContact(body)) {
-      const message = '플랫폼 우회 연락처는 사용할 수 없습니다.';
+      const message = VALIDATION.offPlatformContact;
       setError(message);
       showToast(message);
       return;
