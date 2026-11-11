@@ -25,6 +25,7 @@ function payout(partial: Partial<PayoutItem> & Pick<PayoutItem, 'id' | 'status'>
     requestedAt: '2026-11-09T00:00:00+09:00',
     bidAmount: 10_000,
     bankAccount: '신한은행 110-123-456789',
+    auctionId: 'auc-test',
     ...partial,
   };
 }
@@ -89,12 +90,26 @@ describe('대량이체 대상 필터', () => {
         bankAccount: ' 신한은행  110-123-456789 ',
         bidAmount: 10_000,
       }),
+      {
+        ...payout({ id: 'pending-payout-ok', status: 'pending', bidAmount: 10_000 }),
+        status: 'pending_payout',
+      } as unknown as PayoutItem,
       payout({ id: 'paid', status: 'paid', bidAmount: 10_000 }),
       payout({ id: 'cancelled', status: 'cancelled', bidAmount: 10_000 }),
+      {
+        ...payout({ id: 'canceled', status: 'pending', bidAmount: 10_000 }),
+        status: 'canceled',
+      } as unknown as PayoutItem,
       payout({
-        id: 'orphan',
+        id: 'orphan-deleted',
         status: 'pending',
         auctionTitle: DELETED_CAMPAIGN_LABEL,
+        bidAmount: 10_000,
+      }),
+      payout({
+        id: 'orphan-no-campaign',
+        status: 'pending',
+        auctionId: '',
         bidAmount: 10_000,
       }),
       payout({
@@ -111,14 +126,26 @@ describe('대량이체 대상 필터', () => {
       }),
     ]);
 
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]?.sourceId, 'pending-ok');
-    assert.equal(rows[0]?.bankName, '신한은행');
-    assert.equal(rows[0]?.accountNumber, '110123456789');
-    assert.equal(rows[0]?.amount, 8_000);
+    assert.deepEqual(
+      rows.map((item) => item.sourceId).sort(),
+      ['pending-ok', 'pending-payout-ok'],
+    );
+    assert.equal(rows[0]?.bankName === '신한은행' || rows[1]?.bankName === '신한은행', true);
+    assert.equal(
+      rows.every((item) => item.accountNumber === '110123456789' && item.amount === 8_000),
+      true,
+    );
     assert.deepEqual(
       skipped.map((item) => item.reason).sort(),
-      ['cancelled', 'missing_account', 'missing_bank', 'orphan', 'paid'],
+      [
+        'cancelled',
+        'cancelled',
+        'missing_account',
+        'missing_bank',
+        'orphan',
+        'orphan',
+        'paid',
+      ],
     );
   });
 });
@@ -159,7 +186,11 @@ describe('xlsx 라운드트립', () => {
     assert.equal(area?.amount, floorToTenWon(calculateCreatorPayout(33_333)));
     assert.equal(/<f[ >]/.test(parsed.xml), false);
     assert.equal(/=SUM/i.test(parsed.xml), false);
-    assert.equal(parsed.xml.includes('t="inlineStr"'), true);
+    assert.equal(parsed.xml.includes('t="inlineStr"'), false);
+    assert.equal(parsed.xml.includes('t="s"'), true);
+    assert.equal(parsed.xml.includes('t="n"'), true);
+    assert.equal(parsed.sharedStrings.includes('01012345678'), true);
+    assert.equal(parsed.sharedStrings.includes('02123456789'), true);
     assert.equal(parsed.styles.includes('numFmtId="164"'), true);
     assert.equal(parsed.styles.includes('formatCode="@"'), true);
     assert.equal(parsed.rows.every((row) => row.recipientLabel === TRANSFER_RECIPIENT_LABEL), true);

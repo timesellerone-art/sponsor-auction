@@ -275,7 +275,10 @@ test.describe('관리자 페이지 핵심 기능', () => {
     const parsed = parsePayoutTransferXlsx(await readFile(filePath!));
     expect(parsed.headers).toEqual([...TRANSFER_XLSX_HEADERS]);
     expect(parsed.rows.length).toBeGreaterThan(0);
-    expect(parsed.xml.includes('<f>')).toBe(false);
+    expect(/<f[ >]/.test(parsed.xml)).toBe(false);
+    expect(parsed.xml.includes('t="s"')).toBe(true);
+    expect(parsed.xml.includes('t="n"')).toBe(true);
+    expect(parsed.sharedStrings.includes('01012345678')).toBe(true);
     expect(parsed.rows.every((row) => /^\d+$/.test(row.accountNumber))).toBe(true);
     expect(parsed.rows.every((row) => Number.isInteger(row.amount) && row.amount % 10 === 0)).toBe(
       true,

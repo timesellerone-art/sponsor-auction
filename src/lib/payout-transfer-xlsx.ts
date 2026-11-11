@@ -285,25 +285,40 @@ function skip(id: string, reason: TransferSkipReason, message: string): Transfer
   return { id, reason, message };
 }
 
+function payoutStatus(item: PayoutItem) {
+  return String(item.status ?? '')
+    .trim()
+    .toLowerCase();
+}
+
+export function isTransferPendingStatus(status: string | null | undefined) {
+  const value = String(status ?? '')
+    .trim()
+    .toLowerCase();
+  return value === 'pending' || value === 'pending_payout';
+}
+
 export function collectPayoutTransferRows(payouts: PayoutItem[]) {
   const rows: PayoutTransferRow[] = [];
   const skipped: TransferSkip[] = [];
 
   for (const item of payouts) {
-    if (item.status === 'paid') {
+    const status = payoutStatus(item);
+    if (status === 'paid') {
       skipped.push(skip(item.id, 'paid', '지급 완료 건은 대량이체 대상이 아닙니다.'));
       continue;
     }
-    if (item.status === 'cancelled') {
+    if (status === 'cancelled' || status === 'canceled' || status === 'refunded') {
       skipped.push(skip(item.id, 'cancelled', '취소 건은 대량이체 대상이 아닙니다.'));
       continue;
     }
-    if (item.status !== 'pending') {
+    if (!isTransferPendingStatus(status)) {
       skipped.push(skip(item.id, 'cancelled', '지급 대기가 아닌 건은 제외합니다.'));
       continue;
     }
-    if ((item.auctionTitle || '').trim() === DELETED_CAMPAIGN_LABEL) {
-      skipped.push(skip(item.id, 'orphan', '삭제된 캠페인 정산은 제외합니다.'));
+    const campaignId = (item.auctionId ?? '').trim();
+    if (!campaignId || (item.auctionTitle || '').trim() === DELETED_CAMPAIGN_LABEL) {
+      skipped.push(skip(item.id, 'orphan', '캠페인 식별자가 없는 고아 정산은 제외합니다.'));
       continue;
     }
 
@@ -333,43 +348,65 @@ export function collectPayoutTransferRows(payouts: PayoutItem[]) {
     });
   }
 
-  for (const item of skipped) {
-    console.warn('[SponsorAuction] 대량이체 엑셀 제외', item);
-  }
-
   return { rows, skipped };
 }
 
-function stringCell(ref: string, value: string, textStyle = false) {
+function sharedStringCell(ref: string, index: number, textStyle = false) {
   const style = textStyle ? ' s="1"' : '';
-  return `<c r="${ref}" t="inlineStr"${style}><is><t xml:space="preserve">${xmlEscape(value)}</t></is></c>`;
+  return `<c r="${ref}" t="s"${style}><v>${index}</v></c>`;
 }
 
 function numberCell(ref: string, value: number) {
   return `<c r="${ref}" t="n"><v>${Math.trunc(value)}</v></c>`;
 }
 
-function worksheetXml(rows: PayoutTransferRow[]) {
-  const header = TRANSFER_XLSX_HEADERS.map(
-    (title, index) => stringCell(`${colLetter(index)}1`, title),
-  ).join('');
+function internSharedString(table: string[], index: Map<string, number>, value: string) {
+  const existing = index.get(value);
+  if (existing != null) {
+    return existing;
+  }
+  const next = table.length;
+  index.set(value, next);
+  table.push(value);
+  return next;
+}
+
+function worksheetAndSharedStrings(rows: PayoutTransferRow[]) {
+  const table: string[] = [];
+  const index = new Map<string, number>();
+  const intern = (value: string) => internSharedString(table, index, value);
+  let refs = 0;
+
+  const header = TRANSFER_XLSX_HEADERS.map((title, col) => {
+    refs += 1;
+    return sharedStringCell(`${colLetter(col)}1`, intern(title));
+  }).join('');
+
   const body = rows
     .map((row, rowIndex) => {
       const excelRow = rowIndex + 2;
-      return `<row r="${excelRow}">${stringCell(`A${excelRow}`, row.bankName)}${stringCell(`B${excelRow}`, row.accountNumber, true)}${numberCell(`C${excelRow}`, row.amount)}${stringCell(`D${excelRow}`, row.recipientLabel)}${stringCell(`E${excelRow}`, row.selfLabel)}</row>`;
+      refs += 4;
+      return `<row r="${excelRow}">${sharedStringCell(`A${excelRow}`, intern(row.bankName))}${sharedStringCell(`B${excelRow}`, intern(row.accountNumber), true)}${numberCell(`C${excelRow}`, row.amount)}${sharedStringCell(`D${excelRow}`, intern(row.recipientLabel))}${sharedStringCell(`E${excelRow}`, intern(row.selfLabel))}</row>`;
     })
     .join('');
 
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <sheetData>
     <row r="1">${header}</row>
     ${body}
   </sheetData>
 </worksheet>`;
+
+  const sharedStrings = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${refs}" uniqueCount="${table.length}">
+${table.map((value) => `  <si><t xml:space="preserve">${xmlEscape(value)}</t></si>`).join('\n')}
+</sst>`;
+
+  return { sheet, sharedStrings };
 }
 
-function xlsxParts(sheet: string) {
+function xlsxParts(sheet: string, sharedStrings: string) {
   return [
     {
       name: '[Content_Types].xml',
@@ -380,6 +417,7 @@ function xlsxParts(sheet: string) {
   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
   <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
   <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+  <Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>
 </Types>`),
     },
     {
@@ -395,6 +433,7 @@ function xlsxParts(sheet: string) {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>
 </Relationships>`),
     },
     {
@@ -424,6 +463,10 @@ function xlsxParts(sheet: string) {
 </styleSheet>`),
     },
     {
+      name: 'xl/sharedStrings.xml',
+      data: encoder.encode(sharedStrings),
+    },
+    {
       name: 'xl/worksheets/sheet1.xml',
       data: encoder.encode(sheet),
     },
@@ -432,8 +475,20 @@ function xlsxParts(sheet: string) {
 
 export function buildPayoutTransferXlsx(payouts: PayoutItem[]) {
   const collected = collectPayoutTransferRows(payouts);
-  const bytes = buildStoreZip(xlsxParts(worksheetXml(collected.rows)));
+  const parts = worksheetAndSharedStrings(collected.rows);
+  const bytes = buildStoreZip(xlsxParts(parts.sheet, parts.sharedStrings));
   return { ...collected, bytes };
+}
+
+function parseSharedStrings(xml: string) {
+  const values: string[] = [];
+  const pattern = /<si>[\s\S]*?<t[^>]*>([\s\S]*?)<\/t>[\s\S]*?<\/si>/g;
+  let match: RegExpExecArray | null = pattern.exec(xml);
+  while (match) {
+    values.push(xmlUnescape(match[1]));
+    match = pattern.exec(xml);
+  }
+  return values;
 }
 
 export function parsePayoutTransferXlsx(bytes: Uint8Array) {
@@ -443,20 +498,28 @@ export function parsePayoutTransferXlsx(bytes: Uint8Array) {
     throw new Error('xlsx 시트를 찾지 못했습니다.');
   }
   const xml = decoder.decode(sheet);
-  if (/=SUM|=sum/i.test(xml)) {
+  if (/=SUM|=sum/i.test(xml) || /<f[ >]/.test(xml)) {
     throw new Error('엑셀에 계산식이 포함되어 있습니다.');
   }
+
+  const sharedStringsXml = decoder.decode(files.get('xl/sharedStrings.xml') ?? new Uint8Array());
+  const shared = parseSharedStrings(sharedStringsXml);
 
   const cells = new Map<string, string>();
   const cellPattern = /<c r="([A-E])(\d+)"([^>]*)>([\s\S]*?)<\/c>/g;
   let match: RegExpExecArray | null = cellPattern.exec(xml);
   while (match) {
     const ref = `${match[1]}${match[2]}`;
+    const attrs = match[3] ?? '';
     const inner = match[4];
-    const text = inner.match(/<t[^>]*>([\s\S]*?)<\/t>/);
     const number = inner.match(/<v>([\s\S]*?)<\/v>/);
-    if (text) {
-      cells.set(ref, xmlUnescape(text[1]));
+    const inline = inner.match(/<t[^>]*>([\s\S]*?)<\/t>/);
+    if (/\bt="s"/.test(attrs) && number) {
+      cells.set(ref, shared[Number(number[1].trim())] ?? '');
+    } else if (/\bt="n"/.test(attrs) && number) {
+      cells.set(ref, number[1].trim());
+    } else if (inline) {
+      cells.set(ref, xmlUnescape(inline[1]));
     } else if (number) {
       cells.set(ref, number[1].trim());
     }
@@ -479,7 +542,7 @@ export function parsePayoutTransferXlsx(bytes: Uint8Array) {
   }
 
   const styles = decoder.decode(files.get('xl/styles.xml') ?? new Uint8Array());
-  return { headers, rows, xml, styles };
+  return { headers, rows, xml, styles, sharedStrings: sharedStringsXml };
 }
 
 export function downloadPayoutTransferXlsx(payouts: PayoutItem[]) {
