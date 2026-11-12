@@ -108,12 +108,15 @@ export function Navbar() {
           <span className="text-[15px] sm:text-lg">Clink</span>
         </Link>
 
-        <nav className="hidden min-w-0 flex-1 items-center gap-5 lg:flex" aria-label="주요">
+        <nav className="hidden min-w-0 flex-1 items-center gap-3 md:flex lg:gap-5" aria-label="주요">
           <Link href="/#auctions" className={navLinkClass}>
             오픈 캠페인
           </Link>
           <Link href="/inventory" className={navLinkClass}>
-            크리에이터 찾기
+            크리에이터
+          </Link>
+          <Link href="/#guide" className={navLinkClass}>
+            이용안내
           </Link>
           {showAdmin ? (
             <Link href="/admin" className={navLinkClass}>
@@ -121,7 +124,7 @@ export function Navbar() {
             </Link>
           ) : null}
 
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 lg:gap-2">
             {ready && user ? (
               <>
                 <RoleSwitcher />
@@ -138,7 +141,7 @@ export function Navbar() {
                 {showDashboard ? (
                   <Link
                     href="/my"
-                    className="inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-800 shadow-sm hover:shadow-md"
+                    className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-800 shadow-sm hover:shadow-md lg:h-10 lg:px-4 lg:text-sm"
                   >
                     {dashboardLabel}
                   </Link>
@@ -147,7 +150,7 @@ export function Navbar() {
             ) : (
               <Link
                 href="/login"
-                className="inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-800 shadow-sm hover:shadow-md"
+                className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-800 shadow-sm hover:shadow-md lg:h-10 lg:px-4 lg:text-sm"
               >
                 로그인
               </Link>
@@ -156,14 +159,14 @@ export function Navbar() {
               type="button"
               disabled={!ready || Boolean(user && !canCreateAuction)}
               onClick={requestCreateAuction}
-              className="inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full bg-clink px-4 text-sm font-semibold text-white transition-colors hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+              className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full bg-clink px-3 text-xs font-semibold text-white transition-colors hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 lg:h-10 lg:px-4 lg:text-sm"
             >
               + 캠페인 등록
             </button>
           </div>
         </nav>
 
-        <div className="flex shrink-0 items-center gap-1.5 lg:hidden">
+        <div className="flex shrink-0 items-center gap-1.5 md:hidden">
           <NotificationBell />
           <button
             type="button"
@@ -189,7 +192,7 @@ export function Navbar() {
       {open ? (
         <button
           type="button"
-          className="fixed inset-0 top-14 z-40 bg-stone-950/30 sm:top-16 lg:hidden"
+          className="fixed inset-0 top-14 z-40 bg-stone-950/30 sm:top-16 md:hidden"
           aria-label="메뉴 닫기"
           onClick={() => setOpen(false)}
         />
@@ -198,7 +201,7 @@ export function Navbar() {
       <div
         id={menuId}
         className={cn(
-          'relative z-50 border-t border-stone-200 bg-[#FAF8F5] lg:hidden',
+          'relative z-50 border-t border-stone-200 bg-[#FAF8F5] md:hidden',
           open ? 'block' : 'hidden',
         )}
       >
@@ -215,7 +218,14 @@ export function Navbar() {
             className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
             onClick={() => setOpen(false)}
           >
-            크리에이터 찾기
+            크리에이터
+          </Link>
+          <Link
+            href="/#guide"
+            className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
+            onClick={() => setOpen(false)}
+          >
+            이용안내
           </Link>
           {showDashboard ? (
             <Link

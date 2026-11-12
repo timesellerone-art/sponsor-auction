@@ -150,7 +150,7 @@ export function AuctionCard({
   const isAdvertiser = Boolean(ready && user && canCreateAuction);
 
   return (
-    <article className="flex h-full min-w-0 flex-col rounded-2xl border border-clink-border bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
+    <article className="flex h-full min-w-0 flex-col rounded-2xl bg-white/90 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-stone-900/5 backdrop-blur-md transition-shadow hover:shadow-md sm:p-5">
       <div className="flex min-w-0 items-start gap-2">
         <span
           className={cn(

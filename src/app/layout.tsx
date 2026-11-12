@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Clink',
-  description: '제품만 등록하면 AI가 기획안을 짜주고, 크리에이터가 맞춤 콘텐츠를 제안합니다.',
+  description: '기획부터 매칭까지, 크리에이터 협업의 새로운 기준. 제품만 등록하면 AI가 촬영 콘셉트를 설계합니다.',
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
