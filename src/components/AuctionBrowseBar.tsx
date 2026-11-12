@@ -3,6 +3,10 @@
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BrowsePlatformFilter, BrowseSort } from '@/lib/auction-browse';
+import {
+  CAMPAIGN_CATEGORIES,
+  type BrowseCategoryFilter,
+} from '@/lib/campaign-presentation';
 import { SELECTABLE_PLATFORMS } from '@/lib/platforms';
 
 const PLATFORMS: { id: BrowsePlatformFilter; label: string }[] = [
@@ -20,8 +24,10 @@ type AuctionBrowseBarProps = {
   query: string;
   platform: BrowsePlatformFilter;
   sort: BrowseSort;
+  category: BrowseCategoryFilter;
   onQueryChange: (value: string) => void;
   onPlatformChange: (value: BrowsePlatformFilter) => void;
+  onCategoryChange: (value: BrowseCategoryFilter) => void;
   onSortChange: (value: BrowseSort) => void;
 };
 
@@ -29,8 +35,10 @@ export function AuctionBrowseBar({
   query,
   platform,
   sort,
+  category,
   onQueryChange,
   onPlatformChange,
+  onCategoryChange,
   onSortChange,
 }: AuctionBrowseBarProps) {
   return (
@@ -50,8 +58,36 @@ export function AuctionBrowseBar({
         />
       </label>
 
+      <div
+        className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto overscroll-x-contain whitespace-nowrap pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        role="group"
+        aria-label="콘텐츠 분야"
+      >
+        {CAMPAIGN_CATEGORIES.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-label={item.id === 'all' ? '콘텐츠 분야 전체' : item.label}
+            aria-pressed={category === item.id}
+            onClick={() => onCategoryChange(item.id)}
+            className={cn(
+              'inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-xs font-semibold',
+              category === item.id
+                ? 'border-clink bg-clink text-white'
+                : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',
+            )}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto overscroll-x-contain whitespace-nowrap pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          className="flex min-w-0 flex-nowrap gap-2 overflow-x-auto overscroll-x-contain whitespace-nowrap pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          role="group"
+          aria-label="채널"
+        >
           {PLATFORMS.map((item) => (
             <button
               key={item.id}

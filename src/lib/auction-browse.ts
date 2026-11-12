@@ -1,4 +1,11 @@
+import {
+  isTestCampaignCopy,
+  matchesCategoryFilter,
+  type BrowseCategoryFilter,
+} from '@/lib/campaign-presentation';
 import { isAuctionClosed, type AuctionItem, type PlatformType } from '@/types/auction';
+
+export type { BrowseCategoryFilter };
 
 export type BrowsePlatformFilter = 'all' | Exclude<PlatformType, 'other'>;
 
@@ -59,12 +66,18 @@ export function browseAuctions(
     query: string;
     platform: BrowsePlatformFilter;
     sort: BrowseSort;
+    category?: BrowseCategoryFilter;
+    hideTestCopy?: boolean;
   },
 ) {
+  const category = options.category ?? 'all';
   const filtered = auctions.filter(
     (auction) =>
       matchesAuctionQuery(auction, options.query) &&
-      matchesPlatformFilter(auction, options.platform),
+      matchesPlatformFilter(auction, options.platform) &&
+      matchesCategoryFilter(auction, category) &&
+      (!options.hideTestCopy ||
+        !isTestCampaignCopy(auction.title, auction.description)),
   );
 
   return {

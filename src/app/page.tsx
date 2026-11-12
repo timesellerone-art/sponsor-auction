@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AuctionBrowseBar } from '@/components/AuctionBrowseBar';
 import { AuctionCard, AuctionCardSkeleton } from '@/components/AuctionCard';
+import { ClosedCampaignRow } from '@/components/ClosedCampaignRow';
 import { PageContainer } from '@/components/PageContainer';
 import { HomeAiPreview } from '@/components/home/HomeAiPreview';
 import { HomeHero } from '@/components/home/HomeHero';
@@ -13,6 +14,7 @@ import {
   type BrowseSort,
 } from '@/lib/auction-browse';
 import { getAuctions } from '@/lib/auctions';
+import type { BrowseCategoryFilter } from '@/lib/campaign-presentation';
 import type { AuctionItem } from '@/types/auction';
 
 export default function Home() {
@@ -21,6 +23,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [platform, setPlatform] = useState<BrowsePlatformFilter>('all');
+  const [category, setCategory] = useState<BrowseCategoryFilter>('all');
   const [sort, setSort] = useState<BrowseSort>('newest');
 
   useEffect(() => {
@@ -61,9 +64,17 @@ export default function Home() {
   }, []);
 
   const browsed = useMemo(
-    () => browseAuctions(auctions, { query, platform, sort }),
-    [auctions, platform, query, sort],
+    () =>
+      browseAuctions(auctions, {
+        query,
+        platform,
+        category,
+        sort,
+        hideTestCopy: true,
+      }),
+    [auctions, category, platform, query, sort],
   );
+  const filtered = Boolean(query.trim() || platform !== 'all' || category !== 'all');
   const isEmpty = !loading && browsed.open.length === 0 && browsed.closed.length === 0;
 
   return (
@@ -87,9 +98,11 @@ export default function Home() {
           <AuctionBrowseBar
             query={query}
             platform={platform}
+            category={category}
             sort={sort}
             onQueryChange={setQuery}
             onPlatformChange={setPlatform}
+            onCategoryChange={setCategory}
             onSortChange={setSort}
           />
         </div>
@@ -108,9 +121,7 @@ export default function Home() {
         ) : isEmpty ? (
           <div className="rounded-2xl border border-dashed border-clink-border bg-white px-6 py-16 text-center shadow-sm">
             <p className="text-base font-medium text-clink">
-              {query.trim() || platform !== 'all'
-                ? '조건에 맞는 오픈 캠페인이 없습니다'
-                : '등록된 오픈 캠페인이 없습니다'}
+              {filtered ? '조건에 맞는 오픈 캠페인이 없습니다' : '등록된 오픈 캠페인이 없습니다'}
             </p>
             {error ? <p className="mt-2 text-sm text-clink-muted">{error}</p> : null}
           </div>
@@ -122,7 +133,7 @@ export default function Home() {
                   지금 지원 가능한 오픈 캠페인이 없습니다.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {browsed.open.map((auction) => (
                     <AuctionCard key={auction.id} auction={auction} />
                   ))}
@@ -132,10 +143,12 @@ export default function Home() {
 
             {browsed.closed.length > 0 ? (
               <div>
-                <h3 className="mb-4 text-lg font-semibold text-clink">모집 마감·완료된 캠페인</h3>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <h3 className="mb-3 text-lg font-bold tracking-[-0.03em] leading-[1.15] text-clink">
+                  모집 마감·완료된 캠페인
+                </h3>
+                <div className="divide-y divide-stone-200/80 overflow-hidden rounded-2xl bg-white/70 ring-1 ring-stone-900/5">
                   {browsed.closed.map((auction) => (
-                    <AuctionCard key={auction.id} auction={auction} />
+                    <ClosedCampaignRow key={auction.id} auction={auction} />
                   ))}
                 </div>
               </div>

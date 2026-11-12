@@ -3,88 +3,30 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import {
-  AtSign,
-  BookOpen,
-  Camera,
-  Globe,
-  Hash,
-  MonitorPlay,
-  Music2,
-  Play,
-  Users,
-  type LucideIcon,
-} from 'lucide-react';
-import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
 import { showToast } from '@/components/Toast';
 import { ACCESS_REASON } from '@/lib/access';
 import { isOpenForBid } from '@/lib/auction-browse';
 import { loginPath } from '@/lib/auth-guard';
+import {
+  campaignCoverUrl,
+  formatDeadlineBadge,
+  platformBadgeLabel,
+} from '@/lib/campaign-presentation';
 import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { VALIDATION } from '@/lib/validation';
 import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
-import { PLATFORM_LABELS } from '@/lib/platforms';
-import { cn, formatWon } from '@/lib/utils';
-import type { AuctionItem, AuctionStatus, PlatformType } from '@/types/auction';
+import { formatWon } from '@/lib/utils';
+import type { AuctionItem, AuctionStatus } from '@/types/auction';
 
 type AuctionCardData = Partial<AuctionItem> & {
   title?: string | null;
   budget?: number | null;
 };
 
-const PLATFORM_CHIP =
-  'bg-[#FFF7ED] text-[#1C1917] ring-1 ring-stone-900/5';
-
 const CARD_CTA =
   'mt-auto inline-flex h-10 min-h-10 w-full min-w-0 items-center justify-center rounded-full bg-[#FFF7ED] px-3 text-sm font-semibold text-[#1C1917] ring-1 ring-stone-900/5 transition-colors hover:bg-[#1C1917] hover:text-white';
-
-const platformMeta: Record<
-  PlatformType,
-  { label: string; icon: LucideIcon; className: string }
-> = {
-  youtube_shorts: {
-    label: PLATFORM_LABELS.youtube_shorts,
-    icon: Play,
-    className: PLATFORM_CHIP,
-  },
-  instagram_reels: {
-    label: PLATFORM_LABELS.instagram_reels,
-    icon: Camera,
-    className: PLATFORM_CHIP,
-  },
-  tiktok: {
-    label: PLATFORM_LABELS.tiktok,
-    icon: Music2,
-    className: PLATFORM_CHIP,
-  },
-  youtube: {
-    label: PLATFORM_LABELS.youtube,
-    icon: MonitorPlay,
-    className: PLATFORM_CHIP,
-  },
-  threads: {
-    label: PLATFORM_LABELS.threads,
-    icon: Hash,
-    className: PLATFORM_CHIP,
-  },
-  naver_blog: {
-    label: PLATFORM_LABELS.naver_blog,
-    icon: BookOpen,
-    className: PLATFORM_CHIP,
-  },
-  x_twitter: {
-    label: PLATFORM_LABELS.x_twitter,
-    icon: AtSign,
-    className: PLATFORM_CHIP,
-  },
-  other: {
-    label: PLATFORM_LABELS.other,
-    icon: Globe,
-    className: PLATFORM_CHIP,
-  },
-};
 
 const statusMeta: Record<AuctionStatus, { label: string; className: string }> = {
   active: {
@@ -129,11 +71,15 @@ export function AuctionCard({
   const [bidOpen, setBidOpen] = useState(false);
   const title = auction.title || '제목 없음';
   const platform = auction.platform ?? 'other';
-  const platformInfo = platformMeta[platform] ?? platformMeta.other;
   const status = auction.status ?? 'active';
   const statusInfo = statusMeta[status] ?? statusMeta.active;
-  const PlatformIcon = platformInfo.icon;
   const href = auction.id ? `/auctions/${auction.id}` : '/#auctions';
+  const cover = campaignCoverUrl({
+    id: auction.id ?? title,
+    title,
+    description: auction.description ?? '',
+  });
+  const deadlineBadge = formatDeadlineBadge(auction.deadline);
   const auctionOpen = Boolean(auction.id) && isOpenForBid({
     status,
     isBlind: Boolean(auction.isBlind),
@@ -153,66 +99,49 @@ export function AuctionCard({
   const isAdvertiser = Boolean(ready && user && canCreateAuction);
 
   return (
-    <article className="flex h-full min-w-0 flex-col rounded-2xl bg-white/90 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-stone-900/5 backdrop-blur-md transition-shadow hover:shadow-md sm:p-5">
-      <div className="flex min-w-0 items-start justify-between gap-2">
-        <span
-          className={cn(
-            'inline-flex w-fit max-w-[70%] items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold sm:text-[11px]',
-            platformInfo.className,
-          )}
-        >
-          <PlatformIcon className="size-3 shrink-0 text-clink-accent" aria-hidden />
-          <span className="min-w-0 truncate">{platformInfo.label}</span>
+    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-stone-900/5 transition-shadow hover:shadow-md">
+      <div className="relative h-44 overflow-hidden bg-stone-200">
+        <img
+          src={cover}
+          alt=""
+          width={600}
+          height={176}
+          className="absolute inset-0 size-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
+        <span className="absolute top-3 left-3 max-w-[70%] truncate rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+          {platformBadgeLabel(platform)}
         </span>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {owned ? (
-            <span className="rounded-full bg-clink px-2 py-0.5 text-[10px] font-semibold text-white">
-              내 캠페인
-            </span>
-          ) : null}
-          <span
-            className={cn(
-              'rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset',
-              statusInfo.className,
-            )}
-          >
-            {statusInfo.label}
+        <span className="absolute top-3 right-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+          {auctionOpen ? deadlineBadge : statusInfo.label}
+        </span>
+        {owned ? (
+          <span className="absolute bottom-3 right-3 rounded-full bg-[#1C1917] px-2 py-0.5 text-[10px] font-semibold text-white">
+            내 캠페인
           </span>
-        </div>
+        ) : null}
       </div>
 
-      <h3 className="mt-3 line-clamp-2 min-w-0 break-words text-base font-bold tracking-[-0.03em] leading-[1.15] text-clink">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-4 sm:p-5">
+      <h3 className="line-clamp-2 min-w-0 break-words text-base font-bold tracking-[-0.03em] leading-[1.15] text-clink">
         <Link href={href} className="hover:underline">
           {title}
         </Link>
       </h3>
 
-      <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-5 text-clink-muted">
+      <p className="line-clamp-2 text-sm leading-5 text-clink-muted">
         {auction.description || '설명이 없습니다.'}
       </p>
 
-      <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-stone-200/80 pt-4">
+      <div className="mt-1 flex items-end justify-between gap-3 border-t border-stone-200/80 pt-4">
         <div className="min-w-0">
-          <dt className="text-[11px] text-clink-muted">예산</dt>
-          <dd className="mt-1 truncate text-sm font-semibold tracking-tight text-clink">
+          <p className="text-[11px] text-clink-muted">예산</p>
+          <p className="mt-0.5 truncate text-xl font-bold tracking-tight text-[#1C1917]">
             {formatBudget(auction.budget)}
-          </dd>
+          </p>
         </div>
-        <div className="min-w-0">
-          <dt className="text-[11px] text-clink-muted">현재 제안 수</dt>
-          <dd className="mt-1 inline-flex min-w-0 items-center gap-1 text-sm font-semibold tracking-tight text-clink">
-            <Users className="size-3.5 shrink-0 text-clink-accent" aria-hidden />
-            {auction.bidsCount ?? 0}건
-          </dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="text-[11px] text-clink-muted">남은 모집 기간</dt>
-          <dd className="mt-1">
-            <AuctionCountdown className="min-w-0 text-sm font-semibold tracking-tight text-clink" deadline={auction.deadline} />
-          </dd>
-        </div>
-      </dl>
-      <p className="mt-3 text-[11px] font-medium text-clink-accent">AI 가이드 포함</p>
+        <p className="shrink-0 text-xs text-clink-muted">제안 {auction.bidsCount ?? 0}건</p>
+      </div>
       {auction.highestBidAmount && auction.highestBidAmount > 0 ? (
         <p className="mt-2 text-xs text-clink-muted">
           최저 {formatWon(auction.leadingBidAmount ?? auction.highestBidAmount)}
@@ -275,6 +204,7 @@ export function AuctionCard({
               : '크리에이터 전용 기능입니다'}
         </p>
       )}
+      </div>
 
       {auction.id ? (
         <BidModal
@@ -300,22 +230,17 @@ export function AuctionCard({
 export function AuctionCardSkeleton() {
   return (
     <div
-      className="animate-pulse rounded-2xl bg-white/90 p-4 ring-1 ring-stone-900/5 sm:p-5"
+      className="animate-pulse overflow-hidden rounded-2xl bg-white ring-1 ring-stone-900/5"
       aria-hidden
     >
-      <div className="flex justify-between">
-        <div className="h-5 w-20 rounded-full bg-zinc-200" />
-        <div className="h-5 w-12 rounded-full bg-zinc-200" />
+      <div className="h-44 bg-zinc-200" />
+      <div className="p-4 sm:p-5">
+        <div className="h-5 w-4/5 rounded bg-zinc-200" />
+        <div className="mt-3 h-4 w-full rounded bg-zinc-100" />
+        <div className="mt-2 h-4 w-2/3 rounded bg-zinc-100" />
+        <div className="mt-5 h-8 w-28 rounded bg-zinc-200" />
+        <div className="mt-6 h-10 w-full rounded-full bg-zinc-200" />
       </div>
-      <div className="mt-4 h-5 w-4/5 rounded bg-zinc-200" />
-      <div className="mt-3 h-4 w-full rounded bg-zinc-100" />
-      <div className="mt-2 h-4 w-2/3 rounded bg-zinc-100" />
-      <div className="mt-5 grid grid-cols-3 gap-3 border-t border-stone-200/80 pt-4">
-        <div className="h-8 rounded bg-zinc-100" />
-        <div className="h-8 rounded bg-zinc-100" />
-        <div className="h-8 rounded bg-zinc-100" />
-      </div>
-      <div className="mt-6 h-10 w-full rounded-full bg-zinc-200" />
     </div>
   );
 }
