@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Loader2, X } from 'lucide-react';
+import { Loader2, Sparkles, X } from 'lucide-react';
 import { AgreementFields } from '@/components/AgreementFields';
 import { EscrowNotice } from '@/components/EscrowNotice';
 import { useAuth } from '@/components/AuthProvider';
@@ -24,13 +24,21 @@ import {
   validateBidForm,
   type BidFieldErrors,
 } from '@/lib/validation';
+import {
+  campaignCategoryLabel,
+  displayCampaignDescription,
+  resolveCampaignCategory,
+} from '@/lib/campaign-presentation';
 import type { AuctionItem } from '@/types/auction';
 
 type FieldErrors = BidFieldErrors;
 
 type BidModalProps = {
   open: boolean;
-  auction: Pick<AuctionItem, 'id' | 'title' | 'budget' | 'status' | 'isBlind' | 'authorId'> | null;
+  auction: Pick<
+    AuctionItem,
+    'id' | 'title' | 'budget' | 'status' | 'isBlind' | 'authorId' | 'description' | 'platform' | 'category'
+  > | null;
   onClose: () => void;
   onCreated?: () => void;
 };
@@ -43,6 +51,9 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
   const [creatorChannelUrl, setCreatorChannelUrl] = useState('');
   const [bidAmount, setBidAmount] = useState('');
   const [proposalText, setProposalText] = useState('');
+  const [creatorStyle, setCreatorStyle] = useState('');
+  const [proposalBusy, setProposalBusy] = useState(false);
+  const [proposalHint, setProposalHint] = useState<string | null>(null);
   const [bankAccount, setBankAccount] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -62,6 +73,9 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
     setCreatorChannelUrl('');
     setBidAmount('');
     setProposalText('');
+    setCreatorStyle('');
+    setProposalBusy(false);
+    setProposalHint(null);
     setBankAccount('');
     setErrors({});
     setSubmitError(null);
@@ -108,6 +122,66 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
   if (!open || !auction) {
     return null;
   }
+
+  const handleGenerateProposal = async () => {
+    if (proposalBusy || isSubmitting) {
+      return;
+    }
+    setProposalBusy(true);
+    setProposalHint(null);
+    try {
+      const categoryId = resolveCampaignCategory({
+        title: auction.title,
+        description: auction.description ?? '',
+        category: auction.category,
+      });
+      const response = await fetch('/api/ai-proposal', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignTitle: auction.title,
+          campaignDescription: displayCampaignDescription(auction.description),
+          category: categoryId ? campaignCategoryLabel(categoryId) : '',
+          platform: auction.platform,
+          creatorStyle,
+        }),
+      });
+      const json = (await response.json().catch(() => null)) as {
+        proposal?: string;
+        errorMessage?: string;
+        error?: string;
+      } | null;
+      if (response.status === 401 || response.status === 403) {
+        const message =
+          json?.errorMessage ?? json?.error ?? '크리에이터 로그인 후 AI 초안을 만들 수 있습니다.';
+        setProposalHint(message);
+        showToast(message);
+        return;
+      }
+      const draft = json?.proposal?.trim() ?? '';
+      if (!draft) {
+        const message = 'AI 제안서 초안을 만들지 못했습니다. 다시 시도해 주세요.';
+        setProposalHint(message);
+        showToast(message);
+        return;
+      }
+      setProposalText(draft);
+      setErrors((current) => {
+        const next = { ...current };
+        delete next.proposalText;
+        return next;
+      });
+      setProposalHint('초안을 채워 두었습니다. 말투에 맞게 수정한 뒤 제출하세요.');
+      showToast('AI 제안서 초안을 채워 두었습니다.', 'success');
+    } catch {
+      const message = 'AI 제안서 초안을 만들지 못했습니다. 다시 시도해 주세요.';
+      setProposalHint(message);
+      showToast(message);
+    } finally {
+      setProposalBusy(false);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -317,6 +391,49 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
                 </p>
               </div>
             )}
+
+            <div className="rounded-2xl bg-[#1C1917] p-4 text-white shadow-[0_8px_30px_rgb(28,25,23,0.18)]">
+              <p className="text-[11px] font-semibold tracking-wide text-[#EA580C]">
+                AI 제안서 초안 생성기
+              </p>
+              <p className="mt-1 text-xs leading-5 text-white/65">
+                채널 스타일을 적으면 캠페인에 맞춘 제안서 초안을 채워 줍니다. 제출 전에 자유롭게
+                수정하세요.
+              </p>
+              <label className="mt-3 block">
+                <span className="sr-only">내 채널 스타일</span>
+                <input
+                  id="bid-creator-style"
+                  type="text"
+                  value={creatorStyle}
+                  onChange={(event) => setCreatorStyle(event.target.value)}
+                  className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-[#EA580C] focus:ring-2 focus:ring-[#EA580C]/30"
+                  placeholder="예: 20대 직장인 일상 브이로그, 솔직 리뷰 위주"
+                  autoComplete="off"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => void handleGenerateProposal()}
+                disabled={proposalBusy || isSubmitting}
+                className="mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[#EA580C] px-3 text-sm font-semibold text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {proposalBusy ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                    AI가 제안서를 작성 중...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="size-4" aria-hidden />
+                    AI로 맞춤 제안서 초안 쓰기
+                  </>
+                )}
+              </button>
+              {proposalHint ? (
+                <p className="mt-2 text-xs leading-5 text-white/70">{proposalHint}</p>
+              ) : null}
+            </div>
 
             <Field
               label="제안 내용/소개글"

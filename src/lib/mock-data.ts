@@ -539,6 +539,7 @@ export async function createAuction(
       createdAt: new Date().toISOString(),
       bidsCount: 0,
       imageUrl: data.imageUrl?.trim() || null,
+      category: data.category?.trim() || null,
     };
 
     auctionsStore = [created, ...auctionsStore];

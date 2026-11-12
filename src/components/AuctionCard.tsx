@@ -10,9 +10,12 @@ import { ACCESS_REASON } from '@/lib/access';
 import { isOpenForBid } from '@/lib/auction-browse';
 import { loginPath } from '@/lib/auth-guard';
 import {
+  campaignCategoryLabel,
   campaignCoverUrl,
+  displayCampaignDescription,
   formatDeadlineBadge,
   platformBadgeLabel,
+  resolveCampaignCategory,
 } from '@/lib/campaign-presentation';
 import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { VALIDATION } from '@/lib/validation';
@@ -79,6 +82,12 @@ export function AuctionCard({
     title,
     description: auction.description ?? '',
     imageUrl: auction.imageUrl,
+    category: auction.category,
+  });
+  const categoryId = resolveCampaignCategory({
+    title,
+    description: auction.description ?? '',
+    category: auction.category,
   });
   const deadlineBadge = formatDeadlineBadge(auction.deadline);
   const auctionOpen = Boolean(auction.id) && isOpenForBid({
@@ -111,7 +120,9 @@ export function AuctionCard({
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
         <span className="absolute top-3 left-3 max-w-[70%] truncate rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
-          {platformBadgeLabel(platform)}
+          {categoryId
+            ? `${campaignCategoryLabel(categoryId)} · ${platformBadgeLabel(platform)}`
+            : platformBadgeLabel(platform)}
         </span>
         <span className="absolute top-3 right-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
           {auctionOpen ? deadlineBadge : statusInfo.label}
@@ -131,7 +142,7 @@ export function AuctionCard({
       </h3>
 
       <p className="line-clamp-2 text-sm leading-5 text-clink-muted">
-        {auction.description || '설명이 없습니다.'}
+        {displayCampaignDescription(auction.description) || '설명이 없습니다.'}
       </p>
 
       <div className="mt-1 flex items-end justify-between gap-3 border-t border-stone-200/80 pt-4">
@@ -217,6 +228,9 @@ export function AuctionCard({
             status: auction.status ?? 'active',
             isBlind: Boolean(auction.isBlind),
             authorId: auction.authorId ?? null,
+            description: auction.description ?? '',
+            platform: auction.platform ?? 'other',
+            category: auction.category,
           }}
           onClose={() => setBidOpen(false)}
           onCreated={() => {

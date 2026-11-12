@@ -34,6 +34,7 @@ export interface AuctionItem {
   leadingBidAmount?: number;
   highestBidAmount?: number;
   imageUrl?: string | null;
+  category?: string | null;
 }
 
 export interface BidItem {

@@ -164,6 +164,8 @@ alter table if exists public.auctions
   add column if not exists image_url text;
 alter table if exists public.auctions
   add column if not exists thumbnail_url text;
+alter table if exists public.auctions
+  add column if not exists category text;
 
 alter table if exists public.bids
   add column if not exists creator_id uuid;

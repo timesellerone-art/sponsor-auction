@@ -28,6 +28,12 @@ import { buildFallbackReport } from '@/lib/ai-report';
 import { getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
 import { isCampaignAuthor, isOwnedAuction } from '@/lib/my-campaigns';
 import { VALIDATION } from '@/lib/validation';
+import {
+  campaignCategoryLabel,
+  displayCampaignDescription,
+  resolveCampaignCategory,
+} from '@/lib/campaign-presentation';
+import { platformLabel } from '@/lib/platforms';
 import { formatWon } from '@/lib/utils';
 import type { AiAnalyzeResponse, AiGuideResponse, AiReport } from '@/types/ai';
 import { isAuctionClosed, type AuctionItem, type BidItem } from '@/types/auction';
@@ -185,6 +191,7 @@ export function AuctionDetail({ id }: { id: string }) {
   }, [auction]);
 
   const title = auction?.title || '제목 없음';
+  const detailCategory = auction ? resolveCampaignCategory(auction) : null;
   const auctionOpen = auction?.status === 'active' && !auction.isBlind;
   const ownCampaign = Boolean(auction && isCampaignAuthor(auction, user?.id));
   const canBid = Boolean(auctionOpen && canPlaceBid && !ownCampaign);
@@ -280,6 +287,16 @@ export function AuctionDetail({ id }: { id: string }) {
             <h1 className="mt-2 text-2xl font-bold break-keep text-zinc-950">
               {title}
             </h1>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {detailCategory ? (
+                <span className="inline-flex rounded-full bg-[#FFF7ED] px-2.5 py-1 text-[11px] font-semibold text-[#EA580C] ring-1 ring-stone-900/5">
+                  {campaignCategoryLabel(detailCategory)}
+                </span>
+              ) : null}
+              <span className="inline-flex rounded-full bg-[#FAF8F5] px-2.5 py-1 text-[11px] font-semibold text-[#1C1917] ring-1 ring-stone-900/5">
+                {platformLabel(auction.platform)}
+              </span>
+            </div>
             {matched && selectedBid ? (
               <p className="mt-2 text-sm text-zinc-600">
                 선택된 크리에이터{' '}
@@ -294,7 +311,7 @@ export function AuctionDetail({ id }: { id: string }) {
               {formatWon(auction.budget)}
             </p>
             <p className="mt-4 text-sm leading-6 whitespace-pre-wrap text-zinc-600">
-              {auction.description || '설명이 없습니다.'}
+              {displayCampaignDescription(auction.description) || '설명이 없습니다.'}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-4 text-sm text-zinc-500">
               <AuctionCountdown deadline={auction.deadline} />
@@ -383,6 +400,9 @@ export function AuctionDetail({ id }: { id: string }) {
             status: auction.status,
             isBlind: auction.isBlind,
             authorId: auction.authorId,
+            description: auction.description,
+            platform: auction.platform,
+            category: auction.category,
           }}
           onClose={() => setBidOpen(false)}
           onCreated={handleBidCreated}

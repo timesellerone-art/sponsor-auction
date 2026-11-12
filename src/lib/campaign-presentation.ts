@@ -9,7 +9,10 @@ export type BrowseCategoryFilter =
   | 'tech'
   | 'living'
   | 'pet'
-  | 'fitness';
+  | 'fitness'
+  | 'parenting';
+
+export type CampaignCategoryId = Exclude<BrowseCategoryFilter, 'all'>;
 
 export const CAMPAIGN_CATEGORIES: { id: BrowseCategoryFilter; label: string }[] = [
   { id: 'all', label: '전체' },
@@ -19,36 +22,93 @@ export const CAMPAIGN_CATEGORIES: { id: BrowseCategoryFilter; label: string }[] 
   { id: 'living', label: '리빙·인테리어' },
   { id: 'pet', label: '반려동물' },
   { id: 'fitness', label: '헬스·운동' },
+  { id: 'parenting', label: '육아·라이프' },
 ];
 
-const CATEGORY_KEYWORDS: Record<Exclude<BrowseCategoryFilter, 'all'>, string[]> = {
+export const SELECTABLE_CAMPAIGN_CATEGORIES = CAMPAIGN_CATEGORIES.filter(
+  (item): item is { id: CampaignCategoryId; label: string } => item.id !== 'all',
+);
+
+const CATEGORY_LABELS: Record<CampaignCategoryId, string> = {
+  beauty: '뷰티·패션',
+  food: '푸드·카페',
+  tech: '테크·앱',
+  living: '리빙·인테리어',
+  pet: '반려동물',
+  fitness: '헬스·운동',
+  parenting: '육아·라이프',
+};
+
+const CATEGORY_MARKER = '콘텐츠 분야:';
+
+const CATEGORY_KEYWORDS: Record<CampaignCategoryId, string[]> = {
   tech: ['가계부', '스마트폰', 'saas', '노트북', '핀테크', '테크', '앱', '기기', '송금'],
   pet: ['반려동물', '강아지', '고양이', '반려', '사료', '배변매트', '펫매트'],
   beauty: ['앰플', '시카', '스킨', '화장품', '코디', '룩북', '뷰티', '패션', '세럼', '립밤', '립스틱'],
   food: ['그래놀라', '맥주', '커피', '카페', '맛집', '식단', '간식', '푸드', '브런치', '음료'],
   living: ['리빙', '인테리어', '홈스타일', '공간'],
   fitness: ['헬스', '운동', '러닝화', '피트니스', '요가', '러닝'],
+  parenting: ['육아', '아기', '유아', '신생아', '키즈', '워킹맘', '육아템', '이유식', '기저귀', '맘카페'],
 };
 
-const CATEGORY_COVERS: Record<Exclude<BrowseCategoryFilter, 'all'> | 'default', string> = {
+const CATEGORY_COVERS: Record<CampaignCategoryId | 'default', string> = {
   tech: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=1200&h=704&q=80',
   pet: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1200&h=704&q=80',
   beauty: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1200&h=704&q=80',
   food: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&h=704&q=80',
   living: 'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1200&h=704&q=80',
   fitness: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1200&h=704&q=80',
+  parenting:
+    'https://images.unsplash.com/photo-1476703993599-0035a21b17a9?auto=format&fit=crop&w=1200&h=704&q=80',
   default:
     'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&h=704&q=80',
 };
 
-const CATEGORY_ORDER: Exclude<BrowseCategoryFilter, 'all'>[] = [
+const CATEGORY_ORDER: CampaignCategoryId[] = [
   'tech',
   'pet',
   'beauty',
   'food',
   'living',
   'fitness',
+  'parenting',
 ];
+
+export function isCampaignCategoryId(value: string | null | undefined): value is CampaignCategoryId {
+  return Boolean(value && value in CATEGORY_LABELS);
+}
+
+export function campaignCategoryLabel(id: CampaignCategoryId) {
+  return CATEGORY_LABELS[id];
+}
+
+export function campaignCategoryIdFromLabel(label: string): CampaignCategoryId | null {
+  const normalized = label.trim();
+  const found = SELECTABLE_CAMPAIGN_CATEGORIES.find((item) => item.label === normalized);
+  return found?.id ?? null;
+}
+
+export function parseCategoryFromDescription(description?: string | null): CampaignCategoryId | null {
+  const firstLine = (description ?? '').split(/\r?\n/, 1)[0]?.trim() ?? '';
+  if (!firstLine.startsWith(CATEGORY_MARKER)) {
+    return null;
+  }
+  return campaignCategoryIdFromLabel(firstLine.slice(CATEGORY_MARKER.length).trim());
+}
+
+export function withCategoryMarker(description: string, category: CampaignCategoryId) {
+  const body = displayCampaignDescription(description).trim();
+  return `${CATEGORY_MARKER} ${campaignCategoryLabel(category)}\n\n${body}`;
+}
+
+export function displayCampaignDescription(description?: string | null) {
+  const text = description ?? '';
+  const firstLine = text.split(/\r?\n/, 1)[0] ?? '';
+  if (!firstLine.trim().startsWith(CATEGORY_MARKER)) {
+    return text;
+  }
+  return text.replace(/^[^\n]*\n+/, '');
+}
 
 function haystackOf(title?: string | null, description?: string | null) {
   return `${title ?? ''} ${description ?? ''}`.toLowerCase();
@@ -61,8 +121,12 @@ function hasKeyword(haystack: string, keyword: string) {
 export function classifyCampaignCategory(
   title?: string | null,
   description?: string | null,
-): Exclude<BrowseCategoryFilter, 'all'> | null {
-  const haystack = haystackOf(title, description);
+): CampaignCategoryId | null {
+  const marked = parseCategoryFromDescription(description);
+  if (marked) {
+    return marked;
+  }
+  const haystack = haystackOf(title, displayCampaignDescription(description));
   for (const id of CATEGORY_ORDER) {
     if (CATEGORY_KEYWORDS[id].some((keyword) => hasKeyword(haystack, keyword))) {
       return id;
@@ -71,14 +135,23 @@ export function classifyCampaignCategory(
   return null;
 }
 
+export function resolveCampaignCategory(
+  auction: Pick<AuctionItem, 'title' | 'description'> & { category?: string | null },
+): CampaignCategoryId | null {
+  if (isCampaignCategoryId(auction.category)) {
+    return auction.category;
+  }
+  return classifyCampaignCategory(auction.title, auction.description);
+}
+
 export function matchesCategoryFilter(
-  auction: Pick<AuctionItem, 'title' | 'description'>,
+  auction: Pick<AuctionItem, 'title' | 'description'> & { category?: string | null },
   category: BrowseCategoryFilter,
 ) {
   if (category === 'all') {
     return true;
   }
-  return classifyCampaignCategory(auction.title, auction.description) === category;
+  return resolveCampaignCategory(auction) === category;
 }
 
 function publicImageUrl(value?: string | null) {
@@ -96,6 +169,7 @@ export function campaignCoverUrl(
   auction: Pick<AuctionItem, 'id' | 'title' | 'description'> & {
     imageUrl?: string | null;
     thumbnailUrl?: string | null;
+    category?: string | null;
   },
 ) {
   const uploaded =
@@ -106,7 +180,7 @@ export function campaignCoverUrl(
   if (uploaded) {
     return uploaded;
   }
-  const category = classifyCampaignCategory(auction.title, auction.description) ?? 'default';
+  const category = resolveCampaignCategory(auction) ?? 'default';
   return CATEGORY_COVERS[category];
 }
 

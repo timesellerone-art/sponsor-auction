@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  CAMPAIGN_CATEGORIES,
+  SELECTABLE_CAMPAIGN_CATEGORIES,
   campaignCoverUrl,
   classifyCampaignCategory,
+  displayCampaignDescription,
+  resolveCampaignCategory,
 } from '../../src/lib/campaign-presentation';
 
 test('테크·앱 키워드는 반려동물보다 우선한다', () => {
@@ -27,6 +31,40 @@ test('업로드 이미지가 있으면 카테고리 기본 커버보다 우선�
       imageUrl: uploaded,
     }),
     uploaded,
+  );
+});
+
+test('공식 분야는 전체 포함 8종이다', () => {
+  assert.equal(CAMPAIGN_CATEGORIES.length, 8);
+  assert.deepEqual(
+    CAMPAIGN_CATEGORIES.map((item) => item.label),
+    [
+      '전체',
+      '뷰티·패션',
+      '푸드·카페',
+      '테크·앱',
+      '리빙·인테리어',
+      '반려동물',
+      '헬스·운동',
+      '육아·라이프',
+    ],
+  );
+  assert.equal(SELECTABLE_CAMPAIGN_CATEGORIES.length, 7);
+});
+
+test('육아·라이프 키워드와 저장된 분야를 우선한다', () => {
+  assert.equal(classifyCampaignCategory('육아템 리뷰', '기저귀 교체 숏폼'), 'parenting');
+  assert.equal(
+    resolveCampaignCategory({
+      title: '강아지 매트',
+      description: '배변매트',
+      category: 'parenting',
+    }),
+    'parenting',
+  );
+  assert.equal(
+    displayCampaignDescription('콘텐츠 분야: 육아·라이프\n\n이유식 루틴 브이로그'),
+    '이유식 루틴 브이로그',
   );
 });
 

@@ -16,6 +16,10 @@ import { rememberMyAuction } from '@/lib/my-campaigns';
 import { rememberAuctionOwner } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
 import { validateAuctionForm, type AuctionFieldErrors } from '@/lib/validation';
+import {
+  SELECTABLE_CAMPAIGN_CATEGORIES,
+  type CampaignCategoryId,
+} from '@/lib/campaign-presentation';
 import { SELECTABLE_PLATFORMS } from '@/lib/platforms';
 import type { PlatformType } from '@/types/auction';
 
@@ -44,6 +48,7 @@ export function CreateAuctionModal({
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [platform, setPlatform] = useState<PlatformType>('youtube_shorts');
+  const [category, setCategory] = useState<CampaignCategoryId>('beauty');
   const [budget, setBudget] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState(() => defaultDeadline());
@@ -126,6 +131,7 @@ export function CreateAuctionModal({
         const result = await createAuction({
           title: title.trim(),
           platform,
+          category,
           budget: Number(budget),
           description: description.trim(),
           deadline: new Date(`${deadline}T23:59:59+09:00`).toISOString(),
@@ -143,6 +149,7 @@ export function CreateAuctionModal({
 
         setTitle('');
         setPlatform('youtube_shorts');
+        setCategory('beauty');
         setBudget('');
         setDescription('');
         setDeadline(defaultDeadline());
@@ -224,6 +231,23 @@ export function CreateAuctionModal({
                 className={inputClass(false)}
               >
                 {SELECTABLE_PLATFORMS.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="콘텐츠 분야" htmlFor="auction-category">
+              <select
+                id="auction-category"
+                value={category}
+                onChange={(event) =>
+                  setCategory(event.target.value as CampaignCategoryId)
+                }
+                className={inputClass(false)}
+              >
+                {SELECTABLE_CAMPAIGN_CATEGORIES.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.label}
                   </option>

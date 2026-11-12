@@ -39,6 +39,11 @@ import {
   expiredAuctionStatus,
 } from '@/lib/auction-engine';
 import { attachScore, getCreatorScoresByIds } from '@/lib/creator-metrics';
+import {
+  isCampaignCategoryId,
+  parseCategoryFromDescription,
+  withCategoryMarker,
+} from '@/lib/campaign-presentation';
 import { isPlatformType } from '@/lib/platforms';
 import type { Database } from '@/types/database';
 import {
@@ -51,7 +56,7 @@ export const INSERT_FAIL_MESSAGE = '등록에 실패했습니다. 다시 시도�
 export const UPDATE_FAIL_MESSAGE = '변경에 실패했습니다. 다시 시도해 주세요.';
 
 const AUCTION_COLUMNS =
-  'id, title, platform, budget, description, status, is_blind, author_id, author_name, winner_bid_id, deadline, created_at, updated_at, bids_count, leading_bid_amount, highest_bid_amount, image_url, thumbnail_url';
+  'id, title, platform, budget, description, status, is_blind, author_id, author_name, winner_bid_id, deadline, created_at, updated_at, bids_count, leading_bid_amount, highest_bid_amount, image_url, thumbnail_url, category';
 
 const AUCTION_COLUMNS_CORE =
   'id, title, platform, budget, description, status, deadline, created_at, bids_count';
@@ -102,6 +107,8 @@ function mapAuction(row: Partial<AuctionRow> & Pick<AuctionRow, 'id'>): AuctionI
     leadingBidAmount: Number(row.leading_bid_amount) || 0,
     highestBidAmount: Number(row.highest_bid_amount) || 0,
     imageUrl: rowImageUrl(row),
+    category:
+      isCampaignCategoryId(row.category) ? row.category : parseCategoryFromDescription(row.description),
   };
 }
 
@@ -353,11 +360,13 @@ export async function createAuction(
   try {
     const authorId = await resolveAuthUserId(supabase, input.authorId);
     const imageUrl = input.imageUrl?.trim() || null;
+    const category = isCampaignCategoryId(input.category) ? input.category : null;
+    const description = input.description.trim();
     const payload = {
       title: input.title.trim(),
       platform: input.platform,
       budget: input.budget,
-      description: input.description.trim(),
+      description,
       status: input.status ?? 'active',
       is_blind: input.isBlind ?? false,
       author_id: authorId,
@@ -365,6 +374,7 @@ export async function createAuction(
       deadline: input.deadline,
       image_url: imageUrl,
       thumbnail_url: imageUrl,
+      ...(category ? { category } : {}),
     };
 
     let { data, error } = await supabase
@@ -375,13 +385,38 @@ export async function createAuction(
 
     if (error && isSchemaMismatch(error)) {
       logDbError('경매 등록 컬럼 폴백', error);
+      const withoutCategory = await supabase
+        .from('auctions')
+        .insert({
+          title: payload.title,
+          platform: payload.platform,
+          budget: payload.budget,
+          description: category ? withCategoryMarker(description, category) : description,
+          status: payload.status,
+          is_blind: payload.is_blind,
+          author_id: payload.author_id,
+          author_name: payload.author_name,
+          deadline: payload.deadline,
+          image_url: imageUrl,
+          thumbnail_url: imageUrl,
+        })
+        .select(
+          'id, title, platform, budget, description, status, is_blind, author_id, author_name, winner_bid_id, deadline, created_at, updated_at, bids_count, leading_bid_amount, highest_bid_amount, image_url, thumbnail_url',
+        )
+        .single();
+      data = withoutCategory.data as typeof data;
+      error = withoutCategory.error;
+    }
+
+    if (error && isSchemaMismatch(error)) {
+      logDbError('경매 등록 핵심 컬럼 폴백', error);
       const retry = await supabase
         .from('auctions')
         .insert({
           title: payload.title,
           platform: payload.platform,
           budget: payload.budget,
-          description: payload.description,
+          description: category ? withCategoryMarker(description, category) : description,
           status: payload.status,
           deadline: payload.deadline,
         })
