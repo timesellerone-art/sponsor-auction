@@ -27,6 +27,8 @@ export type Database = {
           bids_count: number;
           leading_bid_amount: number;
           highest_bid_amount: number;
+          image_url: string | null;
+          thumbnail_url: string | null;
           ai_guide: {
             fingerprint?: string;
             concepts?: Array<{ title: string; description: string }>;
@@ -58,6 +60,8 @@ export type Database = {
           bids_count?: number;
           leading_bid_amount?: number;
           highest_bid_amount?: number;
+          image_url?: string | null;
+          thumbnail_url?: string | null;
           ai_guide?: {
             fingerprint?: string;
             concepts?: Array<{ title: string; description: string }>;
@@ -87,6 +91,8 @@ export type Database = {
           bids_count?: number;
           leading_bid_amount?: number;
           highest_bid_amount?: number;
+          image_url?: string | null;
+          thumbnail_url?: string | null;
           ai_guide?: {
             fingerprint?: string;
             concepts?: Array<{ title: string; description: string }>;

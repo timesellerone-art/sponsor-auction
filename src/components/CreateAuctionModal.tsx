@@ -8,6 +8,10 @@ import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { INSERT_FAIL_MESSAGE, createAuction } from '@/lib/auctions';
+import {
+  uploadCampaignCover,
+  validateCampaignCoverFile,
+} from '@/lib/campaign-image';
 import { rememberMyAuction } from '@/lib/my-campaigns';
 import { rememberAuctionOwner } from '@/lib/notifications';
 import { cn } from '@/lib/utils';
@@ -43,6 +47,8 @@ export function CreateAuctionModal({
   const [budget, setBudget] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState(() => defaultDeadline());
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { isBusy: isSubmitting, run } = useActionLock();
@@ -73,6 +79,14 @@ export function CreateAuctionModal({
     };
   }, [open, onClose, isSubmitting]);
 
+  useEffect(() => {
+    return () => {
+      if (coverPreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(coverPreview);
+      }
+    };
+  }, [coverPreview]);
+
   if (!open) {
     return null;
   }
@@ -99,6 +113,16 @@ export function CreateAuctionModal({
       }
 
       try {
+        let imageUrl: string | null = null;
+        if (coverFile) {
+          const uploaded = await uploadCampaignCover(coverFile, user?.id);
+          if (uploaded.url) {
+            imageUrl = uploaded.url;
+          } else if (uploaded.error) {
+            showToast(uploaded.error);
+          }
+        }
+
         const result = await createAuction({
           title: title.trim(),
           platform,
@@ -107,6 +131,7 @@ export function CreateAuctionModal({
           deadline: new Date(`${deadline}T23:59:59+09:00`).toISOString(),
           authorId: user?.id ?? null,
           authorName: user?.name?.trim() || '',
+          imageUrl,
         });
 
         if (result.error || !result.data) {
@@ -121,6 +146,11 @@ export function CreateAuctionModal({
         setBudget('');
         setDescription('');
         setDeadline(defaultDeadline());
+        setCoverFile(null);
+        if (coverPreview?.startsWith('blob:')) {
+          URL.revokeObjectURL(coverPreview);
+        }
+        setCoverPreview(null);
         setErrors({});
         rememberMyAuction(result.data.id);
         rememberAuctionOwner(result.data.id, user?.id);
@@ -237,6 +267,44 @@ export function CreateAuctionModal({
                 )}
                 placeholder="캠페인 목적, 필수 컷, 납품 형식 등을 적어 주세요."
               />
+            </Field>
+
+            <Field
+              label="캠페인 대표 사진 업로드(선택)"
+              htmlFor="auction-cover"
+              hint="JPG, PNG, WEBP · 5MB 이하"
+            >
+              <input
+                id="auction-cover"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="block w-full min-w-0 text-sm text-zinc-700 file:mr-3 file:rounded-full file:border-0 file:bg-[#FFF7ED] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[#1C1917] hover:file:bg-[#FFEDD5]"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  if (!file) {
+                    setCoverFile(null);
+                    setCoverPreview(null);
+                    return;
+                  }
+                  const invalid = validateCampaignCoverFile(file);
+                  if (invalid) {
+                    setSubmitError(invalid);
+                    showToast(invalid);
+                    event.target.value = '';
+                    return;
+                  }
+                  setSubmitError(null);
+                  setCoverFile(file);
+                  setCoverPreview(URL.createObjectURL(file));
+                }}
+              />
+              {coverPreview ? (
+                <img
+                  src={coverPreview}
+                  alt="대표 사진 미리보기"
+                  className="mt-3 h-32 w-full rounded-xl object-cover ring-1 ring-stone-900/10"
+                />
+              ) : null}
             </Field>
 
             <Field label="마감일" htmlFor="auction-deadline" error={errors.deadline}>

@@ -22,60 +22,49 @@ export const CAMPAIGN_CATEGORIES: { id: BrowseCategoryFilter; label: string }[] 
 ];
 
 const CATEGORY_KEYWORDS: Record<Exclude<BrowseCategoryFilter, 'all'>, string[]> = {
-  pet: ['반려동물', '강아지', '고양이', '펫', '독', 'dog', 'cat'],
-  beauty: ['시카', '앰플', '세럼', '스킨', '뷰티', '패션', '화장품', '비건', '피부'],
-  fitness: ['헬스', '운동', '러닝', '피트니스', '요가', '러닝화'],
-  food: ['그래놀라', '푸드', '카페', '맥주', '맛집', '베이커리', '음식', '커피'],
+  tech: ['가계부', '스마트폰', 'saas', '노트북', '핀테크', '테크', '앱', '기기', '송금'],
+  pet: ['반려동물', '강아지', '고양이', '반려', '사료', '배변매트', '펫매트'],
+  beauty: ['앰플', '시카', '스킨', '화장품', '코디', '룩북', '뷰티', '패션', '세럼', '립밤', '립스틱'],
+  food: ['그래놀라', '맥주', '커피', '카페', '맛집', '식단', '간식', '푸드', '브런치', '음료'],
   living: ['리빙', '인테리어', '홈스타일', '공간'],
-  tech: ['가계부', '핀테크', '앱', '테크', '언박싱', '스마트폰', '송금'],
+  fitness: ['헬스', '운동', '러닝화', '피트니스', '요가', '러닝'],
 };
 
-const CATEGORY_COVERS: Record<Exclude<BrowseCategoryFilter, 'all'> | 'default', string[]> = {
-  beauty: [
-    'https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?auto=format&fit=crop&w=1200&h=704&q=80',
-    'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1200&h=704&q=80',
-  ],
-  food: [
-    'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&h=704&q=80',
-    'https://images.unsplash.com/photo-1436076863939-06870fe779c2?auto=format&fit=crop&w=1200&h=704&q=80',
-  ],
-  tech: [
-    'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=1200&h=704&q=80',
-    'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&h=704&q=80',
-  ],
-  living: [
-    'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1200&h=704&q=80',
-    'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1200&h=704&q=80',
-  ],
-  pet: [
-    'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1200&h=704&q=80',
-    'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=1200&h=704&q=80',
-  ],
-  fitness: [
-    'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?auto=format&fit=crop&w=1200&h=704&q=80',
-    'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&h=704&q=80',
-  ],
-  default: [
-    'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&h=704&q=80',
-    'https://images.unsplash.com/photo-1492693422561-d3260f5c2d0d?auto=format&fit=crop&w=1200&h=704&q=80',
-  ],
+const CATEGORY_COVERS: Record<Exclude<BrowseCategoryFilter, 'all'> | 'default', string> = {
+  tech: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=1200&h=704&q=80',
+  pet: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1200&h=704&q=80',
+  beauty: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1200&h=704&q=80',
+  food: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&h=704&q=80',
+  living: 'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1200&h=704&q=80',
+  fitness: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1200&h=704&q=80',
+  default:
+    'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&h=704&q=80',
 };
+
+const CATEGORY_ORDER: Exclude<BrowseCategoryFilter, 'all'>[] = [
+  'tech',
+  'pet',
+  'beauty',
+  'food',
+  'living',
+  'fitness',
+];
+
+function haystackOf(title?: string | null, description?: string | null) {
+  return `${title ?? ''} ${description ?? ''}`.toLowerCase();
+}
+
+function hasKeyword(haystack: string, keyword: string) {
+  return haystack.includes(keyword.toLowerCase());
+}
 
 export function classifyCampaignCategory(
   title?: string | null,
   description?: string | null,
 ): Exclude<BrowseCategoryFilter, 'all'> | null {
-  const haystack = `${title ?? ''} ${description ?? ''}`.toLowerCase();
-  const order: Exclude<BrowseCategoryFilter, 'all'>[] = [
-    'pet',
-    'beauty',
-    'fitness',
-    'food',
-    'living',
-    'tech',
-  ];
-  for (const id of order) {
-    if (CATEGORY_KEYWORDS[id].some((keyword) => haystack.includes(keyword.toLowerCase()))) {
+  const haystack = haystackOf(title, description);
+  for (const id of CATEGORY_ORDER) {
+    if (CATEGORY_KEYWORDS[id].some((keyword) => hasKeyword(haystack, keyword))) {
       return id;
     }
   }
@@ -92,18 +81,33 @@ export function matchesCategoryFilter(
   return classifyCampaignCategory(auction.title, auction.description) === category;
 }
 
-function hashKey(value: string) {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+function publicImageUrl(value?: string | null) {
+  const url = value?.trim() ?? '';
+  if (!url) {
+    return null;
   }
-  return hash;
+  if (/^https?:\/\//i.test(url) || url.startsWith('blob:') || url.startsWith('data:image/')) {
+    return url;
+  }
+  return null;
 }
 
-export function campaignCoverUrl(auction: Pick<AuctionItem, 'id' | 'title' | 'description'>) {
+export function campaignCoverUrl(
+  auction: Pick<AuctionItem, 'id' | 'title' | 'description'> & {
+    imageUrl?: string | null;
+    thumbnailUrl?: string | null;
+  },
+) {
+  const uploaded =
+    publicImageUrl(auction.imageUrl) ||
+    publicImageUrl(auction.thumbnailUrl) ||
+    publicImageUrl((auction as { image_url?: string | null }).image_url) ||
+    publicImageUrl((auction as { thumbnail_url?: string | null }).thumbnail_url);
+  if (uploaded) {
+    return uploaded;
+  }
   const category = classifyCampaignCategory(auction.title, auction.description) ?? 'default';
-  const pool = CATEGORY_COVERS[category];
-  return pool[hashKey(auction.id || auction.title || '') % pool.length];
+  return CATEGORY_COVERS[category];
 }
 
 export function formatDeadlineBadge(deadline?: string | null) {

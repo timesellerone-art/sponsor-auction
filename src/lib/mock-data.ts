@@ -538,6 +538,7 @@ export async function createAuction(
       deadline: data.deadline,
       createdAt: new Date().toISOString(),
       bidsCount: 0,
+      imageUrl: data.imageUrl?.trim() || null,
     };
 
     auctionsStore = [created, ...auctionsStore];

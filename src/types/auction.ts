@@ -33,6 +33,7 @@ export interface AuctionItem {
   bidsCount: number;
   leadingBidAmount?: number;
   highestBidAmount?: number;
+  imageUrl?: string | null;
 }
 
 export interface BidItem {

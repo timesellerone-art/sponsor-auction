@@ -78,6 +78,7 @@ export function AuctionCard({
     id: auction.id ?? title,
     title,
     description: auction.description ?? '',
+    imageUrl: auction.imageUrl,
   });
   const deadlineBadge = formatDeadlineBadge(auction.deadline);
   const auctionOpen = Boolean(auction.id) && isOpenForBid({

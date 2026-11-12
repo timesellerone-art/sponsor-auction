@@ -51,7 +51,7 @@ export const INSERT_FAIL_MESSAGE = '등록에 실패했습니다. 다시 시도�
 export const UPDATE_FAIL_MESSAGE = '변경에 실패했습니다. 다시 시도해 주세요.';
 
 const AUCTION_COLUMNS =
-  'id, title, platform, budget, description, status, is_blind, author_id, author_name, winner_bid_id, deadline, created_at, updated_at, bids_count, leading_bid_amount, highest_bid_amount';
+  'id, title, platform, budget, description, status, is_blind, author_id, author_name, winner_bid_id, deadline, created_at, updated_at, bids_count, leading_bid_amount, highest_bid_amount, image_url, thumbnail_url';
 
 const AUCTION_COLUMNS_CORE =
   'id, title, platform, budget, description, status, deadline, created_at, bids_count';
@@ -71,6 +71,12 @@ function fail<T>(data: T, error: string): DataResult<T> {
 
 function ok<T>(data: T): DataResult<T> {
   return { data, error: null };
+}
+
+function rowImageUrl(row: Partial<AuctionRow>) {
+  const image = row.image_url?.trim() || '';
+  const thumb = row.thumbnail_url?.trim() || '';
+  return image || thumb || null;
 }
 
 function mapAuction(row: Partial<AuctionRow> & Pick<AuctionRow, 'id'>): AuctionItem {
@@ -95,6 +101,7 @@ function mapAuction(row: Partial<AuctionRow> & Pick<AuctionRow, 'id'>): AuctionI
     bidsCount: row.bids_count ?? 0,
     leadingBidAmount: Number(row.leading_bid_amount) || 0,
     highestBidAmount: Number(row.highest_bid_amount) || 0,
+    imageUrl: rowImageUrl(row),
   };
 }
 
@@ -345,6 +352,7 @@ export async function createAuction(
 
   try {
     const authorId = await resolveAuthUserId(supabase, input.authorId);
+    const imageUrl = input.imageUrl?.trim() || null;
     const payload = {
       title: input.title.trim(),
       platform: input.platform,
@@ -355,6 +363,8 @@ export async function createAuction(
       author_id: authorId,
       author_name: input.authorName?.trim() || '',
       deadline: input.deadline,
+      image_url: imageUrl,
+      thumbnail_url: imageUrl,
     };
 
     let { data, error } = await supabase
