@@ -57,7 +57,7 @@ export default function InventoryPage() {
   return (
     <PageContainer className="flex min-w-0 flex-1 flex-col py-8 sm:py-12">
       <p className="text-sm font-semibold tracking-wide text-clink-accent">크리에이터 인벤토리</p>
-      <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">타임슬롯 마켓플레이스</h1>
+      <h1 className="mt-1 text-2xl font-bold tracking-[-0.03em] leading-[1.15] text-zinc-950 sm:text-3xl">타임슬롯 마켓플레이스</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
         크리에이터가 등록한 예상 조회수·시작가 슬롯에 광고주가 콘텐츠를 제안합니다. 마감 전 최고가가 실시간으로
         갱신됩니다.

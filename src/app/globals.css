@@ -1,4 +1,4 @@
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 @import "tailwindcss";
 
 :root {
@@ -21,7 +21,7 @@
   --color-clink-peach-strong: var(--clink-peach-strong);
   --color-clink-muted: var(--clink-muted);
   --color-clink-border: var(--clink-border);
-  --font-sans: "Pretendard Variable", Pretendard, ui-sans-serif, system-ui, sans-serif;
+  --font-sans: Pretendard, "Pretendard Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
@@ -37,4 +37,12 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   word-break: keep-all;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
 }

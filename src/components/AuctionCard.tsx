@@ -35,7 +35,10 @@ type AuctionCardData = Partial<AuctionItem> & {
 };
 
 const PLATFORM_CHIP =
-  'border-clink-border bg-clink-peach text-clink';
+  'bg-[#FFF7ED] text-[#1C1917] ring-1 ring-stone-900/5';
+
+const CARD_CTA =
+  'mt-auto inline-flex h-10 min-h-10 w-full min-w-0 items-center justify-center rounded-full bg-[#FFF7ED] px-3 text-sm font-semibold text-[#1C1917] ring-1 ring-stone-900/5 transition-colors hover:bg-[#1C1917] hover:text-white';
 
 const platformMeta: Record<
   PlatformType,
@@ -151,25 +154,25 @@ export function AuctionCard({
 
   return (
     <article className="flex h-full min-w-0 flex-col rounded-2xl bg-white/90 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-stone-900/5 backdrop-blur-md transition-shadow hover:shadow-md sm:p-5">
-      <div className="flex min-w-0 items-start gap-2">
+      <div className="flex min-w-0 items-start justify-between gap-2">
         <span
           className={cn(
-            'inline-flex min-w-0 flex-1 items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-semibold sm:px-2.5 sm:text-xs',
+            'inline-flex w-fit max-w-[70%] items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold sm:text-[11px]',
             platformInfo.className,
           )}
         >
-          <PlatformIcon className="size-3.5 shrink-0 text-clink-accent" aria-hidden />
+          <PlatformIcon className="size-3 shrink-0 text-clink-accent" aria-hidden />
           <span className="min-w-0 truncate">{platformInfo.label}</span>
         </span>
-        <div className="flex max-w-[48%] shrink-0 flex-col items-end gap-1">
+        <div className="flex shrink-0 flex-col items-end gap-1">
           {owned ? (
-            <span className="rounded-full bg-clink px-2 py-1 text-[11px] font-semibold text-white">
+            <span className="rounded-full bg-clink px-2 py-0.5 text-[10px] font-semibold text-white">
               내 캠페인
             </span>
           ) : null}
           <span
             className={cn(
-              'rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-inset',
+              'rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset',
               statusInfo.className,
             )}
           >
@@ -178,7 +181,7 @@ export function AuctionCard({
         </div>
       </div>
 
-      <h3 className="mt-3 line-clamp-2 min-w-0 break-words text-base font-semibold text-clink">
+      <h3 className="mt-3 line-clamp-2 min-w-0 break-words text-base font-bold tracking-[-0.03em] leading-[1.15] text-clink">
         <Link href={href} className="hover:underline">
           {title}
         </Link>
@@ -188,33 +191,28 @@ export function AuctionCard({
         {auction.description || '설명이 없습니다.'}
       </p>
 
-      <dl className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-clink-border bg-[#FAF8F5] p-3 text-xs">
-        <div>
-          <dt className="text-clink-muted">예산</dt>
-          <dd className="mt-0.5 text-sm font-semibold text-clink">{formatBudget(auction.budget)}</dd>
+      <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-stone-200/80 pt-4">
+        <div className="min-w-0">
+          <dt className="text-[11px] text-clink-muted">예산</dt>
+          <dd className="mt-1 truncate text-sm font-semibold tracking-tight text-clink">
+            {formatBudget(auction.budget)}
+          </dd>
         </div>
-        <div>
-          <dt className="text-clink-muted">현재 제안 수</dt>
-          <dd className="mt-0.5 inline-flex items-center gap-1 text-sm font-semibold text-clink">
-            <Users className="size-3.5 text-clink-accent" aria-hidden />
+        <div className="min-w-0">
+          <dt className="text-[11px] text-clink-muted">현재 제안 수</dt>
+          <dd className="mt-1 inline-flex min-w-0 items-center gap-1 text-sm font-semibold tracking-tight text-clink">
+            <Users className="size-3.5 shrink-0 text-clink-accent" aria-hidden />
             {auction.bidsCount ?? 0}건
           </dd>
         </div>
-        <div className="col-span-2">
-          <dt className="text-clink-muted">남은 모집 기간</dt>
-          <dd className="mt-0.5">
-            <AuctionCountdown className="min-w-0 text-sm font-semibold text-clink" deadline={auction.deadline} />
-          </dd>
-        </div>
-        <div className="col-span-2">
-          <dt className="text-clink-muted">AI 가이드</dt>
+        <div className="min-w-0">
+          <dt className="text-[11px] text-clink-muted">남은 모집 기간</dt>
           <dd className="mt-1">
-            <span className="inline-flex rounded-full bg-clink-peach px-2 py-0.5 text-[11px] font-semibold text-clink-accent">
-              AI 가이드 포함
-            </span>
+            <AuctionCountdown className="min-w-0 text-sm font-semibold tracking-tight text-clink" deadline={auction.deadline} />
           </dd>
         </div>
       </dl>
+      <p className="mt-3 text-[11px] font-medium text-clink-accent">AI 가이드 포함</p>
       {auction.highestBidAmount && auction.highestBidAmount > 0 ? (
         <p className="mt-2 text-xs text-clink-muted">
           최저 {formatWon(auction.leadingBidAmount ?? auction.highestBidAmount)}
@@ -230,7 +228,7 @@ export function AuctionCard({
             disabled
             title={VALIDATION.selfCampaignHint}
             aria-label={VALIDATION.selfCampaignHint}
-            className="inline-flex h-10 min-h-10 w-full min-w-0 cursor-not-allowed items-center justify-center rounded-full border border-zinc-200 bg-zinc-100 px-3 text-sm font-semibold text-zinc-400"
+            className="inline-flex h-10 min-h-10 w-full min-w-0 cursor-not-allowed items-center justify-center rounded-full bg-stone-100 px-3 text-sm font-semibold text-stone-400"
           >
             콘텐츠 제안하기
           </button>
@@ -240,7 +238,7 @@ export function AuctionCard({
         <button
           type="button"
           onClick={() => setBidOpen(true)}
-          className="mt-auto inline-flex h-10 min-h-10 w-full min-w-0 items-center justify-center rounded-full bg-clink px-3 text-sm font-semibold text-white hover:bg-stone-800"
+          className={CARD_CTA}
         >
           콘텐츠 제안하기
         </button>
@@ -251,14 +249,14 @@ export function AuctionCard({
             showToast(ACCESS_REASON['creator-auth']);
             router.push(loginPath('creator-auth', href));
           }}
-          className="mt-auto inline-flex min-h-10 w-full min-w-0 items-center justify-center rounded-full bg-clink px-3 py-2 text-center text-sm font-semibold break-keep text-white hover:bg-stone-800"
+          className={`${CARD_CTA} py-2 text-center break-keep`}
         >
           로그인하고 콘텐츠 제안하기
         </button>
       ) : isAdvertiser && auction.id ? (
         <Link
           href={owned ? `${href}#proposals` : href}
-          className="mt-auto inline-flex h-10 min-h-10 w-full min-w-0 items-center justify-center rounded-full bg-clink-peach px-3 text-sm font-semibold text-clink hover:bg-clink-peach-strong"
+          className={CARD_CTA}
         >
           {owned
             ? auctionOpen
@@ -302,21 +300,22 @@ export function AuctionCard({
 export function AuctionCardSkeleton() {
   return (
     <div
-      className="animate-pulse rounded-2xl border border-clink-border bg-white p-4 sm:p-5"
+      className="animate-pulse rounded-2xl bg-white/90 p-4 ring-1 ring-stone-900/5 sm:p-5"
       aria-hidden
     >
       <div className="flex justify-between">
-        <div className="h-6 w-28 rounded-full bg-zinc-200" />
-        <div className="h-6 w-12 rounded-full bg-zinc-200" />
+        <div className="h-5 w-20 rounded-full bg-zinc-200" />
+        <div className="h-5 w-12 rounded-full bg-zinc-200" />
       </div>
       <div className="mt-4 h-5 w-4/5 rounded bg-zinc-200" />
       <div className="mt-3 h-4 w-full rounded bg-zinc-100" />
       <div className="mt-2 h-4 w-2/3 rounded bg-zinc-100" />
-      <div className="mt-5 h-7 w-28 rounded bg-zinc-200" />
-      <div className="mt-6 flex justify-between">
-        <div className="h-3 w-20 rounded bg-zinc-100" />
-        <div className="h-3 w-14 rounded bg-zinc-100" />
+      <div className="mt-5 grid grid-cols-3 gap-3 border-t border-stone-200/80 pt-4">
+        <div className="h-8 rounded bg-zinc-100" />
+        <div className="h-8 rounded bg-zinc-100" />
+        <div className="h-8 rounded bg-zinc-100" />
       </div>
+      <div className="mt-6 h-10 w-full rounded-full bg-zinc-200" />
     </div>
   );
 }

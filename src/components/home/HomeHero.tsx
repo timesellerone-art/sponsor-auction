@@ -1,15 +1,12 @@
 'use client';
 
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/components/AuthProvider';
+import { CreatorAvatar } from '@/components/home/CreatorAvatar';
+import { getShowcaseCreator, SHORTFORM_CARDS } from '@/components/home/showcase';
 import { PageContainer } from '@/components/PageContainer';
-
-const PROPOSALS = [
-  { name: '민지', label: '민지 · 뷰티 릴스', amount: '25만 원', concept: '앰플 텍스처 매크로 훅', tone: 'bg-[#FFEDD5] text-[#EA580C]' },
-  { name: '하연', label: '피부일기 하연', amount: '30만 원', concept: '7일 진정 전후 클로즈업', tone: 'bg-[#FFF7ED] text-[#1C1917]' },
-  { name: '현우', label: '테크리뷰 현우', amount: '28만 원', concept: '성분 라벨 15초 하이라이트', tone: 'bg-stone-100 text-[#1C1917]' },
-] as const;
+import { cn } from '@/lib/utils';
 
 export function HomeHero() {
   const { user, ready, canCreateAuction } = useAuth();
@@ -25,7 +22,7 @@ export function HomeHero() {
         <p className="inline-flex max-w-full items-center rounded-full bg-[#FFF7ED] px-3.5 py-1.5 text-center text-xs font-semibold text-[#EA580C] ring-1 ring-stone-900/5 sm:whitespace-nowrap sm:text-sm">
           AI 기획 가이드 기반 크리에이터 콘텐츠 매칭
         </p>
-        <h1 className="mt-6 max-w-3xl text-[1.85rem] font-semibold tracking-tight text-[#1C1917] sm:text-5xl sm:leading-[1.15]">
+        <h1 className="mt-6 max-w-3xl text-[1.85rem] font-bold tracking-[-0.03em] leading-[1.15] text-[#1C1917] sm:text-5xl">
           기획부터 매칭까지,
           <br />
           크리에이터 협업의 새로운 기준
@@ -57,88 +54,67 @@ export function HomeHero() {
           initial={{ opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.22 }}
-          className="mt-12 w-full max-w-5xl overflow-hidden px-1"
+          className="mt-12 w-full max-w-4xl overflow-hidden"
         >
-          <HeroShowcase />
+          <ShortformShowcase />
         </motion.div>
       </PageContainer>
     </section>
   );
 }
 
-function HeroShowcase() {
+function ShortformShowcase() {
   return (
-    <div className="flex flex-col items-stretch justify-center gap-5 md:flex-row md:items-center">
-      <motion.article
-        whileHover={{ y: -6 }}
-        className="w-full rounded-3xl bg-white/80 p-5 text-left shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-stone-900/5 backdrop-blur-md md:max-w-[22rem]"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold tracking-wide text-[#EA580C]">브랜드 캠페인</p>
-          <span className="rounded-full bg-[#FFF7ED] px-2 py-0.5 text-[10px] font-semibold text-[#EA580C]">
-            릴스
-          </span>
-        </div>
-        <p className="mt-3 text-lg font-semibold tracking-tight text-[#1C1917]">
-          수분 진정 시카 앰플 15초 릴스
-        </p>
-        <p className="mt-1 text-sm text-[#78716C]">예산 30만 원 · 모집 마감 D-4</p>
-        <div className="mt-4 rounded-2xl bg-[#FAF8F5] p-3 ring-1 ring-stone-900/5">
-          <p className="text-[11px] font-medium text-[#78716C]">콘셉트 초안</p>
-          <p className="mt-1 text-sm leading-5 text-[#1C1917]">
-            첫 3초 텍스처 매크로 → 7일 진정 전후 → CTA 저장 유도
-          </p>
-        </div>
-        <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#1C1917] px-3 py-1.5 text-[11px] font-semibold text-white">
-          <Sparkles className="size-3.5 text-[#FFEDD5]" aria-hidden />
-          Gemini AI 기획 가이드 생성 완료
-        </div>
-      </motion.article>
-
-      <div className="relative hidden h-24 w-16 shrink-0 items-center justify-center md:flex" aria-hidden>
-        <span className="absolute inset-x-0 top-1/2 h-px bg-gradient-to-r from-transparent via-stone-300 to-transparent" />
-        <motion.span
-          className="absolute size-10 rounded-full bg-[#EA580C]/20"
-          animate={{ scale: [1, 1.45, 1], opacity: [0.35, 0.08, 0.35] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <span className="relative flex size-9 items-center justify-center rounded-full bg-white shadow-[0_8px_30px_rgb(0,0,0,0.06)] ring-1 ring-stone-900/5">
-          <ArrowRight className="size-4 text-[#EA580C]" />
-        </span>
-      </div>
-
-      <div className="relative w-full md:max-w-[24rem]">
-        <p className="mb-3 text-left text-[11px] font-semibold tracking-wide text-[#78716C] md:text-center">
-          실시간 콘텐츠 제안
-        </p>
-        <ul className="relative space-y-3">
-          {PROPOSALS.map((item, index) => (
-            <motion.li
-              key={item.name}
-              initial={{ opacity: 0, x: 18 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.35 + index * 0.1, duration: 0.4 }}
-              whileHover={{ y: -3, x: 4 }}
-              className={`flex items-center gap-3 rounded-2xl bg-white/90 px-3.5 py-3 text-left shadow-xl ring-1 ring-stone-900/5 backdrop-blur-md ${
-                index === 1 ? 'md:translate-x-2' : index === 2 ? 'md:translate-x-1' : ''
-              }`}
-            >
-              <span
-                className={`flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${item.tone}`}
-              >
-                {item.name.slice(0, 1)}
+    <div className="flex items-center justify-center overflow-hidden py-4 sm:py-6">
+      {SHORTFORM_CARDS.map((card, index) => {
+        const creator = getShowcaseCreator(card.creatorId);
+        return (
+          <motion.article
+            key={card.id}
+            whileHover={{ y: -12 }}
+            className={cn(
+              'w-[38%] max-w-[196px] shrink-0',
+              index === 0 && 'z-10 origin-bottom -mr-[8%] rotate-[-8deg]',
+              index === 1 && 'z-30 origin-bottom scale-[1.04]',
+              index === 2 && 'z-20 origin-bottom -ml-[8%] rotate-[8deg]',
+            )}
+          >
+            <div className="relative aspect-[9/16] overflow-hidden rounded-[1.35rem] bg-stone-200 shadow-[0_18px_40px_rgb(0,0,0,0.16)] ring-1 ring-white/80">
+              <img
+                src={card.cover}
+                alt={`${card.title} 숏폼 프리뷰`}
+                width={196}
+                height={348}
+                className="absolute inset-0 size-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/10" />
+              <span className="absolute top-2.5 left-2.5 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
+                {card.reach}
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[#1C1917]">{item.label}</p>
-                <p className="truncate text-xs text-[#78716C]">{item.concept}</p>
+              <span className="absolute top-[42%] left-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-xl ring-1 ring-stone-900/5 backdrop-blur-md sm:size-11">
+                <Play className="ml-0.5 size-4 fill-[#1C1917] text-[#1C1917]" aria-hidden />
+                <span className="sr-only">{card.title} 재생 미리보기</span>
+              </span>
+              <div className="absolute inset-x-1.5 bottom-1.5 rounded-2xl bg-white/90 p-1.5 text-left shadow-xl ring-1 ring-stone-900/5 backdrop-blur-md sm:inset-x-2 sm:bottom-2 sm:p-2">
+                <p className="text-[10px] font-semibold tracking-wide text-[#EA580C]">{card.title}</p>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <CreatorAvatar
+                    src={creator.photo}
+                    alt={creator.name}
+                    platform={creator.platform}
+                    size="sm"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[11px] font-semibold text-[#1C1917]">{creator.handle}</p>
+                    <p className="truncate text-[10px] text-[#78716C]">{card.chip}</p>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-bold text-[#EA580C]">{creator.amount}</span>
+                </div>
               </div>
-              <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-[#EA580C]">
-                {item.amount} 제안
-              </span>
-            </motion.li>
-          ))}
-        </ul>
-      </div>
+            </div>
+          </motion.article>
+        );
+      })}
     </div>
   );
 }

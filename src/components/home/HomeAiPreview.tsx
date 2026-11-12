@@ -52,7 +52,7 @@ export function HomeAiPreview() {
       <PageContainer>
         <div className="rounded-[1.75rem] bg-white/80 px-5 py-8 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-stone-900/5 backdrop-blur-md sm:px-10 sm:py-12">
           <p className="text-sm font-semibold tracking-wide text-clink-accent">AI 에이전트 가이드</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-clink sm:text-4xl">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] leading-[1.15] text-clink sm:text-4xl">
             캠페인 목적만 고르면 촬영 콘셉트가 바로 나옵니다
           </h2>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-clink-muted sm:text-base">

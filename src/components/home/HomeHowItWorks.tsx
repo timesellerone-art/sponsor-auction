@@ -2,6 +2,8 @@
 
 import { Check, Lock, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { CreatorAvatar } from '@/components/home/CreatorAvatar';
+import { SHOWCASE_CREATORS } from '@/components/home/showcase';
 import { PageContainer } from '@/components/PageContainer';
 
 const cardClass =
@@ -13,7 +15,7 @@ export function HomeHowItWorks() {
       <PageContainer>
         <div className="mb-8 max-w-2xl">
           <p className="text-sm font-semibold tracking-wide text-[#EA580C]">이용안내</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#1C1917] sm:text-4xl">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.03em] leading-[1.15] text-[#1C1917] sm:text-4xl">
             등록, 제안, 정산이 한 화면에서 이어집니다
           </h2>
         </div>
@@ -27,7 +29,7 @@ export function HomeHowItWorks() {
             className={`${cardClass} md:col-span-4 md:row-span-2`}
           >
             <p className="text-[11px] font-semibold tracking-wide text-[#EA580C]">01 · AI 기획</p>
-            <h3 className="mt-2 text-xl font-semibold tracking-tight text-[#1C1917]">
+            <h3 className="mt-2 text-xl font-bold tracking-[-0.03em] leading-[1.15] text-[#1C1917]">
               캠페인만 올리면 촬영 콘셉트가 바로 생성됩니다
             </h3>
             <p className="mt-2 max-w-lg text-sm leading-6 text-[#78716C]">
@@ -70,29 +72,37 @@ export function HomeHowItWorks() {
             className={`${cardClass} md:col-span-2`}
           >
             <p className="text-[11px] font-semibold tracking-wide text-[#EA580C]">02 · 매칭</p>
-            <h3 className="mt-2 text-lg font-semibold tracking-tight text-[#1C1917]">
+            <h3 className="mt-2 text-lg font-bold tracking-[-0.03em] leading-[1.15] text-[#1C1917]">
               기획안과 단가를 비교해 고릅니다
             </h3>
             <ul className="mt-4 space-y-2">
-              <li className="flex items-center gap-2 rounded-xl bg-[#FFF7ED] px-3 py-2 ring-1 ring-[#EA580C]/20">
-                <span className="flex size-7 items-center justify-center rounded-full bg-[#FFEDD5] text-[11px] font-bold text-[#EA580C]">
-                  민
-                </span>
-                <span className="min-w-0 flex-1 text-xs font-semibold text-[#1C1917]">민지 · 25만 원</span>
-                <Check className="size-4 text-[#EA580C]" aria-hidden />
-              </li>
-              <li className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-stone-900/5">
-                <span className="flex size-7 items-center justify-center rounded-full bg-stone-100 text-[11px] font-bold text-[#1C1917]">
-                  하
-                </span>
-                <span className="min-w-0 flex-1 text-xs font-medium text-[#78716C]">하연 · 30만 원</span>
-              </li>
-              <li className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-stone-900/5">
-                <span className="flex size-7 items-center justify-center rounded-full bg-stone-100 text-[11px] font-bold text-[#1C1917]">
-                  현
-                </span>
-                <span className="min-w-0 flex-1 text-xs font-medium text-[#78716C]">현우 · 28만 원</span>
-              </li>
+              {SHOWCASE_CREATORS.map((creator, index) => (
+                <li
+                  key={creator.id}
+                  className={
+                    index === 0
+                      ? 'flex items-center gap-2 rounded-xl bg-[#FFF7ED] px-3 py-2 ring-1 ring-[#EA580C]/20'
+                      : 'flex items-center gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-stone-900/5'
+                  }
+                >
+                  <CreatorAvatar
+                    src={creator.photo}
+                    alt={creator.name}
+                    platform={creator.platform}
+                    size="sm"
+                  />
+                  <span
+                    className={
+                      index === 0
+                        ? 'min-w-0 flex-1 text-xs font-semibold text-[#1C1917]'
+                        : 'min-w-0 flex-1 text-xs font-medium text-[#78716C]'
+                    }
+                  >
+                    {creator.name} · {creator.amount}
+                  </span>
+                  {index === 0 ? <Check className="size-4 text-[#EA580C]" aria-hidden /> : null}
+                </li>
+              ))}
             </ul>
           </motion.article>
 
@@ -105,7 +115,7 @@ export function HomeHowItWorks() {
             className={`${cardClass} md:col-span-2`}
           >
             <p className="text-[11px] font-semibold tracking-wide text-[#EA580C]">03 · 안전 정산</p>
-            <h3 className="mt-2 text-lg font-semibold tracking-tight text-[#1C1917]">
+            <h3 className="mt-2 text-lg font-bold tracking-[-0.03em] leading-[1.15] text-[#1C1917]">
               에스크로로 결제부터 정산까지
             </h3>
             <div className="mt-4 rounded-xl bg-[#FAF8F5] p-3 ring-1 ring-stone-900/5">

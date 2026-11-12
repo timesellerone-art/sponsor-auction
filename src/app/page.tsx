@@ -75,7 +75,7 @@ export default function Home() {
       <PageContainer id="auctions" className="flex-1 py-16 sm:py-20">
         <div className="mb-6 flex flex-col gap-2 sm:mb-8">
           <p className="text-sm font-semibold tracking-wide text-clink-accent">오픈 캠페인</p>
-          <h2 className="text-2xl font-semibold tracking-tight text-clink sm:text-4xl">
+          <h2 className="text-2xl font-bold tracking-[-0.03em] leading-[1.15] text-clink sm:text-4xl">
             진행 중인 오픈 캠페인
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-clink-muted">
