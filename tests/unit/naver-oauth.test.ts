@@ -113,7 +113,10 @@ describe('네이버 OAuth 환경변수', () => {
     assert.equal(httpsCookies.path, '/');
     assert.equal(httpsCookies.secure, true);
     assert.equal(httpsCookies.maxAge, 10 * 60);
+    assert.equal(httpsCookies.domain, undefined);
     assert.equal(cookieOptions(false).secure, false);
+    assert.equal(cookieOptions(true, 'www.clinkapp.kr').domain, '.clinkapp.kr');
+    assert.equal(cookieOptions(true, 'clinkapp.kr').domain, '.clinkapp.kr');
   });
 
   it('state 쿠키가 없어도 URL의 code·state면 콜백을 받는다', () => {

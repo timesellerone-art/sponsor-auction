@@ -131,31 +131,33 @@ function rowImageUrl(row: Partial<AuctionRow>) {
   return image || thumb || parseImageFromDescription(row.description) || null;
 }
 
-function mapAuction(row: Partial<AuctionRow> & Pick<AuctionRow, 'id'>): AuctionItem {
-  const platformRaw = String(row.platform ?? '');
+function mapAuction(row: unknown): AuctionItem {
+  const record = row as Partial<AuctionRow> & Pick<AuctionRow, 'id'>;
+  const platformRaw = String(record.platform ?? '');
   return {
-    id: row.id,
-    title: row.title ?? '제목 없음',
+    id: record.id,
+    title: record.title ?? '제목 없음',
     platform: isPlatformType(platformRaw) ? platformRaw : 'other',
-    budget: row.budget ?? 0,
-    description: row.description ?? '',
+    budget: record.budget ?? 0,
+    description: record.description ?? '',
     status: expiredAuctionStatus(
-      row.status ?? 'active',
-      row.deadline ?? '',
-      row.winner_bid_id ?? null,
+      record.status ?? 'active',
+      record.deadline ?? '',
+      record.winner_bid_id ?? null,
     ) as AuctionStatus,
-    isBlind: Boolean(row.is_blind),
-    authorId: row.author_id ?? null,
-    authorName: row.author_name?.trim() || '미상',
-    winnerBidId: row.winner_bid_id ?? null,
-    deadline: row.deadline ?? '',
-    createdAt: row.created_at ?? '',
-    bidsCount: row.bids_count ?? 0,
-    leadingBidAmount: Number(row.leading_bid_amount) || 0,
-    highestBidAmount: Number(row.highest_bid_amount) || 0,
-    imageUrl: rowImageUrl(row),
-    category:
-      isCampaignCategoryId(row.category) ? row.category : parseCategoryFromDescription(row.description),
+    isBlind: Boolean(record.is_blind),
+    authorId: record.author_id ?? null,
+    authorName: record.author_name?.trim() || '미상',
+    winnerBidId: record.winner_bid_id ?? null,
+    deadline: record.deadline ?? '',
+    createdAt: record.created_at ?? '',
+    bidsCount: record.bids_count ?? 0,
+    leadingBidAmount: Number(record.leading_bid_amount) || 0,
+    highestBidAmount: Number(record.highest_bid_amount) || 0,
+    imageUrl: rowImageUrl(record),
+    category: isCampaignCategoryId(record.category)
+      ? record.category
+      : parseCategoryFromDescription(record.description),
   };
 }
 
@@ -445,7 +447,11 @@ export async function createAuction(
     let data: Partial<AuctionRow> & Pick<AuctionRow, 'id'> | null = null;
     let error: { message?: string; code?: string } | null = null;
     for (const attempt of attempts) {
-      const result = await supabase.from('auctions').insert(attempt.row).select(attempt.columns).single();
+      const result = await supabase
+        .from('auctions')
+        .insert(attempt.row as never)
+        .select(attempt.columns)
+        .single();
       data = result.data as typeof data;
       error = result.error;
       if (!error && data) {

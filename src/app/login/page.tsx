@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -25,7 +25,7 @@ import {
   sanitizeNextPath,
 } from '@/lib/auth-guard';
 import { cn } from '@/lib/utils';
-import { needsRoleOnboarding, type SessionUser } from '@/types/auth';
+import { type SessionUser } from '@/types/auth';
 
 type Mode = 'signin' | 'signup';
 
@@ -40,6 +40,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [oauthBusy, setOauthBusy] = useState<SocialOAuthProvider | null>(null);
+  const oauthInFlight = useRef(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreementErrors, setAgreementErrors] = useState<{
@@ -49,9 +50,7 @@ export default function LoginPage() {
 
   const destinationAfterLogin = (sessionUser: SessionUser | null) => {
     const params = new URLSearchParams(window.location.search);
-    return postSocialAuthPath(sessionUser, params.get('next'), {
-      needsOnboarding: needsRoleOnboarding(sessionUser),
-    });
+    return postSocialAuthPath(sessionUser, params.get('next'));
   };
 
   useEffect(() => {
@@ -72,7 +71,7 @@ export default function LoginPage() {
           return;
         }
         const sessionUser = result.data;
-        if (sessionUser) {
+        if (sessionUser && !oauthInFlight.current) {
           router.replace(destinationAfterLogin(sessionUser));
           return;
         }
@@ -105,11 +104,11 @@ export default function LoginPage() {
   }, [router]);
 
   useEffect(() => {
-    if (isLoading || !ready || !user) {
+    if (isLoading || !ready || !user || oauthBusy) {
       return;
     }
     router.replace(destinationAfterLogin(user));
-  }, [isLoading, ready, router, user]);
+  }, [isLoading, oauthBusy, ready, router, user]);
 
   const ensureSignupAgreements = () => {
     if (mode !== 'signup') {
@@ -126,12 +125,13 @@ export default function LoginPage() {
   };
 
   const handleOAuth = async (provider: SocialOAuthProvider) => {
-    if (submitting || oauthBusy) {
+    if (submitting || oauthBusy || oauthInFlight.current) {
       return;
     }
     if (!ensureSignupAgreements()) {
       return;
     }
+    oauthInFlight.current = true;
     setOauthBusy(provider);
     setError(null);
     try {
@@ -140,14 +140,16 @@ export default function LoginPage() {
       );
       const result = await signInWithOAuth(provider, next);
       if (result.error) {
+        oauthInFlight.current = false;
+        setOauthBusy(null);
         setError(result.error);
         showToast(result.error);
       }
     } catch {
+      oauthInFlight.current = false;
+      setOauthBusy(null);
       setError(AUTH_FAIL_MESSAGE);
       showToast(AUTH_FAIL_MESSAGE);
-    } finally {
-      setOauthBusy(null);
     }
   };
 
@@ -176,7 +178,7 @@ export default function LoginPage() {
       }
 
       showToast(
-        mode === 'signup' ? '가입되었습니다. 역할을 선택해 주세요.' : '로그인했습니다.',
+        mode === 'signup' ? '가입되었습니다.' : '로그인했습니다.',
         'success',
       );
       await refresh();
@@ -200,7 +202,7 @@ export default function LoginPage() {
         {mode === 'signup' ? '회원가입' : '로그인'}
       </h1>
       <p className="mt-2 text-sm text-zinc-500">
-        광고주 또는 크리에이터로 시작한 뒤, 역할에 맞는 메뉴를 사용할 수 있습니다.
+        소셜 계정으로 바로 시작하고, 캠페인 등록이나 제안할 때 필요한 정보만 입력하면 됩니다.
       </p>
 
       <div className="mt-6 flex gap-1 rounded-full bg-zinc-100 p-1">
@@ -313,7 +315,7 @@ export default function LoginPage() {
           {submitting ? (
             <Loader2 className="size-4 animate-spin" aria-hidden />
           ) : null}
-          {mode === 'signup' ? '가입하고 역할 선택' : '로그인'}
+          {mode === 'signup' ? '가입하기' : '로그인'}
         </button>
 
         <div className="mt-5 flex items-center gap-3">

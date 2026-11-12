@@ -10,7 +10,7 @@ import {
   writeAccountLinkCookie,
 } from '@/lib/account-link';
 import {
-  ROLE_SELECT_PATH,
+  POST_AUTH_HOME,
   isUsedOrExpiredOAuthCode,
   oauthFailedLoginPath,
   postSocialAuthPath,
@@ -26,10 +26,9 @@ import {
   writeCookies,
   type CookieToSet,
 } from '@/lib/auth-paths';
-import { sessionUserFromAuthUser } from '@/lib/auth-session';
+import { sessionUserWithProfileRoles } from '@/lib/auth-session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSupabaseEnv } from '@/lib/supabase/env';
-import { needsRoleOnboarding } from '@/types/auth';
 
 export type CompletedAuthRedirect = {
   response: NextResponse;
@@ -57,7 +56,7 @@ function createRequestSupabase(request: NextRequest, origin: string) {
   const cookieBag = createCookieBag();
   const secure = origin.startsWith('https://');
   const supabase = createServerClient(env.url, env.anonKey, {
-    cookieOptions: sessionCookieOptions(secure),
+    cookieOptions: sessionCookieOptions(secure, new URL(origin).hostname),
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -85,18 +84,29 @@ export async function readRequestAuthUser(request: NextRequest, origin: string):
   return data.user ?? null;
 }
 
-export function finishAuthUserRedirect(params: {
+async function loadAuthSessionLike(user: User) {
+  const admin = createAdminClient();
+  if (!admin) {
+    return sessionUserWithProfileRoles(user);
+  }
+  const profile = await admin
+    .from('profiles')
+    .select('role, roles, phone')
+    .eq('id', user.id)
+    .maybeSingle();
+  return sessionUserWithProfileRoles(user, profile.data);
+}
+
+export async function finishAuthUserRedirect(params: {
   request: NextRequest;
   origin: string;
   user: User;
   next?: string;
   extraCookies?: CookieToSet[];
-}): CompletedAuthRedirect {
-  const sessionLike = sessionUserFromAuthUser(params.user);
-  const next = sanitizeNextPath(params.next) ?? ROLE_SELECT_PATH;
-  const destination = postSocialAuthPath(sessionLike, next, {
-    needsOnboarding: needsRoleOnboarding(sessionLike),
-  });
+}): Promise<CompletedAuthRedirect> {
+  const sessionLike = await loadAuthSessionLike(params.user);
+  const next = sanitizeNextPath(params.next) ?? POST_AUTH_HOME;
+  const destination = postSocialAuthPath(sessionLike, next);
   const secure = params.origin.startsWith('https://');
   const cookies = [...(params.extraCookies ?? [])];
   const redirect = NextResponse.redirect(new URL(destination, params.origin));
@@ -111,12 +121,17 @@ export function finishAuthUserRedirect(params: {
   });
   writeCookies(redirect.cookies, cookies, { secure });
   expireAuthDebrisCookies(params.request, redirect, { secure });
-  writeAccountLinkCookie(redirect.cookies, params.user.id, secure);
+  writeAccountLinkCookie(
+    redirect.cookies,
+    params.user.id,
+    secure,
+    new URL(params.origin).hostname,
+  );
   applyAuthCookies(redirect.cookies, {
     present: true,
-    roles: destination === ROLE_SELECT_PATH ? [] : sessionLike.roles,
-    activeRole:
-      destination === ROLE_SELECT_PATH ? null : sessionLike.currentMode ?? sessionLike.roles,
+    roles: sessionLike.roles,
+    activeRole: sessionLike.currentMode ?? sessionLike.roles,
+    hostname: new URL(params.origin).hostname,
   });
   return { response: redirect, destination, cookies };
 }
@@ -145,7 +160,7 @@ async function restoreFromAccountLinkCookie(params: {
   const link = await admin.auth.admin.generateLink({
     type: 'magiclink',
     email,
-    options: { redirectTo: `${params.origin}${sanitizeNextPath(params.next) ?? ROLE_SELECT_PATH}` },
+    options: { redirectTo: `${params.origin}${sanitizeNextPath(params.next) ?? POST_AUTH_HOME}` },
   });
   const tokenHash = link.data.properties?.hashed_token ?? '';
   if (created && tokenHash) {
@@ -154,24 +169,28 @@ async function restoreFromAccountLinkCookie(params: {
       type: 'magiclink',
     });
     const authUser = verified.data.user ?? user;
-    return finishAuthUserRedirect({
-      request: params.request,
-      origin: params.origin,
-      user: authUser,
-      next: params.next,
-      extraCookies: created.cookieBag.getAll().filter((cookie) => Boolean(cookie.value)),
-    }).response;
+    return (
+      await finishAuthUserRedirect({
+        request: params.request,
+        origin: params.origin,
+        user: authUser,
+        next: params.next,
+        extraCookies: created.cookieBag.getAll().filter((cookie) => Boolean(cookie.value)),
+      })
+    ).response;
   }
 
-  return finishAuthUserRedirect({
-    request: params.request,
-    origin: params.origin,
-    user,
-    next: params.next,
-  }).response;
+  return (
+    await finishAuthUserRedirect({
+      request: params.request,
+      origin: params.origin,
+      user,
+      next: params.next,
+    })
+  ).response;
 }
 
-/** 세션 쿠키 또는 15분 연동 쿠키가 있으면 코드 재교환 없이 마이페이지로 보낸다. */
+/** 세션 쿠키 또는 15분 연동 쿠키가 있으면 코드 재교환 없이 홈으로 보낸다. */
 export async function redirectExistingAuthUser(params: {
   request: NextRequest;
   origin: string;
@@ -180,12 +199,14 @@ export async function redirectExistingAuthUser(params: {
 }): Promise<NextResponse | null> {
   const user = await readRequestAuthUser(params.request, params.origin);
   if (user) {
-    return finishAuthUserRedirect({
-      request: params.request,
-      origin: params.origin,
-      user,
-      next: params.next,
-    }).response;
+    return (
+      await finishAuthUserRedirect({
+        request: params.request,
+        origin: params.origin,
+        user,
+        next: params.next,
+      })
+    ).response;
   }
   if (params.allowAccountLink === false) {
     return null;
@@ -197,7 +218,7 @@ function replayCachedAuth(
   request: NextRequest,
   origin: string,
   cached: CachedAuthFinish,
-): CompletedAuthRedirect {
+): Promise<CompletedAuthRedirect> {
   return finishAuthUserRedirect({
     request,
     origin,
@@ -207,7 +228,7 @@ function replayCachedAuth(
   });
 }
 
-/** 매직링크 토큰을 서버에서 세션 쿠키로 바꾸고 바로 목적지(보통 /my)로 보낸다. */
+/** 매직링크 토큰을 서버에서 세션 쿠키로 바꾸고 바로 목적지(보통 홈)로 보낸다. */
 export async function completeMagicLinkSession(params: {
   request: NextRequest;
   origin: string;
@@ -274,7 +295,7 @@ export async function completeMagicLinkSessionDetailed(params: {
   if (resumed) {
     return {
       response: resumed,
-      destination: resumed.headers.get('location') ?? '/my',
+      destination: resumed.headers.get('location') ?? POST_AUTH_HOME,
       cookies: [],
     };
   }

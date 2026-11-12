@@ -11,6 +11,8 @@ import { isMemberRole, type MemberRole } from '@/types/auth';
 type RoleOnboardingProps = {
   name: string;
   email?: string | null;
+  intent?: MemberRole;
+  headingLevel?: 'h1' | 'h2';
   onCompleted: (roles: MemberRole[]) => void;
 };
 
@@ -36,11 +38,31 @@ const ROLE_OPTIONS: {
   },
 ];
 
-export function RoleOnboarding({ name, email, onCompleted }: RoleOnboardingProps) {
+export function RoleOnboarding({
+  name,
+  email,
+  intent,
+  headingLevel = 'h1',
+  onCompleted,
+}: RoleOnboardingProps) {
   const providerEmail = isPlaceholderOAuthEmail(email) ? '' : (email?.trim() ?? '');
   const [contactEmail, setContactEmail] = useState(providerEmail);
   const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState<MemberRole | null>(null);
+  const Heading = headingLevel;
+  const options = intent ? ROLE_OPTIONS.filter((option) => option.value === intent) : ROLE_OPTIONS;
+  const heading =
+    intent === 'advertiser'
+      ? `${name}님, 광고주 정보를 입력해 주세요`
+      : intent === 'creator'
+        ? `${name}님, 크리에이터 채널 정보를 입력해 주세요`
+        : `${name}님, 역할을 선택해 주세요`;
+  const description =
+    intent === 'advertiser'
+      ? '캠페인을 등록하려면 연락처를 남겨 주세요. 대표 이메일이나 전화번호가 기존 계정과 같으면 하나로 합쳐집니다.'
+      : intent === 'creator'
+        ? '콘텐츠를 제안하려면 연락처를 남겨 주세요. 채널 주소는 제안 화면에서 입력합니다.'
+        : '대표 이메일이나 전화번호가 기존 계정과 같으면 추가 로그인 없이 바로 하나로 합쳐집니다.';
 
   const handleChoose = async (role: MemberRole) => {
     if (!isMemberRole(role) || busy) {
@@ -81,10 +103,8 @@ export function RoleOnboarding({ name, email, onCompleted }: RoleOnboardingProps
   return (
     <div className="mx-auto max-h-[min(100dvh,52rem)] w-full max-w-lg overflow-y-auto">
       <p className="text-sm font-semibold tracking-wide text-clink-accent">시작하기</p>
-      <h1 className="mt-1 text-2xl font-bold text-zinc-950">{name}님, 역할을 선택해 주세요</h1>
-      <p className="mt-2 text-sm text-zinc-500">
-        대표 이메일이나 전화번호가 기존 계정과 같으면 추가 로그인 없이 바로 하나로 합쳐집니다.
-      </p>
+      <Heading className="mt-1 pr-10 text-2xl font-bold text-zinc-950">{heading}</Heading>
+      <p className="mt-2 text-sm text-zinc-500">{description}</p>
 
       <div className="mt-5 space-y-3">
         <label className="block">
@@ -114,7 +134,7 @@ export function RoleOnboarding({ name, email, onCompleted }: RoleOnboardingProps
       </div>
 
       <div className="mt-6 flex flex-col gap-3">
-        {ROLE_OPTIONS.map((option) => {
+        {options.map((option) => {
           const Icon = option.icon;
           const submitting = busy === option.value;
           return (

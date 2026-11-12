@@ -11,7 +11,8 @@ import {
 } from '@/lib/auth-complete';
 import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
 import { mergeUserInto } from '@/lib/auth-identity';
-import { expireAuthDebrisCookies } from '@/lib/auth-paths';
+import { expireAuthDebrisCookies, expireNamedCookies } from '@/lib/auth-paths';
+import { canonicalAppOrigin } from '@/lib/site-origin';
 import { shareOAuthAttempt } from '@/lib/oauth-once';
 import { readNaverIdpState, signNaverIdpTicket } from '@/lib/naver-idp';
 import { linkNaverProfile } from '@/lib/naver-link';
@@ -30,21 +31,31 @@ import {
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+export const preferredRegion = 'icn1';
+
+function expireNaverCookies(response: NextResponse, origin: string) {
+  expireNamedCookies(response.cookies, [NAVER_STATE_COOKIE, NAVER_NEXT_COOKIE], {
+    secure: origin.startsWith('https://'),
+    hostname: new URL(origin).hostname,
+  });
+}
+
 function loginError(request: NextRequest, origin: string, message: string) {
   const response = NextResponse.redirect(
     new URL(oauthFailedLoginPath(describeOAuthError(message)), origin),
   );
-  response.cookies.delete(NAVER_STATE_COOKIE);
-  response.cookies.delete(NAVER_NEXT_COOKIE);
-  expireAuthDebrisCookies(request, response);
+  expireNaverCookies(response, origin);
+  expireAuthDebrisCookies(request, response, {
+    secure: origin.startsWith('https://'),
+    hostname: new URL(origin).hostname,
+  });
   return response;
 }
 
 async function resumeOrLoginError(request: NextRequest, origin: string, next: string, message: string) {
   const resumed = await redirectExistingAuthUser({ request, origin, next });
   if (resumed) {
-    resumed.cookies.delete(NAVER_STATE_COOKIE);
-    resumed.cookies.delete(NAVER_NEXT_COOKIE);
+    expireNaverCookies(resumed, origin);
     return resumed;
   }
   return loginError(request, origin, message);
@@ -113,7 +124,7 @@ export async function GET(request: NextRequest) {
             clientSecret: env.clientSecret,
             code,
             state,
-            redirectUri: naverCallbackUrl(callbackOrigin),
+            redirectUri: naverCallbackUrl(canonicalAppOrigin(callbackOrigin)),
           }),
         );
 
@@ -167,8 +178,7 @@ export async function GET(request: NextRequest) {
       redirect.searchParams.set('code', once.ticket);
       redirect.searchParams.set('state', once.gotrueState);
       const response = NextResponse.redirect(redirect);
-      response.cookies.delete(NAVER_STATE_COOKIE);
-      response.cookies.delete(NAVER_NEXT_COOKIE);
+      expireNaverCookies(response, origin);
       return response;
     }
 
@@ -189,14 +199,12 @@ export async function GET(request: NextRequest) {
         type: 'magiclink',
         next: once.next,
       });
-      completed.response.cookies.delete(NAVER_STATE_COOKIE);
-      completed.response.cookies.delete(NAVER_NEXT_COOKIE);
+      expireNaverCookies(completed.response, origin);
       return completed.response;
     } catch (error) {
       const resumed = await redirectExistingAuthUser({ request, origin, next: once.next });
       if (resumed) {
-        resumed.cookies.delete(NAVER_STATE_COOKIE);
-        resumed.cookies.delete(NAVER_NEXT_COOKIE);
+        expireNaverCookies(resumed, origin);
         return resumed;
       }
       console.warn('[SponsorAuction] 네이버 세션 쿠키 발급 예외, 클라이언트 교환으로 전환', error);
@@ -207,8 +215,7 @@ export async function GET(request: NextRequest) {
       fallback.searchParams.set('client', '1');
       fallback.searchParams.set('linked', '1');
       const response = NextResponse.redirect(fallback);
-      response.cookies.delete(NAVER_STATE_COOKIE);
-      response.cookies.delete(NAVER_NEXT_COOKIE);
+      expireNaverCookies(response, origin);
       return response;
     }
   } catch (error) {

@@ -21,7 +21,6 @@ import {
 } from '@/lib/access';
 import {
   isMemberRole,
-  needsRoleOnboarding,
   resolveActiveMemberRole,
   switchableMemberRoles,
   type MemberRole,
@@ -31,7 +30,6 @@ import {
 type AuthContextValue = {
   user: SessionUser | null;
   ready: boolean;
-  needsOnboarding: boolean;
   activeRole: MemberRole | null;
   switchableRoles: MemberRole[];
   canCreateAuction: boolean;
@@ -43,7 +41,6 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   ready: false,
-  needsOnboarding: false,
   activeRole: null,
   switchableRoles: [],
   canCreateAuction: false,
@@ -136,12 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [switchableRoles],
   );
 
-  const needsOnboarding = needsRoleOnboarding(user);
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       ready,
-      needsOnboarding,
       activeRole,
       switchableRoles,
       canCreateAuction: activeRole === 'advertiser',
@@ -149,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setActiveRole,
       refresh,
     }),
-    [activeRole, needsOnboarding, ready, refresh, setActiveRole, switchableRoles, user],
+    [activeRole, ready, refresh, setActiveRole, switchableRoles, user],
   );
 
   return (

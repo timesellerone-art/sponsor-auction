@@ -12,10 +12,10 @@ import { PageContainer } from '@/components/PageContainer';
 import { cn } from '@/lib/utils';
 
 export function HomeHero() {
-  const { user, ready, canCreateAuction } = useAuth();
+  const { ready } = useAuth();
   const { audience } = useLandingAudience();
   const copy = LANDING_INTRO[audience];
-  const createDisabled = !ready || Boolean(user && !canCreateAuction);
+  const createDisabled = !ready;
 
   const openCreateAuction = () => {
     window.dispatchEvent(new Event('create-auction:open'));

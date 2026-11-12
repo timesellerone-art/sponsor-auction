@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
-import { ROLE_SELECT_PATH, sanitizeNextPath } from '@/lib/auth-guard';
+import { POST_AUTH_HOME, sanitizeNextPath } from '@/lib/auth-guard';
 import { isPlaceholderOAuthEmail, normalizePhone } from '@/lib/contact';
+import { authCookieDomain, requestAppOrigin } from '@/lib/site-origin';
 
 export const NAVER_STATE_COOKIE = 'sa_naver_oauth_state';
 export const NAVER_NEXT_COOKIE = 'sa_naver_oauth_next';
@@ -101,13 +102,7 @@ export function getNaverOAuthEnv(): NaverEnv | null {
 }
 
 export function requestOrigin(request: Request) {
-  const url = new URL(request.url);
-  const forwardedHost = request.headers.get('x-forwarded-host');
-  const forwardedProto = request.headers.get('x-forwarded-proto');
-  if (forwardedHost) {
-    return `${forwardedProto === 'http' ? 'http' : 'https'}://${forwardedHost}`;
-  }
-  return url.origin;
+  return requestAppOrigin(request);
 }
 
 export function naverCallbackUrl(origin: string) {
@@ -118,13 +113,15 @@ export function createNaverState() {
   return randomBytes(24).toString('base64url');
 }
 
-export function cookieOptions(secure = false) {
+export function cookieOptions(secure = false, hostname?: string | null) {
+  const domain = authCookieDomain(hostname);
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
     secure,
     path: '/',
     maxAge: 10 * 60,
+    ...(domain ? { domain } : {}),
   };
 }
 
@@ -161,7 +158,7 @@ export function buildNaverAuthorizeUrl(params: {
 }
 
 export function readStoredNext(value: string | undefined) {
-  return sanitizeNextPath(value ?? null) ?? ROLE_SELECT_PATH;
+  return sanitizeNextPath(value ?? null) ?? POST_AUTH_HOME;
 }
 
 export async function exchangeNaverCode(params: {

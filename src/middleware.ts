@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { ROLE_COOKIE_NAME } from '@/lib/access';
-import { ROLE_SELECT_PATH } from '@/lib/auth-guard';
+import { POST_AUTH_HOME } from '@/lib/auth-guard';
 import {
   expireAuthDebrisCookies,
   hasAuthPresence,
@@ -64,7 +64,6 @@ export async function middleware(request: NextRequest) {
   const hasAdmin = cookieRoles.includes('admin');
   const hasAdvertiser = cookieRoles.includes('advertiser');
   const hasCreator = cookieRoles.includes('creator');
-  const hasMemberRole = hasAdmin || hasAdvertiser || hasCreator;
   const loggedIn = hasAuthPresence(request.cookies.getAll());
 
   if (shouldRateLimitPath(pathname) && request.method !== 'OPTIONS') {
@@ -80,8 +79,7 @@ export async function middleware(request: NextRequest) {
     loggedIn &&
     (loginError === 'oauth_failed' || loginError === 'oauth_retry')
   ) {
-    const destination = hasAdmin ? '/admin' : hasMemberRole ? '/my' : ROLE_SELECT_PATH;
-    return finish(request, withSessionCookies(session, redirectTo(request, destination)));
+    return finish(request, withSessionCookies(session, redirectTo(request, POST_AUTH_HOME)));
   }
 
   const onboardingPath = onboardingCanonicalPath(pathname);
@@ -92,18 +90,6 @@ export async function middleware(request: NextRequest) {
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/');
   const isDashboardPath = pathname === '/my' || pathname.startsWith('/my/');
   const isPaymentPath = pathname === '/payments' || pathname.startsWith('/payments/');
-  const needsRole = loggedIn && !hasMemberRole;
-
-  if (needsRole && (pathname.startsWith('/login') || !isAuthPassthroughPath(pathname))) {
-    return finish(request, withSessionCookies(session, redirectTo(request, ROLE_SELECT_PATH)));
-  }
-
-  if (pathname.startsWith('/onboarding') && hasMemberRole) {
-    return finish(
-      request,
-      withSessionCookies(session, redirectTo(request, hasAdmin ? '/admin' : '/my')),
-    );
-  }
 
   if (isAdminPath && !hasAdmin) {
     return finish(
@@ -112,42 +98,29 @@ export async function middleware(request: NextRequest) {
         session,
         redirectTo(
           request,
-          hasMemberRole ? '/' : '/login',
-          hasMemberRole ? 'admin-forbidden' : 'admin-auth',
+          loggedIn ? '/' : '/login',
+          loggedIn ? 'admin-forbidden' : 'admin-auth',
         ),
       ),
     );
   }
 
-  if (isDashboardPath && !hasAdvertiser && !hasCreator) {
-    if (loggedIn && !hasMemberRole) {
-      return finish(request, withSessionCookies(session, redirectTo(request, ROLE_SELECT_PATH)));
-    }
+  if (isDashboardPath && !loggedIn) {
     return finish(
       request,
-      withSessionCookies(
-        session,
-        redirectTo(
-          request,
-          hasMemberRole ? '/' : '/login',
-          hasMemberRole ? 'advertiser-forbidden' : 'advertiser-auth',
-        ),
-      ),
+      withSessionCookies(session, redirectTo(request, '/login', 'advertiser-auth')),
     );
   }
 
   if (isPaymentPath && !hasAdvertiser && !hasCreator && !hasAdmin) {
-    if (loggedIn && !hasMemberRole) {
-      return finish(request, withSessionCookies(session, redirectTo(request, ROLE_SELECT_PATH)));
-    }
     return finish(
       request,
       withSessionCookies(
         session,
         redirectTo(
           request,
-          hasMemberRole ? '/' : '/login',
-          hasMemberRole ? 'advertiser-forbidden' : 'payment-auth',
+          loggedIn ? '/' : '/login',
+          loggedIn ? 'advertiser-forbidden' : 'payment-auth',
         ),
       ),
     );

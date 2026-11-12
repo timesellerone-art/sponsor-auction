@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
+import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { showToast } from '@/components/Toast';
 import { ACCESS_REASON } from '@/lib/access';
 import { isOpenForBid } from '@/lib/auction-browse';
@@ -70,7 +71,8 @@ export function AuctionCard({
   hideBidAction?: boolean;
 }) {
   const router = useRouter();
-  const { user, ready, canPlaceBid, canCreateAuction } = useAuth();
+  const { user, ready } = useAuth();
+  const { requestCreator } = useRoleIntent();
   const [bidOpen, setBidOpen] = useState(false);
   const title = auction.title || '제목 없음';
   const platform = auction.platform ?? 'other';
@@ -105,8 +107,10 @@ export function AuctionCard({
         user.id,
       ),
   );
-  const canBid = auctionOpen && canPlaceBid && !owned;
-  const isAdvertiser = Boolean(ready && user && canCreateAuction);
+  const canAttemptBid = auctionOpen && !owned && Boolean(ready && user);
+  const openBid = () => {
+    requestCreator(() => setBidOpen(true));
+  };
 
   return (
     <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-stone-900/5 transition-shadow hover:shadow-md">
@@ -162,7 +166,7 @@ export function AuctionCard({
         </p>
       ) : null}
 
-      {hideBidAction ? null : owned && auctionOpen && canPlaceBid ? (
+      {hideBidAction ? null : owned && auctionOpen ? (
         <div className="mt-auto pt-4">
           <button
             type="button"
@@ -175,12 +179,8 @@ export function AuctionCard({
           </button>
           <p className="mt-1.5 text-center text-xs text-zinc-500">{VALIDATION.selfCampaignHint}</p>
         </div>
-      ) : canBid ? (
-        <button
-          type="button"
-          onClick={() => setBidOpen(true)}
-          className={CARD_CTA}
-        >
+      ) : canAttemptBid ? (
+        <button type="button" onClick={openBid} className={CARD_CTA}>
           콘텐츠 제안하기
         </button>
       ) : auctionOpen && ready && !user ? (
@@ -194,26 +194,13 @@ export function AuctionCard({
         >
           로그인하고 콘텐츠 제안하기
         </button>
-      ) : isAdvertiser && auction.id ? (
-        <Link
-          href={owned ? `${href}#proposals` : href}
-          className={CARD_CTA}
-        >
-          {owned
-            ? auctionOpen
-              ? '내 캠페인 제안 현황'
-              : '내 캠페인 보기'
-            : auctionOpen
-              ? '진행 중 · 상세 보기'
-              : '상세 보기'}
+      ) : owned && auction.id ? (
+        <Link href={`${href}#proposals`} className={CARD_CTA}>
+          내 캠페인 보기
         </Link>
       ) : (
         <p className="mt-auto rounded-xl bg-zinc-50 px-3 py-2 text-center text-xs text-zinc-500">
-          {!auctionOpen
-            ? '모집 마감'
-            : !ready
-              ? '로그인 후 크리에이터 계정으로 제안할 수 있습니다.'
-              : '크리에이터 전용 기능입니다'}
+          {!auctionOpen ? '모집 마감' : '로그인 후 콘텐츠를 제안할 수 있습니다.'}
         </p>
       )}
       </div>

@@ -43,6 +43,7 @@ export async function POST(request: Request) {
       present: true,
       roles: synced.roles,
       activeRole: selectedRoles[0],
+      hostname: request.headers.get('x-forwarded-host') || request.headers.get('host'),
     });
     return response;
   } catch (error) {

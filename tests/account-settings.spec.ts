@@ -98,6 +98,10 @@ test.describe('마이페이지와 계정 설정', () => {
       await page.getByRole('link', { name: '계정 설정' }).click();
       await expect(page).toHaveURL((url) => url.pathname === '/my/settings', { timeout: 8000 });
       await expect(page.getByRole('heading', { name: '계정 설정' })).toBeVisible();
+      await expect(page.getByText('회원이름', { exact: true })).toBeVisible();
+      await expect(page.getByText('E2E 계정설정')).toBeVisible();
+      await expect(page.getByText('이메일', { exact: true })).toBeVisible();
+      await expect(page.getByText('휴대전화번호', { exact: true })).toBeVisible();
 
       const panel = page.getByRole('heading', { name: '연동된 계정' });
       await panel.scrollIntoViewIfNeeded();

@@ -5,7 +5,7 @@ import { applyAuthCookies } from '@/lib/access';
 import {
   OAUTH_NEXT_COOKIE,
   OAUTH_PROVIDER_COOKIE,
-  ROLE_SELECT_PATH,
+  POST_AUTH_HOME,
   describeOAuthError,
   isOAuthStateLost,
   isUsedOrExpiredOAuthCode,
@@ -31,23 +31,17 @@ import {
 import { redirectExistingAuthUser } from '@/lib/auth-complete';
 import { shareOAuthAttempt } from '@/lib/oauth-once';
 import { getSupabaseEnv } from '@/lib/supabase/env';
+import { requestAppOrigin } from '@/lib/site-origin';
 import { reconcileSocialIdentities } from '@/lib/auth-identity';
 import {
   isMemberRole,
-  needsRoleOnboarding,
   parseAuthRoles,
   primaryAuthRole,
   type SessionUser,
 } from '@/types/auth';
 
 function callbackOrigin(request: Request) {
-  const url = new URL(request.url);
-  const forwardedHost = request.headers.get('x-forwarded-host');
-  const forwardedProto = request.headers.get('x-forwarded-proto');
-  if (forwardedHost) {
-    return `${forwardedProto === 'http' ? 'http' : 'https'}://${forwardedHost}`;
-  }
-  return url.origin;
+  return requestAppOrigin(request);
 }
 
 function readNext(request: NextRequest, requestUrl: URL) {
@@ -57,12 +51,12 @@ function readNext(request: NextRequest, requestUrl: URL) {
   }
   const stored = request.cookies.get(OAUTH_NEXT_COOKIE)?.value;
   if (!stored) {
-    return ROLE_SELECT_PATH;
+    return POST_AUTH_HOME;
   }
   try {
-    return sanitizeNextPath(decodeURIComponent(stored)) ?? ROLE_SELECT_PATH;
+    return sanitizeNextPath(decodeURIComponent(stored)) ?? POST_AUTH_HOME;
   } catch {
-    return ROLE_SELECT_PATH;
+    return POST_AUTH_HOME;
   }
 }
 
@@ -153,7 +147,7 @@ export async function GET(request: NextRequest) {
   const cookieBag = createCookieBag();
   const secure = origin.startsWith('https://');
   const supabase = createServerClient(env.url, env.anonKey, {
-    cookieOptions: sessionCookieOptions(secure),
+    cookieOptions: sessionCookieOptions(secure, new URL(origin).hostname),
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -248,9 +242,7 @@ export async function GET(request: NextRequest) {
 
   const authUser = once.user;
   const sessionLike = await sessionLikeFor(supabase, authUser);
-  const destination = postSocialAuthPath(sessionLike, nextPath, {
-    needsOnboarding: needsRoleOnboarding(sessionLike),
-  });
+  const destination = postSocialAuthPath(sessionLike, nextPath);
   const redirect = NextResponse.redirect(new URL(destination, origin));
   const issued = once.cookies.length > 0 ? once.cookies : cookieBag.getAll();
   request.cookies
@@ -272,12 +264,12 @@ export async function GET(request: NextRequest) {
   redirect.cookies.delete(OAUTH_NEXT_COOKIE);
   redirect.cookies.delete(OAUTH_PROVIDER_COOKIE);
   redirect.cookies.delete(LEGACY_PENDING_MERGE_COOKIE);
-  writeAccountLinkCookie(redirect.cookies, authUser.id, secure);
+  writeAccountLinkCookie(redirect.cookies, authUser.id, secure, new URL(origin).hostname);
   applyAuthCookies(redirect.cookies, {
     present: true,
-    roles: destination === ROLE_SELECT_PATH ? [] : sessionLike.roles,
-    activeRole:
-      destination === ROLE_SELECT_PATH ? null : sessionLike.currentMode ?? sessionLike.roles,
+    roles: sessionLike.roles,
+    activeRole: sessionLike.currentMode ?? sessionLike.roles,
+    hostname: new URL(origin).hostname,
   });
   return redirect;
 }

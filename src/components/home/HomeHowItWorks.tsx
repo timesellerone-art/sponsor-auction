@@ -14,10 +14,10 @@ const cardClass =
   'min-w-0 overflow-hidden rounded-3xl bg-white/80 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-stone-900/5 backdrop-blur-md sm:p-6';
 
 export function HomeHowItWorks() {
-  const { user, ready, canCreateAuction } = useAuth();
+  const { ready } = useAuth();
   const { audience } = useLandingAudience();
   const copy = LANDING_GUIDE[audience];
-  const createDisabled = !ready || Boolean(user && !canCreateAuction);
+  const createDisabled = !ready;
 
   const openCreateAuction = () => {
     window.dispatchEvent(new Event('create-auction:open'));

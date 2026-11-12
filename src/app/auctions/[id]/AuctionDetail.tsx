@@ -9,6 +9,7 @@ import { AuctionChat } from '@/components/AuctionChat';
 import { AiAgentGuide } from '@/components/AiAgentGuide';
 import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
+import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { BidProposalList } from '@/components/BidProposalList';
 import { PaymentCheckoutModal } from '@/components/PaymentCheckoutModal';
 import { showToast } from '@/components/Toast';
@@ -40,8 +41,9 @@ import { isAuctionClosed, type AuctionItem, type BidItem } from '@/types/auction
 
 export function AuctionDetail({ id }: { id: string }) {
   const router = useRouter();
-  const { user, ready, canPlaceBid, canCreateAuction } = useAuth();
+  const { user, ready, canCreateAuction } = useAuth();
   const { requireAdvertiser } = useRequireAuth();
+  const { requestCreator } = useRoleIntent();
   const [auction, setAuction] = useState<AuctionItem | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -194,7 +196,7 @@ export function AuctionDetail({ id }: { id: string }) {
   const detailCategory = auction ? resolveCampaignCategory(auction) : null;
   const auctionOpen = auction?.status === 'active' && !auction.isBlind;
   const ownCampaign = Boolean(auction && isCampaignAuthor(auction, user?.id));
-  const canBid = Boolean(auctionOpen && canPlaceBid && !ownCampaign);
+  const canAttemptBid = Boolean(auctionOpen && ready && user && !ownCampaign);
 
   const handleBidCreated = () => {
     setAuction((current) =>
@@ -339,10 +341,10 @@ export function AuctionDetail({ id }: { id: string }) {
                 </button>
                 <p className="mt-2 text-center text-xs text-zinc-500">{VALIDATION.selfCampaignHint}</p>
               </div>
-            ) : canBid ? (
+            ) : canAttemptBid ? (
               <button
                 type="button"
-                onClick={() => setBidOpen(true)}
+                onClick={() => requestCreator(() => setBidOpen(true))}
                 className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
               >
                 콘텐츠 제안하기
@@ -351,9 +353,7 @@ export function AuctionDetail({ id }: { id: string }) {
               <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 {!auctionOpen
                   ? '이 캠페인은 모집이 마감되었거나 제안을 받지 않습니다.'
-                  : !ready || !user
-                    ? '로그인 후 크리에이터 계정으로 제안할 수 있습니다. 크리에이터 전용 기능입니다.'
-                    : '크리에이터 전용 기능입니다. 광고주 계정으로는 지원할 수 없습니다.'}
+                  : '로그인 후 콘텐츠를 제안할 수 있습니다.'}
                 {!user && auctionOpen ? (
                   <button
                     type="button"

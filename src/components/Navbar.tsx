@@ -2,25 +2,22 @@
 
 import { useCallback, useEffect, useId, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Menu, X } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { CreateAuctionModal } from '@/components/CreateAuctionModal';
+import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { NotificationBell } from '@/components/NotificationBell';
-import { showToast } from '@/components/Toast';
-import { ACCESS_REASON } from '@/lib/access';
 import { signOut } from '@/lib/auth';
-import { loginPath } from '@/lib/auth-guard';
 import { cn } from '@/lib/utils';
 import { RoleSwitcher } from '@/components/RoleSwitcher';
-import { hasAuthRole, isAdmin, memberRolesLabel } from '@/types/auth';
+import { isAdmin, memberRolesLabel } from '@/types/auth';
 
 export function Navbar() {
-  const router = useRouter();
-  const { user, ready, canCreateAuction, canPlaceBid, switchableRoles } = useAuth();
+  const { user, ready, canPlaceBid, switchableRoles } = useAuth();
+  const { requestAdvertiser } = useRoleIntent();
   const showAdmin = Boolean(ready && isAdmin(user));
-  const showDashboard = Boolean(ready && switchableRoles.length > 0);
-  const dashboardLabel = canPlaceBid ? '내 제안' : '내 캠페인';
+  const showDashboard = Boolean(ready && user);
+  const dashboardLabel = switchableRoles.length === 0 ? '마이페이지' : canPlaceBid ? '내 제안' : '내 캠페인';
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const menuId = useId();
@@ -30,21 +27,8 @@ export function Navbar() {
     if (!ready) {
       return;
     }
-    if (!user) {
-      showToast(ACCESS_REASON['advertiser-auth']);
-      router.push(loginPath('advertiser-auth', '/'));
-      return;
-    }
-    if (!canCreateAuction) {
-      showToast(
-        hasAuthRole(user, 'advertiser')
-          ? '광고주 모드로 전환하면 캠페인을 등록할 수 있습니다.'
-          : ACCESS_REASON['advertiser-forbidden'],
-      );
-      return;
-    }
-    setCreateOpen(true);
-  }, [canCreateAuction, ready, router, user]);
+    requestAdvertiser(() => setCreateOpen(true));
+  }, [ready, requestAdvertiser]);
 
   useEffect(() => {
     if (!open) {
@@ -80,13 +64,8 @@ export function Navbar() {
 
   const handleSignOut = async () => {
     setOpen(false);
-    const result = await signOut();
-    if (result.error) {
-      showToast(result.error);
-      return;
-    }
-    showToast('로그아웃했습니다.', 'success');
-    router.push('/');
+    await signOut();
+    window.location.replace('/');
   };
 
   const navLinkClass =
@@ -158,7 +137,7 @@ export function Navbar() {
             )}
             <button
               type="button"
-              disabled={!ready || Boolean(user && !canCreateAuction)}
+              disabled={!ready}
               onClick={requestCreateAuction}
               className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full bg-clink px-3 text-xs font-semibold text-white transition-colors hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 lg:h-10 lg:px-4 lg:text-sm"
             >
@@ -171,7 +150,7 @@ export function Navbar() {
           <NotificationBell />
           <button
             type="button"
-            disabled={!ready || Boolean(user && !canCreateAuction)}
+            disabled={!ready}
             onClick={requestCreateAuction}
             className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300"
           >
@@ -273,7 +252,7 @@ export function Navbar() {
           <button
             type="button"
             className="rounded-lg px-3 py-3 text-left text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white disabled:text-stone-400"
-            disabled={!ready || Boolean(user && !canCreateAuction)}
+            disabled={!ready}
             onClick={requestCreateAuction}
           >
             캠페인 등록

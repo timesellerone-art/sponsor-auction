@@ -1,6 +1,7 @@
 import { createBrowserClient } from '@supabase/ssr';
 import { sessionCookieOptions } from '@/lib/auth-paths';
 import { getSupabaseEnv, warnMockFallback } from '@/lib/supabase/env';
+import { publicAppOrigin } from '@/lib/site-origin';
 import type { Database } from '@/types/database';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -24,11 +25,13 @@ export function createClient(): SupabaseClient<Database> | null {
   }
 
   try {
+    const origin = typeof window !== 'undefined' ? publicAppOrigin() : '';
     const secure =
       typeof window !== 'undefined' ? window.location.protocol === 'https:' : undefined;
+    const hostname = origin ? new URL(origin).hostname : undefined;
     browserClient = createBrowserClient<Database>(env.url, env.anonKey, {
       isSingleton: true,
-      cookieOptions: sessionCookieOptions(secure),
+      cookieOptions: sessionCookieOptions(secure, hostname),
       auth: {
         flowType: 'pkce',
         persistSession: true,

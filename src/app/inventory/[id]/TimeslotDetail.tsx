@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { useAuth } from '@/components/AuthProvider';
+import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { CreatorRatingBadge } from '@/components/CreatorRatingBadge';
 import { TimeslotBidModal } from '@/components/TimeslotBidModal';
 import { showToast } from '@/components/Toast';
@@ -15,7 +16,8 @@ import { formatDateTime, formatViews, formatWon } from '@/lib/utils';
 import type { TimeSlotBidItem, TimeSlotItem } from '@/types/timeslot';
 
 export function TimeslotDetail({ id }: { id: string }) {
-  const { user, canCreateAuction, canPlaceBid } = useAuth();
+  const { user, canPlaceBid } = useAuth();
+  const { requestAdvertiser } = useRoleIntent();
   const [slot, setSlot] = useState<TimeSlotItem | null>(null);
   const [bids, setBids] = useState<TimeSlotBidItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +66,7 @@ export function TimeslotDetail({ id }: { id: string }) {
         Boolean(slot) &&
           slot?.status === 'open' &&
           !slot?.winnerBidId &&
-          canCreateAuction &&
+          !(slot?.creatorId && user?.id && slot.creatorId === user.id) &&
           !isDeadlinePassed(slot?.deadline),
       );
     };
@@ -74,7 +76,7 @@ export function TimeslotDetail({ id }: { id: string }) {
       window.clearTimeout(timer);
       window.clearInterval(interval);
     };
-  }, [slot, canCreateAuction]);
+  }, [slot, user]);
 
   return (
     <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10">
@@ -132,7 +134,7 @@ export function TimeslotDetail({ id }: { id: string }) {
             {canBid ? (
               <button
                 type="button"
-                onClick={() => setBidOpen(true)}
+                onClick={() => requestAdvertiser(() => setBidOpen(true))}
                 className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
               >
                 제안하기
@@ -141,7 +143,7 @@ export function TimeslotDetail({ id }: { id: string }) {
               <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 {slot.status !== 'open' || slot.winnerBidId
                   ? '이 슬롯은 마감되었거나 낙찰되었습니다.'
-                  : '광고주 계정으로 제안할 수 있습니다.'}
+                  : '로그인 후 제안할 수 있습니다.'}
               </p>
             )}
           </article>

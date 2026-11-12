@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { isSupabaseAuthCookieName } from '@/lib/auth-paths';
 import { readServerEnv } from '@/lib/naver-oauth';
+import { authCookieDomain } from '@/lib/site-origin';
 
 export const ACCOUNT_LINK_COOKIE = 'sa_account_link';
 export const ACCOUNT_LINK_MAX_AGE_SEC = 15 * 60;
@@ -74,13 +75,15 @@ export function readAccountLinkUserId(value: string | null | undefined, nowMs = 
   return userId;
 }
 
-export function accountLinkCookieOptions(secure: boolean) {
+export function accountLinkCookieOptions(secure: boolean, hostname?: string | null) {
+  const domain = authCookieDomain(hostname);
   return {
     path: '/' as const,
     maxAge: ACCOUNT_LINK_MAX_AGE_SEC,
     sameSite: 'lax' as const,
     httpOnly: true,
     ...(secure ? { secure: true } : {}),
+    ...(domain ? { domain } : {}),
   };
 }
 
@@ -95,17 +98,19 @@ export function writeAccountLinkCookie(
         sameSite: 'lax';
         httpOnly: boolean;
         secure?: boolean;
+        domain?: string;
       },
     ) => void;
   },
   userId: string,
   secure: boolean,
+  hostname?: string | null,
 ) {
   const value = signAccountLinkValue(userId);
   if (!value) {
     return;
   }
-  store.set(ACCOUNT_LINK_COOKIE, value, accountLinkCookieOptions(secure));
+  store.set(ACCOUNT_LINK_COOKIE, value, accountLinkCookieOptions(secure, hostname));
 }
 
 export function pickPreferredMergeUser<T extends { id: string; created_at: string }>(

@@ -1,7 +1,7 @@
 import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { readAuthUserIdFromCookies, writeAccountLinkCookie } from '@/lib/account-link';
-import { ROLE_SELECT_PATH, oauthFailedLoginPath, sanitizeNextPath } from '@/lib/auth-guard';
+import { POST_AUTH_HOME, oauthFailedLoginPath, sanitizeNextPath } from '@/lib/auth-guard';
 import { expirePkceVerifierCookies } from '@/lib/auth-paths';
 import { createClient } from '@/lib/supabase/server';
 import {
@@ -16,6 +16,8 @@ import {
   requestOrigin,
 } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
+
+export const preferredRegion = 'icn1';
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
     }
 
     const next =
-      sanitizeNextPath(new URL(request.url).searchParams.get('next')) ?? ROLE_SELECT_PATH;
+      sanitizeNextPath(new URL(request.url).searchParams.get('next')) ?? POST_AUTH_HOME;
     const state = createNaverState();
     const authorize = buildNaverAuthorizeUrl({
       clientId: env.clientId,
@@ -54,15 +56,18 @@ export async function GET(request: NextRequest) {
 
     const response = NextResponse.redirect(authorize);
     const secure = origin.startsWith('https://');
-    const cookies = cookieOptions(secure);
+    const cookies = cookieOptions(secure, new URL(origin).hostname);
     response.cookies.set(NAVER_STATE_COOKIE, state, cookies);
     response.cookies.set(NAVER_NEXT_COOKIE, next, cookies);
-    expirePkceVerifierCookies(request, response, { secure });
+    expirePkceVerifierCookies(request, response, {
+      secure,
+      hostname: new URL(origin).hostname,
+    });
     const supabase = await createClient();
     const sessionUser = supabase ? (await supabase.auth.getUser()).data.user : null;
     const userId = sessionUser?.id || readAuthUserIdFromCookies(request.cookies.getAll());
     if (userId) {
-      writeAccountLinkCookie(response.cookies, userId, secure);
+      writeAccountLinkCookie(response.cookies, userId, secure, new URL(origin).hostname);
     }
     return response;
   } catch (error) {

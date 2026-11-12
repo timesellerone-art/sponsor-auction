@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { showToast } from '@/components/Toast';
 import { applyKnownSession, notifyAuthChanged } from '@/lib/auth';
 import {
-  ROLE_SELECT_PATH,
+  POST_AUTH_HOME,
   describeOAuthError,
   oauthFailedLoginPath,
   postSocialAuthPath,
@@ -15,7 +15,6 @@ import {
 import { sessionUserFromAuthUser } from '@/lib/auth-session';
 import { AUTH_BOOT_TIMEOUT_MS } from '@/lib/auth-timeout';
 import { getSupabaseClient } from '@/lib/supabase';
-import { needsRoleOnboarding } from '@/types/auth';
 
 function loginFallback(message?: string) {
   return oauthFailedLoginPath(describeOAuthError(message));
@@ -75,9 +74,7 @@ async function verifyAndFinish(
   notifyAuthChanged();
   return {
     error: null,
-    destination: postSocialAuthPath(session, next, {
-      needsOnboarding: needsRoleOnboarding(session),
-    }),
+    destination: postSocialAuthPath(session, next),
   };
 }
 
@@ -130,7 +127,7 @@ export default function AuthOAuthCompletePage() {
 
     const finish = async () => {
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-      const next = sanitizeNextPath(params.get('next')) ?? ROLE_SELECT_PATH;
+      const next = sanitizeNextPath(params.get('next')) ?? POST_AUTH_HOME;
       const errorDescription =
         params.get('error_description') ||
         hashParams.get('error_description') ||
@@ -153,11 +150,7 @@ export default function AuthOAuthCompletePage() {
         if (result.error || !result.destination) {
           const existing = (await supabase?.auth.getSession())?.data.session?.user;
           if (existing) {
-            go(
-              postSocialAuthPath(sessionUserFromAuthUser(existing), next, {
-                needsOnboarding: needsRoleOnboarding(sessionUserFromAuthUser(existing)),
-              }),
-            );
+            go(postSocialAuthPath(sessionUserFromAuthUser(existing), next));
             return;
           }
           go(loginFallback(result.error ?? undefined));

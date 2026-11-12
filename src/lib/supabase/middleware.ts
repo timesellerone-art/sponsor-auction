@@ -8,6 +8,7 @@ import {
   type CookieToSet,
 } from '@/lib/auth-paths';
 import { getSupabaseEnv } from '@/lib/supabase/env';
+import { requestAppOrigin } from '@/lib/site-origin';
 
 export type SessionMiddlewareResult = {
   response: NextResponse;
@@ -17,8 +18,9 @@ export type SessionMiddlewareResult = {
 
 export async function updateSession(request: NextRequest): Promise<SessionMiddlewareResult> {
   const bag = createCookieBag();
-  const secure = request.nextUrl.protocol === 'https:';
-  const cookieOptions = sessionCookieOptions(secure);
+  const origin = requestAppOrigin(request);
+  const secure = origin.startsWith('https://');
+  const cookieOptions = sessionCookieOptions(secure, new URL(origin).hostname);
   let supabaseResponse = NextResponse.next({ request });
   const env = getSupabaseEnv();
   if (!env) {

@@ -17,13 +17,15 @@ import {
 } from '@/lib/access';
 import { createClient } from '@/lib/supabase/client';
 import { getSupabaseOAuthCallbackUrl } from '@/lib/supabase/env';
+import { clientCookieSuffix, publicAppOrigin } from '@/lib/site-origin';
 import {
   OAUTH_NEXT_COOKIE,
   OAUTH_PROVIDER_COOKIE,
-  ROLE_SELECT_PATH,
+  POST_AUTH_HOME,
   buildAppOAuthCallbackUrl,
   sanitizeNextPath,
 } from '@/lib/auth-guard';
+import { beginAuthLogout, expireBrowserAuthCookies } from '@/lib/auth-logout';
 import {
   kakaoOAuthScopeQuery,
   kakaoOAuthScopesOption,
@@ -93,12 +95,14 @@ function persistClientAuth(user: SessionUser | null) {
 const AUTH_CHANGED_EVENT = 'auth:changed';
 const AUTH_SESSION_EVENT = 'auth:session';
 
-const PROFILE_COLUMNS = 'id, name, email, role, roles, status';
+const PROFILE_COLUMNS_WITH_PHONE = 'id, name, email, phone, role, roles, status';
+const PROFILE_COLUMNS_BASE = 'id, name, email, role, roles, status';
 
 type ProfileRow = {
   id: string;
   name: string | null;
   email: string | null;
+  phone?: string | null;
   role: string | null;
   roles?: unknown;
   status: string | null;
@@ -139,16 +143,21 @@ function mapSessionUser(
   authUser?: {
     created_at?: string;
     last_sign_in_at?: string | null;
+    phone?: string | null;
     user_metadata?: Record<string, unknown>;
   } | null,
   roles?: unknown,
+  phone?: string | null,
 ): SessionUser {
   const parsed = parseAuthRoles(roles, role);
   const modeRaw = authUser?.user_metadata?.current_mode;
+  const metaPhone =
+    typeof authUser?.user_metadata?.phone === 'string' ? authUser.user_metadata.phone.trim() : '';
   return {
     id,
     email,
     name,
+    phone: phone?.trim() || metaPhone || authUser?.phone?.trim() || null,
     role: primaryAuthRole(parsed),
     roles: parsed,
     createdAt: authUser?.created_at,
@@ -157,6 +166,8 @@ function mapSessionUser(
     currentMode: isMemberRole(modeRaw) ? modeRaw : null,
   };
 }
+
+export { isAuthLoggingOut, beginAuthLogout } from '@/lib/auth-logout';
 
 export function notifyAuthChanged() {
   if (typeof window === 'undefined') {
@@ -232,10 +243,10 @@ export function subscribeAuthState(listener: (event?: string) => void) {
 export type SocialOAuthProvider = 'google' | 'kakao' | 'naver';
 
 function rememberOAuthStart(provider: SocialOAuthProvider | null, nextPath?: string | null) {
-  const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${OAUTH_NEXT_COOKIE}=${encodeURIComponent(next)}; Path=/; Max-Age=600; SameSite=Lax${secure}`;
-  document.cookie = `${OAUTH_PROVIDER_COOKIE}=${provider ?? ''}; Path=/; Max-Age=${provider ? 600 : 0}; SameSite=Lax${secure}`;
+  const next = sanitizeNextPath(nextPath) ?? POST_AUTH_HOME;
+  const suffix = clientCookieSuffix();
+  document.cookie = `${OAUTH_NEXT_COOKIE}=${encodeURIComponent(next)}; Max-Age=600${suffix}`;
+  document.cookie = `${OAUTH_PROVIDER_COOKIE}=${provider ?? ''}; Max-Age=${provider ? 600 : 0}${suffix}`;
 }
 
 function readCookie(name: string) {
@@ -306,7 +317,7 @@ export async function signInWithOAuth(
       scopes?: string;
       queryParams?: Record<string, string>;
     } = {
-      redirectTo: buildAppOAuthCallbackUrl(window.location.origin),
+      redirectTo: buildAppOAuthCallbackUrl(publicAppOrigin()),
       skipBrowserRedirect: true,
     };
     if (provider === 'kakao') {
@@ -316,21 +327,24 @@ export async function signInWithOAuth(
       oauthOptions.queryParams = { access_type: 'offline', prompt: 'consent' };
     }
 
-    const session = await supabase.auth.getSession();
-    if (session.data.session?.user) {
-      const linked = await supabase.auth.linkIdentity({
-        provider,
-        options: oauthOptions,
-      });
-      if (!linked.error && linked.data.url) {
-        window.location.assign(authorizeUrlForProvider(provider, linked.data.url));
-        return ok(true);
-      }
-      if (linked.error) {
-        console.warn(
-          '[SponsorAuction] 로그인된 계정에 소셜 연결을 바로 붙이지 못해 기존 로그인으로 이어갑니다',
-          linked.error.message,
-        );
+    const wantsAccountLink = Boolean(sanitizeNextPath(nextPath)?.startsWith('/my/settings'));
+    if (wantsAccountLink) {
+      const session = await supabase.auth.getSession();
+      if (session.data.session?.user) {
+        const linked = await supabase.auth.linkIdentity({
+          provider,
+          options: oauthOptions,
+        });
+        if (!linked.error && linked.data.url) {
+          window.location.assign(authorizeUrlForProvider(provider, linked.data.url));
+          return ok(true);
+        }
+        if (linked.error) {
+          console.warn(
+            '[SponsorAuction] 로그인된 계정에 소셜 연결을 바로 붙이지 못해 기존 로그인으로 이어갑니다',
+            linked.error.message,
+          );
+        }
       }
     }
 
@@ -369,8 +383,8 @@ export async function signInWithNaver(nextPath?: string | null) {
     return fail(false, AUTH_FAIL_MESSAGE);
   }
   rememberOAuthStart('naver', nextPath);
-  const next = sanitizeNextPath(nextPath) ?? ROLE_SELECT_PATH;
-  const naverStart = `${window.location.origin}/api/auth/naver?next=${encodeURIComponent(next)}`;
+  const next = sanitizeNextPath(nextPath) ?? POST_AUTH_HOME;
+  const naverStart = `${publicAppOrigin()}/api/auth/naver?next=${encodeURIComponent(next)}`;
   // 네이버는 PKCE 없이 자체 콜백으로 들어가 쿠키 유실을 피합니다.
   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign(naverStart);
@@ -389,11 +403,21 @@ async function loadProfile(
   } | null,
 ): Promise<SessionUser> {
   try {
-    const { data, error } = await withTimeout(
-      supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle(),
+    let { data, error } = await withTimeout(
+      supabase.from('profiles').select(PROFILE_COLUMNS_WITH_PHONE).eq('id', userId).maybeSingle(),
       2000,
       '프로필 조회',
     );
+
+    if (error && /phone/i.test(error.message)) {
+      const retried = await withTimeout(
+        supabase.from('profiles').select(PROFILE_COLUMNS_BASE).eq('id', userId).maybeSingle(),
+        2000,
+        '프로필 조회',
+      );
+      data = retried.data as typeof data;
+      error = retried.error;
+    }
 
     if (error) {
       console.warn('[SponsorAuction] 프로필 조회에 실패했습니다.', error.message);
@@ -407,6 +431,7 @@ async function loadProfile(
       row?.role,
       authUser,
       row?.roles,
+      row?.phone,
     );
   } catch (error) {
     console.warn('[SponsorAuction] 프로필 조회가 지연되어 세션 메타데이터를 사용합니다.', error);
@@ -692,31 +717,34 @@ export async function signIn(input: {
 }
 
 export async function signOut(): Promise<DataResult<boolean>> {
+  beginAuthLogout();
+  expireBrowserAuthCookies();
   const mockResult = await mockSignOut();
-  const supabase = createClient();
-  if (!supabase) {
-    applyKnownSession(null);
-    if (!mockResult.error) {
-      notifyAuthChanged();
-    }
-    return mockResult;
-  }
+  applyKnownSession(null);
 
   try {
-    const { error } = await supabase.auth.signOut();
-    applyKnownSession(null);
-    notifyAuthChanged();
-    if (error) {
-      console.warn('[SponsorAuction] 로그아웃에 실패했습니다.', error.message);
-      return fail(false, AUTH_FAIL_MESSAGE);
-    }
-    return ok(true);
-  } catch (error) {
-    console.warn('[SponsorAuction] 로그아웃 중 예외가 발생했습니다.', error);
-    applyKnownSession(null);
-    notifyAuthChanged();
-    return fail(false, AUTH_FAIL_MESSAGE);
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(2500),
+    });
+  } catch {
+    // 서버 쿠키 정리가 실패해도 클라이언트 세션은 지웁니다.
   }
+
+  const supabase = createClient();
+  if (supabase) {
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.warn('[SponsorAuction] 로그아웃 중 예외가 발생했습니다.', error);
+    }
+  }
+
+  expireBrowserAuthCookies();
+  notifyAuthChanged();
+  return mockResult.error ? mockResult : ok(true);
 }
 
 type RoleApiPayload = {

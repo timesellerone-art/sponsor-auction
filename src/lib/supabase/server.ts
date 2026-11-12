@@ -1,7 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { sessionCookieOptions } from '@/lib/auth-paths';
 import { getSupabaseEnv, warnMockFallback } from '@/lib/supabase/env';
+import { hostnameOf } from '@/lib/site-origin';
 import type { Database } from '@/types/database';
 
 export async function createClient() {
@@ -14,9 +15,11 @@ export async function createClient() {
 
   try {
     const cookieStore = await cookies();
+    const headerStore = await headers();
+    const host = headerStore.get('x-forwarded-host') || headerStore.get('host') || '';
 
     return createServerClient<Database>(env.url, env.anonKey, {
-      cookieOptions: sessionCookieOptions(),
+      cookieOptions: sessionCookieOptions(undefined, hostnameOf(host)),
       cookies: {
         getAll() {
           return cookieStore.getAll();

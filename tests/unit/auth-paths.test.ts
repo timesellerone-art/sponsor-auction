@@ -25,8 +25,9 @@ describe('auth path helpers', () => {
     assert.equal(isAuthPassthroughPath('/onboarding/role-select'), true);
     assert.equal(isAuthPassthroughPath('/auth/oauth'), true);
     assert.equal(isAuthPassthroughPath('/my'), false);
-    assert.equal(onboardingCanonicalPath('/select-role'), '/onboarding/role-select');
-    assert.equal(onboardingCanonicalPath('/onboarding'), '/onboarding/role-select');
+    assert.equal(onboardingCanonicalPath('/select-role'), '/');
+    assert.equal(onboardingCanonicalPath('/onboarding'), '/');
+    assert.equal(onboardingCanonicalPath('/onboarding/role-select'), '/');
     assert.match(
       describeOAuthError('Invalid scope: account_email'),
       /카카오 로그인 동의 항목/,
@@ -47,15 +48,24 @@ describe('auth path helpers', () => {
 });
 
 describe('post-auth destination', () => {
-  it('역할 없는 신규 유저는 온보딩으로 보낸다', () => {
-    assert.equal(
-      postSocialAuthPath({ roles: [] }, '/admin', { needsOnboarding: true }),
-      '/onboarding/role-select',
-    );
+  it('역할 없는 신규 유저도 홈으로 보낸다', () => {
+    assert.equal(postSocialAuthPath({ roles: [] }, '/admin'), '/');
+    assert.equal(postAuthPath({ roles: [] }), '/');
+  });
+
+  it('역할이 있는 기존 회원도 온보딩 next를 무시하고 홈으로 보낸다', () => {
+    assert.equal(postSocialAuthPath({ roles: ['advertiser'] }, '/onboarding/role-select'), '/');
+    assert.equal(postSocialAuthPath({ roles: ['creator'] }, '/onboarding'), '/');
+    assert.equal(postSocialAuthPath({ roles: ['admin'] }, '/onboarding/role-select'), '/');
   });
 
   it('광고주에게 /admin next를 강제하지 않는다', () => {
-    assert.equal(postAuthPath({ roles: ['advertiser'] }, '/admin'), '/my');
+    assert.equal(postAuthPath({ roles: ['advertiser'] }, '/admin'), '/');
+  });
+
+  it('로그인 성공 시 유효한 next가 있으면 그 경로로 보낸다', () => {
+    assert.equal(postSocialAuthPath({ roles: [] }, '/#auctions'), '/#auctions');
+    assert.equal(postSocialAuthPath({ roles: ['advertiser'] }, '/my'), '/my');
   });
 
   it('역할 전환은 쿠키/선택 값을 세션 재조회 없이 유지한다', () => {
@@ -141,5 +151,9 @@ describe('post-auth destination', () => {
     assert.equal(options.sameSite, 'lax');
     assert.equal(options.secure, true);
     assert.equal(options.maxAge, AUTH_COOKIE_MAX_AGE);
+    assert.equal(options.domain, undefined);
+    const production = sessionCookieOptions(true, 'www.clinkapp.kr');
+    assert.equal(production.domain, '.clinkapp.kr');
+    assert.equal(sessionCookieOptions(true, 'clinkapp.kr').domain, '.clinkapp.kr');
   });
 });

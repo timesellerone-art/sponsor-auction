@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { expect, test, type BrowserContext } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 
 const AUTH_REQUIRED_TOAST = '이 기능을 사용하려면 로그인이 필요합니다.';
 const SESSION_FAIL_COPY = '로그인 정보를 확인하지 못했습니다';
@@ -51,6 +51,13 @@ async function sessionUserId(context: BrowserContext): Promise<string | null> {
   return session.user?.id ?? null;
 }
 
+async function openAdvertiserOnboarding(page: Page) {
+  await page.getByRole('button', { name: '+ 캠페인 등록' }).first().click();
+  await expect(page.getByRole('heading', { name: /광고주 정보를 입력해 주세요/ })).toBeVisible({
+    timeout: 8000,
+  });
+}
+
 test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
   test('a) 로그인 페이지에 구글·카카오·네이버 버튼이 있다', async ({ page }) => {
     await page.goto('/login');
@@ -84,7 +91,7 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
     expect(verifier, 'PKCE code verifier 쿠키가 있어야 콜백에서 교환할 수 있다').toBeTruthy();
     expect(verifier?.path).toBe('/');
     expect(cookies.find((cookie) => cookie.name === 'sponsor-auction-oauth-next')?.value).toBe(
-      encodeURIComponent('/onboarding/role-select'),
+      encodeURIComponent('/'),
     );
   });
 
@@ -106,7 +113,7 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
     expect(cookies.find((cookie) => cookie.name === 'sa_naver_oauth_state')?.httpOnly).toBe(true);
     expect(
       decodeURIComponent(cookies.find((cookie) => cookie.name === 'sa_naver_oauth_next')?.value ?? ''),
-    ).toBe('/onboarding/role-select');
+    ).toBe('/');
   });
 
   test('b) 콜백 교환 실패 시 상세 사유와 함께 /login?error=oauth_failed 로 보낸다', async ({
@@ -211,13 +218,12 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
       await page.goto(
         `/auth/oauth?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink&next=${encodeURIComponent('/onboarding')}`,
       );
-      await expect(page).toHaveURL(/\/onboarding\/role-select/, { timeout: 15000 });
-      await expect(page.getByRole('heading', { name: /역할을 선택해 주세요/ })).toBeVisible({
-        timeout: 8000,
-      });
+      await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 15000 });
       await expect(page.getByText(SESSION_FAIL_COPY)).toHaveCount(0);
       await expect(page.getByText(AUTH_REQUIRED_TOAST)).toHaveCount(0);
       await expect(page.locator(VISIBLE_SPINNER)).toHaveCount(0);
+      await openAdvertiserOnboarding(page);
+      await expect(page.getByLabel('대표 이메일')).toBeVisible();
 
       const authCookies = (await context.cookies('http://localhost:3000')).filter((cookie) =>
         /^sb-.+-auth-token(\.\d+)?$/.test(cookie.name),
@@ -231,9 +237,7 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
       }
 
       await page.goto('/onboarding');
-      await expect(page.getByRole('heading', { name: /역할을 선택해 주세요/ })).toBeVisible({
-        timeout: 8000,
-      });
+      await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 8000 });
       await expect(page.getByText(SESSION_FAIL_COPY)).toHaveCount(0);
       await expect(page.locator(VISIBLE_SPINNER)).toHaveCount(0);
     } finally {
@@ -264,7 +268,7 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
     await form.getByPlaceholder('6자 이상').fill('demo1234');
     await form.locator('button[type=submit]').click();
 
-    await expect(page).toHaveURL(/\/admin(\?|$)/, { timeout: 15000 });
+    await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 15000 });
     expect(
       passwordGrant.every((status) => status === 200),
       '라이브 비밀번호 로그인은 200이어야 하고, 데모 Mock 폴백은 호출이 없어도 됩니다.',
@@ -279,11 +283,11 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
     expect(liveUid || demoSession).toBeTruthy();
 
     await page.waitForTimeout(3000);
-    await expect(page).toHaveURL(/\/admin(\?|$)/);
+    await expect(page).toHaveURL((url) => url.pathname === '/');
     await expect(header.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible();
 
     await page.reload();
-    await expect(page).toHaveURL(/\/admin(\?|$)/);
+    await expect(page).toHaveURL((url) => url.pathname === '/');
     await expect(header.getByRole('link', { name: '관리자', exact: true }).first()).toBeVisible({ timeout: 10000 });
     await expect(page.locator('form button[type=submit]')).toHaveCount(0);
   });
@@ -327,13 +331,14 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
 
     try {
       await loginAs(kakao.data.user?.email ?? '', '/onboarding');
-      await expect(page.getByRole('heading', { name: /역할을 선택해 주세요/ })).toBeVisible({
-        timeout: 15000,
-      });
+      await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 15000 });
+      await openAdvertiserOnboarding(page);
       await page.getByLabel('대표 이메일').fill(contactEmail);
       await expect(page.getByLabel('대표 이메일')).toHaveValue(contactEmail);
-      await page.getByRole('button', { name: /크리에이터로 시작하기/ }).click();
-      await expect(page).not.toHaveURL(/\/onboarding/, { timeout: 20000 });
+      await page.getByRole('button', { name: /광고주로 시작하기/ }).click();
+      await expect(page.getByRole('heading', { name: /광고주 정보를 입력해 주세요/ })).toHaveCount(0, {
+        timeout: 20000,
+      });
       const onboarded = (await admin.auth.admin.getUserById(kakaoId)).data.user;
       expect(onboarded?.app_metadata?.contact_email).toBe(contactEmail);
       // Admin API로는 실제 카카오 identity를 만들 수 없고, 매직링크 로그인 시 GoTrue가 providers를 email로 재계산한다.
@@ -347,9 +352,8 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
 
       await context.clearCookies();
       await loginAs(google.data.user?.email ?? '', '/onboarding');
-      await expect(page.getByRole('heading', { name: /역할을 선택해 주세요/ })).toBeVisible({
-        timeout: 15000,
-      });
+      await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 15000 });
+      await openAdvertiserOnboarding(page);
       expect(await sessionUserId(context)).toBe(googleId);
       await page.getByLabel('대표 이메일').fill(contactEmail);
       await expect(page.getByLabel('대표 이메일')).toHaveValue(contactEmail);
@@ -361,15 +365,7 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
       const roleResponse = await mergedRole;
       expect(roleResponse.ok(), await roleResponse.text()).toBeTruthy();
       await expect(page.getByRole('heading', { name: '이미 가입된 계정이 있습니다' })).toHaveCount(0);
-      try {
-        await page.waitForURL(
-          (url) => !url.pathname.startsWith('/onboarding'),
-          { timeout: 8_000 },
-        );
-      } catch {
-        await page.goto('/my');
-      }
-      await page.waitForURL((url) => url.pathname === '/my' || url.pathname.startsWith('/my/'), {
+      await expect(page).toHaveURL((url) => url.pathname === '/' || url.pathname.startsWith('/my'), {
         timeout: 15_000,
       });
       expect(
@@ -444,9 +440,8 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
       await page.goto(
         `/auth/oauth?token_hash=${incomingLink.data.properties?.hashed_token}&type=magiclink&next=${encodeURIComponent('/onboarding')}`,
       );
-      await expect(page.getByRole('heading', { name: /역할을 선택해 주세요/ })).toBeVisible({
-        timeout: 15000,
-      });
+      await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 15000 });
+      await openAdvertiserOnboarding(page);
       expect(await sessionUserId(context)).toBe(incomingId);
 
       await page.getByLabel('대표 이메일').fill(canonicalEmail);
@@ -518,10 +513,10 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
     }
   });
 
-  test('c) 세션이 없을 때도 온보딩은 무한 스피너 없이 안내 화면으로 끝난다', async ({ page }) => {
+  test('c) 세션이 없을 때도 온보딩 경로는 홈으로 보낸다', async ({ page }) => {
     await page.goto('/onboarding');
-    await expect(page).toHaveURL(/\/onboarding\/role-select/);
-    await expect(page.getByRole('button', { name: '다시 시도' })).toBeVisible({ timeout: 5000 });
+    await expect(page).toHaveURL((url) => url.pathname === '/', { timeout: 5000 });
+    await expect(page.getByRole('button', { name: '다시 시도' })).toHaveCount(0);
     await expect(page.locator(VISIBLE_SPINNER)).toHaveCount(0);
     await expect(page.getByText(AUTH_REQUIRED_TOAST)).toHaveCount(0);
   });

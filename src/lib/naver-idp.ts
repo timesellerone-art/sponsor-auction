@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'crypto';
+import { canonicalAppOrigin, PRODUCTION_SITE_ORIGIN } from '@/lib/site-origin';
 import type { NaverProfile } from './naver-oauth';
 import { getNaverOAuthEnv, readServerEnv } from './naver-oauth';
 
@@ -73,9 +74,9 @@ export function naverIdpPublicOrigin() {
   const fromEnv = (
     readServerEnv('NEXT_PUBLIC_SITE_URL') ||
     readServerEnv('NEXT_PUBLIC_APP_URL') ||
-    'https://sponsor-auction-eta.vercel.app'
+    PRODUCTION_SITE_ORIGIN
   ).trim();
-  return fromEnv.replace(/\/$/, '') || 'https://sponsor-auction-eta.vercel.app';
+  return canonicalAppOrigin(fromEnv.replace(/\/$/, '') || PRODUCTION_SITE_ORIGIN);
 }
 
 export function signNaverIdpState(state: NaverIdpState) {
@@ -142,17 +143,17 @@ export function appOriginFromIdpRequest(request: Request) {
   const url = new URL(request.url);
   const fromQuery = url.searchParams.get('app_origin')?.trim();
   if (fromQuery?.startsWith('http')) {
-    return fromQuery.replace(/\/$/, '');
+    return canonicalAppOrigin(fromQuery);
   }
   const referer = request.headers.get('referer') || request.headers.get('referrer') || '';
   try {
     const ref = new URL(referer);
     const redirectTo = ref.searchParams.get('redirect_to') || ref.searchParams.get('redirectTo') || '';
     if (redirectTo.startsWith('http')) {
-      return new URL(redirectTo).origin;
+      return canonicalAppOrigin(new URL(redirectTo).origin);
     }
   } catch {
     // referer가 없으면 authorize 호스트를 쓴다.
   }
-  return url.origin;
+  return canonicalAppOrigin(url.origin);
 }

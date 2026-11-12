@@ -6,10 +6,11 @@ import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { ACCESS_REASON, syncRoleCookie } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
+import { isAuthLoggingOut } from '@/lib/auth-logout';
 import { useSafetyTimeout } from '@/lib/auth-timeout';
 import { hasAuthRole, type AuthProfileRole } from '@/types/auth';
 
-type AccessRole = 'admin' | 'advertiser' | 'creator';
+type AccessRole = 'admin' | 'advertiser' | 'creator' | 'signed-in';
 
 type AccessGuardProps = {
   allow: AccessRole | readonly AccessRole[];
@@ -28,10 +29,16 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
   const roles = allowedRoles(allow);
   const allowKey = roles.join('|');
   const hasAccess = Boolean(
-    settled && user && roles.some((role) => hasAuthRole(user, role as AuthProfileRole)),
+    settled &&
+      user &&
+      (roles.includes('signed-in') ||
+        roles.some((role) => role !== 'signed-in' && hasAuthRole(user, role as AuthProfileRole))),
   );
 
   useEffect(() => {
+    if (isAuthLoggingOut()) {
+      return;
+    }
     if (!settled || hasAccess) {
       if (settled) {
         syncRoleCookie(user?.role, user?.roles);
@@ -60,6 +67,14 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
       `/?reason=${wantsAdmin ? 'admin-forbidden' : allowed.includes('advertiser') && !allowed.includes('creator') ? 'advertiser-forbidden' : 'creator-forbidden'}`,
     );
   }, [allowKey, hasAccess, router, settled, user]);
+
+  if (isAuthLoggingOut()) {
+    return (
+      <div className="flex w-full flex-1 items-center justify-center px-4 py-16">
+        <div className="h-40 w-full max-w-md animate-pulse rounded-2xl bg-white" />
+      </div>
+    );
+  }
 
   if (hasAccess) {
     return (

@@ -1,5 +1,6 @@
 import { AUTH_COOKIE_MAX_AGE, AUTH_PRESENT_COOKIE_NAME } from '@/lib/access';
-import { ROLE_SELECT_PATH } from '@/lib/auth-guard';
+import { POST_AUTH_HOME, ROLE_SELECT_PATH } from '@/lib/auth-guard';
+import { authCookieDomain } from '@/lib/site-origin';
 
 export function isAuthPassthroughPath(pathname: string) {
   return (
@@ -39,8 +40,12 @@ export type CookieToSet = {
 };
 
 export function onboardingCanonicalPath(pathname: string) {
-  if (pathname === '/onboarding' || pathname === '/select-role') {
-    return ROLE_SELECT_PATH;
+  if (
+    pathname === '/onboarding' ||
+    pathname === '/select-role' ||
+    pathname.startsWith('/onboarding/')
+  ) {
+    return POST_AUTH_HOME;
   }
   return null;
 }
@@ -136,29 +141,58 @@ export function shouldApplyRequestCookie(name: string, value: string) {
   return !isSupabaseAuthCookieName(name);
 }
 
+type ExpireCookieStore = {
+  set: (
+    name: string,
+    value: string,
+    options: {
+      path: string;
+      maxAge: number;
+      sameSite: 'lax';
+      secure?: boolean;
+      domain?: string;
+    },
+  ) => void;
+};
+
+export function expireNamedCookie(
+  store: ExpireCookieStore,
+  name: string,
+  defaults: { secure?: boolean; hostname?: string | null } = {},
+) {
+  const base = {
+    path: '/',
+    maxAge: 0,
+    sameSite: 'lax' as const,
+    ...(defaults.secure ? { secure: true } : {}),
+  };
+  store.set(name, '', base);
+  const domain = authCookieDomain(defaults.hostname);
+  if (domain) {
+    store.set(name, '', { ...base, domain });
+  }
+}
+
+export function expireNamedCookies(
+  store: ExpireCookieStore,
+  names: Iterable<string>,
+  defaults: { secure?: boolean; hostname?: string | null } = {},
+) {
+  for (const name of names) {
+    expireNamedCookie(store, name, defaults);
+  }
+}
+
 export function expirePkceVerifierCookies(
   request: { cookies: { getAll: () => Array<{ name: string }> } },
-  response: {
-    cookies: {
-      set: (
-        name: string,
-        value: string,
-        options: { path: string; maxAge: number; sameSite: 'lax'; secure?: boolean },
-      ) => void;
-    };
-  },
-  defaults: { secure?: boolean } = {},
+  response: { cookies: ExpireCookieStore },
+  defaults: { secure?: boolean; hostname?: string | null } = {},
 ) {
   for (const cookie of request.cookies.getAll()) {
     if (!isPkceVerifierCookieName(cookie.name)) {
       continue;
     }
-    response.cookies.set(cookie.name, '', {
-      path: '/',
-      maxAge: 0,
-      sameSite: 'lax',
-      ...(defaults.secure ? { secure: true } : {}),
-    });
+    expireNamedCookie(response.cookies, cookie.name, defaults);
   }
 }
 
@@ -169,37 +203,26 @@ export function isAuthDebrisCookieName(name: string) {
   return name === LEGACY_PENDING_MERGE_COOKIE;
 }
 
-export function sessionCookieOptions(secure?: boolean) {
+export function sessionCookieOptions(secure?: boolean, hostname?: string | null) {
+  const domain = authCookieDomain(hostname);
   return {
     path: '/' as const,
     sameSite: 'lax' as const,
     maxAge: AUTH_COOKIE_MAX_AGE,
     ...(typeof secure === 'boolean' ? { secure } : {}),
+    ...(domain ? { domain } : {}),
   };
 }
 
 export function expireAuthDebrisCookies(
   request: { cookies: { getAll: () => Array<{ name: string }> } },
-  response: {
-    cookies: {
-      set: (
-        name: string,
-        value: string,
-        options: { path: string; maxAge: number; sameSite: 'lax'; secure?: boolean },
-      ) => void;
-    };
-  },
-  defaults: { secure?: boolean } = {},
+  response: { cookies: ExpireCookieStore },
+  defaults: { secure?: boolean; hostname?: string | null } = {},
 ) {
   for (const cookie of request.cookies.getAll()) {
     if (!isAuthDebrisCookieName(cookie.name)) {
       continue;
     }
-    response.cookies.set(cookie.name, '', {
-      path: '/',
-      maxAge: 0,
-      sameSite: 'lax',
-      ...(defaults.secure ? { secure: true } : {}),
-    });
+    expireNamedCookie(response.cookies, cookie.name, defaults);
   }
 }

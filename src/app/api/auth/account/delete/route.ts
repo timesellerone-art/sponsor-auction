@@ -46,7 +46,10 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({ data: { deleted: true } }, { headers: NO_STORE });
     expireAuthDebrisCookies(request, response);
-    applyAuthCookies(response.cookies, { present: false });
+    applyAuthCookies(response.cookies, {
+      present: false,
+      hostname: request.headers.get('x-forwarded-host') || request.headers.get('host'),
+    });
     return response;
   } catch (error) {
     console.warn('[SponsorAuction] 회원 탈퇴 예외', error);

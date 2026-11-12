@@ -160,6 +160,7 @@ export async function POST(request: Request) {
       present: true,
       roles: profileRoles,
       activeRole: currentMode,
+      hostname: request.headers.get('x-forwarded-host') || request.headers.get('host'),
     });
     return response;
   } catch (error) {

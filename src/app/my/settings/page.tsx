@@ -5,11 +5,9 @@ import { LinkedAccountsPanel } from '@/components/LinkedAccountsPanel';
 import { MyWorkspaceNav } from '@/components/MyWorkspaceNav';
 import { PageContainer } from '@/components/PageContainer';
 
-const SETTINGS_ROLES = ['advertiser', 'creator'] as const;
-
 export default function AccountSettingsPage() {
   return (
-    <AccessGuard allow={SETTINGS_ROLES}>
+    <AccessGuard allow="signed-in">
       <PageContainer className="flex min-w-0 flex-1 flex-col py-6 sm:py-10">
         <MyWorkspaceNav current="settings" />
         <p className="mt-6 text-sm font-semibold tracking-wide text-clink-accent">계정</p>

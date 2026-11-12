@@ -8,6 +8,7 @@ export interface SessionUser {
   id: string;
   email: string;
   name: string;
+  phone?: string | null;
   role: AuthProfileRole | null;
   roles?: AuthProfileRole[];
   createdAt?: string;

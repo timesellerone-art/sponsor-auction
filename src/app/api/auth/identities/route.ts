@@ -34,7 +34,11 @@ export async function GET(request: Request) {
       {
         data: {
           id: user.id,
+          name:
+            (typeof user.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
+            null,
           email: user.email ?? null,
+          phone: user.phone ?? null,
           accounts: listLinkedAccountStatuses(user),
         },
       },

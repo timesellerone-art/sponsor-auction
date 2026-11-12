@@ -2,6 +2,7 @@ import { ACCESS_REASON, type AccessReason } from '@/lib/access';
 import { parseAuthRoles } from '@/types/auth';
 
 export const ROLE_SELECT_PATH = '/onboarding/role-select';
+export const POST_AUTH_HOME = '/';
 
 export function sanitizeNextPath(value: string | null | undefined) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) {
@@ -105,7 +106,7 @@ function canFollowNextPath(roles: ReturnType<typeof parseAuthRoles>, next: strin
   if (next === '/admin' || next.startsWith('/admin/')) {
     return roles.includes('admin');
   }
-  if (next === '/my' || next.startsWith('/my/') || next.startsWith('/payments')) {
+  if (next.startsWith('/payments')) {
     return (
       roles.includes('advertiser') ||
       roles.includes('creator') ||
@@ -118,25 +119,12 @@ function canFollowNextPath(roles: ReturnType<typeof parseAuthRoles>, next: strin
 export function postAuthPath(role: unknown, nextPath?: string | null) {
   const next = sanitizeNextPath(nextPath);
   const roles = parseAuthRoles(role);
-  if (roles.length === 0) {
-    return ROLE_SELECT_PATH;
-  }
   if (next && canFollowNextPath(roles, next)) {
     return next;
   }
-  if (roles.includes('admin')) {
-    return '/admin';
-  }
-  return '/my';
+  return POST_AUTH_HOME;
 }
 
-export function postSocialAuthPath(
-  role: unknown,
-  nextPath?: string | null,
-  options?: { needsOnboarding?: boolean },
-) {
-  if (options?.needsOnboarding) {
-    return ROLE_SELECT_PATH;
-  }
+export function postSocialAuthPath(role: unknown, nextPath?: string | null) {
   return postAuthPath(role, nextPath);
 }

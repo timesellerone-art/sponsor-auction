@@ -19,7 +19,12 @@ import { authRequestInit } from '@/lib/auth-request';
 import { cn } from '@/lib/utils';
 
 type AccountsResponse = {
-  data?: { accounts?: LinkedAccountStatus[] };
+  data?: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    accounts?: LinkedAccountStatus[];
+  };
   error?: string;
 };
 
@@ -97,6 +102,7 @@ export function LinkedAccountsPanel() {
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [phone, setPhone] = useState('');
   const [phoneBusy, setPhoneBusy] = useState(false);
+  const [profilePhone, setProfilePhone] = useState<string | null>(null);
 
   const loadAccounts = useCallback(async () => {
     if (!ready) {
@@ -109,6 +115,7 @@ export function LinkedAccountsPanel() {
     }
     if (isDemoAccountEmail(user.email)) {
       setAccounts(listLinkedAccountStatuses(null));
+      setProfilePhone(user.phone || null);
       setLoading(false);
       return;
     }
@@ -128,7 +135,12 @@ export function LinkedAccountsPanel() {
       if (!response.ok) {
         throw new Error(payload?.error || '연동 계정을 불러오지 못했습니다.');
       }
-      setAccounts(Array.isArray(payload?.data?.accounts) ? payload.data.accounts : []);
+      const accounts = Array.isArray(payload?.data?.accounts) ? payload.data.accounts : [];
+      setAccounts(accounts);
+      const linkedPhone = accounts.find(
+        (account) => account.provider === 'phone' && account.linked,
+      )?.hint;
+      setProfilePhone(payload?.data?.phone || linkedPhone || user.phone || null);
     } catch (error) {
       console.warn('[SponsorAuction] 연동 계정 조회 실패', error);
       showToast(error instanceof Error ? error.message : '연동 계정을 불러오지 못했습니다.');
@@ -252,6 +264,30 @@ export function LinkedAccountsPanel() {
   return (
     <div className="mt-8 flex min-w-0 flex-1 flex-col">
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
+        <h2 className="text-lg font-bold text-zinc-950">회원 정보</h2>
+        <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl bg-zinc-50 px-4 py-3">
+            <dt className="text-xs font-medium text-zinc-500">회원이름</dt>
+            <dd className="mt-1 truncate text-sm font-semibold text-zinc-950">
+              {user?.name || '미등록'}
+            </dd>
+          </div>
+          <div className="rounded-xl bg-zinc-50 px-4 py-3">
+            <dt className="text-xs font-medium text-zinc-500">이메일</dt>
+            <dd className="mt-1 truncate text-sm font-semibold text-zinc-950">
+              {user?.email || '미등록'}
+            </dd>
+          </div>
+          <div className="rounded-xl bg-zinc-50 px-4 py-3">
+            <dt className="text-xs font-medium text-zinc-500">휴대전화번호</dt>
+            <dd className="mt-1 truncate text-sm font-semibold text-zinc-950">
+              {profilePhone || user?.phone || '미등록'}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="mt-4 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
         <h2 className="text-lg font-bold text-zinc-950">연동된 계정</h2>
         <p className="mt-1 text-sm text-zinc-500">
           Google, Kakao, Naver, Phone 연동 상태를 확인하고 추가로 연결하거나 해제할 수 있습니다.
