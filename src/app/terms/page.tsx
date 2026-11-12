@@ -1,5 +1,11 @@
 import { LegalDocument, LegalSection } from '@/components/LegalDocument';
 import { COMPANY } from '@/lib/company';
+import {
+  ADVERTISER_FEE_PERCENT,
+  VAT_PERCENT,
+  WITHHOLDING_PERCENT,
+  creatorFeePolicyCopy,
+} from '@/lib/fee-policy';
 
 export default function TermsPage() {
   return (
@@ -54,10 +60,12 @@ export default function TermsPage() {
       </LegalSection>
       <LegalSection title="제6조 (수수료 및 결제)">
         <p>
-          낙찰 시 광고주는 제안 금액에 안전결제 수수료(10%)를 더한 금액을 결제합니다.
-          크리에이터 정산액은 제안 금액에서 통합 수수료(20%, PG·간편 결제·플랫폼 포함)를 제외한 금액입니다. 결제
-          승인이 완료되기 전에는 낙찰이 확정되지 않습니다. 결제는 토스페이먼츠 등 전자지급결제
-          대행사를 통해 처리됩니다.
+          낙찰 시 광고주는 제안 금액에 광고주 수수료({ADVERTISER_FEE_PERCENT}%)를 합산한 금액을
+          결제합니다. 크리에이터 정산액은 제안 금액에서 구간별 수수료({creatorFeePolicyCopy(', ')})를
+          제외한 금액입니다. 개인 크리에이터는 사업소득 {WITHHOLDING_PERCENT}% 원천징수가 안내되며,
+          사업자 크리에이터는 VAT {VAT_PERCENT}%를 세금계산서로 별도 발행합니다. 결제 승인이 완료되기
+          전에는 낙찰이 확정되지 않습니다. 결제는 토스페이먼츠 등 전자지급결제 대행사를 통해
+          처리됩니다.
         </p>
       </LegalSection>
       <LegalSection title="제7조 (회원의 의무)">

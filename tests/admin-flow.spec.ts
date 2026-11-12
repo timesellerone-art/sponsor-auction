@@ -204,9 +204,9 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await page.getByRole('button', { name: '세무 상세' }).first().click();
     const taxDialog = page.getByRole('dialog', { name: '세무 내역' });
     await expect(taxDialog).toBeVisible();
-    await expect(taxDialog.getByText('공급가액')).toBeVisible();
-    await expect(taxDialog.getByText('부가세(10%)')).toBeVisible();
-    await expect(taxDialog.getByText('3.3% 공제액')).toBeVisible();
+    await expect(taxDialog.getByText('낙찰 금액')).toBeVisible();
+    await expect(taxDialog.getByText('사업자 부가세(10% 별도)')).toBeVisible();
+    await expect(taxDialog.getByText('개인 원천징수(3.3%)')).toBeVisible();
     await expect(taxDialog.getByText('최종 실지급액')).toBeVisible();
     await taxDialog.getByRole('button', { name: '닫기' }).click();
     await expect(page.getByText('민지쇼츠').first()).toBeVisible();

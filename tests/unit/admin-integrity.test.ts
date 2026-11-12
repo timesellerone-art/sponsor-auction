@@ -8,7 +8,7 @@ import {
   creatorCombinedFeeAmount,
   creatorPayoutAmount,
   floorToTenWon,
-  PLATFORM_NET_RATE,
+  platformFeeFromAmount,
   platformNetFeeFromBid,
 } from '../../src/lib/fees';
 import type { PayoutItem } from '../../src/types/admin';
@@ -54,12 +54,12 @@ describe('관리자 정산 정합성', () => {
     assert.equal(floorToTenWon(0), 0);
   });
 
-  it('플랫폼 순수익은 입찰가의 26.7%를 10원 단위로 절사한다', () => {
-    assert.equal(platformNetFeeFromBid(10_000), floorToTenWon(10_000 * PLATFORM_NET_RATE));
-    assert.equal(platformNetFeeFromBid(980_000), floorToTenWon(980_000 * PLATFORM_NET_RATE));
+  it('플랫폼 순수익은 광고주 15%와 크리에이터 구간 수수료 합을 10원 단위로 절사한다', () => {
+    assert.equal(platformNetFeeFromBid(10_000), floorToTenWon(platformFeeFromAmount(10_000)));
+    assert.equal(platformNetFeeFromBid(980_000), floorToTenWon(platformFeeFromAmount(980_000)));
   });
 
-  it('최종 정산액은 크리에이터 20% 통합 공제와 같다', () => {
+  it('최종 정산액은 크리에이터 구간 수수료 공제와 같다', () => {
     const [row] = applyAdminPayoutIntegrity([basePayout], [auction('active')]);
     assert.equal(row.netPayoutAmount, creatorPayoutAmount(980_000));
     assert.equal(row.platformFee, creatorCombinedFeeAmount(980_000));

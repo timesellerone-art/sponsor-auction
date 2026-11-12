@@ -1,3 +1,5 @@
+import { ADVERTISER_FEE_PERCENT, creatorFeePolicyCopy } from '@/lib/fee-policy';
+
 export type LandingAudience = 'advertiser' | 'creator';
 
 export const LANDING_ROLE_TABS = [
@@ -37,7 +39,7 @@ export const LANDING_GUIDE = {
       {
         step: 'STEP 03',
         title: '토스페이먼츠 결제 & 콘텐츠 발행',
-        body: '매칭 확정 후 토스페이먼츠로 간편 결제하고 콘텐츠 제작 결과를 확인합니다.',
+        body: `매칭 확정 후 낙찰 금액에 광고주 수수료 ${ADVERTISER_FEE_PERCENT}%를 합산해 토스페이먼츠로 결제하고 콘텐츠 제작 결과를 확인합니다.`,
       },
     ],
     cta: '캠페인 등록하기',
@@ -58,7 +60,7 @@ export const LANDING_GUIDE = {
       {
         step: 'STEP 03',
         title: '콘텐츠 업로드 & 수익 정산',
-        body: '콘텐츠 업로드 및 검수 완료 후 확정된 캠페인 보상금을 정산받습니다.',
+        body: `콘텐츠 업로드 및 검수 완료 후, 제안 금액에서 구간별 수수료(${creatorFeePolicyCopy(' / ')})를 공제한 금액을 정산받습니다.`,
       },
     ],
     cta: '진행 중인 캠페인 보기',

@@ -232,7 +232,7 @@ export function AdminBidTable({
                     </td>
                     <td
                       className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600"
-                      title={`크리에이터 공제 20% ${formatWon(creatorFee)} · 플랫폼 순수익 26.7% ${formatWon(platformNet)}`}
+                      title={`크리에이터 구간 수수료 ${formatWon(creatorFee)} · 플랫폼 수수료 합산 ${formatWon(platformNet)}`}
                     >
                       <span className="block truncate">{formatWon(platformNet)}</span>
                       <span className="block truncate text-[10px] text-zinc-400">

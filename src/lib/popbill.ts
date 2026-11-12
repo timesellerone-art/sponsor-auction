@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { describeSettlementTax } from '@/lib/tax';
+import { describeSettlementTax, splitAdvertiserInvoiceFromTotal } from '@/lib/tax';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export type TaxInvoiceIssueInput = {
@@ -112,6 +112,7 @@ export async function issueTaxInvoice(
   input: TaxInvoiceIssueInput,
 ): Promise<TaxInvoiceIssueResult> {
   const tax = describeSettlementTax(input.bidAmount);
+  const advertiserInvoice = splitAdvertiserInvoiceFromTotal(tax.advertiser.totalAmount);
   const mgtKey = makeMgtKey(input);
   const secret = popbillSecret();
   const linkId = popbillLinkId();
@@ -119,8 +120,8 @@ export async function issueTaxInvoice(
   const baseLog = {
     createdAt: new Date().toISOString(),
     input,
-    supplyAmount: tax.advertiser.supplyAmount,
-    vatAmount: tax.advertiser.vatAmount,
+    supplyAmount: advertiserInvoice.supplyAmount,
+    vatAmount: advertiserInvoice.vatAmount,
     withholdingAmount: tax.creator.withholdingAmount,
     netPayout: tax.creator.netPayout,
     mgtKey,
@@ -163,8 +164,8 @@ export async function issueTaxInvoice(
     };
     console.info('[SponsorAuction] 팝빌 키 없음, 세금계산서 fallback', {
       mgtKey,
-      supplyAmount: tax.advertiser.supplyAmount,
-      vatAmount: tax.advertiser.vatAmount,
+      supplyAmount: advertiserInvoice.supplyAmount,
+      vatAmount: advertiserInvoice.vatAmount,
       withholdingAmount: tax.creator.withholdingAmount,
       netPayout: tax.creator.netPayout,
     });
@@ -188,9 +189,9 @@ export async function issueTaxInvoice(
         invoicerCorpName: 'SponsorAuction',
         invoiceeCorpName: input.buyerName || '광고주',
         invoiceeEmail: input.buyerEmail || '',
-        supplyCostTotal: String(tax.advertiser.supplyAmount),
-        taxTotal: String(tax.advertiser.vatAmount),
-        totalAmount: String(tax.advertiser.totalAmount),
+        supplyCostTotal: String(advertiserInvoice.supplyAmount),
+        taxTotal: String(advertiserInvoice.vatAmount),
+        totalAmount: String(advertiserInvoice.totalAmount),
         itemName: input.itemName || '스폰서십 캠페인',
         remark1: `withholding=${tax.creator.withholdingAmount}`,
       }),

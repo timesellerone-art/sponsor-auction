@@ -87,7 +87,7 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
 
     const paymentDialog = page.getByRole('dialog', { name: '안전결제' });
     await expect(paymentDialog).toBeVisible();
-    await expect(paymentDialog.getByText('기존 광고 대행사(마크업 25%) 대비 약 15% 절감')).toBeVisible();
+    await expect(paymentDialog.getByText('광고주 수수료 15%')).toBeVisible();
     await paymentDialog
       .getByRole('checkbox', { name: '구매 조건 확인 및 환불 규정에 동의합니다' })
       .check();

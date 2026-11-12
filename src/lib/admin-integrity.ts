@@ -66,7 +66,7 @@ export function enrichPayoutAmounts(item: PayoutItem, bids: BidRef[] = []): Payo
     platformNetFee: platformNetFeeFromBid(bidAmount),
     advertiserCharge: floorToTenWon(advertiserPayableAmount(bidAmount)),
     supplyAmount: floorToTenWon(tax.advertiser.supplyAmount),
-    vatAmount: floorToTenWon(tax.advertiser.vatAmount),
+    vatAmount: floorToTenWon(tax.creator.businessVatAmount),
     withholdingAmount: floorToTenWon(tax.creator.withholdingAmount),
     netPayoutAmount,
     amount:

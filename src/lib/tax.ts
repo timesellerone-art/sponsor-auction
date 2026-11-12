@@ -1,7 +1,15 @@
-import { CREATOR_FEE_RATE, creatorPayoutAmount } from './fees';
+import {
+  VAT_RATE,
+  WITHHOLDING_RATE,
+  advertiserPayableAmount,
+  creatorBusinessVatAmount,
+  creatorIndividualNetAmount,
+  creatorPlatformFeeAmount,
+  creatorPayoutAmount,
+  creatorWithholdingAmount,
+} from '@/lib/fee-policy';
 
-export const VAT_RATE = 0.1;
-export const WITHHOLDING_RATE = 0.033;
+export { VAT_RATE, WITHHOLDING_RATE };
 
 function asWon(value: number) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
@@ -20,7 +28,9 @@ export type CreatorTaxSplit = {
   awardAmount: number;
   platformFee: number;
   withholdingAmount: number;
+  businessVatAmount: number;
   netPayout: number;
+  individualNetPayout: number;
 };
 
 export type SettlementTaxBreakdown = {
@@ -30,11 +40,11 @@ export type SettlementTaxBreakdown = {
 
 export function splitAdvertiserInvoice(bidAmount: number): AdvertiserTaxSplit {
   const supplyAmount = asWon(bidAmount);
-  const vatAmount = asWon(supplyAmount * VAT_RATE);
+  const totalAmount = advertiserPayableAmount(supplyAmount);
   return {
     supplyAmount,
-    vatAmount,
-    totalAmount: supplyAmount + vatAmount,
+    vatAmount: Math.max(0, totalAmount - supplyAmount),
+    totalAmount,
   };
 }
 
@@ -53,14 +63,15 @@ export function splitAdvertiserInvoiceFromTotal(totalAmount: number): Advertiser
 
 export function splitCreatorSettlement(bidAmount: number): CreatorTaxSplit {
   const awardAmount = asWon(bidAmount);
-  const platformFee = asWon(awardAmount * CREATOR_FEE_RATE);
-  const withholdingAmount = asWon(awardAmount * WITHHOLDING_RATE);
+  const platformFee = creatorPlatformFeeAmount(awardAmount);
   const netPayout = creatorPayoutAmount(awardAmount);
   return {
     awardAmount,
     platformFee,
-    withholdingAmount,
+    withholdingAmount: creatorWithholdingAmount(awardAmount),
+    businessVatAmount: creatorBusinessVatAmount(awardAmount),
     netPayout,
+    individualNetPayout: creatorIndividualNetAmount(awardAmount),
   };
 }
 

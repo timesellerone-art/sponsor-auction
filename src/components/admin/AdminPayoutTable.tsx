@@ -15,6 +15,7 @@ import {
   filterPayoutsByPeriod,
   summarizePayouts,
 } from '@/lib/payout-stats';
+import { WITHHOLDING_PERCENT } from '@/lib/fee-policy';
 import { applyPaidPayoutLocal } from '@/lib/payouts';
 import { formatAdminTimestamp, formatWon } from '@/lib/utils';
 import type {
@@ -366,7 +367,7 @@ export function AdminPayoutTable({
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">처리 일시</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">공급가액</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">부가세</th>
-                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">3.3% 공제액</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">{WITHHOLDING_PERCENT}% 공제액</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">최종 정산액</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">수수료(공제액)</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">실지급액</th>

@@ -7,6 +7,7 @@ import { RealtimeNotifications } from '@/components/RealtimeNotifications';
 import { RoleIntentProvider } from '@/components/RoleIntentProvider';
 import { RoleRouteGuard } from '@/components/RoleRouteGuard';
 import { SiteFooter } from '@/components/SiteFooter';
+import { AiSupportWidget } from '@/components/support/AiSupportWidget';
 import { ToastHost } from '@/components/Toast';
 import './globals.css';
 
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
                 {children}
               </main>
               <SiteFooter />
+              <AiSupportWidget />
               <ToastHost />
               <AccessReasonToast />
             </RoleRouteGuard>

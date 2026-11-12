@@ -20,7 +20,7 @@ function payout(partial: Partial<PayoutItem> & Pick<PayoutItem, 'id' | 'status'>
     creatorId: 'usr-test',
     creatorName: '테스트 크리에이터',
     creatorEmail: 'creator@demo.com',
-    amount: 8_000,
+    amount: 8_800,
     auctionTitle: '테스트 캠페인',
     requestedAt: '2026-11-09T00:00:00+09:00',
     bidAmount: 10_000,
@@ -56,7 +56,7 @@ describe('계좌번호 정규화', () => {
 });
 
 describe('실정산액 10원 절사', () => {
-  it('20% 공제 후 10원 단위 절사가 payout.ts와 일치한다', () => {
+  it('구간 수수료 공제 후 10원 단위 절사가 payout.ts와 일치한다', () => {
     for (const bid of [10_000, 12_345, 33_333, 980_000, 1_234_567]) {
       const item = payout({
         id: `payout-${bid}`,
@@ -76,8 +76,8 @@ describe('실정산액 10원 절사', () => {
       bidAmount: 333,
       amount: calculateCreatorPayout(333),
     });
-    assert.equal(calculateCreatorPayout(333), 266);
-    assert.equal(transferPayoutAmount(item), 260);
+    assert.equal(calculateCreatorPayout(333), 293);
+    assert.equal(transferPayoutAmount(item), 290);
   });
 });
 
@@ -132,7 +132,7 @@ describe('대량이체 대상 필터', () => {
     );
     assert.equal(rows[0]?.bankName === '신한은행' || rows[1]?.bankName === '신한은행', true);
     assert.equal(
-      rows.every((item) => item.accountNumber === '110123456789' && item.amount === 8_000),
+      rows.every((item) => item.accountNumber === '110123456789' && item.amount === 8_800),
       true,
     );
     assert.deepEqual(

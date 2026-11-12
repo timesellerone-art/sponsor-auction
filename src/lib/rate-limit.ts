@@ -57,8 +57,24 @@ export function shouldRateLimitPath(pathname: string) {
     pathname.startsWith('/api/auth/account') ||
     pathname.startsWith('/api/auth/logout') ||
     pathname.startsWith('/api/onboarding') ||
-    pathname.startsWith('/api/webhooks')
+    pathname.startsWith('/api/webhooks') ||
+    pathname.startsWith('/api/support-chat') ||
+    pathname.startsWith('/api/support-ticket')
   );
+}
+
+export function consumeKeyedRateLimit(key: string, max: number, windowMs = WINDOW_MS) {
+  const now = Date.now();
+  const windowStart = now - windowMs;
+  const recent = (hits.get(key) ?? []).filter((stamp) => stamp > windowStart);
+  if (recent.length >= max) {
+    hits.set(key, recent);
+    const retryAfter = Math.max(1, Math.ceil(((recent[0] ?? now) + windowMs - now) / 1000));
+    return { allowed: false as const, retryAfter };
+  }
+  recent.push(now);
+  hits.set(key, recent);
+  return { allowed: true as const, retryAfter: 0 };
 }
 
 export function consumeRateLimit(ip: string, pathname: string) {

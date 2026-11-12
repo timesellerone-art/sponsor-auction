@@ -445,6 +445,32 @@ export type Database = {
         };
         Relationships: [];
       };
+      support_tickets: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          name: string;
+          email: string;
+          category: 'payment' | 'auction' | 'account' | 'other';
+          message: string;
+          status: 'open' | 'closed';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          name: string;
+          email: string;
+          category: 'payment' | 'auction' | 'account' | 'other';
+          message: string;
+          status?: 'open' | 'closed';
+          created_at?: string;
+        };
+        Update: {
+          status?: 'open' | 'closed';
+        };
+        Relationships: [];
+      };
       tax_invoice_logs: {
         Row: {
           id: string;

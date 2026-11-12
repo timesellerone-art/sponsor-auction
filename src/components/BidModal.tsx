@@ -14,6 +14,7 @@ import { INSERT_FAIL_MESSAGE, createBid, getAuctionById } from '@/lib/auctions';
 import { isUuid } from '@/lib/uuid';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { rememberMyBid } from '@/lib/my-bids';
+import { creatorFeeShortRatesCopy } from '@/lib/fee-policy';
 import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { getAuctionOwnerId, pushNotification } from '@/lib/notifications';
 import { cn, formatWon } from '@/lib/utils';
@@ -386,8 +387,8 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
             ) : (
               <div className="rounded-xl border border-clink-peach-strong bg-clink-peach px-3 py-3 text-sm text-clink">
                 <p className="text-xs text-clink-accent">
-                  제안 금액을 입력하면 통합 수수료(20%) 공제 후 최종 입금액이 실시간으로
-                  계산됩니다.
+                  제안 금액을 입력하면 구간별 수수료({creatorFeeShortRatesCopy()}) 공제 후
+                  예상 실수령액이 실시간으로 계산됩니다.
                 </p>
               </div>
             )}

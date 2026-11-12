@@ -1,41 +1,25 @@
-export const CREATOR_COMBINED_DEDUCTION_RATE = 0.2;
-
-function asWon(value: number) {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
-    return 0;
-  }
-
-  return Math.round(value);
-}
+import {
+  creatorFeeRate,
+  creatorPlatformFeeAmount,
+  creatorPayoutAmount,
+  bidAmountFromCreatorPayout,
+} from '@/lib/fee-policy';
 
 export function creatorCombinedFeeAmount(bidAmount: number) {
-  const won = asWon(bidAmount);
-  if (won <= 0) {
-    return 0;
-  }
-
-  return Math.round(won * CREATOR_COMBINED_DEDUCTION_RATE);
+  return creatorPlatformFeeAmount(bidAmount);
 }
 
 export function calculateCreatorPayout(bidAmount: number) {
-  const won = asWon(bidAmount);
-  if (won <= 0) {
-    return 0;
-  }
-
-  return Math.max(0, won - creatorCombinedFeeAmount(won));
+  return creatorPayoutAmount(bidAmount);
 }
 
-export function bidAmountFromCreatorPayout(payoutAmount: number) {
-  if (typeof payoutAmount !== 'number' || !Number.isFinite(payoutAmount) || payoutAmount <= 0) {
-    return 0;
-  }
-
-  return Math.round(payoutAmount / (1 - CREATOR_COMBINED_DEDUCTION_RATE));
-}
+export { bidAmountFromCreatorPayout };
 
 export function describeCreatorPayout(bidAmount: number) {
-  const awardAmount = asWon(bidAmount);
+  const awardAmount =
+    typeof bidAmount === 'number' && Number.isFinite(bidAmount) && bidAmount > 0
+      ? Math.round(bidAmount)
+      : 0;
   const combinedFee = creatorCombinedFeeAmount(awardAmount);
   const netPayout = calculateCreatorPayout(awardAmount);
 
@@ -43,6 +27,6 @@ export function describeCreatorPayout(bidAmount: number) {
     awardAmount,
     combinedFee,
     netPayout,
-    rate: CREATOR_COMBINED_DEDUCTION_RATE,
+    rate: creatorFeeRate(awardAmount),
   };
 }

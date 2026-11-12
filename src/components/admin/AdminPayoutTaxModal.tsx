@@ -1,6 +1,11 @@
 'use client';
 
 import { X } from 'lucide-react';
+import {
+  ADVERTISER_FEE_PERCENT,
+  VAT_PERCENT,
+  WITHHOLDING_PERCENT,
+} from '@/lib/fee-policy';
 import { formatWon } from '@/lib/utils';
 import type { PayoutItem } from '@/types/admin';
 
@@ -11,12 +16,11 @@ type AdminPayoutTaxModalProps = {
 
 export function AdminPayoutTaxModal({ payout, onClose }: AdminPayoutTaxModalProps) {
   const rows = [
-    { label: '낙찰(공급) 금액', value: payout.bidAmount ?? 0 },
-    { label: '공급가액', value: payout.supplyAmount ?? 0 },
-    { label: '부가세(10%)', value: payout.vatAmount ?? 0 },
-    { label: '광고주 결제 합계', value: payout.advertiserCharge ?? 0 },
-    { label: '플랫폼 수수료', value: payout.platformFee ?? 0 },
-    { label: '3.3% 공제액', value: payout.withholdingAmount ?? 0 },
+    { label: '낙찰 금액', value: payout.bidAmount ?? 0 },
+    { label: `광고주 결제 합계(${ADVERTISER_FEE_PERCENT}% 합산)`, value: payout.advertiserCharge ?? 0 },
+    { label: '크리에이터 수수료', value: payout.platformFee ?? 0 },
+    { label: `개인 원천징수(${WITHHOLDING_PERCENT}%)`, value: payout.withholdingAmount ?? 0 },
+    { label: `사업자 부가세(${VAT_PERCENT}% 별도)`, value: payout.vatAmount ?? 0 },
     { label: '최종 실지급액', value: payout.netPayoutAmount ?? payout.amount },
   ];
 
