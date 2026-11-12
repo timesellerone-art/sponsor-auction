@@ -48,39 +48,43 @@ export function HomeAiPreview() {
   const report = useMemo(() => buildFallbackReport(active.input), [active]);
 
   return (
-    <section className="border-y border-stone-200/80 bg-white py-16 sm:py-20">
-      <PageContainer>
-        <p className="text-sm font-semibold tracking-wide text-emerald-700">AI 에이전트 가이드</p>
-        <h2 className="mt-3 max-w-3xl text-2xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
-          아이디어 하나면 충분합니다 —{' '}
-          <span className="text-stone-400">AI가 캠페인 기획을 완성합니다</span>
-        </h2>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-stone-500 sm:text-base">
-          캠페인 목적만 고르면 촬영 콘셉트 3가지와 예상 효과가 바로 펼쳐집니다. 상세 페이지에서는
-          Gemini가 실제 캠페인 설명에 맞춰 같은 형식으로 제안합니다.
-        </p>
+    <section className="relative bg-[#FAF8F5] pb-16 sm:pb-20">
+      <div
+        className="h-40 bg-gradient-to-br from-violet-200 via-amber-100 to-emerald-100 sm:h-52"
+        aria-hidden
+      />
+      <PageContainer className="-mt-24">
+        <div className="rounded-[1.75rem] border border-stone-200/80 bg-white px-5 py-8 text-center shadow-sm sm:px-10 sm:py-12">
+          <h2 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
+            아이디어 하나면 충분합니다 — AI가 캠페인 기획을 완성합니다
+          </h2>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-stone-500 sm:text-base">
+            캠페인 목적만 고르면 촬영 콘셉트 3가지와 예상 효과가 바로 펼쳐집니다. 상세 페이지에서는
+            Gemini가 실제 캠페인 설명에 맞춰 같은 형식으로 제안합니다.
+          </p>
 
-        <div className="mt-8 flex flex-wrap gap-2">
-          {TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id)}
-              aria-pressed={tab === item.id}
-              className={cn(
-                'rounded-full px-4 py-2 text-sm font-semibold transition-colors',
-                tab === item.id
-                  ? 'bg-emerald-900 text-white'
-                  : 'bg-[#FAF8F5] text-stone-600 ring-1 ring-stone-200 hover:bg-white',
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 border-b border-stone-200">
+            {TABS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                aria-pressed={tab === item.id}
+                className={cn(
+                  '-mb-px whitespace-nowrap border-b-2 px-1 pb-3 text-sm font-semibold transition-colors',
+                  tab === item.id
+                    ? 'border-stone-900 text-stone-900'
+                    : 'border-transparent text-stone-400 hover:text-stone-700',
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
 
-        <div className="mt-6">
-          <AiAgentGuide report={report} source="ai" />
+          <div className="mt-8 text-left">
+            <AiAgentGuide report={report} source="ai" />
+          </div>
         </div>
       </PageContainer>
     </section>

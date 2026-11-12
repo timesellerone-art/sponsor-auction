@@ -46,7 +46,7 @@ export function NotificationBell() {
     <div className="relative shrink-0">
       <button
         type="button"
-        className="relative inline-flex size-10 items-center justify-center rounded-lg text-zinc-800 hover:bg-zinc-100"
+        className="relative inline-flex size-10 shrink-0 items-center justify-center whitespace-nowrap rounded-lg text-zinc-800 hover:bg-zinc-100"
         aria-label={unread > 0 ? `알림 ${unread}개` : '알림'}
         aria-expanded={open}
         aria-controls={panelId}

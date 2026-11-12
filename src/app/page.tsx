@@ -1,14 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { AuctionBrowseBar } from '@/components/AuctionBrowseBar';
 import { AuctionCard, AuctionCardSkeleton } from '@/components/AuctionCard';
-import { useAuth } from '@/components/AuthProvider';
 import { PageContainer } from '@/components/PageContainer';
 import { HomeAiPreview } from '@/components/home/HomeAiPreview';
 import { HomeDashboardPreview } from '@/components/home/HomeDashboardPreview';
+import { HomeHero } from '@/components/home/HomeHero';
 import { HomeMatchingVisual } from '@/components/home/HomeMatchingVisual';
+import { HomeQuoteBanner } from '@/components/home/HomeQuoteBanner';
+import { HomeInsights } from '@/components/home/HomeInsights';
+import { HomeSplitFeatures } from '@/components/home/HomeSplitFeatures';
 import {
   browseAuctions,
   type BrowsePlatformFilter,
@@ -18,7 +21,6 @@ import { getAuctions } from '@/lib/auctions';
 import type { AuctionItem } from '@/types/auction';
 
 export default function Home() {
-  const { user, ready, canCreateAuction } = useAuth();
   const [auctions, setAuctions] = useState<AuctionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,36 +73,8 @@ export default function Home() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <section className="bg-[#FAF8F5]">
-        <PageContainer className="flex flex-col gap-6 py-14 sm:py-20 lg:py-24">
-          <h1 className="max-w-4xl text-3xl font-semibold tracking-tight sm:text-5xl lg:text-[3.5rem] lg:leading-[1.15]">
-            <span className="block text-stone-900">좋은 브랜드는 광고를 억지로 팔지 않고</span>
-            <span className="mt-2 block text-stone-400">크리에이터와 함께 콘텐츠를 만듭니다.</span>
-          </h1>
-          <p className="max-w-2xl text-sm leading-7 text-stone-500 sm:text-base">
-            Clink는 브랜드와 크리에이터가 기획을 나누고, AI가 콘셉트를 다듬고, 맞는 파트너를
-            연결하는 크리에이터 콘텐츠 매칭 플랫폼입니다.
-          </p>
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
-            <button
-              type="button"
-              disabled={!ready || Boolean(user && !canCreateAuction)}
-              onClick={() => window.dispatchEvent(new Event('create-auction:open'))}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-emerald-900 px-6 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300 sm:w-auto"
-            >
-              캠페인 시작하기
-              <ArrowRight className="size-4" aria-hidden />
-            </button>
-            <a
-              href="#auctions"
-              className="inline-flex h-12 w-full items-center justify-center rounded-full border border-stone-200/80 bg-white px-6 text-sm font-semibold text-stone-800 shadow-sm hover:shadow-md sm:w-auto"
-            >
-              오픈 캠페인 둘러보기
-            </a>
-          </div>
-        </PageContainer>
-      </section>
-
+      <HomeHero />
+      <HomeQuoteBanner />
       <HomeAiPreview />
 
       <PageContainer id="auctions" className="flex-1 py-16 sm:py-20">
@@ -178,8 +152,10 @@ export default function Home() {
         )}
       </PageContainer>
 
+      <HomeSplitFeatures />
       <HomeMatchingVisual />
       <HomeDashboardPreview />
+      <HomeInsights />
     </div>
   );
 }

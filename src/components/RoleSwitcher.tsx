@@ -22,7 +22,7 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
     return (
       <span
         className={cn(
-          'inline-flex h-[30px] w-[12.5rem] shrink-0 rounded-full border border-zinc-200 bg-zinc-50',
+          'inline-flex h-[30px] w-[8.5rem] shrink-0 rounded-full border border-zinc-200 bg-zinc-50',
           className,
         )}
         aria-hidden
@@ -34,7 +34,7 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
     return (
       <span
         className={cn(
-          'inline-flex max-w-[42vw] truncate rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 sm:max-w-none',
+          'inline-flex shrink-0 whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800',
           className,
         )}
       >
@@ -58,26 +58,28 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
       role="group"
       aria-label="역할 전환"
       className={cn(
-        'inline-flex max-w-full min-w-0 overflow-hidden rounded-full border border-zinc-200 bg-zinc-50 p-0.5',
+        'inline-flex shrink-0 overflow-hidden whitespace-nowrap rounded-full border border-stone-200 bg-white p-0.5',
         className,
       )}
     >
       {switchableRoles.map((role) => {
         const selected = role === activeRole;
+        const modeName = memberModeLabel(role);
         return (
           <button
             key={role}
             type="button"
+            aria-label={modeName}
             aria-pressed={selected}
             onClick={() => handleSelect(role)}
             className={cn(
-              'min-w-0 truncate rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap transition-colors',
+              'shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-semibold transition-colors',
               selected
                 ? 'bg-emerald-900 text-white'
-                : 'text-zinc-600 hover:text-zinc-950',
+                : 'text-stone-600 hover:text-stone-950',
             )}
           >
-            {memberRoleLabel(role)} 모드
+            {memberRoleLabel(role)}
           </button>
         );
       })}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Menu, Plus, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { CreateAuctionModal } from '@/components/CreateAuctionModal';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -89,94 +89,89 @@ export function Navbar() {
     router.push('/');
   };
 
+  const navLinkClass =
+    'shrink-0 whitespace-nowrap text-sm font-medium text-stone-600 transition-colors hover:text-stone-950';
+
   return (
-    <header className="sticky top-0 z-50 w-full min-w-0 border-b border-stone-200/70 bg-[#FAF8F5]/80 backdrop-blur-md">
-      <div className="flex h-14 w-full min-w-0 items-center justify-between gap-2 px-4 sm:h-16 sm:px-6">
+    <header className="sticky top-0 z-50 w-full overflow-x-clip border-b border-stone-200/70 bg-[#FAF8F5]/80 backdrop-blur-md">
+      <div className="flex h-14 w-full items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
+        {ready && user ? <span className="sr-only">{user.name}</span> : null}
         <Link
           href="/"
           aria-label="Clink"
-          className="flex min-w-0 items-center gap-2 font-semibold tracking-tight text-stone-900"
+          className="flex shrink-0 items-center gap-2 whitespace-nowrap font-semibold tracking-tight text-stone-900"
           onClick={() => setOpen(false)}
         >
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-sm font-bold text-white">
             C
           </span>
-          <span className="truncate text-[15px] sm:text-lg">Clink</span>
+          <span className="text-[15px] sm:text-lg">Clink</span>
         </Link>
 
-        <nav className="hidden items-center gap-3 md:flex" aria-label="주요">
-          <Link
-            href="/#auctions"
-            className="text-sm font-medium text-stone-600 transition-colors hover:text-stone-950"
-          >
-            오픈 캠페인 둘러보기
+        <nav className="hidden min-w-0 flex-1 items-center gap-5 lg:flex" aria-label="주요">
+          <Link href="/#auctions" className={navLinkClass}>
+            오픈 캠페인
           </Link>
-          <Link
-            href="/inventory"
-            className="text-sm font-medium text-stone-600 transition-colors hover:text-stone-950"
-          >
+          <Link href="/inventory" className={navLinkClass}>
             인벤토리
           </Link>
           {showAdmin ? (
-            <Link
-              href="/admin"
-              className="text-sm font-medium text-stone-600 transition-colors hover:text-stone-950"
-            >
+            <Link href="/admin" className={navLinkClass}>
               관리자
             </Link>
           ) : null}
-          {ready && user ? (
-            <div className="flex min-w-0 items-center gap-2">
-              <RoleSwitcher />
-              <NotificationBell />
-              <span className="max-w-[120px] truncate text-xs text-stone-500">{user.name}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  void handleSignOut();
-                }}
-                className="text-sm font-medium text-stone-600 hover:text-stone-950"
-              >
-                로그아웃
-              </button>
-              {showDashboard ? (
-                <Link
-                  href="/my"
-                  className="inline-flex h-10 items-center rounded-full border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-800 shadow-sm hover:shadow-md"
+
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {ready && user ? (
+              <>
+                <RoleSwitcher />
+                <NotificationBell />
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleSignOut();
+                  }}
+                  className={navLinkClass}
                 >
-                  {dashboardLabel}
-                </Link>
-              ) : null}
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="inline-flex h-10 items-center rounded-full border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-800 shadow-sm hover:shadow-md"
+                  로그아웃
+                </button>
+                {showDashboard ? (
+                  <Link
+                    href="/my"
+                    className="inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-800 shadow-sm hover:shadow-md"
+                  >
+                    {dashboardLabel}
+                  </Link>
+                ) : null}
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-800 shadow-sm hover:shadow-md"
+              >
+                로그인
+              </Link>
+            )}
+            <button
+              type="button"
+              disabled={!ready || Boolean(user && !canCreateAuction)}
+              onClick={requestCreateAuction}
+              className="inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300"
             >
-              로그인
-            </Link>
-          )}
-          <button
-            type="button"
-            disabled={!ready || Boolean(user && !canCreateAuction)}
-            onClick={requestCreateAuction}
-            className="inline-flex h-10 items-center gap-1.5 rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300"
-          >
-            <Plus className="size-4" aria-hidden />
-            캠페인 등록
-          </button>
+              + 캠페인 등록
+            </button>
+          </div>
         </nav>
 
-        <div className="flex min-w-0 shrink-0 items-center gap-1.5 md:hidden">
-          <RoleSwitcher />
+        <div className="flex shrink-0 items-center gap-1.5 lg:hidden">
           <NotificationBell />
           <button
             type="button"
             disabled={!ready || Boolean(user && !canCreateAuction)}
             onClick={requestCreateAuction}
-            className="inline-flex h-9 max-w-[38vw] shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-900 px-3 text-xs font-semibold whitespace-nowrap text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+            className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-emerald-900 px-3 text-xs font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300"
           >
-            캠페인 등록
+            + 캠페인 등록
           </button>
           <button
             type="button"
@@ -194,7 +189,7 @@ export function Navbar() {
       {open ? (
         <button
           type="button"
-          className="fixed inset-0 top-14 z-40 bg-stone-950/30 sm:top-16 md:hidden"
+          className="fixed inset-0 top-14 z-40 bg-stone-950/30 sm:top-16 lg:hidden"
           aria-label="메뉴 닫기"
           onClick={() => setOpen(false)}
         />
@@ -203,21 +198,21 @@ export function Navbar() {
       <div
         id={menuId}
         className={cn(
-          'relative z-50 border-t border-stone-200 bg-[#FAF8F5] md:hidden',
+          'relative z-50 border-t border-stone-200 bg-[#FAF8F5] lg:hidden',
           open ? 'block' : 'hidden',
         )}
       >
         <nav className="flex w-full flex-col gap-1 px-4 py-3" aria-label="모바일">
           <Link
             href="/#auctions"
-            className="rounded-lg px-3 py-3 text-sm font-medium text-stone-800 hover:bg-white"
+            className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
             onClick={() => setOpen(false)}
           >
             오픈 캠페인 둘러보기
           </Link>
           <Link
             href="/inventory"
-            className="rounded-lg px-3 py-3 text-sm font-medium text-stone-800 hover:bg-white"
+            className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
             onClick={() => setOpen(false)}
           >
             인벤토리
@@ -225,7 +220,7 @@ export function Navbar() {
           {showDashboard ? (
             <Link
               href="/my"
-              className="rounded-lg px-3 py-3 text-sm font-medium text-stone-800 hover:bg-white"
+              className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
               onClick={() => setOpen(false)}
             >
               {dashboardLabel}
@@ -234,7 +229,7 @@ export function Navbar() {
           {showAdmin ? (
             <Link
               href="/admin"
-              className="rounded-lg px-3 py-3 text-sm font-medium text-stone-800 hover:bg-white"
+              className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
               onClick={() => setOpen(false)}
             >
               관리자
@@ -247,7 +242,7 @@ export function Navbar() {
               </div>
               <button
                 type="button"
-                className="rounded-lg px-3 py-3 text-left text-sm font-medium text-stone-800 hover:bg-white"
+                className="rounded-lg px-3 py-3 text-left text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
                 onClick={() => {
                   void handleSignOut();
                 }}
@@ -258,7 +253,7 @@ export function Navbar() {
           ) : (
             <Link
               href="/login"
-              className="rounded-lg px-3 py-3 text-sm font-medium text-stone-800 hover:bg-white"
+              className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
               onClick={() => setOpen(false)}
             >
               로그인
@@ -266,7 +261,7 @@ export function Navbar() {
           )}
           <button
             type="button"
-            className="rounded-lg px-3 py-3 text-left text-sm font-medium text-stone-800 hover:bg-white disabled:text-stone-400"
+            className="rounded-lg px-3 py-3 text-left text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white disabled:text-stone-400"
             disabled={!ready || Boolean(user && !canCreateAuction)}
             onClick={requestCreateAuction}
           >

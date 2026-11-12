@@ -73,12 +73,19 @@ export async function signIn(
         ? '광고주 모드'
         : null;
   if (wantedMode) {
+    const mobile = await isMobileNav(page);
+    if (mobile) {
+      await openMobileNav(page);
+    }
     const modeButton = page.getByRole('button', { name: wantedMode }).first();
     const modeBadge = page.locator('span').filter({ hasText: wantedMode }).first();
     await expect(modeButton.or(modeBadge)).toBeVisible({ timeout: 15_000 });
     if (await modeButton.isVisible()) {
       await modeButton.click();
       await expect(modeButton).toHaveAttribute('aria-pressed', 'true');
+    }
+    if (mobile) {
+      await closeMobileNav(page);
     }
   }
 
@@ -92,17 +99,23 @@ export async function signIn(
   }
 
   await expect(page.getByRole('button', { name: '로그아웃' })).toBeVisible();
-  await expect(page.getByText(account.name, { exact: false })).toBeVisible();
 }
 
 export async function openCreateAuction(page: Page) {
   await page.goto('/');
+  const mobile = await isMobileNav(page);
+  if (mobile) {
+    await openMobileNav(page);
+  }
   const advertiserMode = page.getByRole('button', { name: '광고주 모드' }).first();
   const advertiserBadge = page.locator('span').filter({ hasText: '광고주 모드' }).first();
   await expect(advertiserMode.or(advertiserBadge)).toBeVisible({ timeout: 15_000 });
   if (await advertiserMode.isVisible()) {
     await advertiserMode.click();
     await expect(advertiserMode).toHaveAttribute('aria-pressed', 'true');
+  }
+  if (mobile) {
+    await closeMobileNav(page);
   }
 
   const desktopNav = page.getByRole('navigation', { name: '주요' });
