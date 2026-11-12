@@ -61,7 +61,7 @@ function TimeslotBidForm({
       }
       const bidAmount = Number(amount);
       if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
-        setError(`입찰가는 ${formatWon(minBid)} 이상이어야 합니다.`);
+        setError(`제안가는 ${formatWon(minBid)} 이상이어야 합니다.`);
         return;
       }
       if (message.trim().length < MIN_PROPOSAL_LENGTH) {
@@ -98,7 +98,7 @@ function TimeslotBidForm({
         } else {
           result = {
             data: null,
-            error: json?.errorMessage ?? json?.error ?? '입찰을 등록하지 못했습니다.',
+            error: json?.errorMessage ?? json?.error ?? '제안을 등록하지 못했습니다.',
           };
         }
       } catch {
@@ -110,7 +110,7 @@ function TimeslotBidForm({
         showToast(result.error);
         return;
       }
-      showToast('입찰을 등록했습니다.', 'success');
+      showToast('제안을 등록했습니다.', 'success');
       window.dispatchEvent(new Event('timeslots:changed'));
       onClose();
     });
@@ -126,7 +126,7 @@ function TimeslotBidForm({
       >
         <div className="flex items-center justify-between">
           <h2 id={titleId} className="text-base font-bold text-zinc-950">
-            인벤토리 입찰
+            인벤토리 제안
           </h2>
           <button type="button" onClick={onClose} className="rounded-lg p-1 hover:bg-zinc-100">
             <X className="size-5" />
@@ -140,7 +140,7 @@ function TimeslotBidForm({
           <EscrowNotice compact />
         </div>
         <label className="mt-4 block text-sm font-medium text-zinc-800" htmlFor="slot-bid-amount">
-          입찰가
+          제안가
         </label>
         <input
           id="slot-bid-amount"
@@ -167,10 +167,10 @@ function TimeslotBidForm({
         <button
           type="submit"
           disabled={isBusy}
-          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-60"
+          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
         >
           {isBusy ? <Loader2 className="size-4 animate-spin" /> : null}
-          입찰하기
+          제안하기
         </button>
       </form>
     </div>,

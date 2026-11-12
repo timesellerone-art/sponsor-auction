@@ -31,7 +31,7 @@ const ROLE_OPTIONS: {
     value: 'creator',
     title: '크리에이터로 시작하기',
     description:
-      '유튜브 채널 광고 타임슬롯을 판매하는 사용자입니다. 진행 중인 역경매에 채널과 금액으로 입찰할 수 있습니다.',
+      '유튜브 채널 광고 타임슬롯을 판매하는 사용자입니다. 진행 중인 오픈 캠페인에 채널과 금액으로 콘텐츠를 제안할 수 있습니다.',
     icon: Clapperboard,
   },
 ];
@@ -80,7 +80,7 @@ export function RoleOnboarding({ name, email, onCompleted }: RoleOnboardingProps
 
   return (
     <div className="mx-auto max-h-[min(100dvh,52rem)] w-full max-w-lg overflow-y-auto">
-      <p className="text-sm font-semibold tracking-wide text-teal-800">시작하기</p>
+      <p className="text-sm font-semibold tracking-wide text-emerald-800">시작하기</p>
       <h1 className="mt-1 text-2xl font-bold text-zinc-950">{name}님, 역할을 선택해 주세요</h1>
       <p className="mt-2 text-sm text-zinc-500">
         대표 이메일이나 전화번호가 기존 계정과 같으면 추가 로그인 없이 바로 하나로 합쳐집니다.
@@ -94,7 +94,7 @@ export function RoleOnboarding({ name, email, onCompleted }: RoleOnboardingProps
             autoComplete="email"
             value={contactEmail}
             onChange={(event) => setContactEmail(event.target.value)}
-            className="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm text-zinc-950 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+            className="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm text-zinc-950 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
             placeholder="name@example.com"
           />
         </label>
@@ -107,7 +107,7 @@ export function RoleOnboarding({ name, email, onCompleted }: RoleOnboardingProps
             autoComplete="tel"
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
-            className="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm text-zinc-950 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+            className="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm text-zinc-950 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
             placeholder="01012345678"
           />
         </label>
@@ -126,10 +126,10 @@ export function RoleOnboarding({ name, email, onCompleted }: RoleOnboardingProps
                 void handleChoose(option.value);
               }}
               className={cn(
-                'flex w-full min-w-0 items-start gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-left hover:border-teal-600 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-60',
+                'flex w-full min-w-0 items-start gap-3 rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-left hover:border-emerald-600 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60',
               )}
             >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-800">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-800">
                 {submitting ? (
                   <Loader2 className="size-5 animate-spin" aria-hidden />
                 ) : (

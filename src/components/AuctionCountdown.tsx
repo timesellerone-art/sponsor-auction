@@ -35,7 +35,7 @@ export function AuctionCountdown({
       )}
     >
       <Clock className="size-3.5 shrink-0" aria-hidden />
-      {expired ? '마감됨' : `남은 시간 ${label}`}
+      {expired ? '모집 마감' : `남은 시간 ${label}`}
     </span>
   );
 }

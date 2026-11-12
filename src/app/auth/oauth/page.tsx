@@ -180,7 +180,7 @@ export default function AuthOAuthCompletePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-16">
-      <Loader2 className="size-6 animate-spin text-teal-700" aria-hidden />
+      <Loader2 className="size-6 animate-spin text-emerald-800" aria-hidden />
       <p className="mt-4 text-sm text-zinc-600">
         {failed ? '로그인 화면으로 이동합니다...' : '로그인 정보를 확인하고 있습니다...'}
       </p>

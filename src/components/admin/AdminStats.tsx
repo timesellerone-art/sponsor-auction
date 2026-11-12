@@ -20,13 +20,13 @@ export function AdminStats({
   const memberTotal = advertiserCount + creatorCount;
   const cards = [
     {
-      label: '총 역경매 수',
+      label: '총 캠페인 수',
       value: numberFormatter.format(auctionCount),
       hint: `진행 중 ${numberFormatter.format(activeAuctionCount)}건`,
       icon: Gavel,
     },
     {
-      label: '진행 중인 역경매 수',
+      label: '진행 중인 캠페인 수',
       value: numberFormatter.format(activeAuctionCount),
       hint: '블라인드되지 않은 진행중 캠페인',
       icon: PlayCircle,
@@ -56,7 +56,7 @@ export function AdminStats({
             <p className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-500" title={card.label}>
               {card.label}
             </p>
-            <card.icon className="size-4 shrink-0 text-teal-700" aria-hidden />
+            <card.icon className="size-4 shrink-0 text-emerald-800" aria-hidden />
           </div>
           <p className="mt-3 min-w-0 truncate text-xl font-bold tracking-tight text-zinc-950 sm:text-2xl" title={card.value}>
             {card.value}

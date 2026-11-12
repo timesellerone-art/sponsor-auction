@@ -34,7 +34,7 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
     return (
       <span
         className={cn(
-          'inline-flex max-w-[42vw] truncate rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-800 sm:max-w-none',
+          'inline-flex max-w-[42vw] truncate rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 sm:max-w-none',
           className,
         )}
       >
@@ -73,7 +73,7 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
             className={cn(
               'min-w-0 truncate rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap transition-colors',
               selected
-                ? 'bg-teal-700 text-white'
+                ? 'bg-emerald-900 text-white'
                 : 'text-zinc-600 hover:text-zinc-950',
             )}
           >

@@ -21,18 +21,18 @@ test.describe('모바일 반응형 UI', () => {
 
   test('모바일에서 역경매 목록과 메뉴가 잘리지 않고 터치된다', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: /광고주는 예산을 올리고/ })).toBeVisible();
-    await expect(page.getByRole('heading', { name: '진행 중인 역경매' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /좋은 브랜드는 광고를 억지로 팔지 않고/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '진행 중인 오픈 캠페인' })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toBeVisible();
 
-    await expectInViewportHorizontally(page.getByRole('link', { name: 'SponsorAuction', exact: true }));
-    await expectInViewportHorizontally(page.getByRole('button', { name: '역경매 등록' }).first());
+    await expectInViewportHorizontally(page.getByRole('link', { name: 'Clink', exact: true }));
+    await expectInViewportHorizontally(page.getByRole('button', { name: '캠페인 등록' }).first());
     await expectInViewportHorizontally(page.getByRole('button', { name: '메뉴 열기' }));
     await expectNoPageHorizontalOverflow(page);
 
     await openMobileNav(page);
     const mobileNav = page.getByRole('navigation', { name: '모바일' });
-    await expect(mobileNav.getByRole('link', { name: '역경매 둘러보기' })).toBeVisible();
+    await expect(mobileNav.getByRole('link', { name: '오픈 캠페인 둘러보기' })).toBeVisible();
     await expect(mobileNav.getByRole('link', { name: '로그인' })).toBeVisible();
     await expectInViewportHorizontally(mobileNav);
     await closeMobileNav(page);
@@ -53,12 +53,12 @@ test.describe('모바일 반응형 UI', () => {
     await expectInViewportHorizontally(heading);
     await expectNoPageHorizontalOverflow(page);
 
-    const bidButton = page.getByRole('button', { name: '제안하기' });
+    const bidButton = page.getByRole('button', { name: '콘텐츠 제안하기' });
     await expect(bidButton).toBeVisible();
     await expectInViewportHorizontally(bidButton);
     await bidButton.click();
 
-    const bidDialog = page.getByRole('dialog', { name: '제안하기' });
+    const bidDialog = page.getByRole('dialog', { name: '콘텐츠 제안하기' });
     await expect(bidDialog).toBeVisible();
     await expectDialogFitsViewport(page, bidDialog);
 
@@ -75,9 +75,9 @@ test.describe('모바일 반응형 UI', () => {
     await expect(heading).toBeVisible();
   });
 
-  test('모바일에서 역경매 등록 모달이 뷰포트 안에 표시된다', async ({ page }) => {
+  test('모바일에서 캠페인 등록 모달이 뷰포트 안에 표시된다', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: '역경매 등록' }).first().click();
+    await page.getByRole('button', { name: '캠페인 등록' }).first().click();
     await expect(page).toHaveURL(/\/login/);
 
     await signIn(page, ADVERTISER);
@@ -85,7 +85,7 @@ test.describe('모바일 반응형 UI', () => {
     await expectDialogFitsViewport(page, createDialog);
     await expect(createDialog.getByLabel('제목')).toBeVisible();
     await expect(createDialog.getByLabel('예산')).toBeVisible();
-    await expect(createDialog.getByRole('button', { name: '역경매 등록' })).toBeVisible();
+    await expect(createDialog.getByRole('button', { name: '캠페인 등록' })).toBeVisible();
     await createDialog.getByRole('button', { name: '닫기' }).click();
     await expect(createDialog).toBeHidden();
   });
@@ -97,11 +97,11 @@ test.describe('모바일 반응형 UI', () => {
     await expect(page).toHaveURL(/\/admin/);
 
     await expect(page.getByRole('heading', { name: '관리자 대시보드' })).toBeVisible();
-    await expect(page.getByText('총 역경매 수')).toBeVisible();
+    await expect(page.getByText('총 캠페인 수')).toBeVisible();
     await expectNoPageHorizontalOverflow(page);
     await expectInViewportHorizontally(page.getByRole('heading', { name: '관리자 대시보드' }));
 
-    const auctionsTab = page.getByRole('button', { name: '역경매 관리' });
+    const auctionsTab = page.getByRole('button', { name: '캠페인 관리' });
     await expect(auctionsTab).toBeVisible();
     await auctionsTab.click();
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toBeVisible();
@@ -110,7 +110,7 @@ test.describe('모바일 반응형 UI', () => {
     await page.getByRole('button', { name: '회원 관리' }).click();
     await expect(page.getByRole('columnheader', { name: '이름/이메일' })).toBeVisible();
 
-    await page.getByRole('button', { name: '역경매 관리' }).click();
+    await page.getByRole('button', { name: '캠페인 관리' }).click();
     await page.getByPlaceholder('캠페인 제목, 설명, 광고주 이름/이메일 검색').fill(ACTIVE_AUCTION);
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toBeVisible();
     await expectNoPageHorizontalOverflow(page);

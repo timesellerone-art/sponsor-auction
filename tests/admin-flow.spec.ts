@@ -52,8 +52,8 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(page.getByRole('navigation', { name: '주요' }).getByRole('link', { name: '관리자' })).toBeVisible();
 
     await expect(page.getByRole('heading', { name: '관리자 대시보드' })).toBeVisible();
-    await expect(page.getByText('총 역경매 수')).toBeVisible();
-    await expect(page.getByText('진행 중인 역경매 수')).toBeVisible();
+    await expect(page.getByText('총 캠페인 수')).toBeVisible();
+    await expect(page.getByText('진행 중인 캠페인 수')).toBeVisible();
     await expect(page.getByText('전체 가입 회원 수')).toBeVisible();
     await expect(page.getByText('블라인드 처리된 게시글 수')).toBeVisible();
     await expect(page.getByText(/광고주 \d+ \/ 크리에이터 \d+/)).toBeVisible();
@@ -62,7 +62,7 @@ test.describe('관리자 페이지 핵심 기능', () => {
   test('전체 역경매 목록, 검색, 상태 필터가 동작한다', async ({ page }) => {
     await unlockAdmin(page);
 
-    await page.getByRole('button', { name: '역경매 관리' }).click();
+    await page.getByRole('button', { name: '캠페인 관리' }).click();
     const table = page.getByRole('table');
     await expect(table.getByRole('columnheader', { name: '제목' })).toBeVisible();
     await expect(table.getByRole('columnheader', { name: '작성자' })).toBeVisible();
@@ -100,7 +100,7 @@ test.describe('관리자 페이지 핵심 기능', () => {
     page,
   }) => {
     await unlockAdmin(page);
-    await page.getByRole('button', { name: '역경매 관리' }).click();
+    await page.getByRole('button', { name: '캠페인 관리' }).click();
 
     const targetRow = page.getByRole('row', { name: new RegExp(ACTIVE_AUCTION) });
     await expect(targetRow.getByText('진행중', { exact: true })).toBeVisible();
@@ -164,11 +164,11 @@ test.describe('관리자 페이지 핵심 기능', () => {
     ).toBeVisible();
     await expect(memberRow.getByText('정상')).toBeVisible();
 
-    await page.getByRole('button', { name: '입찰 관리' }).click();
+    await page.getByRole('button', { name: '제안 관리' }).click();
     await expect(page.getByPlaceholder('크리에이터 이름, 이메일, 캠페인 제목 검색').first()).toBeVisible();
     await expect(page.getByText('민지쇼츠').first()).toBeVisible();
     await expect(page.getByText(ACTIVE_AUCTION).first()).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: '입찰 상태' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: '제안 상태' })).toBeVisible();
     await expect(page.locator('tbody').getByText('제안/대기').first()).toBeVisible();
     await expect(page.getByText('낙찰 / 지급 완료').first()).toBeVisible();
 
@@ -183,7 +183,7 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await page.getByRole('button', { name: '정산 관리' }).click();
 
     const table = page.getByRole('table');
-    await expect(page.getByText('총 결제/입찰 금액')).toBeVisible();
+    await expect(page.getByText('총 결제/제안 금액')).toBeVisible();
     await expect(page.getByText('플랫폼 총 수수료 수익')).toBeVisible();
     await expect(page.getByText('크리에이터 지급 완료액')).toBeVisible();
     await expect(page.getByPlaceholder('크리에이터 이름, 이메일, 캠페인 제목 검색')).toBeVisible();
@@ -254,7 +254,7 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await expect(updatedRow.getByRole('button', { name: '지급 처리' })).toHaveCount(0);
     await expect(pinnedRow).toHaveCount(0);
 
-    await page.getByRole('button', { name: '입찰 관리' }).click();
+    await page.getByRole('button', { name: '제안 관리' }).click();
     await page.getByRole('button', { name: '지급 완료', exact: true }).click();
     await expect(page.getByText(campaign).first()).toBeVisible();
     await expect(page.getByText('낙찰 / 지급 완료').first()).toBeVisible();
@@ -322,7 +322,7 @@ test.describe('관리자 페이지 핵심 기능', () => {
     await page.getByRole('button', { name: '메모 저장' }).first().click();
     await expect(page.getByRole('alert').filter({ hasText: '메모를 저장했습니다.' })).toBeVisible();
 
-    await page.getByRole('button', { name: '입찰 관리' }).click();
+    await page.getByRole('button', { name: '제안 관리' }).click();
     await expect(page.getByRole('combobox')).toBeVisible();
     const [bidDownload] = await Promise.all([
       page.waitForEvent('download'),

@@ -24,10 +24,10 @@ async function openBidModal(page: import('@playwright/test').Page, title: string
   await page.getByRole('link', { name: title }).click();
   await expect(page).toHaveURL(/\/auctions\//);
   await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
-  const bidButton = page.getByRole('button', { name: '제안하기' });
+  const bidButton = page.getByRole('button', { name: '콘텐츠 제안하기' });
   await expect(bidButton).toBeEnabled({ timeout: 15_000 });
   await bidButton.click();
-  const dialog = page.getByRole('dialog', { name: '제안하기' });
+  const dialog = page.getByRole('dialog', { name: '콘텐츠 제안하기' });
   await expect(dialog).toBeVisible({ timeout: 12_000 });
   return dialog;
 }
@@ -38,7 +38,7 @@ test.describe('입력 유효성 및 예외 시나리오', () => {
   }) => {
     await signIn(page, ADVERTISER);
     const createDialog = await openCreateAuction(page);
-    await createDialog.getByRole('button', { name: '역경매 등록' }).click();
+    await createDialog.getByRole('button', { name: '캠페인 등록' }).click();
     await expect(createDialog).toBeVisible();
     await expect(createDialog.getByText('제목을 입력해 주세요.')).toBeVisible();
     await expect(createDialog.getByText('예산을 입력해 주세요.')).toBeVisible();
@@ -91,15 +91,15 @@ test.describe('입력 유효성 및 예외 시나리오', () => {
       .fill('금액 유효성 검사를 위한 상세설명입니다.');
 
     await createDialog.getByLabel('예산').fill('0');
-    await createDialog.getByRole('button', { name: '역경매 등록' }).click();
+    await createDialog.getByRole('button', { name: '캠페인 등록' }).click();
     await expect(createDialog.getByText('예산은 0원 이하일 수 없습니다.')).toBeVisible();
 
     await createDialog.getByLabel('예산').fill('-5000');
-    await createDialog.getByRole('button', { name: '역경매 등록' }).click();
+    await createDialog.getByRole('button', { name: '캠페인 등록' }).click();
     await expect(createDialog.getByText('예산은 0원 이하일 수 없습니다.')).toBeVisible();
 
     await createDialog.locator('#auction-budget').fill('200000000');
-    await createDialog.getByRole('button', { name: '역경매 등록' }).click();
+    await createDialog.getByRole('button', { name: '캠페인 등록' }).click();
     await expect(createDialog.getByRole('alert').filter({ hasText: '1억' })).toBeVisible();
     await expect(createDialog).toBeVisible();
     await createDialog.getByRole('button', { name: '닫기' }).click();
@@ -131,18 +131,18 @@ test.describe('입력 유효성 및 예외 시나리오', () => {
     await page.goto('/');
     await page.getByRole('link', { name: CLOSED_AUCTION }).click();
     await expect(page).toHaveURL(/\/auctions\//);
-    await expect(page.getByRole('button', { name: '제안하기' })).toHaveCount(0);
-    await expect(page.getByText('매칭 완료된 역경매입니다').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: '콘텐츠 제안하기' })).toHaveCount(0);
+    await expect(page.getByText('매칭 완료된 캠페인입니다').first()).toBeVisible();
     await expect(
-      page.getByText('이 역경매는 마감되었거나 제안을 받지 않습니다.'),
+      page.getByText('이 캠페인은 모집이 마감되었거나 제안을 받지 않습니다.'),
     ).toBeVisible();
 
     await page.goto('/');
     await page.getByRole('link', { name: AWARDED_AUCTION }).click();
     await expect(page).toHaveURL(/\/auctions\//);
-    await expect(page.getByRole('button', { name: '제안하기' })).toHaveCount(0);
-    await expect(page.getByText('결제 완료된 역경매입니다').first()).toBeVisible();
-    await expect(page.getByRole('dialog', { name: '제안하기' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '콘텐츠 제안하기' })).toHaveCount(0);
+    await expect(page.getByText('결제 완료된 캠페인입니다').first()).toBeVisible();
+    await expect(page.getByRole('dialog', { name: '콘텐츠 제안하기' })).toHaveCount(0);
   });
 
   test('같은 역경매에 중복 제안을 제출하면 차단된다', async ({ page }) => {
@@ -156,7 +156,7 @@ test.describe('입력 유효성 및 예외 시나리오', () => {
     await expect(
       page.getByRole('alert').filter({ hasText: /^제안을 제출했습니다\.?$/ }),
     ).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole('dialog', { name: '제안하기' })).toHaveCount(0, {
+    await expect(page.getByRole('dialog', { name: '콘텐츠 제안하기' })).toHaveCount(0, {
       timeout: 20_000,
     });
 
@@ -168,7 +168,7 @@ test.describe('입력 유효성 및 예외 시나리오', () => {
     await second.getByRole('button', { name: '제안 제출' }).click();
     await expect(second).toBeVisible();
     await expect(
-      second.getByRole('alert').filter({ hasText: '이미 이 역경매에 제안을 제출했습니다.' }),
+      second.getByRole('alert').filter({ hasText: '이미 이 캠페인에 제안을 제출했습니다.' }),
     ).toBeVisible();
   });
 });

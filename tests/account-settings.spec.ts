@@ -88,7 +88,7 @@ test.describe('마이페이지와 계정 설정', () => {
         { waitUntil: 'domcontentloaded' },
       );
       await expect(page).toHaveURL((url) => url.pathname === '/my', { timeout: 20000 });
-      await expect(page.getByRole('heading', { name: '내 역경매' })).toBeVisible({
+      await expect(page.getByRole('heading', { name: '내 캠페인' })).toBeVisible({
         timeout: 20000,
       });
       await expect(page.getByRole('button', { name: '로그아웃', exact: true })).toBeVisible();
@@ -120,7 +120,7 @@ test.describe('마이페이지와 계정 설정', () => {
 
       await page.getByRole('link', { name: '마이페이지' }).click();
       await expect(page).toHaveURL((url) => url.pathname === '/my', { timeout: 8000 });
-      await expect(page.getByRole('heading', { name: '내 역경매' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '내 캠페인' })).toBeVisible();
       await page.getByRole('link', { name: '계정 설정' }).click();
       await expect(page).toHaveURL((url) => url.pathname === '/my/settings');
 

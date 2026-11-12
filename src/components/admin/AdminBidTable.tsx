@@ -99,7 +99,7 @@ export function AdminBidTable({
   const handleExport = () => {
     downloadCsv(
       `bids-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['크리에이터', '이메일', '계좌', '캠페인', '광고주', '상태', '입찰가', '처리일시'],
+      ['크리에이터', '이메일', '계좌', '캠페인', '광고주', '상태', '제안가', '처리일시'],
       filtered.map((bid) => {
         const auction = auctionById.get(bid.auctionId);
         const lifecycle = resolveAdminBidStatus(bid, auction, payouts);
@@ -131,7 +131,7 @@ export function AdminBidTable({
         query={query}
         onQueryChange={setQuery}
         placeholder="크리에이터 이름, 이메일, 캠페인 제목 검색"
-        searchLabel="입찰 검색"
+        searchLabel="제안 검색"
         filters={FILTERS}
         filter={filter}
         onFilterChange={setFilter}
@@ -150,7 +150,7 @@ export function AdminBidTable({
       />
       {filtered.length === 0 ? (
         <div className="p-4">
-          <AdminEmptyState message="조건에 맞는 입찰이 없습니다." />
+          <AdminEmptyState message="조건에 맞는 제안이 없습니다." />
         </div>
       ) : (
         <div className="max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto">
@@ -170,9 +170,9 @@ export function AdminBidTable({
                 <th className="px-1 py-1.5 sm:px-2 font-medium">크리에이터</th>
                 <th className="px-1 py-1.5 sm:px-2 font-medium">캠페인</th>
                 <th className="px-1 py-1.5 sm:px-2 font-medium">광고주</th>
-                <th className="px-1 py-1.5 sm:px-2 font-medium">입찰 상태</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">제안 상태</th>
                 <th className="px-1 py-1.5 sm:px-2 font-medium">처리 일시</th>
-                <th className="px-1 py-1.5 sm:px-2 font-medium">입찰가</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">제안가</th>
                 <th className="px-1 py-1.5 sm:px-2 font-medium">예상 수수료</th>
                 <th className="px-1 py-1.5 sm:px-2 font-medium">채널</th>
               </tr>
@@ -245,7 +245,7 @@ export function AdminBidTable({
                           href={bid.creatorChannelUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="block truncate text-teal-800 hover:underline"
+                          className="block truncate text-emerald-800 hover:underline"
                         >
                           {bid.creatorChannelUrl}
                         </a>

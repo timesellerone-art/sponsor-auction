@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     const creatorName = asText(body?.creatorName);
     if (!auctionId) {
       return NextResponse.json(
-        { error: '경매 ID가 필요합니다.', errorMessage: '경매 ID가 필요합니다.' },
+        { error: '캠페인 ID가 필요합니다.', errorMessage: '캠페인 ID가 필요합니다.' },
         { status: 400, headers: NO_STORE },
       );
     }

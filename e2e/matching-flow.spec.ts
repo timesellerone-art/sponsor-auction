@@ -26,7 +26,7 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
     await createDialog.getByLabel('플랫폼').selectOption('youtube_shorts');
     await createDialog.getByLabel('예산').fill('150000');
     await createDialog.getByLabel('상세설명').fill(description);
-    await createDialog.getByRole('button', { name: '역경매 등록' }).click();
+    await createDialog.getByRole('button', { name: '캠페인 등록' }).click();
     await expect(createDialog).toBeHidden();
     await expect(page.getByRole('link', { name: title })).toBeVisible();
   });
@@ -38,9 +38,9 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
     await page.getByRole('link', { name: title }).click();
     await expect(page).toHaveURL(/\/auctions\//);
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
-    await page.getByRole('button', { name: '제안하기' }).click();
+    await page.getByRole('button', { name: '콘텐츠 제안하기' }).click();
 
-    const bidDialog = page.getByRole('dialog', { name: '제안하기' });
+    const bidDialog = page.getByRole('dialog', { name: '콘텐츠 제안하기' });
     await expect(bidDialog).toBeVisible();
     await bidDialog.getByLabel('제안 금액(단가)').fill('120000');
     await expect(bidDialog.getByText('타 플랫폼/MCN(평균 50% 공제) 대비 추가 정산')).toBeVisible();
@@ -97,15 +97,15 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
 
     await expect(
       page.getByRole('alert').filter({
-        hasText: '낙찰이 확정되었고 역경매가 마감되었습니다.',
+        hasText: '선정이 확정되었고 모집이 마감되었습니다.',
       }),
     ).toBeVisible();
-    await expect(page.getByText('매칭 완료된 역경매입니다').first()).toBeVisible();
+    await expect(page.getByText('매칭 완료된 캠페인입니다').first()).toBeVisible();
     await expect(page.getByText('선택된 크리에이터').first()).toBeVisible();
     await expect(page.getByText('낙찰됨')).toBeVisible();
     await expect(
       page.getByRole('button', { name: '낙찰하기 (선택)' }),
     ).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '제안하기' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '콘텐츠 제안하기' })).toHaveCount(0);
   });
 });

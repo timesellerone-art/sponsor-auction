@@ -280,7 +280,7 @@ export async function getAuctionById(
 
   try {
     if (!auctionId) {
-      return fail(null, '유효한 경매 ID가 필요합니다.');
+      return fail(null, '유효한 캠페인 ID가 필요합니다.');
     }
     if (!isUuid(auctionId)) {
       return getMockAuctionById(auctionId);
@@ -308,12 +308,12 @@ export async function getAuctionById(
       if (isInvalidUuidError(error)) {
         return getMockAuctionById(auctionId);
       }
-      return fail(null, '경매 정보를 불러오지 못했습니다.');
+      return fail(null, '캠페인 정보를 불러오지 못했습니다.');
     }
 
     if (!data) {
       if (options?.client) {
-        return fail(null, '해당 경매를 찾을 수 없습니다.');
+        return fail(null, '해당 캠페인을 찾을 수 없습니다.');
       }
       return getMockAuctionById(auctionId);
     }
@@ -321,7 +321,7 @@ export async function getAuctionById(
     return ok(mapAuction(data));
   } catch (error) {
     logDbError('경매 단건 조회 예외', error);
-    return fail(null, '경매 정보를 불러오지 못했습니다.');
+    return fail(null, '캠페인 정보를 불러오지 못했습니다.');
   }
 }
 
@@ -406,7 +406,7 @@ export async function createBid(
     });
     const auction = auctionResult.data;
     if (!auction) {
-      return fail(null, auctionResult.error ?? '해당 경매를 찾을 수 없습니다.');
+      return fail(null, auctionResult.error ?? '해당 캠페인을 찾을 수 없습니다.');
     }
 
     const bidderId = (input.creatorId ?? '').trim();
@@ -668,18 +668,18 @@ export async function getBids(): Promise<DataResult<BidItem[]>> {
 
     if (error) {
       logDbError('입찰 목록 조회', error);
-      return fail([], '입찰 목록을 불러오지 못했습니다.');
+      return fail([], '제안 목록을 불러오지 못했습니다.');
     }
 
     const bids = (data ?? []).map((row) => mapBid(row));
     if (bids.length === 0) {
-      return fail([], '등록된 입찰이 없습니다.');
+      return fail([], '등록된 제안이 없습니다.');
     }
 
     return ok(await withBidScores(bids));
   } catch (error) {
     logDbError('입찰 목록 조회 예외', error);
-    return fail([], '입찰 목록을 불러오지 못했습니다.');
+    return fail([], '제안 목록을 불러오지 못했습니다.');
   }
 }
 
@@ -691,7 +691,7 @@ export async function deleteAuction(id: string): Promise<DataResult<boolean>> {
 
   try {
     if (!id.trim()) {
-      return fail(false, '유효한 경매 ID가 필요합니다.');
+      return fail(false, '유효한 캠페인 ID가 필요합니다.');
     }
     if (!isUuid(id)) {
       return deleteMockAuction(id);
@@ -721,7 +721,7 @@ export async function updateAuctionStatus(
 
   try {
     if (!id.trim()) {
-      return fail(null, '유효한 경매 ID가 필요합니다.');
+      return fail(null, '유효한 캠페인 ID가 필요합니다.');
     }
     if (!isUuid(id)) {
       return updateMockAuctionStatus(id, status);
@@ -762,7 +762,7 @@ export async function updateAuctionBlind(
 
     try {
       if (!id.trim()) {
-        return fail(null, '유효한 경매 ID가 필요합니다.');
+        return fail(null, '유효한 캠페인 ID가 필요합니다.');
       }
       if (!isUuid(id)) {
         return updateMockAuctionBlind(id, isBlind);
@@ -770,7 +770,7 @@ export async function updateAuctionBlind(
 
       const current = await getAuctionById(id);
       if (!current.data) {
-        return fail(null, current.error ?? '해당 경매를 찾을 수 없습니다.');
+        return fail(null, current.error ?? '해당 캠페인을 찾을 수 없습니다.');
       }
       if (current.data.isBlind === isBlind) {
         return fail(
@@ -817,7 +817,7 @@ export async function getBidsByAuctionId(
 
   try {
     if (!auctionId.trim()) {
-      return fail([], '유효한 경매 ID가 필요합니다.');
+      return fail([], '유효한 캠페인 ID가 필요합니다.');
     }
     if (!isUuid(auctionId)) {
       return getMockBidsByAuctionId(auctionId);
@@ -866,12 +866,12 @@ export async function awardBid(
 
       try {
         if (!auctionId.trim() || !bidId.trim()) {
-          return fail(null, '유효한 경매/제안 ID가 필요합니다.');
+          return fail(null, '유효한 캠페인/제안 ID가 필요합니다.');
         }
 
         const auctionResult = await getAuctionById(auctionId);
         if (!auctionResult.data) {
-          return fail(null, auctionResult.error ?? '해당 경매를 찾을 수 없습니다.');
+          return fail(null, auctionResult.error ?? '해당 캠페인을 찾을 수 없습니다.');
         }
 
         const awardBlocked = getAwardBlockReason(auctionResult.data);

@@ -195,7 +195,7 @@ export default function LoginPage() {
       aria-busy={isLoading}
       className="mx-auto flex w-full max-w-md min-w-0 flex-1 flex-col justify-center px-4 py-10 sm:px-6"
     >
-      <p className="text-sm font-semibold tracking-wide text-teal-800">Account</p>
+      <p className="text-sm font-semibold tracking-wide text-emerald-800">Account</p>
       <h1 className="mt-1 text-2xl font-bold text-zinc-950">
         {mode === 'signup' ? '회원가입' : '로그인'}
       </h1>
@@ -241,7 +241,7 @@ export default function LoginPage() {
               name="name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              className="mt-1.5 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+              className="mt-1.5 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
               placeholder="홍길동"
               autoComplete="name"
             />
@@ -261,7 +261,7 @@ export default function LoginPage() {
             autoComplete={mode === 'signup' ? 'email' : 'username'}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="mt-1.5 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+            className="mt-1.5 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
             placeholder="you@example.com"
           />
         </label>
@@ -274,7 +274,7 @@ export default function LoginPage() {
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="mt-1.5 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+            className="mt-1.5 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
             placeholder="6자 이상"
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
           />
@@ -308,7 +308,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={submitting || Boolean(oauthBusy)}
-          className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? (
             <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -371,12 +371,12 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-4 text-center text-xs leading-5 text-zinc-500">
-          로그인 시 SponsorAuction의{' '}
-          <Link href="/terms" className="font-semibold text-teal-800 hover:underline">
+          로그인 시 Clink의{' '}
+          <Link href="/terms" className="font-semibold text-emerald-800 hover:underline">
             이용약관
           </Link>
           {' 및 '}
-          <Link href="/privacy" className="font-semibold text-teal-800 hover:underline">
+          <Link href="/privacy" className="font-semibold text-emerald-800 hover:underline">
             개인정보 처리방침
           </Link>
           에 동의하는 것으로 간주됩니다.
@@ -384,7 +384,7 @@ export default function LoginPage() {
       </form>
 
       <p className="mt-4 text-center text-sm text-zinc-500">
-        <Link href="/" className="font-medium text-teal-800 hover:underline">
+        <Link href="/" className="font-medium text-emerald-800 hover:underline">
           홈으로 돌아가기
         </Link>
       </p>

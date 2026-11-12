@@ -46,7 +46,7 @@ export function AuctionBrowseBar({
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="캠페인 제목 또는 설명 검색"
-          className="h-11 w-full min-w-0 rounded-full border border-zinc-200 bg-white py-2 pr-4 pl-10 text-sm text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
+          className="h-11 w-full min-w-0 rounded-full border border-zinc-200 bg-white py-2 pr-4 pl-10 text-sm text-zinc-950 outline-none placeholder:text-zinc-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
         />
       </label>
 
@@ -61,7 +61,7 @@ export function AuctionBrowseBar({
               className={cn(
                 'inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-xs font-semibold',
                 platform === item.id
-                  ? 'border-teal-700 bg-teal-700 text-white'
+                  ? 'border-emerald-900 bg-emerald-900 text-white'
                   : 'border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50',
               )}
             >

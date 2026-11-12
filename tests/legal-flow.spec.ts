@@ -5,7 +5,7 @@ test.describe('전자상거래 약관 및 동의 UI', () => {
   test('로그인 화면에서 이용약관·개인정보 처리방침에 동의 안내가 연결된다', async ({ page }) => {
     await page.goto('/login');
     await expect(
-      page.getByText('로그인 시 SponsorAuction의 이용약관 및 개인정보 처리방침에 동의하는 것으로 간주됩니다.'),
+      page.getByText('로그인 시 Clink의 이용약관 및 개인정보 처리방침에 동의하는 것으로 간주됩니다.'),
     ).toBeVisible();
 
     await page.getByRole('link', { name: '이용약관', exact: true }).click();

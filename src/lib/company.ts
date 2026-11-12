@@ -1,5 +1,5 @@
 export const COMPANY = {
-  brand: 'SponsorAuction',
+  brand: 'Clink',
   legalName: '스폰서옥션',
   ceo: '권경환',
   email: 'cs@timeseller.one',

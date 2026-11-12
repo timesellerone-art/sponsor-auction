@@ -26,7 +26,7 @@ export default function ErrorPage({
           <button
             type="button"
             onClick={reset}
-            className="inline-flex h-11 w-full items-center justify-center rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800"
+            className="inline-flex h-11 w-full items-center justify-center rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800"
           >
             다시 시도
           </button>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Gavel, Menu, Plus, X } from 'lucide-react';
+import { Menu, Plus, X } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { CreateAuctionModal } from '@/components/CreateAuctionModal';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -20,7 +20,7 @@ export function Navbar() {
   const { user, ready, canCreateAuction, canPlaceBid, switchableRoles } = useAuth();
   const showAdmin = Boolean(ready && isAdmin(user));
   const showDashboard = Boolean(ready && switchableRoles.length > 0);
-  const dashboardLabel = canPlaceBid ? '내 제안' : '내 역경매';
+  const dashboardLabel = canPlaceBid ? '내 제안' : '내 캠페인';
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const menuId = useId();
@@ -38,7 +38,7 @@ export function Navbar() {
     if (!canCreateAuction) {
       showToast(
         hasAuthRole(user, 'advertiser')
-          ? '광고주 모드로 전환하면 역경매를 등록할 수 있습니다.'
+          ? '광고주 모드로 전환하면 캠페인을 등록할 수 있습니다.'
           : ACCESS_REASON['advertiser-forbidden'],
       );
       return;
@@ -90,44 +90,37 @@ export function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full min-w-0 border-b border-zinc-200/80 bg-white/90 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full min-w-0 border-b border-stone-200/70 bg-[#FAF8F5]/80 backdrop-blur-md">
       <div className="flex h-14 w-full min-w-0 items-center justify-between gap-2 px-4 sm:h-16 sm:px-6">
         <Link
           href="/"
-          className="flex min-w-0 items-center gap-2 font-semibold tracking-tight text-zinc-950"
+          aria-label="Clink"
+          className="flex min-w-0 items-center gap-2 font-semibold tracking-tight text-stone-900"
           onClick={() => setOpen(false)}
         >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-teal-700 text-white">
-            <Gavel className="size-4" aria-hidden />
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-sm font-bold text-white">
+            C
           </span>
-          <span className="truncate text-[15px] sm:text-lg">SponsorAuction</span>
+          <span className="truncate text-[15px] sm:text-lg">Clink</span>
         </Link>
 
-        <nav className="hidden items-center gap-5 md:flex" aria-label="주요">
+        <nav className="hidden items-center gap-3 md:flex" aria-label="주요">
           <Link
             href="/#auctions"
-            className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-950"
+            className="text-sm font-medium text-stone-600 transition-colors hover:text-stone-950"
           >
-            역경매 둘러보기
+            오픈 캠페인 둘러보기
           </Link>
           <Link
             href="/inventory"
-            className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-950"
+            className="text-sm font-medium text-stone-600 transition-colors hover:text-stone-950"
           >
             인벤토리
           </Link>
-          {showDashboard ? (
-            <Link
-              href="/my"
-              className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-950"
-            >
-              {dashboardLabel}
-            </Link>
-          ) : null}
           {showAdmin ? (
             <Link
               href="/admin"
-              className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-950"
+              className="text-sm font-medium text-stone-600 transition-colors hover:text-stone-950"
             >
               관리자
             </Link>
@@ -136,23 +129,29 @@ export function Navbar() {
             <div className="flex min-w-0 items-center gap-2">
               <RoleSwitcher />
               <NotificationBell />
-              <span className="max-w-[120px] truncate text-xs text-zinc-500">
-                {user.name}
-              </span>
+              <span className="max-w-[120px] truncate text-xs text-stone-500">{user.name}</span>
               <button
                 type="button"
                 onClick={() => {
                   void handleSignOut();
                 }}
-                className="text-sm font-medium text-zinc-600 hover:text-zinc-950"
+                className="text-sm font-medium text-stone-600 hover:text-stone-950"
               >
                 로그아웃
               </button>
+              {showDashboard ? (
+                <Link
+                  href="/my"
+                  className="inline-flex h-10 items-center rounded-full border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-800 shadow-sm hover:shadow-md"
+                >
+                  {dashboardLabel}
+                </Link>
+              ) : null}
             </div>
           ) : (
             <Link
               href="/login"
-              className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-950"
+              className="inline-flex h-10 items-center rounded-full border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-800 shadow-sm hover:shadow-md"
             >
               로그인
             </Link>
@@ -161,10 +160,10 @@ export function Navbar() {
             type="button"
             disabled={!ready || Boolean(user && !canCreateAuction)}
             onClick={requestCreateAuction}
-            className="inline-flex h-10 items-center gap-1.5 rounded-full bg-teal-700 px-4 text-sm font-semibold text-white transition-colors hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+            className="inline-flex h-10 items-center gap-1.5 rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300"
           >
             <Plus className="size-4" aria-hidden />
-            역경매 등록
+            캠페인 등록
           </button>
         </nav>
 
@@ -175,13 +174,13 @@ export function Navbar() {
             type="button"
             disabled={!ready || Boolean(user && !canCreateAuction)}
             onClick={requestCreateAuction}
-            className="inline-flex h-9 max-w-[38vw] shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-700 px-3 text-xs font-semibold whitespace-nowrap text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+            className="inline-flex h-9 max-w-[38vw] shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-900 px-3 text-xs font-semibold whitespace-nowrap text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300"
           >
-            역경매 등록
+            캠페인 등록
           </button>
           <button
             type="button"
-            className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-zinc-800 hover:bg-zinc-100"
+            className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-stone-800 hover:bg-white/80"
             aria-expanded={open}
             aria-controls={menuId}
             aria-label={open ? '메뉴 닫기' : '메뉴 열기'}
@@ -195,7 +194,7 @@ export function Navbar() {
       {open ? (
         <button
           type="button"
-          className="fixed inset-0 top-14 z-40 bg-zinc-950/30 sm:top-16 md:hidden"
+          className="fixed inset-0 top-14 z-40 bg-stone-950/30 sm:top-16 md:hidden"
           aria-label="메뉴 닫기"
           onClick={() => setOpen(false)}
         />
@@ -204,24 +203,21 @@ export function Navbar() {
       <div
         id={menuId}
         className={cn(
-          'relative z-50 border-t border-zinc-200 bg-white md:hidden',
+          'relative z-50 border-t border-stone-200 bg-[#FAF8F5] md:hidden',
           open ? 'block' : 'hidden',
         )}
       >
-        <nav
-          className="flex w-full flex-col gap-1 px-4 py-3"
-          aria-label="모바일"
-        >
+        <nav className="flex w-full flex-col gap-1 px-4 py-3" aria-label="모바일">
           <Link
             href="/#auctions"
-            className="rounded-lg px-3 py-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+            className="rounded-lg px-3 py-3 text-sm font-medium text-stone-800 hover:bg-white"
             onClick={() => setOpen(false)}
           >
-            역경매 둘러보기
+            오픈 캠페인 둘러보기
           </Link>
           <Link
             href="/inventory"
-            className="rounded-lg px-3 py-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+            className="rounded-lg px-3 py-3 text-sm font-medium text-stone-800 hover:bg-white"
             onClick={() => setOpen(false)}
           >
             인벤토리
@@ -229,7 +225,7 @@ export function Navbar() {
           {showDashboard ? (
             <Link
               href="/my"
-              className="rounded-lg px-3 py-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+              className="rounded-lg px-3 py-3 text-sm font-medium text-stone-800 hover:bg-white"
               onClick={() => setOpen(false)}
             >
               {dashboardLabel}
@@ -238,7 +234,7 @@ export function Navbar() {
           {showAdmin ? (
             <Link
               href="/admin"
-              className="rounded-lg px-3 py-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+              className="rounded-lg px-3 py-3 text-sm font-medium text-stone-800 hover:bg-white"
               onClick={() => setOpen(false)}
             >
               관리자
@@ -251,7 +247,7 @@ export function Navbar() {
               </div>
               <button
                 type="button"
-                className="rounded-lg px-3 py-3 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+                className="rounded-lg px-3 py-3 text-left text-sm font-medium text-stone-800 hover:bg-white"
                 onClick={() => {
                   void handleSignOut();
                 }}
@@ -262,7 +258,7 @@ export function Navbar() {
           ) : (
             <Link
               href="/login"
-              className="rounded-lg px-3 py-3 text-sm font-medium text-zinc-800 hover:bg-zinc-50"
+              className="rounded-lg px-3 py-3 text-sm font-medium text-stone-800 hover:bg-white"
               onClick={() => setOpen(false)}
             >
               로그인
@@ -270,20 +266,17 @@ export function Navbar() {
           )}
           <button
             type="button"
-            className="rounded-lg px-3 py-3 text-left text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:text-zinc-400"
+            className="rounded-lg px-3 py-3 text-left text-sm font-medium text-stone-800 hover:bg-white disabled:text-stone-400"
             disabled={!ready || Boolean(user && !canCreateAuction)}
             onClick={requestCreateAuction}
           >
-            역경매 등록
+            캠페인 등록
           </button>
         </nav>
       </div>
 
       {createOpen ? (
-        <CreateAuctionModal
-          open={createOpen}
-          onClose={() => setCreateOpen(false)}
-        />
+        <CreateAuctionModal open={createOpen} onClose={() => setCreateOpen(false)} />
       ) : null}
     </header>
   );

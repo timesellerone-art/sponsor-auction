@@ -52,7 +52,7 @@ export default function RoleSelectPage() {
   if (!bootDone) {
     return (
       <div className="flex flex-1 items-center justify-center px-4 py-16">
-        <Loader2 className="size-6 animate-spin text-teal-700" aria-hidden />
+        <Loader2 className="size-6 animate-spin text-emerald-800" aria-hidden />
         <span className="sr-only">로그인 정보를 확인하는 중</span>
       </div>
     );
@@ -61,7 +61,7 @@ export default function RoleSelectPage() {
   if (user && !needsOnboarding) {
     return (
       <div className="flex flex-1 items-center justify-center px-4 py-16">
-        <Loader2 className="size-6 animate-spin text-teal-700" aria-hidden />
+        <Loader2 className="size-6 animate-spin text-emerald-800" aria-hidden />
         <span className="sr-only">이동 중</span>
       </div>
     );
@@ -78,7 +78,7 @@ export default function RoleSelectPage() {
             onClick={() => {
               void refresh();
             }}
-            className="inline-flex h-10 items-center rounded-full bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+            className="inline-flex h-10 items-center rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white hover:bg-emerald-800"
           >
             다시 시도
           </button>

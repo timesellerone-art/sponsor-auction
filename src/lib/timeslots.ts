@@ -329,13 +329,13 @@ export async function listTimeSlotBids(slotId: string): Promise<DataResult<TimeS
         const leading = bids[0]?.bidAmount ?? 0;
         return ok(bids.map((item) => ({ ...item, isLeading: item.bidAmount === leading })));
       }
-      return fail([], '입찰 목록을 불러오지 못했습니다.');
+      return fail([], '제안 목록을 불러오지 못했습니다.');
     }
     const amounts = (data ?? []).map((row) => row.bid_amount ?? 0);
     const leading = computeBidEngineStats(amounts).highestBidAmount;
     return ok((data ?? []).map((row) => mapSlotBid(row, leading)));
   } catch {
-    return fail([], '입찰 목록을 불러오지 못했습니다.');
+    return fail([], '제안 목록을 불러오지 못했습니다.');
   }
 }
 
@@ -468,15 +468,15 @@ export async function placeTimeSlotBid(
     }
     const live = applySlotExpiry(slot);
     if (live.status !== 'open' || live.winnerBidId) {
-      return fail(null, '마감된 타임슬롯에는 입찰할 수 없습니다.');
+      return fail(null, '마감된 타임슬롯에는 제안할 수 없습니다.');
     }
     const minBid = nextInventoryMinBid(live.startingPrice, live.currentHighestBid);
     if (!Number.isFinite(input.bidAmount) || input.bidAmount < minBid) {
-      return fail(null, `입찰가는 ${minBid.toLocaleString('ko-KR')}원 이상이어야 합니다.`);
+      return fail(null, `제안가는 ${minBid.toLocaleString('ko-KR')}원 이상이어야 합니다.`);
     }
     let message = '';
     try {
-      message = sanitizeUserText(input.message || '인벤토리 입찰', 'reject');
+      message = sanitizeUserText(input.message || '인벤토리 제안', 'reject');
     } catch {
       return fail(null, VALIDATION.offPlatformContact);
     }
@@ -542,7 +542,7 @@ export async function awardTimeSlotBid(
   const bids = await listTimeSlotBids(slotId);
   const winner = bids.data.find((item) => item.id === bidId);
   if (!winner) {
-    return fail(null, '낙찰할 입찰을 찾을 수 없습니다.');
+    return fail(null, '선정할 제안을 찾을 수 없습니다.');
   }
 
   const supabase = await getDataClient();

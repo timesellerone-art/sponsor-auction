@@ -108,11 +108,11 @@ export async function openCreateAuction(page: Page) {
   const desktopNav = page.getByRole('navigation', { name: '주요' });
   const useDesktop = await desktopNav.isVisible();
   const createButton = useDesktop
-    ? desktopNav.getByRole('button', { name: '역경매 등록' })
-    : page.getByRole('button', { name: '역경매 등록' }).first();
+    ? desktopNav.getByRole('button', { name: '캠페인 등록' })
+    : page.getByRole('button', { name: '캠페인 등록' }).first();
   await expect(createButton).toBeEnabled({ timeout: 15_000 });
 
-  const dialog = page.getByRole('dialog', { name: '역경매 요청하기' });
+  const dialog = page.getByRole('dialog', { name: '캠페인 등록' });
   for (let attempt = 0; attempt < 4; attempt += 1) {
     if (await dialog.isVisible()) {
       break;
@@ -153,7 +153,7 @@ export async function unlockAdmin(page: Page) {
   await signIn(page, ADMIN);
   await page.goto('/admin');
   await expect(page.getByRole('heading', { name: '관리자 대시보드' })).toBeVisible();
-  await expect(page.getByText('총 역경매 수')).toBeVisible();
+  await expect(page.getByText('총 캠페인 수')).toBeVisible();
 }
 
 export async function acceptNextConfirm(page: Page) {

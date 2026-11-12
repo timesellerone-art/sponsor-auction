@@ -69,7 +69,7 @@ test.describe('역할 전환 속도', () => {
         `/auth/oauth?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink&next=${encodeURIComponent('/my')}`,
       );
       await expect(page).toHaveURL(/\/my/, { timeout: 20000 });
-      await expect(page.getByRole('heading', { name: '내 역경매' })).toBeVisible({
+      await expect(page.getByRole('heading', { name: '내 캠페인' })).toBeVisible({
         timeout: 15000,
       });
 
@@ -88,7 +88,7 @@ test.describe('역할 전환 속도', () => {
 
       const back = Date.now();
       await switcher.getByRole('button', { name: '광고주 모드' }).click();
-      await expect(page.getByRole('heading', { name: '내 역경매' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '내 캠페인' })).toBeVisible();
       expect(Date.now() - back).toBeLessThan(1000);
     } finally {
       if (userId) {

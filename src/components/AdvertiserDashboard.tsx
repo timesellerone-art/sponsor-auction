@@ -53,7 +53,7 @@ export function AdvertiserDashboard() {
         }
         const list = Array.isArray(result.data) ? result.data : [];
         setDeals(list);
-        setError(list.length === 0 ? '등록한 역경매가 없습니다.' : result.error);
+        setError(list.length === 0 ? '등록한 캠페인이 없습니다.' : result.error);
       } catch {
         if (!cancelled) {
           setDeals([]);
@@ -104,8 +104,8 @@ export function AdvertiserDashboard() {
 
   return (
     <PageContainer className="flex min-w-0 flex-1 flex-col pt-4 pb-6 sm:pt-5 sm:pb-10">
-      <p className="text-sm font-semibold tracking-wide text-teal-800">광고주</p>
-      <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">내 역경매</h1>
+      <p className="text-sm font-semibold tracking-wide text-emerald-800">광고주</p>
+      <h1 className="mt-1 text-2xl font-bold text-stone-900 sm:text-3xl">내 캠페인</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
         등록한 캠페인과 결제 완료된 낙찰 내역을 확인하고, 진행 중인 제안은 여기서 바로
         낙찰할 수 있습니다.
@@ -120,13 +120,13 @@ export function AdvertiserDashboard() {
       ) : deals.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-16 text-center">
           <p className="text-base font-medium text-zinc-800">
-            {error || '등록한 역경매가 없습니다'}
+            {error || '등록한 캠페인이 없습니다'}
           </p>
           <Link
             href="/"
-            className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+            className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white hover:bg-emerald-800"
           >
-            역경매 둘러보기
+            오픈 캠페인 둘러보기
           </Link>
         </div>
       ) : (
@@ -134,9 +134,9 @@ export function AdvertiserDashboard() {
           <section className="mb-8 min-w-0 pb-8">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
-                <h2 className="text-lg font-bold text-zinc-950">진행 중인 역경매</h2>
+                <h2 className="text-lg font-bold text-stone-900">진행 중인 오픈 캠페인</h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  입찰이 열려 있는 내 캠페인입니다. 제안을 확인하고 낙찰할 수 있습니다.
+                  모집이 열려 있는 내 캠페인입니다. 제안을 확인하고 선정할 수 있습니다.
                 </p>
               </div>
               <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
@@ -145,7 +145,7 @@ export function AdvertiserDashboard() {
             </div>
             {openDeals.length === 0 ? (
               <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-10 text-center text-sm text-zinc-500">
-                지금 진행 중인 내 역경매가 없습니다.
+                지금 진행 중인 내 캠페인이 없습니다.
               </div>
             ) : (
               <div className="mt-4 mb-2 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -154,9 +154,9 @@ export function AdvertiserDashboard() {
                     <AuctionCard auction={deal.auction} hideBidAction />
                     <Link
                       href={`/auctions/${deal.auction.id}#proposals`}
-                      className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800"
+                      className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800"
                     >
-                      입찰 현황 보기
+                      제안 현황 보기
                     </Link>
                   </div>
                 ))}
@@ -172,20 +172,20 @@ export function AdvertiserDashboard() {
                   payments · auctions · bids 기준으로 승인된 결제를 보여 줍니다.
                 </p>
               </div>
-              <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
                 {paidDeals.length}건
               </span>
             </div>
             {paidDeals.length === 0 ? (
               <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-10 text-center text-sm text-zinc-500">
-                아직 결제 완료된 역경매가 없습니다.
+                아직 결제 완료된 캠페인이 없습니다.
               </div>
             ) : (
               <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
                 {paidDeals.map((deal) => (
                   <li
                     key={`${deal.auction.id}-${deal.payment?.orderId ?? deal.bid?.id ?? 'paid'}`}
-                    className="rounded-2xl border border-teal-100 bg-white p-4 sm:p-5"
+                    className="rounded-2xl border border-emerald-100 bg-white p-4 sm:p-5"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -200,7 +200,7 @@ export function AdvertiserDashboard() {
                           {deal.bid ? ` · ${formatWon(deal.bid.bidAmount)}` : ''}
                         </p>
                       </div>
-                      <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-900">
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-900">
                         {auctionStatusLabel(deal.auction.status)}
                       </span>
                     </div>
@@ -232,7 +232,7 @@ export function AdvertiserDashboard() {
           </section>
 
           <section className="flex flex-col gap-8">
-            <h2 className="text-lg font-bold text-zinc-950">내 캠페인</h2>
+            <h2 className="text-lg font-bold text-zinc-950">캠페인별 제안 현황</h2>
             {deals.map((deal) => (
               <div
                 key={deal.auction.id}

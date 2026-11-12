@@ -163,7 +163,7 @@ export async function POST(request: Request) {
         auctionId,
         bidId,
         amount: parsed.amount,
-        orderName: '역경매 낙찰',
+        orderName: '캠페인 매칭',
         status: 'pending',
         paymentKey: null,
         createdAt: Date.now(),
@@ -201,7 +201,7 @@ export async function POST(request: Request) {
       return jsonError(
         400,
         'PAYMENT_IDS_MISSING',
-        '경매/입찰 정보가 없어 결제를 확정할 수 없습니다. 낙찰은 진행되지 않았습니다.',
+        '캠페인/제안 정보가 없어 결제를 확정할 수 없습니다. 선정은 진행되지 않았습니다.',
       );
     }
 

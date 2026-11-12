@@ -60,7 +60,7 @@ export function AuctionDetail({ id }: { id: string }) {
       setLoadError(result.error);
     } catch {
       setAuction(null);
-      setLoadError('경매 정보를 불러오지 못했습니다.');
+      setLoadError('캠페인 정보를 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
@@ -244,13 +244,13 @@ export function AuctionDetail({ id }: { id: string }) {
 
       {loading ? (
         <div className="mt-6 space-y-4">
-          <div className="h-40 animate-pulse rounded-2xl bg-teal-50" />
+          <div className="h-40 animate-pulse rounded-2xl bg-emerald-50" />
           <div className="h-48 animate-pulse rounded-2xl bg-white" />
         </div>
       ) : !auction ? (
         <div className="mt-6 rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-16 text-center">
           <p className="text-base font-medium text-zinc-800">
-            해당 역경매를 찾을 수 없습니다
+            해당 캠페인을 찾을 수 없습니다
           </p>
           {loadError ? (
             <p className="mt-2 text-sm text-zinc-500">{loadError}</p>
@@ -264,16 +264,16 @@ export function AuctionDetail({ id }: { id: string }) {
             loading={reportLoading}
           />
 
-          <article className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
+          <article className="rounded-2xl border border-stone-200/80 bg-white p-4 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold tracking-wide text-teal-800">
-                역경매 상세
+              <p className="text-xs font-semibold tracking-wide text-emerald-800">
+                캠페인 상세
               </p>
               {matched ? (
-                <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
                   {auction.status === 'completed'
-                    ? '결제 완료된 역경매입니다'
-                    : '매칭 완료된 역경매입니다'}
+                    ? '결제 완료된 캠페인입니다'
+                    : '매칭 완료된 캠페인입니다'}
                 </span>
               ) : null}
             </div>
@@ -300,7 +300,7 @@ export function AuctionDetail({ id }: { id: string }) {
               <AuctionCountdown deadline={auction.deadline} />
               <span className="inline-flex items-center gap-1">
                 <Users className="size-4" aria-hidden />
-                입찰 {auction.bidsCount ?? 0}
+                제안 {auction.bidsCount ?? 0}
               </span>
               {auction.highestBidAmount && auction.highestBidAmount > 0 ? (
                 <span>
@@ -318,7 +318,7 @@ export function AuctionDetail({ id }: { id: string }) {
                   aria-label={VALIDATION.selfCampaignHint}
                   className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-full bg-zinc-300 text-sm font-semibold text-zinc-500"
                 >
-                  제안하기
+                  콘텐츠 제안하기
                 </button>
                 <p className="mt-2 text-center text-xs text-zinc-500">{VALIDATION.selfCampaignHint}</p>
               </div>
@@ -326,17 +326,17 @@ export function AuctionDetail({ id }: { id: string }) {
               <button
                 type="button"
                 onClick={() => setBidOpen(true)}
-                className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800"
+                className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800"
               >
-                제안하기
+                콘텐츠 제안하기
               </button>
             ) : (
               <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 {!auctionOpen
-                  ? '이 역경매는 마감되었거나 제안을 받지 않습니다.'
+                  ? '이 캠페인은 모집이 마감되었거나 제안을 받지 않습니다.'
                   : !ready || !user
                     ? '로그인 후 크리에이터 계정으로 제안할 수 있습니다. 크리에이터 전용 기능입니다.'
-                    : '크리에이터 전용 기능입니다. 광고주 계정으로는 입찰할 수 없습니다.'}
+                    : '크리에이터 전용 기능입니다. 광고주 계정으로는 지원할 수 없습니다.'}
                 {!user && auctionOpen ? (
                   <button
                     type="button"
@@ -344,7 +344,7 @@ export function AuctionDetail({ id }: { id: string }) {
                       showToast(ACCESS_REASON['creator-auth']);
                       router.push(loginPath('creator-auth', `/auctions/${auction.id}`));
                     }}
-                    className="mt-2 block text-sm font-semibold text-teal-800 hover:underline"
+                    className="mt-2 block text-sm font-semibold text-emerald-800 hover:underline"
                   >
                     로그인하러 가기
                   </button>

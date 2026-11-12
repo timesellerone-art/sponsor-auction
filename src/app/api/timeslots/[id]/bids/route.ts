@@ -51,7 +51,7 @@ export async function GET(
     return NextResponse.json({ data: result.data }, { headers: NO_STORE });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : '입찰 목록을 불러오지 못했습니다.';
+      error instanceof Error ? error.message : '제안 목록을 불러오지 못했습니다.';
     return NextResponse.json(
       { error: message, errorMessage: message },
       { status: 500, headers: NO_STORE },
@@ -71,10 +71,10 @@ export async function POST(
     }
     const actor = await getPaymentActor();
     if (!actor) {
-      return unauthorizedJson('입찰하려면 로그인해 주세요.');
+      return unauthorizedJson('제안하려면 로그인해 주세요.');
     }
     if (!hasAuthRole(actor, 'advertiser') && !hasAuthRole(actor, 'admin')) {
-      return forbiddenJson('인벤토리 입찰은 광고주만 할 수 있습니다.');
+      return forbiddenJson('인벤토리 제안은 광고주만 할 수 있습니다.');
     }
     const { id } = await context.params;
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
@@ -106,7 +106,7 @@ export async function POST(
       message,
     });
     if (result.error || !result.data) {
-      const text = result.error ?? '입찰을 등록하지 못했습니다.';
+      const text = result.error ?? '제안을 등록하지 못했습니다.';
       return NextResponse.json(
         { error: text, errorMessage: text },
         { status: 400, headers: NO_STORE },
@@ -115,7 +115,7 @@ export async function POST(
     return NextResponse.json({ data: result.data }, { headers: NO_STORE });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : '입찰을 등록하지 못했습니다.';
+      error instanceof Error ? error.message : '제안을 등록하지 못했습니다.';
     return NextResponse.json(
       { error: message, errorMessage: message },
       { status: 500, headers: NO_STORE },

@@ -40,7 +40,7 @@ export function buildNotificationText(input: LifecycleNotifyInput) {
     case 'payout_paid':
       return `${name}님, 정산금 입금이 완료되었습니다. 캠페인: ${title}${input.extra ? ` (${input.extra})` : ''}`;
     case 'auction_deadline':
-      return `${name}님, 경매 마감이 임박했습니다. 캠페인: ${title}`;
+      return `${name}님, 모집 마감이 임박했습니다. 캠페인: ${title}`;
     default:
       return `${title} 관련 안내입니다.`;
   }

@@ -96,7 +96,7 @@ export function TimeslotDetail({ id }: { id: string }) {
       ) : (
         <div className="mt-6 flex flex-col gap-5">
           <article className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
-            <p className="text-xs font-semibold tracking-wide text-teal-800">
+            <p className="text-xs font-semibold tracking-wide text-emerald-800">
               {PLATFORM_LABELS[slot.platform]}
             </p>
             <h1 className="mt-2 text-2xl font-bold text-zinc-950">{slot.title}</h1>
@@ -117,7 +117,7 @@ export function TimeslotDetail({ id }: { id: string }) {
               <div>
                 <p className="text-xs text-zinc-400">현재 최고가</p>
                 <p className="font-semibold">
-                  {slot.currentHighestBid > 0 ? formatWon(slot.currentHighestBid) : '입찰 없음'}
+                  {slot.currentHighestBid > 0 ? formatWon(slot.currentHighestBid) : '제안 없음'}
                 </p>
               </div>
               <div>
@@ -125,7 +125,7 @@ export function TimeslotDetail({ id }: { id: string }) {
                 <p className="font-semibold">{formatViews(slot.expectedViews)}</p>
               </div>
               <div>
-                <p className="text-xs text-zinc-400">입찰 마감</p>
+                <p className="text-xs text-zinc-400">모집 마감</p>
                 <AuctionCountdown deadline={slot.deadline} />
               </div>
             </div>
@@ -133,24 +133,24 @@ export function TimeslotDetail({ id }: { id: string }) {
               <button
                 type="button"
                 onClick={() => setBidOpen(true)}
-                className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800"
+                className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800"
               >
-                입찰하기
+                제안하기
               </button>
             ) : (
               <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 {slot.status !== 'open' || slot.winnerBidId
                   ? '이 슬롯은 마감되었거나 낙찰되었습니다.'
-                  : '광고주 계정으로 입찰할 수 있습니다.'}
+                  : '광고주 계정으로 제안할 수 있습니다.'}
               </p>
             )}
           </article>
 
           <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
-            <h2 className="text-lg font-bold text-zinc-950">입찰 현황</h2>
+            <h2 className="text-lg font-bold text-zinc-950">제안 현황</h2>
             <p className="mt-1 text-sm text-zinc-500">최고가가 위에 표시됩니다.</p>
             {bids.length === 0 ? (
-              <p className="mt-4 text-sm text-zinc-500">아직 입찰이 없습니다.</p>
+              <p className="mt-4 text-sm text-zinc-500">아직 제안이 없습니다.</p>
             ) : (
               <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
                 {bids.map((bid) => (
@@ -161,8 +161,8 @@ export function TimeslotDetail({ id }: { id: string }) {
                         <p className="mt-1 text-lg font-bold">{formatWon(bid.bidAmount)}</p>
                       </div>
                       {bid.isLeading ? (
-                        <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
-                          최고 입찰가
+                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                          최고 제안가
                         </span>
                       ) : null}
                     </div>
@@ -186,9 +186,9 @@ export function TimeslotDetail({ id }: { id: string }) {
                             setBusyId(null);
                           }
                         }}
-                        className="mt-3 inline-flex h-9 items-center rounded-full bg-teal-700 px-3 text-xs font-semibold text-white hover:bg-teal-800 disabled:bg-zinc-300"
+                        className="mt-3 inline-flex h-9 items-center rounded-full bg-emerald-900 px-3 text-xs font-semibold text-white hover:bg-emerald-800 disabled:bg-zinc-300"
                       >
-                        {busyId === bid.id ? '낙찰 중...' : '이 입찰 낙찰'}
+                        {busyId === bid.id ? '선정 중...' : '이 제안 선정'}
                       </button>
                     ) : null}
                   </li>

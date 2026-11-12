@@ -85,7 +85,7 @@ export async function prepareAwardPayment(input: {
         bidId: input.bid.id,
         amount,
         bidAmount: input.bid.bidAmount,
-        orderName: input.auction.title.trim() || '역경매 낙찰',
+        orderName: input.auction.title.trim() || '캠페인 매칭',
         customerKey: input.customerKey,
         ...publicSupabasePayload(),
       }),

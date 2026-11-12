@@ -264,7 +264,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-200 bg-white px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <h2 id={titleId} className="text-base font-semibold text-zinc-950">
-              제안하기
+              콘텐츠 제안하기
             </h2>
             <p className="mt-0.5 truncate text-xs text-zinc-500">
               {auction.title || '제목 없음'} · 예산 {formatWon(auction.budget ?? 0)}
@@ -310,8 +310,8 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
             {bidValue > 0 ? (
               <FeeBreakdownCard role="creator" amount={bidValue} />
             ) : (
-              <div className="rounded-xl border border-teal-100 bg-teal-50 px-3 py-3 text-sm text-teal-950">
-                <p className="text-xs text-teal-800">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-sm text-emerald-950">
+                <p className="text-xs text-emerald-800">
                   제안 금액을 입력하면 통합 수수료(20%) 공제 후 최종 입금액이 실시간으로
                   계산됩니다.
                 </p>
@@ -407,7 +407,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? (
                 <>
@@ -462,6 +462,6 @@ function inputClass(invalid: boolean) {
     'h-11 w-full rounded-xl border bg-white px-3 text-sm text-zinc-950 outline-none focus:ring-2',
     invalid
       ? 'border-rose-300 focus:ring-rose-200'
-      : 'border-zinc-200 focus:border-teal-600 focus:ring-teal-100',
+      : 'border-zinc-200 focus:border-emerald-600 focus:ring-emerald-100',
   );
 }

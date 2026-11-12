@@ -20,15 +20,15 @@ export async function GET() {
       return unauthorizedJson('입찰을 조회하려면 로그인해 주세요.');
     }
     if (actor.role !== 'admin') {
-      return forbiddenJson('입찰 목록은 관리자만 볼 수 있습니다.');
+      return forbiddenJson('제안 목록은 관리자만 볼 수 있습니다.');
     }
 
     const client = createAdminClient();
     if (!client) {
       return NextResponse.json(
         {
-          error: 'SUPABASE_SERVICE_ROLE_KEY가 없어 입찰 목록을 DB에서 읽을 수 없습니다.',
-          errorMessage: 'SUPABASE_SERVICE_ROLE_KEY가 없어 입찰 목록을 DB에서 읽을 수 없습니다.',
+          error: 'SUPABASE_SERVICE_ROLE_KEY가 없어 제안 목록을 DB에서 읽을 수 없습니다.',
+          errorMessage: 'SUPABASE_SERVICE_ROLE_KEY가 없어 제안 목록을 DB에서 읽을 수 없습니다.',
           fallbackMock: true,
         },
         { status: 409, headers: NO_STORE },

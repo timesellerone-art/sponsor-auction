@@ -57,7 +57,7 @@ export function formatCountdown(ms: number | null) {
     return '마감 미정';
   }
   if (ms <= 0) {
-    return '마감됨';
+    return '모집 마감';
   }
   const totalSeconds = Math.floor(ms / 1000);
   const days = Math.floor(totalSeconds / 86400);

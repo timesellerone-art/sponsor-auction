@@ -22,7 +22,7 @@ test.describe('보안 접근 제어', () => {
     await page.goto('/my');
     await expect(page).toHaveURL(/\/login/);
     await expect(page.getByRole('heading', { name: '로그인' })).toBeVisible();
-    await expect(page.getByText('내 역경매는 로그인이 필요합니다.')).toBeVisible();
+    await expect(page.getByText('내 캠페인은 로그인이 필요합니다.')).toBeVisible();
 
     await page.goto('/payments/success');
     await expect(page).toHaveURL(/\/login/);

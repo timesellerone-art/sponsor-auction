@@ -51,7 +51,7 @@ export async function listChatMessages(
 ): Promise<DataResult<ChatMessage[]>> {
   const id = auctionId.trim();
   if (!id) {
-    return fail([], '경매 ID가 필요합니다.');
+    return fail([], '캠페인 ID가 필요합니다.');
   }
 
   const supabase = await getDataClient();
@@ -98,7 +98,7 @@ export async function sendChatMessage(
   const senderId = input.senderId?.trim() || null;
 
   if (!auctionId) {
-    return fail(null, '경매 ID가 필요합니다.');
+    return fail(null, '캠페인 ID가 필요합니다.');
   }
 
   let body: string;

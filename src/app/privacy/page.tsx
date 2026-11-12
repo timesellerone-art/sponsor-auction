@@ -6,7 +6,7 @@ export default function PrivacyPage() {
     <LegalDocument kicker="Legal" title="개인정보 처리방침" updated="2026년 10월 16일">
       <LegalSection title="1. 개인정보 처리 목적">
         <p>
-          {COMPANY.legalName}(이하 &quot;회사&quot;)는 회원가입, 역경매 매칭, 낙찰·결제, 정산,
+          {COMPANY.legalName}(이하 &quot;회사&quot;)는 회원가입, 캠페인 매칭, 선정·결제, 정산,
           고객 지원 및 법령상 의무 이행을 위해 개인정보를 처리합니다. 동의 없는 마케팅 목적
           이용은 하지 않습니다.
         </p>
@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <LegalSection title="2. 수집하는 개인정보 항목">
         <ul className="list-disc space-y-1 pl-5">
           <li>필수: 이름, 이메일, 비밀번호(또는 소셜 로그인 식별자), 회원 역할</li>
-          <li>서비스 이용: 캠페인·제안 내용, 채널 URL, 입찰 금액, 접속 로그·기기 정보</li>
+          <li>서비스 이용: 캠페인·제안 내용, 채널 URL, 제안 금액, 접속 로그·기기 정보</li>
           <li>결제: 주문번호, 결제금액, 결제수단 유형, 승인 시각(카드번호 등 민감 정보는 결제사가 처리)</li>
           <li>정산: 크리에이터 이름·이메일, 계좌 정보(운영자가 수집하는 경우)</li>
         </ul>

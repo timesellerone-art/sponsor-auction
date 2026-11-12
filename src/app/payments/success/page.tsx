@@ -33,7 +33,7 @@ function publicTaxInvoiceMessage(message: string | undefined) {
 function SuccessFallback() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 py-16">
-      <Loader2 className="size-6 animate-spin text-teal-700" aria-hidden />
+      <Loader2 className="size-6 animate-spin text-emerald-800" aria-hidden />
       <p className="mt-4 text-sm text-zinc-600">결제 결과를 확인하고 있습니다...</p>
     </div>
   );
@@ -199,7 +199,7 @@ function PaymentSuccessContent() {
 
         setMessage('결제가 완료되어 계약이 확정되었습니다. 대금은 플랫폼 에스크로로 보관됩니다.');
         setDone(true);
-        showToast('낙찰이 확정되었고 역경매가 마감되었습니다.', 'success');
+        showToast('선정이 확정되었고 모집이 마감되었습니다.', 'success');
         const href = recoverAuctionHref(confirmPayload.auctionId);
         pushNotification({
           userId: user?.id,
@@ -267,7 +267,7 @@ function PaymentSuccessContent() {
             <div className="mt-6 flex flex-col gap-2">
               <Link
                 href={auctionHref}
-                className="inline-flex h-11 w-full items-center justify-center rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800"
+                className="inline-flex h-11 w-full items-center justify-center rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800"
               >
                 다시 시도하기
               </Link>
@@ -281,7 +281,7 @@ function PaymentSuccessContent() {
           </>
         ) : (
           <>
-            <div className="flex items-center gap-2 text-teal-800">
+            <div className="flex items-center gap-2 text-emerald-800">
               {done ? (
                 <CheckCircle2 className="size-5" aria-hidden />
               ) : (
@@ -314,7 +314,7 @@ function PaymentSuccessContent() {
                 <div className="mt-6 flex flex-col gap-2">
                   <Link
                     href="/my"
-                    className="inline-flex h-11 w-full items-center justify-center rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800"
+                    className="inline-flex h-11 w-full items-center justify-center rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800"
                   >
                     마이페이지(대시보드)로 이동
                   </Link>

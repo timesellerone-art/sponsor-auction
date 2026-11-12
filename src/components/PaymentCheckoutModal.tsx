@@ -166,7 +166,7 @@ export function PaymentCheckoutModal({
     if (!checkout.auctionId || !checkout.bidId) {
       const info = parsePaymentError({
         code: 'PAYMENT_IDS_MISSING',
-        message: '경매/입찰 정보가 없어 결제를 진행할 수 없습니다.',
+        message: '캠페인/제안 정보가 없어 결제를 진행할 수 없습니다.',
       });
       setPayError(info);
       showToast(formatPaymentToast(info).text, 'error', 9000);
@@ -304,7 +304,7 @@ export function PaymentCheckoutModal({
                     className={cn(
                       'flex cursor-pointer items-center justify-between rounded-xl border px-3 py-3 text-sm',
                       method === option.value
-                        ? 'border-teal-600 bg-teal-50'
+                        ? 'border-emerald-600 bg-emerald-50'
                         : 'border-zinc-200 bg-white',
                     )}
                   >
@@ -318,7 +318,7 @@ export function PaymentCheckoutModal({
                       value={option.value}
                       checked={method === option.value}
                       onChange={() => setMethod(option.value)}
-                      className="size-4 accent-teal-700"
+                      className="size-4 accent-emerald-900"
                     />
                   </label>
                 ))}
@@ -341,7 +341,7 @@ export function PaymentCheckoutModal({
                   setRefundError(null);
                 }
               }}
-              className="mt-0.5 size-4 shrink-0 accent-teal-700"
+              className="mt-0.5 size-4 shrink-0 accent-emerald-900"
               aria-label="구매 조건 확인 및 환불 규정에 동의합니다"
             />
             <span>
@@ -350,7 +350,7 @@ export function PaymentCheckoutModal({
                 href="/refund"
                 target="_blank"
                 rel="noreferrer"
-                className="font-semibold text-teal-800 hover:underline"
+                className="font-semibold text-emerald-800 hover:underline"
               >
                 환불 규정
               </Link>
@@ -379,7 +379,7 @@ export function PaymentCheckoutModal({
             onClick={() => {
               void handlePay();
             }}
-            className="inline-flex h-11 flex-[1.4] items-center justify-center gap-2 rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+            className="inline-flex h-11 flex-[1.4] items-center justify-center gap-2 rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
           >
             {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
             {busy ? '결제 요청 중...' : '결제하기'}

@@ -40,7 +40,7 @@ export default function RefundPage() {
         </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>낙찰 후 정당한 사유 없이 과업을 거부·방치하는 행위</li>
-          <li>허위 채널 정보, 대행 사칭, 중복 계정으로 입찰하는 행위</li>
+          <li>허위 채널 정보, 대행 사칭, 중복 계정으로 제안하는 행위</li>
           <li>광고 미이행으로 100% 환불이 반복되는 경우</li>
           <li>법령 위반 콘텐츠 게시 또는 광고주 자료의 무단 유출</li>
         </ul>

@@ -299,7 +299,7 @@ export function AdminDashboard({
     }
 
     const confirmed = window.confirm(
-      `"${auction.title || '제목 없음'}"을 삭제할까요? 연결된 입찰도 함께 사라질 수 있습니다.`,
+      `"${auction.title || '제목 없음'}"을 삭제할까요? 연결된 제안도 함께 사라질 수 있습니다.`,
     );
     if (!confirmed) {
       return;
@@ -489,10 +489,10 @@ export function AdminDashboard({
   };
 
   const tabs: { id: TabId; label: string }[] = [
-    { id: 'auctions', label: '역경매 관리' },
+    { id: 'auctions', label: '캠페인 관리' },
     { id: 'users', label: '회원 관리' },
     { id: 'payouts', label: '정산 관리' },
-    { id: 'bids', label: '입찰 관리' },
+    { id: 'bids', label: '제안 관리' },
     { id: 'compliance', label: '우회 모니터링' },
   ];
 
@@ -500,12 +500,12 @@ export function AdminDashboard({
     <AccessGuard allow="admin">
       <div className="flex min-w-0 w-full max-w-none flex-1 flex-col gap-4">
         <div>
-          <p className="text-sm font-semibold tracking-wide text-teal-800">Admin</p>
+          <p className="text-sm font-semibold tracking-wide text-emerald-800">Admin</p>
           <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">
             관리자 대시보드
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
-            역경매, 회원, 정산, 우회 시도를 한곳에서 모니터링하고 처리할 수 있습니다.
+            캠페인, 회원, 정산, 우회 시도를 한곳에서 모니터링하고 처리할 수 있습니다.
           </p>
         </div>
 

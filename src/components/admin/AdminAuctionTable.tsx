@@ -113,7 +113,7 @@ export function AdminAuctionTable({
         query={query}
         onQueryChange={setQuery}
         placeholder="캠페인 제목, 설명, 광고주 이름/이메일 검색"
-        searchLabel="역경매 검색"
+        searchLabel="캠페인 검색"
         filters={FILTERS}
         filter={filter}
         onFilterChange={setFilter}
@@ -145,7 +145,7 @@ export function AdminAuctionTable({
 
       {filtered.length === 0 ? (
         <div className="p-4">
-          <AdminEmptyState message="조건에 맞는 역경매가 없습니다." />
+          <AdminEmptyState message="조건에 맞는 캠페인이 없습니다." />
         </div>
       ) : (
         <div className="max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto">
@@ -211,7 +211,7 @@ export function AdminAuctionTable({
                             type="button"
                             disabled={anyBusy}
                             onClick={() => onUnblind(auction)}
-                            className="inline-flex items-center gap-1 rounded-md border border-teal-200 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
                             {busy ? '처리 중...' : '블라인드 해제'}

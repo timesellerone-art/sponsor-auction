@@ -148,7 +148,7 @@ export function CreateAuctionModal({
       >
         <div className="flex shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 py-3 sm:px-5">
           <h2 id={titleId} className="text-base font-semibold text-zinc-950">
-            역경매 요청하기
+            캠페인 등록
           </h2>
           <button
             type="button"
@@ -260,7 +260,7 @@ export function CreateAuctionModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-teal-700 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? (
                 <>
@@ -268,7 +268,7 @@ export function CreateAuctionModal({
                   등록 중...
                 </>
               ) : (
-                '역경매 등록'
+                '캠페인 등록'
               )}
             </button>
           </div>
@@ -315,6 +315,6 @@ function inputClass(invalid: boolean) {
     'h-11 w-full rounded-xl border bg-white px-3 text-sm text-zinc-950 outline-none focus:ring-2',
     invalid
       ? 'border-rose-300 focus:ring-rose-200'
-      : 'border-zinc-200 focus:border-teal-600 focus:ring-teal-100',
+      : 'border-zinc-200 focus:border-emerald-600 focus:ring-emerald-100',
   );
 }

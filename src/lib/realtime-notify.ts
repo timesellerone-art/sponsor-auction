@@ -180,7 +180,7 @@ export async function applyRealtimeChange(change: RealtimeChange, userId: string
     emitInApp({
       userId,
       type: 'bid_received',
-      title: '새 입찰',
+      title: '새 제안',
       body: `"${meta.title}"에 ${name}님의 제안(${formatWon(amount)})이 도착했습니다.`,
       href,
     });
@@ -209,8 +209,8 @@ export async function applyRealtimeChange(change: RealtimeChange, userId: string
     emitInApp({
       userId,
       type: 'timeslot_bid',
-      title: '인벤토리 입찰',
-      body: `"${meta.title}"에 ${name}님의 입찰(${formatWon(amount)})이 도착했습니다.`,
+      title: '인벤토리 제안',
+      body: `"${meta.title}"에 ${name}님의 제안(${formatWon(amount)})이 도착했습니다.`,
       href: `/inventory/${slotId}`,
     });
     return;

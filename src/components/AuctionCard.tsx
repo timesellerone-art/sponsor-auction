@@ -91,7 +91,7 @@ const statusMeta: Record<AuctionStatus, { label: string; className: string }> = 
   },
   completed: {
     label: AUCTION_STATUS_LABEL.completed,
-    className: 'bg-teal-50 text-teal-900 ring-teal-200',
+    className: 'bg-emerald-50 text-emerald-900 ring-emerald-200',
   },
   cancelled: {
     label: AUCTION_STATUS_LABEL.cancelled,
@@ -147,7 +147,7 @@ export function AuctionCard({
   const isAdvertiser = Boolean(ready && user && canCreateAuction);
 
   return (
-    <article className="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
+    <article className="flex h-full min-w-0 flex-col rounded-2xl border border-stone-200/80 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
       <div className="flex min-w-0 items-start gap-2">
         <span
           className={cn(
@@ -160,7 +160,7 @@ export function AuctionCard({
         </span>
         <div className="flex max-w-[48%] shrink-0 flex-col items-end gap-1">
           {owned ? (
-            <span className="rounded-full bg-teal-700 px-2 py-1 text-[11px] font-semibold text-white">
+            <span className="rounded-full bg-emerald-900 px-2 py-1 text-[11px] font-semibold text-white">
               내 캠페인
             </span>
           ) : null}
@@ -175,7 +175,12 @@ export function AuctionCard({
         </div>
       </div>
 
-      <h3 className="mt-3 line-clamp-2 min-w-0 break-words text-base font-semibold text-zinc-950">
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+          AI 가이드
+        </span>
+      </div>
+      <h3 className="mt-2 line-clamp-2 min-w-0 break-words text-base font-semibold text-stone-900">
         <Link href={href} className="hover:underline">
           {title}
         </Link>
@@ -200,7 +205,7 @@ export function AuctionCard({
         <AuctionCountdown className="min-w-0 truncate" deadline={auction.deadline} />
         <span className="inline-flex shrink-0 items-center gap-1">
           <Users className="size-3.5" aria-hidden />
-          입찰 {auction.bidsCount ?? 0}
+          제안 {auction.bidsCount ?? 0}
         </span>
       </div>
 
@@ -213,7 +218,7 @@ export function AuctionCard({
             aria-label={VALIDATION.selfCampaignHint}
             className="inline-flex h-10 min-h-10 w-full min-w-0 cursor-not-allowed items-center justify-center rounded-full border border-zinc-200 bg-zinc-100 px-3 text-sm font-semibold text-zinc-400"
           >
-            제안하기
+            콘텐츠 제안하기
           </button>
           <p className="mt-1.5 text-center text-xs text-zinc-500">{VALIDATION.selfCampaignHint}</p>
         </div>
@@ -221,9 +226,9 @@ export function AuctionCard({
         <button
           type="button"
           onClick={() => setBidOpen(true)}
-          className="mt-4 inline-flex h-10 min-h-10 w-full min-w-0 items-center justify-center rounded-full border border-zinc-200 px-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
+          className="mt-4 inline-flex h-10 min-h-10 w-full min-w-0 items-center justify-center rounded-full bg-emerald-900 px-3 text-sm font-semibold text-white hover:bg-emerald-800"
         >
-          제안하기
+          콘텐츠 제안하기
         </button>
       ) : auctionOpen && ready && !user ? (
         <button
@@ -232,18 +237,18 @@ export function AuctionCard({
             showToast(ACCESS_REASON['creator-auth']);
             router.push(loginPath('creator-auth', href));
           }}
-          className="mt-4 inline-flex min-h-10 w-full min-w-0 items-center justify-center rounded-full border border-zinc-200 px-3 py-2 text-center text-sm font-semibold break-keep text-zinc-800 hover:bg-zinc-50"
+          className="mt-4 inline-flex min-h-10 w-full min-w-0 items-center justify-center rounded-full bg-emerald-900 px-3 py-2 text-center text-sm font-semibold break-keep text-white hover:bg-emerald-800"
         >
-          로그인하고 제안하기
+          로그인하고 콘텐츠 제안하기
         </button>
       ) : isAdvertiser && auction.id ? (
         <Link
           href={owned ? `${href}#proposals` : href}
-          className="mt-4 inline-flex h-10 min-h-10 w-full min-w-0 items-center justify-center rounded-full bg-teal-50 px-3 text-sm font-semibold text-teal-900 hover:bg-teal-100"
+          className="mt-4 inline-flex h-10 min-h-10 w-full min-w-0 items-center justify-center rounded-full bg-emerald-50 px-3 text-sm font-semibold text-emerald-900 hover:bg-emerald-100"
         >
           {owned
             ? auctionOpen
-              ? '내 캠페인 입찰 현황'
+              ? '내 캠페인 제안 현황'
               : '내 캠페인 보기'
             : auctionOpen
               ? '진행 중 · 상세 보기'
@@ -252,7 +257,7 @@ export function AuctionCard({
       ) : (
         <p className="mt-4 rounded-xl bg-zinc-50 px-3 py-2 text-center text-xs text-zinc-500">
           {!auctionOpen
-            ? '입찰 불가'
+            ? '모집 마감'
             : !ready
               ? '로그인 후 크리에이터 계정으로 제안할 수 있습니다.'
               : '크리에이터 전용 기능입니다'}
@@ -283,7 +288,7 @@ export function AuctionCard({
 export function AuctionCardSkeleton() {
   return (
     <div
-      className="animate-pulse rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5"
+      className="animate-pulse rounded-2xl border border-stone-200/80 bg-white p-4 sm:p-5"
       aria-hidden
     >
       <div className="flex justify-between">

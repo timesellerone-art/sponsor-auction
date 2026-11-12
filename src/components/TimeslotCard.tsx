@@ -31,22 +31,22 @@ export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
   const price = slot.currentHighestBid > 0 ? slot.currentHighestBid : slot.startingPrice;
 
   return (
-    <article className="flex h-full min-w-0 flex-col rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5">
+    <article className="flex h-full min-w-0 flex-col rounded-2xl border border-stone-200/80 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
       <div className="flex items-start justify-between gap-2">
-        <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-800">
+        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
           {PLATFORM_LABELS[slot.platform] ?? slot.platform}
         </span>
         <span
           className={cn(
             'rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-inset',
             slot.status === 'awarded'
-              ? 'bg-teal-50 text-teal-900 ring-teal-200'
+              ? 'bg-emerald-50 text-emerald-900 ring-emerald-200'
               : open
                 ? 'bg-emerald-50 text-emerald-800 ring-emerald-200'
                 : 'bg-zinc-100 text-zinc-700 ring-zinc-200',
           )}
         >
-          {slot.status === 'awarded' ? '낙찰' : open ? '입찰 가능' : '마감'}
+          {slot.status === 'awarded' ? '선정' : open ? '제안 가능' : '마감'}
         </span>
       </div>
       <h3 className="mt-3 line-clamp-2 text-base font-semibold text-zinc-950">
@@ -68,13 +68,13 @@ export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
       <p className="mt-1 text-xs text-zinc-500">예상 조회수 {formatViews(slot.expectedViews)}</p>
       <div className="mt-auto flex items-center justify-between gap-2 pt-4 text-xs">
         <AuctionCountdown deadline={slot.deadline} />
-        <span className="text-zinc-500">입찰 {slot.bidsCount}</span>
+        <span className="text-zinc-500">제안 {slot.bidsCount}</span>
       </div>
       <Link
         href={href}
-        className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800"
+        className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-emerald-900 px-3 text-sm font-semibold text-white hover:bg-emerald-800"
       >
-        {open ? '입찰하기' : '상세 보기'}
+        {open ? '제안하기' : '상세 보기'}
       </Link>
     </article>
   );

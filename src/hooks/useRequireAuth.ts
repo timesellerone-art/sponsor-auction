@@ -43,7 +43,7 @@ export function useRequireAuth() {
       if (!canPlaceBid) {
         showToast(
           hasAuthRole(user, 'creator')
-            ? '크리에이터 모드로 전환하면 입찰할 수 있습니다.'
+            ? '크리에이터 모드로 전환하면 콘텐츠를 제안할 수 있습니다.'
             : authGuardMessage('creator-forbidden'),
         );
         return false;
@@ -61,7 +61,7 @@ export function useRequireAuth() {
       if (!canCreateAuction) {
         showToast(
           hasAuthRole(user, 'advertiser')
-            ? '광고주 모드로 전환하면 역경매를 등록할 수 있습니다.'
+            ? '광고주 모드로 전환하면 캠페인을 등록할 수 있습니다.'
             : authGuardMessage('advertiser-forbidden'),
         );
         return false;

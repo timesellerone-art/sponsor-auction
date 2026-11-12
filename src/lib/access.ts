@@ -12,7 +12,7 @@ export const AUTH_PRESENT_COOKIE_NAME = 'sponsor-auction-auth';
 export const ACCESS_REASON = {
   'admin-auth': '관리자 페이지는 로그인이 필요합니다.',
   'admin-forbidden': '관리자만 접근할 수 있는 페이지입니다.',
-  'advertiser-auth': '내 역경매는 로그인이 필요합니다.',
+  'advertiser-auth': '내 캠페인은 로그인이 필요합니다.',
   'advertiser-forbidden': '광고주 전용 페이지입니다.',
   'creator-auth': '제안은 로그인 후 크리에이터 계정으로 할 수 있습니다.',
   'creator-forbidden': '크리에이터 전용 기능입니다.',

@@ -211,7 +211,7 @@ export async function getAdminBids(seedFromServer: BidItem[] = []): Promise<Data
     if (response.ok && Array.isArray(payload?.data)) {
       fromDb = asBidItems(payload.data);
     } else if (!payload?.fallbackMock && response.status !== 409 && !response.ok && fromDb.length === 0) {
-      return fail([], payload?.error || payload?.errorMessage || '입찰 목록을 불러오지 못했습니다.');
+      return fail([], payload?.error || payload?.errorMessage || '제안 목록을 불러오지 못했습니다.');
     }
   } catch (error) {
     console.warn('[SponsorAuction] 입찰 API 목록 조회 실패', error);
@@ -229,7 +229,7 @@ export async function getAdminBids(seedFromServer: BidItem[] = []): Promise<Data
     }
     const list = Array.from(merged.values());
     if (list.length === 0) {
-      return fail([], '등록된 입찰이 없습니다.');
+      return fail([], '등록된 제안이 없습니다.');
     }
     return ok(list);
   }

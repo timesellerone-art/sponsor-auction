@@ -59,7 +59,7 @@ test.describe('전 페이지 가로 스크롤 0px', () => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
       await page.goto('/');
-      await expect(page.getByRole('heading', { name: '진행 중인 역경매' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: '진행 중인 오픈 캠페인' })).toBeVisible();
       await expectNoHorizontalScroll(page, `${viewport.name} /`);
 
       await page.getByRole('link', { name: ACTIVE_AUCTION }).click();
@@ -74,7 +74,7 @@ test.describe('전 페이지 가로 스크롤 0px', () => {
       await expectNoHorizontalScroll(page, `${viewport.name} /admin 역경매`);
 
       await page.getByRole('button', { name: '정산 관리' }).click();
-      await expect(page.getByText('총 결제/입찰 금액')).toBeVisible();
+      await expect(page.getByText('총 결제/제안 금액')).toBeVisible();
       await expectNoHorizontalScroll(page, `${viewport.name} /admin 정산`);
     });
   }

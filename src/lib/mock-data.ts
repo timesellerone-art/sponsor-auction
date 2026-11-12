@@ -461,13 +461,13 @@ export async function getAuctions(): Promise<DataResult<AuctionItem[]>> {
     }));
 
     if (auctions.length === 0) {
-      return fail([], '등록된 경매가 없습니다.');
+      return fail([], '등록된 캠페인이 없습니다.');
     }
 
     return ok(auctions);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : '경매 목록을 불러오지 못했습니다.';
+      error instanceof Error ? error.message : '캠페인 목록을 불러오지 못했습니다.';
     return fail([], message);
   }
 }
@@ -477,14 +477,14 @@ export async function getAuctionById(
 ): Promise<DataResult<AuctionItem | null>> {
   try {
     if (!isNonEmptyString(id)) {
-      return fail(null, '유효한 경매 ID가 필요합니다.');
+      return fail(null, '유효한 캠페인 ID가 필요합니다.');
     }
 
     const auctions = guardAuctionList(auctionsStore);
     const auction = auctions.find((item) => item.id === id) ?? null;
 
     if (!auction) {
-      return fail(null, '해당 경매를 찾을 수 없습니다.');
+      return fail(null, '해당 캠페인을 찾을 수 없습니다.');
     }
 
     return ok({
@@ -497,7 +497,7 @@ export async function getAuctionById(
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : '경매 정보를 불러오지 못했습니다.';
+      error instanceof Error ? error.message : '캠페인 정보를 불러오지 못했습니다.';
     return fail(null, message);
   }
 }
@@ -507,7 +507,7 @@ export async function createAuction(
 ): Promise<DataResult<AuctionItem | null>> {
   try {
     if (!data || typeof data !== 'object') {
-      return fail(null, '경매 데이터가 필요합니다.');
+      return fail(null, '캠페인 데이터가 필요합니다.');
     }
 
     if (!isNonEmptyString(data.platform)) {
@@ -545,7 +545,7 @@ export async function createAuction(
     return ok(created);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : '경매를 생성하지 못했습니다.';
+      error instanceof Error ? error.message : '캠페인을 생성하지 못했습니다.';
     return fail(null, message);
   }
 }
@@ -555,11 +555,11 @@ export async function createBid(
 ): Promise<DataResult<BidItem | null>> {
   try {
     if (!data || typeof data !== 'object') {
-      return fail(null, '입찰 데이터가 필요합니다.');
+      return fail(null, '제안 데이터가 필요합니다.');
     }
 
     if (!isNonEmptyString(data.auctionId)) {
-      return fail(null, '경매 ID가 필요합니다.');
+      return fail(null, '캠페인 ID가 필요합니다.');
     }
 
     if (!isNonEmptyString(data.creatorName)) {
@@ -572,7 +572,7 @@ export async function createBid(
 
     const auction = auctionsStore.find((item) => item.id === data.auctionId);
     if (!auction) {
-      return fail(null, '해당 경매를 찾을 수 없습니다.');
+      return fail(null, '해당 캠페인을 찾을 수 없습니다.');
     }
 
     if (data.creatorId && isCampaignAuthor(auction, data.creatorId)) {
@@ -637,7 +637,7 @@ export async function createBid(
     return ok(created);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : '입찰을 등록하지 못했습니다.';
+      error instanceof Error ? error.message : '제안을 등록하지 못했습니다.';
     return fail(null, message);
   }
 }
@@ -704,13 +704,13 @@ export async function getBids(): Promise<DataResult<BidItem[]>> {
   try {
     const bids = guardBidList(bidsStore);
     if (bids.length === 0) {
-      return fail([], '등록된 입찰이 없습니다.');
+      return fail([], '등록된 제안이 없습니다.');
     }
 
     return ok(bids);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : '입찰 목록을 불러오지 못했습니다.';
+      error instanceof Error ? error.message : '제안 목록을 불러오지 못했습니다.';
     return fail([], message);
   }
 }
@@ -720,7 +720,7 @@ export async function getBidsByAuctionId(
 ): Promise<DataResult<BidItem[]>> {
   try {
     if (!isNonEmptyString(auctionId)) {
-      return fail([], '유효한 경매 ID가 필요합니다.');
+      return fail([], '유효한 캠페인 ID가 필요합니다.');
     }
 
     const bids = guardBidList(bidsStore)
@@ -743,12 +743,12 @@ export async function awardBid(
 ): Promise<DataResult<AuctionItem | null>> {
   try {
     if (!isNonEmptyString(auctionId) || !isNonEmptyString(bidId)) {
-      return fail(null, '유효한 경매/제안 ID가 필요합니다.');
+      return fail(null, '유효한 캠페인/제안 ID가 필요합니다.');
     }
 
     const auction = auctionsStore.find((item) => item.id === auctionId);
     if (!auction) {
-      return fail(null, '해당 경매를 찾을 수 없습니다.');
+      return fail(null, '해당 캠페인을 찾을 수 없습니다.');
     }
 
     const awardBlocked = getAwardBlockReason(auction);
@@ -800,12 +800,12 @@ export async function deleteAuction(
 ): Promise<DataResult<boolean>> {
   try {
     if (!isNonEmptyString(id)) {
-      return fail(false, '유효한 경매 ID가 필요합니다.');
+      return fail(false, '유효한 캠페인 ID가 필요합니다.');
     }
 
     const exists = auctionsStore.some((item) => item.id === id);
     if (!exists) {
-      return fail(false, '해당 경매를 찾을 수 없습니다.');
+      return fail(false, '해당 캠페인을 찾을 수 없습니다.');
     }
 
     auctionsStore = auctionsStore.filter((item) => item.id !== id);
@@ -820,7 +820,7 @@ export async function deleteAuction(
     return ok(true);
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : '경매를 삭제하지 못했습니다.';
+      error instanceof Error ? error.message : '캠페인을 삭제하지 못했습니다.';
     return fail(false, message);
   }
 }
@@ -831,12 +831,12 @@ export async function updateAuctionStatus(
 ): Promise<DataResult<AuctionItem | null>> {
   try {
     if (!isNonEmptyString(id)) {
-      return fail(null, '유효한 경매 ID가 필요합니다.');
+      return fail(null, '유효한 캠페인 ID가 필요합니다.');
     }
 
     const current = auctionsStore.find((item) => item.id === id);
     if (!current) {
-      return fail(null, '해당 경매를 찾을 수 없습니다.');
+      return fail(null, '해당 캠페인을 찾을 수 없습니다.');
     }
 
     const updated: AuctionItem = { ...current, status };
@@ -864,12 +864,12 @@ export async function updateAuctionBlind(
 ): Promise<DataResult<AuctionItem | null>> {
   try {
     if (!isNonEmptyString(id)) {
-      return fail(null, '유효한 경매 ID가 필요합니다.');
+      return fail(null, '유효한 캠페인 ID가 필요합니다.');
     }
 
     const current = auctionsStore.find((item) => item.id === id);
     if (!current) {
-      return fail(null, '해당 경매를 찾을 수 없습니다.');
+      return fail(null, '해당 캠페인을 찾을 수 없습니다.');
     }
 
     if (current.isBlind === isBlind) {

@@ -7,14 +7,14 @@ export default function TermsPage() {
       <LegalSection title="제1조 (목적)">
         <p>
           이 약관은 {COMPANY.legalName}(서비스명 {COMPANY.brand}, 이하 &quot;회사&quot;)가
-          운영하는 B2B 마이크로 스폰서십 역경매 플랫폼의 이용 조건과 회사·광고주·크리에이터의
+          운영하는 B2B 크리에이터 콘텐츠 매칭 플랫폼의 이용 조건과 회사·광고주·크리에이터의
           권리·의무 및 책임 한계를 정합니다.
         </p>
       </LegalSection>
       <LegalSection title="제2조 (정의)">
         <ul className="list-disc space-y-1 pl-5">
-          <li>&quot;광고주&quot;는 캠페인(역경매)을 등록하고 낙찰·결제를 하는 사업자 회원입니다.</li>
-          <li>&quot;크리에이터&quot;는 제안에 입찰하고 낙찰 시 콘텐츠 과업을 이행하는 회원입니다.</li>
+          <li>&quot;광고주&quot;는 오픈 캠페인을 등록하고 선정·결제를 하는 사업자 회원입니다.</li>
+          <li>&quot;크리에이터&quot;는 캠페인에 콘텐츠를 제안하고 선정 시 과업을 이행하는 회원입니다.</li>
           <li>&quot;낙찰&quot;은 광고주가 제안을 선택하고 결제가 승인된 상태를 말합니다.</li>
           <li>
             &quot;과업&quot;은 캠페인에 명시된 콘텐츠 제작·게시·납품 등 광고주와 크리에이터 사이의
@@ -30,7 +30,7 @@ export default function TermsPage() {
       </LegalSection>
       <LegalSection title="제4조 (서비스의 성격 및 중개 책임의 한계)">
         <p>
-          회사는 광고주와 크리에이터 사이의 캠페인 등록, 입찰·매칭, 안전결제 및 정산 정보를
+          회사는 광고주와 크리에이터 사이의 캠페인 등록, 제안·매칭, 안전결제 및 정산 정보를
           중개·제공하는 온라인 플랫폼 사업자입니다. 콘텐츠의 기획·제작·게시·법령 준수 등 과업
           이행은 광고주와 크리에이터 사이의 계약 관계이며, 회사는 당사자가 되지 않습니다.
         </p>

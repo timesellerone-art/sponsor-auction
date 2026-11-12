@@ -56,10 +56,10 @@ export default function InventoryPage() {
 
   return (
     <PageContainer className="flex min-w-0 flex-1 flex-col py-8 sm:py-12">
-      <p className="text-sm font-semibold tracking-wide text-teal-800">크리에이터 인벤토리</p>
+      <p className="text-sm font-semibold tracking-wide text-emerald-800">크리에이터 인벤토리</p>
       <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">타임슬롯 마켓플레이스</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
-        크리에이터가 등록한 예상 조회수·시작가 슬롯에 광고주가 입찰합니다. 마감 전 최고가가 실시간으로
+        크리에이터가 등록한 예상 조회수·시작가 슬롯에 광고주가 콘텐츠를 제안합니다. 마감 전 최고가가 실시간으로
         갱신됩니다.
       </p>
 
@@ -78,9 +78,9 @@ export default function InventoryPage() {
       ) : (
         <div className="mt-8 flex flex-col gap-10">
           <section>
-            <h2 className="text-lg font-bold text-zinc-950">입찰 가능</h2>
+            <h2 className="text-lg font-bold text-zinc-950">제안 가능</h2>
             {open.length === 0 ? (
-              <p className="mt-4 text-sm text-zinc-500">지금 입찰 가능한 슬롯이 없습니다.</p>
+              <p className="mt-4 text-sm text-zinc-500">지금 제안 가능한 슬롯이 없습니다.</p>
             ) : (
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {open.map((slot) => (
