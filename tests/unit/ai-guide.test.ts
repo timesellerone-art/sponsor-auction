@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   GEMINI_FLASH_MODELS,
+  buildGuidePrompt,
   getGeminiApiKey,
   guideFingerprint,
   guideToAiReport,
@@ -30,14 +31,15 @@ describe('AI 가이드 입력 가드', () => {
 });
 
 describe('AI 가이드 JSON 정규화', () => {
-  it('콘셉트 3개와 예상 효과가 있으면 통과한다', () => {
+  it('콘셉트 3개와 캠페인 핵심 전략이 있으면 통과한다', () => {
     const parsed = parseGuidePayload({
       concepts: [
         { title: '3초 훅 컷', description: '첫 장면에 제품 클로즈업을 넣고 자막으로 궁금증을 던지세요. 바로 사용샷으로 이어가세요.' },
         { title: '루틴 삽입', summary: '세안 루틴 중간에 제품을 자연스럽게 꺼내 바르세요.' },
         { title: '저장 유도 CTA', description: '마지막 2초에 저장 버튼을 가리키며 챌린지를 안내하세요.' },
       ],
-      expectedEffect: '릴스 저장과 프로필 방문이 함께 늘어납니다. 예산은 1~2명 테스트 후 확장하세요.',
+      expectedEffect:
+        '릴스 저장과 프로필 방문을 한 편의 고밀도 콘텐츠로 모으세요. 기획력이 검증된 1명의 핵심 크리에이터와 1:1 매칭하여 제작하세요.',
     });
     assert.equal(parsed?.concepts.length, 3);
     assert.equal(parsed?.concepts[1]?.description.includes('세안 루틴'), true);
@@ -66,6 +68,18 @@ describe('AI 가이드 JSON 정규화', () => {
     assert.notEqual(guideFingerprint(input), guideFingerprint({ ...input, budget: 600000 }));
   });
 
+  it('프롬프트에 1:1 단독 매칭 규칙을 넣는다', () => {
+    const prompt = buildGuidePrompt({
+      title: '비건 세럼',
+      platform: 'instagram_reels',
+      budget: 500000,
+      description: '민감 피부를 위한 세럼 리뷰를 15초로 찍어 주세요.',
+    });
+    assert.match(prompt, /단 1명의 크리에이터를 선정하여 1:1로 집중 제작/);
+    assert.match(prompt, /3~5명과 협업/);
+    assert.equal(prompt.includes('1~2명의 핵심 크리에이터'), false);
+  });
+
   it('placeholder Gemini 키는 없는 것으로 본다', () => {
     assert.equal(getGeminiApiKey({ GEMINI_API_KEY: '   ' }), '');
     assert.equal(getGeminiApiKey({ GEMINI_API_KEY: 'YOUR_GEMINI_API_KEY' }), '');
@@ -88,7 +102,8 @@ describe('AI 가이드 JSON 정규화', () => {
         { title: '루틴', description: '일상 장면에 제품을 자연스럽게 배치하세요.' },
         { title: 'CTA', description: '마지막에 저장을 유도하세요.' },
       ],
-      expected_effect: '숏폼 저장과 프로필 방문이 함께 늘어납니다. 1~2명으로 먼저 테스트하세요.',
+      expected_effect:
+        '숏폼 저장과 프로필 방문을 한 편의 콘텐츠에 집중하세요. 기획력이 검증된 1명의 핵심 크리에이터와 1:1 매칭하여 제작하세요.',
     });
     assert.equal(parsed?.concepts.length, 3);
     assert.equal(Boolean(parsed?.expectedEffect), true);

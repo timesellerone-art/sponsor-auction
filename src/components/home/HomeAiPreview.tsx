@@ -111,6 +111,10 @@ export function HomeAiPreview() {
                 <p className="mt-4 text-xs font-medium text-white/45">
                   {platformLabel(active.input.platform)} · 예산 {formatWon(active.input.budget)}
                 </p>
+                <div className="mt-4 rounded-xl bg-[#EA580C] px-3.5 py-3">
+                  <p className="text-[11px] font-semibold tracking-wide text-white/80">캠페인 핵심 전략</p>
+                  <p className="mt-1 text-sm leading-6 text-white">{report.expectedEffect}</p>
+                </div>
               </div>
             </div>
 

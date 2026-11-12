@@ -20,7 +20,7 @@ export function AiAgentGuide({ report, source, loading = false }: AiAgentGuidePr
           </span>
           <div className="min-w-0">
             <h2 className="text-base font-semibold text-clink">AI 에이전트 가이드</h2>
-            <p className="text-xs text-clink-muted">추천 영상 콘셉트와 예상 효과</p>
+            <p className="text-xs text-clink-muted">추천 영상 콘셉트와 캠페인 핵심 전략</p>
           </div>
         </div>
         <span
@@ -59,7 +59,7 @@ export function AiAgentGuide({ report, source, loading = false }: AiAgentGuidePr
             ))}
           </ol>
           <div className="rounded-xl bg-clink px-3 py-3 text-white">
-            <p className="text-xs font-semibold tracking-wide text-white/80">예상 효과</p>
+            <p className="text-xs font-semibold tracking-wide text-white/80">캠페인 핵심 전략</p>
             <p className="mt-1 text-sm leading-5 text-white/90">{report.expectedEffect}</p>
           </div>
         </div>

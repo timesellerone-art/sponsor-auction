@@ -1,6 +1,7 @@
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
+  AI_GUIDE_MATCHING_RULES,
   GEMINI_FLASH_MODELS,
   buildGuidePrompt,
   extractJsonPayload,
@@ -139,6 +140,9 @@ async function writeDbGuide(campaignId: string, fingerprint: string, payload: Ai
 
 function geminiRequestBody(input: AiGuideRequest) {
   return {
+    systemInstruction: {
+      parts: [{ text: AI_GUIDE_MATCHING_RULES }],
+    },
     contents: [
       {
         role: 'user',

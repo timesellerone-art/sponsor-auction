@@ -5,7 +5,11 @@ import type {
   AiReport,
 } from '@/types/ai';
 
-export const AI_GUIDE_CACHE_PREFIX = 'sa:ai-guide:v1:';
+export const AI_GUIDE_CACHE_PREFIX = 'sa:ai-guide:v2:';
+export const AI_GUIDE_PROMPT_VERSION = 'v2-1to1';
+
+export const AI_GUIDE_MATCHING_RULES = `[절대 금지]: "3~5명과 협업", "여러 크리에이터와 나누어", "다수의 인플루언서 분산 집행" 등 예산을 쪼개어 여러 명과 동시에 매칭한다는 표현은 절대 사용하지 마세요.
+[필수 기준]: 본 플랫폼은 캠페인 1건당 가장 기획력이 뛰어난 단 1명의 크리에이터를 선정하여 1:1로 집중 제작하는 방식입니다. 모든 전략과 기대 포인트는 '선정된 1명의 크리에이터가 해당 예산을 바탕으로 고밀도 콘텐츠 1편을 제작하는 기준'으로만 작성하세요.`;
 
 export const GEMINI_FLASH_MODELS = [
   'gemini-3.5-flash-lite',
@@ -40,6 +44,7 @@ export function geminiGenerateUrl(model: string) {
 
 export function guideFingerprint(input: Pick<AiGuideRequest, 'title' | 'description' | 'platform' | 'budget'>) {
   return [
+    AI_GUIDE_PROMPT_VERSION,
     (input.title ?? '').trim(),
     String(input.platform ?? '').trim(),
     String(Number.isFinite(input.budget) ? input.budget : 0),
@@ -206,12 +211,13 @@ export function buildGuidePrompt(input: AiGuideRequest) {
   const budget =
     typeof input.budget === 'number' && Number.isFinite(input.budget) ? `${input.budget}원` : '미정';
   return `당신은 한국 숏폼 광고 디렉터입니다. 아래 캠페인을 분석해 크리에이터가 바로 촬영에 쓸 수 있는 구체적인 콘셉트만 JSON으로 작성하세요.
+${AI_GUIDE_MATCHING_RULES}
 규칙:
 - 반드시 한국어
 - concepts는 정확히 3개
 - 각 title은 15자 이내
 - 각 description은 구체적인 촬영/연출 가이드 2문장 이내
-- expectedEffect는 캠페인 예산과 플랫폼 특성을 반영한 예상 성과 및 운영 전략 2문장 이내
+- expectedEffect는 수치 예측이 아닌 캠페인 핵심 전략(선정된 1명의 크리에이터가 해당 예산으로 고밀도 콘텐츠 1편을 만들 때의 연출·전환 포인트) 2문장 이내
 - JSON 외 텍스트 금지
 
 캠페인 제목: ${input.title || '제목 없음'}
