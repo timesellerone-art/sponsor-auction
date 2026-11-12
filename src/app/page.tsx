@@ -8,6 +8,7 @@ import { PageContainer } from '@/components/PageContainer';
 import { HomeAiPreview } from '@/components/home/HomeAiPreview';
 import { HomeHero } from '@/components/home/HomeHero';
 import { HomeHowItWorks } from '@/components/home/HomeHowItWorks';
+import { LandingAudienceProvider } from '@/components/home/LandingAudienceProvider';
 import {
   browseAuctions,
   type BrowsePlatformFilter,
@@ -79,11 +80,13 @@ export default function Home() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <HomeHero />
-      <HomeHowItWorks />
+      <LandingAudienceProvider>
+        <HomeHero />
+        <HomeHowItWorks />
+      </LandingAudienceProvider>
       <HomeAiPreview />
 
-      <PageContainer id="auctions" className="flex-1 py-16 sm:py-20">
+      <PageContainer id="auctions" className="scroll-mt-24 flex-1 py-16 sm:py-20">
         <div className="mb-6 flex flex-col gap-2 sm:mb-8">
           <p className="text-sm font-semibold tracking-wide text-clink-accent">오픈 캠페인</p>
           <h2 className="text-2xl font-bold tracking-[-0.03em] leading-[1.15] text-clink sm:text-4xl">

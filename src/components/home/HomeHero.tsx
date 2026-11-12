@@ -1,15 +1,29 @@
 'use client';
 
 import { Play } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/components/AuthProvider';
 import { CreatorAvatar } from '@/components/home/CreatorAvatar';
+import { LANDING_INTRO } from '@/components/home/landing-audience';
+import { LandingRoleToggle } from '@/components/home/LandingRoleToggle';
+import { useLandingAudience } from '@/components/home/LandingAudienceProvider';
 import { getShowcaseCreator, SHORTFORM_CARDS } from '@/components/home/showcase';
 import { PageContainer } from '@/components/PageContainer';
 import { cn } from '@/lib/utils';
 
 export function HomeHero() {
   const { user, ready, canCreateAuction } = useAuth();
+  const { audience } = useLandingAudience();
+  const copy = LANDING_INTRO[audience];
+  const createDisabled = !ready || Boolean(user && !canCreateAuction);
+
+  const openCreateAuction = () => {
+    window.dispatchEvent(new Event('create-auction:open'));
+  };
+
+  const scrollToAuctions = () => {
+    document.getElementById('auctions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <section className="relative isolate overflow-hidden bg-[#FAF8F5]">
@@ -19,36 +33,51 @@ export function HomeHero() {
       </div>
 
       <PageContainer className="relative z-10 flex flex-col items-center py-16 text-center sm:py-20">
-        <p className="inline-flex max-w-full items-center rounded-full bg-[#FFF7ED] px-3.5 py-1.5 text-center text-xs font-semibold text-[#EA580C] ring-1 ring-stone-900/5 sm:whitespace-nowrap sm:text-sm">
-          AI 기획 가이드 기반 크리에이터 콘텐츠 매칭
-        </p>
-        <h1 className="mt-6 max-w-3xl text-[1.85rem] font-bold tracking-[-0.03em] leading-[1.15] text-[#1C1917] sm:text-5xl">
-          기획부터 매칭까지,
-          <br />
-          크리에이터 협업의 새로운 기준
-        </h1>
-        <p className="mt-5 max-w-2xl text-sm leading-6 text-[#78716C] sm:text-base">
-          제품만 등록하면 AI가 촬영 콘셉트를 설계하고, 검증된 크리에이터가 맞춤 기획안을 제안합니다.
-        </p>
-        <div className="mt-8 flex w-full flex-col items-center justify-center gap-3 sm:w-auto sm:flex-row">
-          <motion.button
-            type="button"
-            whileHover={{ y: -2 }}
-            whileTap={{ scale: 0.98 }}
-            disabled={!ready || Boolean(user && !canCreateAuction)}
-            onClick={() => window.dispatchEvent(new Event('create-auction:open'))}
-            className="inline-flex w-full items-center justify-center whitespace-nowrap rounded-xl bg-[#1C1917] px-8 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 sm:w-auto"
+        <LandingRoleToggle />
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={audience}
+            initial={false}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.22 }}
+            className="flex w-full flex-col items-center"
           >
-            광고주 · 캠페인 등록하기
-          </motion.button>
-          <motion.a
-            href="#auctions"
-            whileHover={{ y: -2 }}
-            className="inline-flex w-full items-center justify-center whitespace-nowrap rounded-xl border border-[#E7E5E4] bg-white/80 px-8 py-3.5 text-sm font-semibold text-[#1C1917] shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-md ring-1 ring-stone-900/5 hover:shadow-md sm:w-auto"
-          >
-            크리에이터 · 오픈 캠페인 보기
-          </motion.a>
-        </div>
+            <p className="mt-6 inline-flex max-w-full items-center rounded-full bg-[#FFF7ED] px-3.5 py-1.5 text-center text-xs font-semibold text-[#EA580C] ring-1 ring-stone-900/5 sm:whitespace-nowrap sm:text-sm">
+              {copy.eyebrow}
+            </p>
+            <h1 className="mt-6 max-w-3xl text-[1.7rem] font-bold tracking-[-0.03em] leading-[1.2] text-[#1C1917] sm:text-5xl sm:leading-[1.15]">
+              {copy.headline}
+            </h1>
+            <p className="mt-5 max-w-2xl text-sm leading-6 text-[#78716C] sm:text-base">{copy.sub}</p>
+            <div className="mt-8 flex w-full flex-col items-center justify-center sm:w-auto">
+              {audience === 'advertiser' ? (
+                <motion.button
+                  type="button"
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                  disabled={createDisabled}
+                  onClick={openCreateAuction}
+                  className="inline-flex w-full items-center justify-center whitespace-nowrap rounded-xl bg-[#1C1917] px-8 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 sm:w-auto"
+                >
+                  {copy.cta}
+                </motion.button>
+              ) : (
+                <motion.a
+                  href="#auctions"
+                  whileHover={{ y: -2 }}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    scrollToAuctions();
+                  }}
+                  className="inline-flex w-full items-center justify-center whitespace-nowrap rounded-xl bg-[#EA580C] px-8 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_rgb(234,88,12,0.22)] hover:bg-orange-600 sm:w-auto"
+                >
+                  {copy.cta}
+                </motion.a>
+              )}
+            </div>
+          </motion.div>
+        </AnimatePresence>
 
         <motion.div
           initial={{ opacity: 0, y: 28 }}

@@ -21,7 +21,7 @@ test.describe('모바일 반응형 UI', () => {
 
   test('모바일에서 역경매 목록과 메뉴가 잘리지 않고 터치된다', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: /기획부터 매칭까지/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /예산과 제품만 올리면/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: '진행 중인 오픈 캠페인' })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toBeVisible();
 
