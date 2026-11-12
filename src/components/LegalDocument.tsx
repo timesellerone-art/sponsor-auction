@@ -13,7 +13,7 @@ export function LegalDocument({
 }) {
   return (
     <article className="mx-auto w-full max-w-3xl min-w-0 flex-1 px-4 py-8 sm:px-6 sm:py-12">
-      <p className="text-sm font-semibold tracking-wide text-emerald-800">{kicker}</p>
+      <p className="text-sm font-semibold tracking-wide text-clink-accent">{kicker}</p>
       <h1 className="mt-1 text-2xl font-bold break-keep text-zinc-950 sm:text-3xl">{title}</h1>
       <p className="mt-2 text-sm text-zinc-500">시행일 {updated}</p>
       <div className="mt-8 space-y-6 rounded-2xl border border-zinc-200 bg-white p-5 text-sm leading-6 text-zinc-700 sm:p-8">

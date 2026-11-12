@@ -304,7 +304,7 @@ export function PaymentCheckoutModal({
                     className={cn(
                       'flex cursor-pointer items-center justify-between rounded-xl border px-3 py-3 text-sm',
                       method === option.value
-                        ? 'border-emerald-600 bg-emerald-50'
+                        ? 'border-clink-accent bg-clink-peach'
                         : 'border-zinc-200 bg-white',
                     )}
                   >
@@ -318,7 +318,7 @@ export function PaymentCheckoutModal({
                       value={option.value}
                       checked={method === option.value}
                       onChange={() => setMethod(option.value)}
-                      className="size-4 accent-emerald-900"
+                      className="size-4 accent-clink"
                     />
                   </label>
                 ))}
@@ -341,7 +341,7 @@ export function PaymentCheckoutModal({
                   setRefundError(null);
                 }
               }}
-              className="mt-0.5 size-4 shrink-0 accent-emerald-900"
+              className="mt-0.5 size-4 shrink-0 accent-clink"
               aria-label="구매 조건 확인 및 환불 규정에 동의합니다"
             />
             <span>
@@ -350,7 +350,7 @@ export function PaymentCheckoutModal({
                 href="/refund"
                 target="_blank"
                 rel="noreferrer"
-                className="font-semibold text-emerald-800 hover:underline"
+                className="font-semibold text-clink-accent hover:underline"
               >
                 환불 규정
               </Link>
@@ -379,7 +379,7 @@ export function PaymentCheckoutModal({
             onClick={() => {
               void handlePay();
             }}
-            className="inline-flex h-11 flex-[1.4] items-center justify-center gap-2 rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+            className="inline-flex h-11 flex-[1.4] items-center justify-center gap-2 rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
           >
             {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
             {busy ? '결제 요청 중...' : '결제하기'}

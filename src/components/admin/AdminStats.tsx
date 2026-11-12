@@ -56,7 +56,7 @@ export function AdminStats({
             <p className="min-w-0 flex-1 truncate text-xs font-medium text-zinc-500" title={card.label}>
               {card.label}
             </p>
-            <card.icon className="size-4 shrink-0 text-emerald-800" aria-hidden />
+            <card.icon className="size-4 shrink-0 text-clink-accent" aria-hidden />
           </div>
           <p className="mt-3 min-w-0 truncate text-xl font-bold tracking-tight text-zinc-950 sm:text-2xl" title={card.value}>
             {card.value}

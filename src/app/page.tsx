@@ -1,17 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Sparkles } from 'lucide-react';
 import { AuctionBrowseBar } from '@/components/AuctionBrowseBar';
 import { AuctionCard, AuctionCardSkeleton } from '@/components/AuctionCard';
 import { PageContainer } from '@/components/PageContainer';
 import { HomeAiPreview } from '@/components/home/HomeAiPreview';
-import { HomeDashboardPreview } from '@/components/home/HomeDashboardPreview';
 import { HomeHero } from '@/components/home/HomeHero';
-import { HomeMatchingVisual } from '@/components/home/HomeMatchingVisual';
-import { HomeQuoteBanner } from '@/components/home/HomeQuoteBanner';
-import { HomeInsights } from '@/components/home/HomeInsights';
-import { HomeSplitFeatures } from '@/components/home/HomeSplitFeatures';
+import { HomeHowItWorks } from '@/components/home/HomeHowItWorks';
 import {
   browseAuctions,
   type BrowsePlatformFilter,
@@ -74,17 +69,17 @@ export default function Home() {
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <HomeHero />
-      <HomeQuoteBanner />
+      <HomeHowItWorks />
       <HomeAiPreview />
 
       <PageContainer id="auctions" className="flex-1 py-16 sm:py-20">
         <div className="mb-6 flex flex-col gap-2 sm:mb-8">
-          <p className="text-sm font-semibold tracking-wide text-emerald-700">오픈 캠페인</p>
-          <h2 className="text-2xl font-semibold tracking-tight text-stone-900 sm:text-4xl">
+          <p className="text-sm font-semibold tracking-wide text-clink-accent">오픈 캠페인</p>
+          <h2 className="text-2xl font-semibold tracking-tight text-clink sm:text-4xl">
             진행 중인 오픈 캠페인
           </h2>
-          <p className="mt-1 max-w-2xl text-sm text-stone-500">
-            실제 등록된 캠페인을 플랫폼·예산·모집 마감일로 살펴보고 콘텐츠를 제안하세요.
+          <p className="mt-1 max-w-2xl text-sm text-clink-muted">
+            플랫폼, 예산, 남은 모집 기간, 제안 수, AI 가이드를 한눈에 비교하고 콘텐츠를 제안하세요.
           </p>
         </div>
 
@@ -111,19 +106,19 @@ export default function Home() {
             ))}
           </div>
         ) : isEmpty ? (
-          <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-6 py-16 text-center shadow-sm">
-            <p className="text-base font-medium text-stone-800">
+          <div className="rounded-2xl border border-dashed border-clink-border bg-white px-6 py-16 text-center shadow-sm">
+            <p className="text-base font-medium text-clink">
               {query.trim() || platform !== 'all'
                 ? '조건에 맞는 오픈 캠페인이 없습니다'
                 : '등록된 오픈 캠페인이 없습니다'}
             </p>
-            {error ? <p className="mt-2 text-sm text-stone-500">{error}</p> : null}
+            {error ? <p className="mt-2 text-sm text-clink-muted">{error}</p> : null}
           </div>
         ) : (
           <div className="flex flex-col gap-10">
             <div>
               {browsed.open.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-4 py-10 text-center text-sm text-stone-500">
+                <div className="rounded-2xl border border-dashed border-clink-border bg-white px-4 py-10 text-center text-sm text-clink-muted">
                   지금 지원 가능한 오픈 캠페인이 없습니다.
                 </div>
               ) : (
@@ -137,10 +132,7 @@ export default function Home() {
 
             {browsed.closed.length > 0 ? (
               <div>
-                <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-stone-900">
-                  <Sparkles className="size-4 text-emerald-600" aria-hidden />
-                  모집 마감·완료된 캠페인
-                </h3>
+                <h3 className="mb-4 text-lg font-semibold text-clink">모집 마감·완료된 캠페인</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {browsed.closed.map((auction) => (
                     <AuctionCard key={auction.id} auction={auction} />
@@ -151,11 +143,6 @@ export default function Home() {
           </div>
         )}
       </PageContainer>
-
-      <HomeSplitFeatures />
-      <HomeMatchingVisual />
-      <HomeDashboardPreview />
-      <HomeInsights />
     </div>
   );
 }

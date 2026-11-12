@@ -74,7 +74,7 @@ export function ToastHost() {
       role="alert"
       className={
         variant === 'success'
-          ? 'fixed right-4 bottom-4 z-[90] w-[min(100%-2rem,26rem)] rounded-xl border border-emerald-200 bg-white px-4 py-3 shadow-lg'
+          ? 'fixed right-4 bottom-4 z-[90] w-[min(100%-2rem,26rem)] rounded-xl border border-clink-peach-strong bg-white px-4 py-3 shadow-lg'
           : variant === 'info'
             ? 'fixed right-4 bottom-4 z-[90] w-[min(100%-2rem,26rem)] rounded-xl border border-amber-200 bg-white px-4 py-3 shadow-lg'
             : 'fixed right-4 bottom-4 z-[90] w-[min(100%-2rem,26rem)] rounded-xl border border-rose-200 bg-white px-4 py-3 shadow-lg'

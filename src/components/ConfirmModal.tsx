@@ -112,7 +112,7 @@ export function ConfirmModal({
             className={
               danger
                 ? 'inline-flex h-10 items-center justify-center gap-2 rounded-full bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-zinc-300'
-                : 'inline-flex h-10 items-center justify-center gap-2 rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-zinc-300'
+                : 'inline-flex h-10 items-center justify-center gap-2 rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-zinc-300'
             }
           >
             {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}

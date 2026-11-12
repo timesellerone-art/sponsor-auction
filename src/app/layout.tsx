@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Clink',
-  description: '좋은 브랜드는 크리에이터와 함께 콘텐츠를 만듭니다.',
+  description: '제품만 등록하면 AI가 기획안을 짜주고, 크리에이터가 맞춤 콘텐츠를 제안합니다.',
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

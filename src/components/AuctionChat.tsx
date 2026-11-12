@@ -187,7 +187,7 @@ export function AuctionChat({ auctionId }: { auctionId: string }) {
                 <p
                   className={
                     mine
-                      ? 'mt-0.5 inline-block max-w-[90%] rounded-2xl bg-emerald-900 px-3 py-2 text-left text-sm text-white'
+                      ? 'mt-0.5 inline-block max-w-[90%] rounded-2xl bg-clink px-3 py-2 text-left text-sm text-white'
                       : 'mt-0.5 inline-block max-w-[90%] rounded-2xl bg-white px-3 py-2 text-sm text-zinc-800'
                   }
                 >
@@ -213,7 +213,7 @@ export function AuctionChat({ auctionId }: { auctionId: string }) {
         <button
           type="submit"
           disabled={isBusy}
-          className="inline-flex h-11 shrink-0 items-center justify-center gap-1 rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+          className="inline-flex h-11 shrink-0 items-center justify-center gap-1 rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
         >
           {isBusy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           보내기

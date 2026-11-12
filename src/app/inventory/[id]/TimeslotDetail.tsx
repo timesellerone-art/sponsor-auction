@@ -96,7 +96,7 @@ export function TimeslotDetail({ id }: { id: string }) {
       ) : (
         <div className="mt-6 flex flex-col gap-5">
           <article className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
-            <p className="text-xs font-semibold tracking-wide text-emerald-800">
+            <p className="text-xs font-semibold tracking-wide text-clink-accent">
               {PLATFORM_LABELS[slot.platform]}
             </p>
             <h1 className="mt-2 text-2xl font-bold text-zinc-950">{slot.title}</h1>
@@ -133,7 +133,7 @@ export function TimeslotDetail({ id }: { id: string }) {
               <button
                 type="button"
                 onClick={() => setBidOpen(true)}
-                className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800"
+                className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
               >
                 제안하기
               </button>
@@ -161,7 +161,7 @@ export function TimeslotDetail({ id }: { id: string }) {
                         <p className="mt-1 text-lg font-bold">{formatWon(bid.bidAmount)}</p>
                       </div>
                       {bid.isLeading ? (
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                        <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
                           최고 제안가
                         </span>
                       ) : null}
@@ -186,7 +186,7 @@ export function TimeslotDetail({ id }: { id: string }) {
                             setBusyId(null);
                           }
                         }}
-                        className="mt-3 inline-flex h-9 items-center rounded-full bg-emerald-900 px-3 text-xs font-semibold text-white hover:bg-emerald-800 disabled:bg-zinc-300"
+                        className="mt-3 inline-flex h-9 items-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:bg-zinc-300"
                       >
                         {busyId === bid.id ? '선정 중...' : '이 제안 선정'}
                       </button>

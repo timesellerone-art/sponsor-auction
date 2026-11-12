@@ -93,7 +93,7 @@ export function Navbar() {
     'shrink-0 whitespace-nowrap text-sm font-medium text-stone-600 transition-colors hover:text-stone-950';
 
   return (
-    <header className="sticky top-0 z-50 w-full overflow-x-clip border-b border-stone-200/70 bg-[#FAF8F5]/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full overflow-x-clip border-b border-clink-border bg-[#FAF8F5]/80 backdrop-blur-md">
       <div className="flex h-14 w-full items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
         {ready && user ? <span className="sr-only">{user.name}</span> : null}
         <Link
@@ -102,7 +102,7 @@ export function Navbar() {
           className="flex shrink-0 items-center gap-2 whitespace-nowrap font-semibold tracking-tight text-stone-900"
           onClick={() => setOpen(false)}
         >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-900 text-sm font-bold text-white">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-clink text-sm font-bold text-white">
             C
           </span>
           <span className="text-[15px] sm:text-lg">Clink</span>
@@ -113,7 +113,7 @@ export function Navbar() {
             오픈 캠페인
           </Link>
           <Link href="/inventory" className={navLinkClass}>
-            인벤토리
+            크리에이터 찾기
           </Link>
           {showAdmin ? (
             <Link href="/admin" className={navLinkClass}>
@@ -156,7 +156,7 @@ export function Navbar() {
               type="button"
               disabled={!ready || Boolean(user && !canCreateAuction)}
               onClick={requestCreateAuction}
-              className="inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+              className="inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-full bg-clink px-4 text-sm font-semibold text-white transition-colors hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300"
             >
               + 캠페인 등록
             </button>
@@ -169,7 +169,7 @@ export function Navbar() {
             type="button"
             disabled={!ready || Boolean(user && !canCreateAuction)}
             onClick={requestCreateAuction}
-            className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-emerald-900 px-3 text-xs font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-stone-300"
+            className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300"
           >
             + 캠페인 등록
           </button>
@@ -215,7 +215,7 @@ export function Navbar() {
             className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
             onClick={() => setOpen(false)}
           >
-            인벤토리
+            크리에이터 찾기
           </Link>
           {showDashboard ? (
             <Link

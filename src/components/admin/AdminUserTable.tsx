@@ -158,7 +158,7 @@ export function AdminUserTable({
                         className={
                           suspended
                             ? 'rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700'
-                            : 'rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800'
+                            : 'rounded-full bg-clink-peach px-2 py-1 text-xs font-semibold text-clink-accent'
                         }
                       >
                         {STATUS_LABEL[profile.status] ?? profile.status}
@@ -174,7 +174,7 @@ export function AdminUserTable({
                           onClick={() => onToggleStatus(profile)}
                           className={
                             suspended
-                              ? 'inline-flex items-center gap-1 rounded-md border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50'
+                              ? 'inline-flex items-center gap-1 rounded-md border border-clink-peach-strong px-1.5 py-0.5 text-[10px] font-semibold text-clink-accent hover:bg-clink-peach disabled:cursor-not-allowed disabled:opacity-50'
                               : 'inline-flex items-center gap-1 rounded-md border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50'
                           }
                         >

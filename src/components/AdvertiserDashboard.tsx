@@ -104,7 +104,7 @@ export function AdvertiserDashboard() {
 
   return (
     <PageContainer className="flex min-w-0 flex-1 flex-col pt-4 pb-6 sm:pt-5 sm:pb-10">
-      <p className="text-sm font-semibold tracking-wide text-emerald-800">광고주</p>
+      <p className="text-sm font-semibold tracking-wide text-clink-accent">광고주</p>
       <h1 className="mt-1 text-2xl font-bold text-stone-900 sm:text-3xl">내 캠페인</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
         등록한 캠페인과 결제 완료된 낙찰 내역을 확인하고, 진행 중인 제안은 여기서 바로
@@ -124,7 +124,7 @@ export function AdvertiserDashboard() {
           </p>
           <Link
             href="/"
-            className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white hover:bg-emerald-800"
+            className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800"
           >
             오픈 캠페인 둘러보기
           </Link>
@@ -139,7 +139,7 @@ export function AdvertiserDashboard() {
                   모집이 열려 있는 내 캠페인입니다. 제안을 확인하고 선정할 수 있습니다.
                 </p>
               </div>
-              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+              <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
                 {openDeals.length}건
               </span>
             </div>
@@ -154,7 +154,7 @@ export function AdvertiserDashboard() {
                     <AuctionCard auction={deal.auction} hideBidAction />
                     <Link
                       href={`/auctions/${deal.auction.id}#proposals`}
-                      className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800"
+                      className="inline-flex h-10 w-full shrink-0 items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
                     >
                       제안 현황 보기
                     </Link>
@@ -172,7 +172,7 @@ export function AdvertiserDashboard() {
                   payments · auctions · bids 기준으로 승인된 결제를 보여 줍니다.
                 </p>
               </div>
-              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+              <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
                 {paidDeals.length}건
               </span>
             </div>
@@ -185,7 +185,7 @@ export function AdvertiserDashboard() {
                 {paidDeals.map((deal) => (
                   <li
                     key={`${deal.auction.id}-${deal.payment?.orderId ?? deal.bid?.id ?? 'paid'}`}
-                    className="rounded-2xl border border-emerald-100 bg-white p-4 sm:p-5"
+                    className="rounded-2xl border border-clink-peach-strong bg-white p-4 sm:p-5"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -200,7 +200,7 @@ export function AdvertiserDashboard() {
                           {deal.bid ? ` · ${formatWon(deal.bid.bidAmount)}` : ''}
                         </p>
                       </div>
-                      <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-900">
+                      <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink">
                         {auctionStatusLabel(deal.auction.status)}
                       </span>
                     </div>

@@ -310,8 +310,8 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
             {bidValue > 0 ? (
               <FeeBreakdownCard role="creator" amount={bidValue} />
             ) : (
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-sm text-emerald-950">
-                <p className="text-xs text-emerald-800">
+              <div className="rounded-xl border border-clink-peach-strong bg-clink-peach px-3 py-3 text-sm text-clink">
+                <p className="text-xs text-clink-accent">
                   제안 금액을 입력하면 통합 수수료(20%) 공제 후 최종 입금액이 실시간으로
                   계산됩니다.
                 </p>
@@ -407,7 +407,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? (
                 <>
@@ -462,6 +462,6 @@ function inputClass(invalid: boolean) {
     'h-11 w-full rounded-xl border bg-white px-3 text-sm text-zinc-950 outline-none focus:ring-2',
     invalid
       ? 'border-rose-300 focus:ring-rose-200'
-      : 'border-zinc-200 focus:border-emerald-600 focus:ring-emerald-100',
+      : 'border-zinc-200 focus:border-clink-accent focus:ring-clink-peach-strong',
   );
 }

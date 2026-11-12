@@ -244,7 +244,7 @@ export function AuctionDetail({ id }: { id: string }) {
 
       {loading ? (
         <div className="mt-6 space-y-4">
-          <div className="h-40 animate-pulse rounded-2xl bg-emerald-50" />
+          <div className="h-40 animate-pulse rounded-2xl bg-clink-peach" />
           <div className="h-48 animate-pulse rounded-2xl bg-white" />
         </div>
       ) : !auction ? (
@@ -266,11 +266,11 @@ export function AuctionDetail({ id }: { id: string }) {
 
           <article className="rounded-2xl border border-stone-200/80 bg-white p-4 shadow-sm sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold tracking-wide text-emerald-800">
+              <p className="text-xs font-semibold tracking-wide text-clink-accent">
                 캠페인 상세
               </p>
               {matched ? (
-                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
                   {auction.status === 'completed'
                     ? '결제 완료된 캠페인입니다'
                     : '매칭 완료된 캠페인입니다'}
@@ -326,7 +326,7 @@ export function AuctionDetail({ id }: { id: string }) {
               <button
                 type="button"
                 onClick={() => setBidOpen(true)}
-                className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800"
+                className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
               >
                 콘텐츠 제안하기
               </button>
@@ -344,7 +344,7 @@ export function AuctionDetail({ id }: { id: string }) {
                       showToast(ACCESS_REASON['creator-auth']);
                       router.push(loginPath('creator-auth', `/auctions/${auction.id}`));
                     }}
-                    className="mt-2 block text-sm font-semibold text-emerald-800 hover:underline"
+                    className="mt-2 block text-sm font-semibold text-clink-accent hover:underline"
                   >
                     로그인하러 가기
                   </button>

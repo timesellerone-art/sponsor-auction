@@ -21,7 +21,7 @@ test.describe('모바일 반응형 UI', () => {
 
   test('모바일에서 역경매 목록과 메뉴가 잘리지 않고 터치된다', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: /좋은 브랜드는 광고를 억지로 팔지 않고/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /제품만 등록하면 AI가 기획안을 짜주고/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: '진행 중인 오픈 캠페인' })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toBeVisible();
 

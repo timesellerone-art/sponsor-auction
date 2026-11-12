@@ -167,7 +167,7 @@ function TimeslotBidForm({
         <button
           type="submit"
           disabled={isBusy}
-          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+          className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
         >
           {isBusy ? <Loader2 className="size-4 animate-spin" /> : null}
           제안하기

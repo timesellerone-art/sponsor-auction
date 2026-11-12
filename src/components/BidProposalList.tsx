@@ -63,7 +63,7 @@ export function BidProposalList({
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs font-semibold tracking-wide text-emerald-800">
+          <p className="text-xs font-semibold tracking-wide text-clink-accent">
             광고주 확인
           </p>
           <h2 className="mt-1 text-lg font-bold text-zinc-950">
@@ -81,7 +81,7 @@ export function BidProposalList({
           ) : null}
         </div>
         {closed ? (
-          <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+          <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
             {auction.status === 'completed'
               ? '결제 완료된 캠페인입니다'
               : '매칭 완료된 캠페인입니다'}
@@ -90,7 +90,7 @@ export function BidProposalList({
       </div>
 
       {closed && selectedBid ? (
-        <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-950">
+        <div className="mt-4 rounded-xl border border-clink-peach-strong bg-clink-peach px-4 py-3 text-sm text-clink">
           <p className="font-semibold">선택된 크리에이터</p>
           <p className="mt-1">
             {selectedBid.creatorName || '이름 없음'} · {formatWon(selectedBid.bidAmount)}
@@ -100,7 +100,7 @@ export function BidProposalList({
               href={selectedBid.creatorChannelUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-1 inline-block truncate text-xs font-medium text-emerald-800 hover:underline"
+              className="mt-1 inline-block truncate text-xs font-medium text-clink-accent hover:underline"
             >
               {selectedBid.creatorChannelUrl}
             </a>
@@ -144,7 +144,7 @@ export function BidProposalList({
                         href={bid.creatorChannelUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-1 inline-flex max-w-full items-center gap-1 truncate text-xs font-medium text-emerald-800 hover:underline"
+                        className="mt-1 inline-flex max-w-full items-center gap-1 truncate text-xs font-medium text-clink-accent hover:underline"
                       >
                         <span className="truncate">{bid.creatorChannelUrl}</span>
                         <ExternalLink className="size-3 shrink-0" aria-hidden />
@@ -165,7 +165,7 @@ export function BidProposalList({
                         }
                         setPendingBid(bid);
                       }}
-                      className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-emerald-900 px-3 text-xs font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-zinc-300 sm:text-sm"
+                      className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-zinc-300 sm:text-sm"
                     >
                       {busy ? (
                         <Loader2 className="size-3.5 animate-spin" aria-hidden />
@@ -173,7 +173,7 @@ export function BidProposalList({
                       {busy ? '낙찰 중...' : '낙찰하기 (선택)'}
                     </button>
                   ) : winner ? (
-                    <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                    <span className="shrink-0 rounded-full bg-clink-peach px-3 py-1 text-xs font-semibold text-clink-accent">
                       {auction.status === 'completed'
                         ? BID_STATUS_LABEL.selected
                         : '낙찰됨'}
@@ -184,7 +184,7 @@ export function BidProposalList({
                 <p className="mt-3 text-lg font-bold tracking-tight text-zinc-950">
                   {formatWon(bid.bidAmount)}
                   {bid.bidAmount === leadingAmount ? (
-                    <span className="ml-2 text-xs font-semibold text-emerald-800">최저 제안</span>
+                    <span className="ml-2 text-xs font-semibold text-clink-accent">최저 제안</span>
                   ) : null}
                   {bid.bidAmount === highestAmount && highestAmount !== leadingAmount ? (
                     <span className="ml-2 text-xs font-semibold text-amber-700">최고 제안가</span>

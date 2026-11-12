@@ -211,7 +211,7 @@ export function AdminAuctionTable({
                             type="button"
                             disabled={anyBusy}
                             onClick={() => onUnblind(auction)}
-                            className="inline-flex items-center gap-1 rounded-md border border-emerald-200 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="inline-flex items-center gap-1 rounded-md border border-clink-peach-strong px-1.5 py-0.5 text-[10px] font-semibold text-clink-accent hover:bg-clink-peach disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
                             {busy ? '처리 중...' : '블라인드 해제'}

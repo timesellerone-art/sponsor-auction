@@ -36,7 +36,7 @@ function providerButtonClass(provider: SocialIdentityProvider, linked: boolean) 
   if (provider === 'google') {
     return 'border-zinc-200 bg-white';
   }
-  return 'border-emerald-200 bg-emerald-50';
+  return 'border-clink-peach-strong bg-clink-peach';
 }
 
 function ProviderMark({ provider }: { provider: SocialIdentityProvider }) {
@@ -79,7 +79,7 @@ function ProviderMark({ provider }: { provider: SocialIdentityProvider }) {
       </span>
     );
   }
-  return <Smartphone className="size-5 text-emerald-800" aria-hidden />;
+  return <Smartphone className="size-5 text-clink-accent" aria-hidden />;
 }
 
 export function LinkedAccountsPanel() {
@@ -285,7 +285,7 @@ export function LinkedAccountsPanel() {
                 </div>
                 {account.linked ? (
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">
+                    <span className="rounded-full bg-clink-peach px-2 py-0.5 text-xs font-semibold text-clink-accent">
                       연동됨
                     </span>
                     <button
@@ -407,7 +407,7 @@ export function LinkedAccountsPanel() {
                     value={phone}
                     disabled={phoneBusy}
                     onChange={(event) => setPhone(event.target.value)}
-                    className="mt-1 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none ring-emerald-900 focus:ring-2"
+                    className="mt-1 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none ring-clink focus:ring-2"
                   />
                 </label>
                 <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -425,7 +425,7 @@ export function LinkedAccountsPanel() {
                     onClick={() => {
                       void handlePhoneLink();
                     }}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
                   >
                     {phoneBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
                     연동하기

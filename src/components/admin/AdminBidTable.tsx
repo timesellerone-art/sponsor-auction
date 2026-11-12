@@ -245,7 +245,7 @@ export function AdminBidTable({
                           href={bid.creatorChannelUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="block truncate text-emerald-800 hover:underline"
+                          className="block truncate text-clink-accent hover:underline"
                         >
                           {bid.creatorChannelUrl}
                         </a>

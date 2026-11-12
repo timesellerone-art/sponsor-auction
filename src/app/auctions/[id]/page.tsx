@@ -5,7 +5,7 @@ function DetailFallback() {
   return (
     <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10">
       <div className="h-5 w-20 animate-pulse rounded bg-zinc-200" />
-      <div className="mt-6 h-40 animate-pulse rounded-2xl bg-emerald-50" />
+      <div className="mt-6 h-40 animate-pulse rounded-2xl bg-clink-peach" />
       <div className="mt-5 h-48 animate-pulse rounded-2xl bg-white" />
     </div>
   );

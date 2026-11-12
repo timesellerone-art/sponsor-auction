@@ -90,7 +90,7 @@ export function CreatorDashboard() {
 
   return (
     <PageContainer className="flex min-w-0 flex-1 flex-col pt-4 pb-6 sm:pt-5 sm:pb-10">
-      <p className="text-sm font-semibold tracking-wide text-emerald-800">크리에이터</p>
+      <p className="text-sm font-semibold tracking-wide text-clink-accent">크리에이터</p>
       <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">내 제안</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
         타임슬롯 인벤토리와 제출한 제안, 선정·결제 완료된 캠페인을 한곳에서 확인할 수 있습니다.
@@ -99,7 +99,7 @@ export function CreatorDashboard() {
         <button
           type="button"
           onClick={() => setCreateSlotOpen(true)}
-          className="inline-flex h-10 items-center rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white hover:bg-emerald-800"
+          className="inline-flex h-10 items-center rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800"
         >
           타임슬롯 등록
         </button>
@@ -158,7 +158,7 @@ export function CreatorDashboard() {
           </p>
           <Link
             href="/"
-            className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-emerald-900 px-4 text-sm font-semibold text-white hover:bg-emerald-800"
+            className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800"
           >
             오픈 캠페인 둘러보기
           </Link>
@@ -173,7 +173,7 @@ export function CreatorDashboard() {
                   선정되고 결제가 승인된 항목입니다.
                 </p>
               </div>
-              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+              <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
                 {wonDeals.length}건
               </span>
             </div>
@@ -229,7 +229,7 @@ function DealCard({ deal, highlight = false }: { deal: CreatorDeal; highlight?: 
     <li
       className={cn(
         'rounded-2xl border bg-white p-4 sm:p-5',
-        highlight || paid ? 'border-emerald-100' : 'border-amber-100',
+        highlight || paid ? 'border-clink-peach-strong' : 'border-amber-100',
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -245,7 +245,7 @@ function DealCard({ deal, highlight = false }: { deal: CreatorDeal; highlight?: 
         <span
           className={cn(
             'rounded-full px-2.5 py-1 text-xs font-semibold',
-            paid ? 'bg-emerald-50 text-emerald-900' : 'bg-amber-50 text-amber-800',
+            paid ? 'bg-clink-peach text-clink' : 'bg-amber-50 text-amber-800',
           )}
         >
           {bidStatusLabel(deal.bid.status, paid)}

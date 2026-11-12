@@ -62,7 +62,7 @@ export function NotificationBell() {
       >
         <Bell className="size-5" aria-hidden />
         {unread > 0 ? (
-          <span className="absolute -top-0.5 -right-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-emerald-900 px-1 text-[10px] font-bold leading-4 text-white">
+          <span className="absolute -top-0.5 -right-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-clink px-1 text-[10px] font-bold leading-4 text-white">
             {unread > 99 ? '99+' : unread}
           </span>
         ) : null}
@@ -95,14 +95,14 @@ export function NotificationBell() {
                     href={item.href}
                     className={cn(
                       'block px-3 py-3 hover:bg-zinc-50',
-                      item.read ? 'opacity-70' : 'bg-emerald-50/60',
+                      item.read ? 'opacity-70' : 'bg-clink-peach/60',
                     )}
                     onClick={() => {
                       markNotificationRead(item.id);
                       setOpen(false);
                     }}
                   >
-                    <p className="text-xs font-semibold text-emerald-800">{TYPE_LABEL[item.type]}</p>
+                    <p className="text-xs font-semibold text-clink-accent">{TYPE_LABEL[item.type]}</p>
                     <p className="mt-0.5 text-sm font-medium text-zinc-950">{item.title}</p>
                     <p className="mt-0.5 text-xs leading-5 text-zinc-600">{item.body}</p>
                     <p className="mt-1 text-[11px] text-zinc-400">{formatDateTime(item.createdAt)}</p>

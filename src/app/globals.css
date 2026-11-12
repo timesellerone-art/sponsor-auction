@@ -4,8 +4,12 @@
 :root {
   --background: #faf8f5;
   --foreground: #1c1917;
-  --clink: #064e3b;
-  --clink-accent: #10b981;
+  --clink: #1c1917;
+  --clink-accent: #ea580c;
+  --clink-peach: #fff7ed;
+  --clink-peach-strong: #ffedd5;
+  --clink-muted: #78716c;
+  --clink-border: #e7e5e4;
 }
 
 @theme inline {
@@ -13,6 +17,10 @@
   --color-foreground: var(--foreground);
   --color-clink: var(--clink);
   --color-clink-accent: var(--clink-accent);
+  --color-clink-peach: var(--clink-peach);
+  --color-clink-peach-strong: var(--clink-peach-strong);
+  --color-clink-muted: var(--clink-muted);
+  --color-clink-border: var(--clink-border);
   --font-sans: "Pretendard Variable", Pretendard, ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }

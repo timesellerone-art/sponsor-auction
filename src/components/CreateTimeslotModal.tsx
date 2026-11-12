@@ -252,7 +252,7 @@ export function CreateTimeslotModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-900 text-sm font-semibold text-white hover:bg-emerald-800 disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
             >
               {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
               {isSubmitting ? '등록 중...' : '타임슬롯 등록'}
@@ -301,6 +301,6 @@ function inputClass(invalid: boolean) {
     'h-11 w-full rounded-xl border bg-white px-3 text-sm text-zinc-950 outline-none focus:ring-2',
     invalid
       ? 'border-rose-300 focus:ring-rose-200'
-      : 'border-zinc-200 focus:border-emerald-600 focus:ring-emerald-100',
+      : 'border-zinc-200 focus:border-clink-accent focus:ring-clink-peach-strong',
   );
 }

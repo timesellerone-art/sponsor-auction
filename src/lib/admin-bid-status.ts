@@ -78,8 +78,8 @@ export const ADMIN_BID_STATUS_LABEL: Record<AdminBidLifecycle, string> = {
 };
 
 export const ADMIN_BID_STATUS_CLASS: Record<AdminBidLifecycle, string> = {
-  pending: 'bg-amber-50 text-amber-800',
-  awarded: 'bg-sky-50 text-sky-800',
-  paid: 'bg-emerald-50 text-emerald-800',
-  rejected: 'bg-zinc-100 text-zinc-600',
+  pending: 'bg-clink-peach text-clink-accent',
+  awarded: 'bg-clink text-white',
+  paid: 'bg-clink-peach-strong text-clink',
+  rejected: 'bg-stone-100 text-stone-600',
 };

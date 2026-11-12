@@ -51,7 +51,7 @@ export function AdminFilterBar<T extends string>({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder={placeholder}
-            className="h-10 w-full min-w-0 rounded-xl border border-zinc-200 py-2 pr-3 pl-9 text-sm outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+            className="h-10 w-full min-w-0 rounded-xl border border-zinc-200 py-2 pr-3 pl-9 text-sm outline-none focus:border-clink-accent focus:ring-2 focus:ring-clink-peach-strong"
           />
         </label>
         <div className="flex min-w-0 flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">

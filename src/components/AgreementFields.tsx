@@ -34,7 +34,7 @@ export function AgreementFields({
               onTermsChange(event.target.checked);
               onPrivacyChange(event.target.checked);
             }}
-            className="mt-0.5 size-4 shrink-0 accent-emerald-900"
+            className="mt-0.5 size-4 shrink-0 accent-clink"
             aria-label="서비스 이용약관 및 개인정보 처리방침에 동의합니다"
           />
           <span>
@@ -43,7 +43,7 @@ export function AgreementFields({
               target="_blank"
               rel="noreferrer"
               onClick={(event) => event.stopPropagation()}
-              className="font-semibold text-emerald-800 hover:underline"
+              className="font-semibold text-clink-accent hover:underline"
             >
               서비스 이용약관
             </Link>
@@ -53,7 +53,7 @@ export function AgreementFields({
               target="_blank"
               rel="noreferrer"
               onClick={(event) => event.stopPropagation()}
-              className="font-semibold text-emerald-800 hover:underline"
+              className="font-semibold text-clink-accent hover:underline"
             >
               개인정보 처리방침
             </Link>
@@ -79,7 +79,7 @@ export function AgreementFields({
           type="checkbox"
           checked={agreeTerms}
           onChange={(event) => onTermsChange(event.target.checked)}
-          className="mt-0.5 size-4 shrink-0 accent-emerald-900"
+          className="mt-0.5 size-4 shrink-0 accent-clink"
           aria-label="서비스 이용약관에 동의합니다"
         />
         <span>
@@ -88,7 +88,7 @@ export function AgreementFields({
             target="_blank"
             rel="noreferrer"
             onClick={(event) => event.stopPropagation()}
-            className="font-semibold text-emerald-800 hover:underline"
+            className="font-semibold text-clink-accent hover:underline"
           >
             서비스 이용약관
           </Link>
@@ -106,7 +106,7 @@ export function AgreementFields({
           type="checkbox"
           checked={agreePrivacy}
           onChange={(event) => onPrivacyChange(event.target.checked)}
-          className="mt-0.5 size-4 shrink-0 accent-emerald-900"
+          className="mt-0.5 size-4 shrink-0 accent-clink"
           aria-label="개인정보처리방침에 동의합니다"
         />
         <span>
@@ -115,7 +115,7 @@ export function AgreementFields({
             target="_blank"
             rel="noreferrer"
             onClick={(event) => event.stopPropagation()}
-            className="font-semibold text-emerald-800 hover:underline"
+            className="font-semibold text-clink-accent hover:underline"
           >
             개인정보처리방침
           </Link>
