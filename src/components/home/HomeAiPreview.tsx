@@ -12,8 +12,6 @@ const TABS = [
   {
     id: 'launch',
     label: '신제품 런칭',
-    reach: 74,
-    save: 16,
     input: {
       title: '여름 무알콜 맥주 숏폼',
       platform: 'youtube_shorts',
@@ -25,8 +23,6 @@ const TABS = [
   {
     id: 'awareness',
     label: '브랜드 인지도',
-    reach: 68,
-    save: 19,
     input: {
       title: '비건 스킨케어 릴스 리뷰',
       platform: 'instagram_reels',
@@ -38,8 +34,6 @@ const TABS = [
   {
     id: 'viral',
     label: '숏폼 바이럴',
-    reach: 86,
-    save: 22,
     input: {
       title: '러닝화 언박싱 틱톡 챌린지',
       platform: 'tiktok',
@@ -54,6 +48,12 @@ const TIMELINE = [
   { tag: '0~3초 HOOK', tone: 'text-[#EA580C]' },
   { tag: '4~12초 MAIN', tone: 'text-white' },
   { tag: '13~15초 CTA', tone: 'text-[#FFEDD5]' },
+] as const;
+
+const CONCEPT_POINTS = [
+  ['핵심 포인트: 전후 대비 클로즈업', '추천 길이: 3초 이내'],
+  ['핵심 포인트: 자연스러운 일상 노출', '자막 강조 필수'],
+  ['핵심 포인트: 프로필 링크·저장 유도', '엔딩 2초 집중'],
 ] as const;
 
 export function HomeAiPreview() {
@@ -71,7 +71,7 @@ export function HomeAiPreview() {
               캠페인 목적만 고르면 촬영 콘셉트가 바로 나옵니다
             </h2>
             <p className="mt-3 text-sm leading-6 text-white/60 sm:text-base">
-              상세 페이지에서는 Gemini가 실제 캠페인 설명에 맞춰 같은 형식으로 제안합니다.
+              상세 페이지에서는 AI가 실제 캠페인 설명에 맞춰 같은 형식으로 제안합니다.
             </p>
           </div>
 
@@ -101,7 +101,7 @@ export function HomeAiPreview() {
                   <p className="text-[11px] font-semibold tracking-wide text-white/50">제품 브리프</p>
                   <span className="inline-flex items-center gap-1 rounded-full bg-[#EA580C] px-2.5 py-1 text-[11px] font-semibold text-white">
                     <Sparkles className="size-3" aria-hidden />
-                    Gemini 2.5 AI 분석 완료
+                    AI 분석 완료
                   </span>
                 </div>
                 <p className="mt-3 text-lg font-bold tracking-[-0.03em] leading-[1.15] text-white">
@@ -140,9 +140,15 @@ export function HomeAiPreview() {
                       {concept.title}
                     </h3>
                     <p className="mt-1.5 text-sm leading-6 text-white/65">{concept.summary}</p>
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-                      <MetricBar label="예상 도달률" value={active.reach - index * 4} />
-                      <MetricBar label="예상 저장률" value={active.save - index} />
+                    <div className="mt-4 flex min-w-0 flex-wrap gap-1.5">
+                      {(CONCEPT_POINTS[index] ?? CONCEPT_POINTS[2]).map((point) => (
+                        <span
+                          key={point}
+                          className="inline-flex max-w-full rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-white/80 ring-1 ring-white/10"
+                        >
+                          {point}
+                        </span>
+                      ))}
                     </div>
                   </motion.article>
                 );
@@ -152,20 +158,5 @@ export function HomeAiPreview() {
         </div>
       </PageContainer>
     </section>
-  );
-}
-
-function MetricBar({ label, value }: { label: string; value: number }) {
-  const safe = Math.max(8, Math.min(100, value));
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between text-[10px] font-medium">
-        <span className="text-white/45">{label}</span>
-        <span className="tabular-nums text-white/80">{safe}%</span>
-      </div>
-      <div className="h-1 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full rounded-full bg-[#EA580C]" style={{ width: `${safe}%` }} />
-      </div>
-    </div>
   );
 }

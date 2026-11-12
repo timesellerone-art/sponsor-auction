@@ -89,7 +89,7 @@ function ShortformShowcase() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/10" />
               <span className="absolute top-2.5 left-2.5 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
-                {card.reach}
+                {card.format}
               </span>
               <span className="absolute top-[42%] left-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-xl ring-1 ring-stone-900/5 backdrop-blur-md sm:size-11">
                 <Play className="ml-0.5 size-4 fill-[#1C1917] text-[#1C1917]" aria-hidden />

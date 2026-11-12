@@ -197,7 +197,7 @@ function PaymentSuccessContent() {
           return;
         }
 
-        setMessage('결제가 완료되어 계약이 확정되었습니다. 대금은 플랫폼 에스크로로 보관됩니다.');
+        setMessage('결제가 완료되어 계약이 확정되었습니다. 토스페이먼츠 간편 결제로 처리되었습니다.');
         setDone(true);
         showToast('선정이 확정되었고 모집이 마감되었습니다.', 'success');
         const href = recoverAuctionHref(confirmPayload.auctionId);

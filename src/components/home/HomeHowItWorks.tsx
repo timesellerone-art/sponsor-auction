@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, Lock, Sparkles } from 'lucide-react';
+import { Check, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { CreatorAvatar } from '@/components/home/CreatorAvatar';
 import { SHOWCASE_CREATORS } from '@/components/home/showcase';
@@ -33,7 +33,7 @@ export function HomeHowItWorks() {
               캠페인만 올리면 촬영 콘셉트가 바로 생성됩니다
             </h3>
             <p className="mt-2 max-w-lg text-sm leading-6 text-[#78716C]">
-              Gemini가 제품 설명과 예산에 맞춰 훅, 컷 구성, CTA까지 3가지 대본 초안을 만듭니다.
+              AI가 제품 설명과 예산에 맞춰 훅, 컷 구성, CTA까지 3가지 대본 초안을 만듭니다.
             </p>
             <div className="mt-5 rounded-2xl bg-[#FAF8F5] p-4 ring-1 ring-stone-900/5">
               <div className="mb-3 flex items-center justify-between">
@@ -114,32 +114,29 @@ export function HomeHowItWorks() {
             whileHover={{ y: -4 }}
             className={`${cardClass} md:col-span-2`}
           >
-            <p className="text-[11px] font-semibold tracking-wide text-[#EA580C]">03 · 안전 정산</p>
+            <p className="text-[11px] font-semibold tracking-wide text-[#EA580C]">03 · 간편 결제</p>
             <h3 className="mt-2 text-lg font-bold tracking-[-0.03em] leading-[1.15] text-[#1C1917]">
-              에스크로로 결제부터 정산까지
+              토스페이먼츠로 간편하고 투명하게 결제
             </h3>
             <div className="mt-4 rounded-xl bg-[#FAF8F5] p-3 ring-1 ring-stone-900/5">
-              <div className="mb-2 flex items-center justify-between text-[11px] font-semibold">
-                <span className="inline-flex items-center gap-1 text-[#1C1917]">
-                  <Lock className="size-3.5 text-[#EA580C]" aria-hidden />
-                  에스크로 보호 중
-                </span>
-                <span className="text-[#EA580C]">66%</span>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-stone-200">
-                <motion.div
-                  className="h-full rounded-full bg-[#EA580C]"
-                  initial={{ width: '0%' }}
-                  whileInView={{ width: '66%' }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.9, delay: 0.2 }}
-                />
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-1 text-center text-[10px] text-[#78716C]">
-                <span className="font-semibold text-[#1C1917]">결제 완료</span>
-                <span className="font-semibold text-[#EA580C]">제작 중</span>
-                <span>정산 대기</span>
-              </div>
+              <span className="inline-flex rounded-full bg-[#1C1917] px-2.5 py-1 text-[10px] font-semibold text-white">
+                Toss Payments 연동
+              </span>
+              <ol className="mt-3 space-y-2">
+                {[
+                  '1. 크리에이터 채택',
+                  '2. 토스 간편 결제',
+                  '3. 콘텐츠 협업 시작',
+                ].map((step, index) => (
+                  <li key={step} className="flex items-center gap-2 text-xs font-medium text-[#1C1917]">
+                    <Check
+                      className={index === 0 ? 'size-3.5 text-[#EA580C]' : 'size-3.5 text-[#78716C]'}
+                      aria-hidden
+                    />
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
             </div>
           </motion.article>
         </div>

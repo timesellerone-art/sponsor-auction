@@ -49,7 +49,7 @@ export const SHORTFORM_CARDS = [
     title: '뷰티 릴스',
     cover:
       'https://images.unsplash.com/photo-1616683693504-3ea7e9ad6fec?auto=format&fit=crop&w=720&h=1280&q=80',
-    reach: '예상 도달 12.4만',
+    format: '뷰티 · 15초 릴스',
     creatorId: 'minji' as const,
     chip: 'AI 기획안 · 텍스처 매크로',
   },
@@ -58,7 +58,7 @@ export const SHORTFORM_CARDS = [
     title: '테크 언박싱',
     cover:
       'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=720&h=1280&q=80',
-    reach: '예상 도달 8.9만',
+    format: '테크 · 20초 쇼츠',
     creatorId: 'hyunwoo' as const,
     chip: 'AI 기획안 · 언박싱 3컷',
   },
@@ -67,7 +67,7 @@ export const SHORTFORM_CARDS = [
     title: '홈카페 브이로그',
     cover:
       'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=720&h=1280&q=80',
-    reach: '예상 도달 15.2만',
+    format: '홈카페 · 감성 릴스',
     creatorId: 'hayeon' as const,
     chip: 'AI 기획안 · 홈카페 루틴',
   },
