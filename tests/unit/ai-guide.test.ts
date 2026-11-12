@@ -75,8 +75,8 @@ describe('AI 가이드 JSON 정규화', () => {
       budget: 500000,
       description: '민감 피부를 위한 세럼 리뷰를 15초로 찍어 주세요.',
     });
-    assert.match(prompt, /단 1명의 크리에이터를 선정하여 1:1로 집중 제작/);
-    assert.match(prompt, /3~5명과 협업/);
+    assert.match(prompt, /단 1명의 핵심 크리에이터를 선정해 1:1로 집중 제작/);
+    assert.match(prompt, /크리에이터 3~5명과 협업/);
     assert.equal(prompt.includes('1~2명의 핵심 크리에이터'), false);
   });
 

@@ -5,11 +5,11 @@ import type {
   AiReport,
 } from '@/types/ai';
 
-export const AI_GUIDE_CACHE_PREFIX = 'sa:ai-guide:v2:';
-export const AI_GUIDE_PROMPT_VERSION = 'v2-1to1';
+export const AI_GUIDE_CACHE_PREFIX = 'sa:ai-guide:v3:';
+export const AI_GUIDE_PROMPT_VERSION = 'v3-1to1';
 
-export const AI_GUIDE_MATCHING_RULES = `[절대 금지]: "3~5명과 협업", "여러 크리에이터와 나누어", "다수의 인플루언서 분산 집행" 등 예산을 쪼개어 여러 명과 동시에 매칭한다는 표현은 절대 사용하지 마세요.
-[필수 기준]: 본 플랫폼은 캠페인 1건당 가장 기획력이 뛰어난 단 1명의 크리에이터를 선정하여 1:1로 집중 제작하는 방식입니다. 모든 전략과 기대 포인트는 '선정된 1명의 크리에이터가 해당 예산을 바탕으로 고밀도 콘텐츠 1편을 제작하는 기준'으로만 작성하세요.`;
+export const AI_GUIDE_MATCHING_RULES = `[절대 금지]: "크리에이터 3~5명과 협업", "여러 크리에이터와 나누어", "다수의 인플루언서 분산 집행" 등 1:N 분할 매칭 표현은 절대 사용하지 마세요.
+[필수 기준]: 오직 단 1명의 핵심 크리에이터를 선정해 1:1로 집중 제작하는 기준으로만 작성하세요. 모든 전략과 기대 포인트는 선정된 1명이 해당 예산을 바탕으로 고밀도 콘텐츠 1편을 제작하는 기준입니다. expectedEffect 필드는 수치 예측이 아닌 캠페인 핵심 전략으로 작성하세요.`;
 
 export const GEMINI_FLASH_MODELS = [
   'gemini-3.5-flash-lite',

@@ -99,13 +99,14 @@ export function Navbar() {
         <Link
           href="/"
           aria-label="Clink"
-          className="flex shrink-0 items-center gap-2 whitespace-nowrap font-semibold tracking-tight text-stone-900"
+          className="flex shrink-0 items-center whitespace-nowrap"
           onClick={() => setOpen(false)}
         >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-clink text-sm font-bold text-white">
-            C
-          </span>
-          <span className="text-[15px] sm:text-lg">Clink</span>
+          <img
+            src="/logo.svg"
+            alt="Clink"
+            className="h-8 w-auto sm:h-9"
+          />
         </Link>
 
         <nav className="hidden min-w-0 flex-1 items-center gap-3 md:flex lg:gap-5" aria-label="주요">

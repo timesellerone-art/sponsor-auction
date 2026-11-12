@@ -17,6 +17,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Clink',
   description: '기획부터 매칭까지, 크리에이터 협업의 새로운 기준. 제품만 등록하면 AI가 촬영 콘셉트를 설계합니다.',
+  icons: {
+    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    shortcut: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
