@@ -31,13 +31,13 @@ export function AiAgentGuide({ report, source, loading = false }: AiAgentGuidePr
               : 'bg-white text-teal-800 ring-1 ring-teal-200',
           )}
         >
-          {loading ? '분석 중' : source === 'ai' ? 'AI 리포트' : '기본 추천 리포트'}
+          {loading ? '분석 중' : source === 'ai' ? 'AI 맞춤 분석 리포트' : '기본 추천 리포트'}
         </span>
       </div>
 
       {loading || !report ? (
         <div className="mt-4 space-y-3" aria-busy="true" aria-live="polite">
-          <span className="sr-only">AI 가이드를 준비하고 있습니다.</span>
+          <p className="text-sm text-teal-800">AI가 캠페인 맞춤 가이드를 분석 중입니다...</p>
           <div className="h-16 animate-pulse rounded-xl bg-white/80" />
           <div className="h-16 animate-pulse rounded-xl bg-white/80" />
           <div className="h-16 animate-pulse rounded-xl bg-white/70" />

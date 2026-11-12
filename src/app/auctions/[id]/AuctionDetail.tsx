@@ -17,12 +17,19 @@ import { useAwardCheckout } from '@/hooks/useAwardCheckout';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { ACCESS_REASON } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
+import {
+  guideFingerprint,
+  guideToAiReport,
+  isLowQualityDescription,
+  readCachedAiGuide,
+  writeCachedAiGuide,
+} from '@/lib/ai-guide';
 import { buildFallbackReport } from '@/lib/ai-report';
 import { getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
 import { isCampaignAuthor, isOwnedAuction } from '@/lib/my-campaigns';
 import { VALIDATION } from '@/lib/validation';
 import { formatWon } from '@/lib/utils';
-import type { AiAnalyzeResponse, AiReport } from '@/types/ai';
+import type { AiAnalyzeResponse, AiGuideResponse, AiReport } from '@/types/ai';
 import { isAuctionClosed, type AuctionItem, type BidItem } from '@/types/auction';
 
 export function AuctionDetail({ id }: { id: string }) {
@@ -99,17 +106,37 @@ export function AuctionDetail({ id }: { id: string }) {
     let cancelled = false;
 
     const loadReport = async () => {
+      const input = {
+        title: auction.title,
+        platform: auction.platform,
+        budget: auction.budget,
+        description: auction.description,
+      };
+      const fingerprint = guideFingerprint(input);
+      if (isLowQualityDescription(input.description)) {
+        setReport(buildFallbackReport(input));
+        setReportSource('fallback');
+        setReportLoading(false);
+        return;
+      }
+
+      const cached = readCachedAiGuide(auction.id, fingerprint);
+      if (cached) {
+        setReport(guideToAiReport(cached));
+        setReportSource('ai');
+        setReportLoading(false);
+        return;
+      }
+
       setReportLoading(true);
 
       try {
-        const response = await fetch('/api/ai-analyze', {
+        const response = await fetch('/api/ai-guide', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            title: auction.title,
-            platform: auction.platform,
-            budget: auction.budget,
-            description: auction.description,
+            campaignId: auction.id,
+            ...input,
           }),
         });
 
@@ -117,33 +144,31 @@ export function AuctionDetail({ id }: { id: string }) {
           if (response.status === 429) {
             showToast('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.');
           }
-          throw new Error('AI analyze failed');
+          throw new Error('AI guide failed');
         }
 
-        const payload = (await response.json()) as AiAnalyzeResponse;
+        const payload = (await response.json()) as AiGuideResponse;
         if (cancelled) {
           return;
         }
 
-        if (!payload?.report?.concepts?.length) {
-          throw new Error('Invalid AI payload');
+        if (payload?.fallback === false && payload.concepts?.length === 3) {
+          writeCachedAiGuide(auction.id, fingerprint, {
+            concepts: payload.concepts,
+            expectedEffect: payload.expectedEffect,
+          });
+          setReport(guideToAiReport(payload));
+          setReportSource('ai');
+          return;
         }
 
-        setReport(payload.report);
-        setReportSource(payload.source === 'ai' ? 'ai' : 'fallback');
+        throw new Error('AI guide fallback');
       } catch {
         if (cancelled) {
           return;
         }
 
-        setReport(
-          buildFallbackReport({
-            title: auction.title,
-            platform: auction.platform,
-            budget: auction.budget,
-            description: auction.description,
-          }),
-        );
+        setReport(buildFallbackReport(input));
         setReportSource('fallback');
       } finally {
         if (!cancelled) {

@@ -19,5 +19,6 @@ declare namespace NodeJS {
     TOSS_SECRET_KEY?: string;
     NAVER_CLIENT_ID?: string;
     NAVER_CLIENT_SECRET?: string;
+    GEMINI_API_KEY?: string;
   }
 }

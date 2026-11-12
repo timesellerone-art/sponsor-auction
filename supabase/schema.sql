@@ -158,6 +158,8 @@ alter table if exists public.auctions
   add column if not exists leading_bid_amount integer not null default 0;
 alter table if exists public.auctions
   add column if not exists highest_bid_amount integer not null default 0;
+alter table if exists public.auctions
+  add column if not exists ai_guide jsonb;
 
 alter table if exists public.bids
   add column if not exists creator_id uuid;
