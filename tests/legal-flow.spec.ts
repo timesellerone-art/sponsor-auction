@@ -5,7 +5,7 @@ test.describe('전자상거래 약관 및 동의 UI', () => {
   test('로그인 화면에서 이용약관·개인정보 처리방침에 동의 안내가 연결된다', async ({ page }) => {
     await page.goto('/login');
     await expect(
-      page.getByText('로그인 시 Clink의 이용약관 및 개인정보 처리방침에 동의하는 것으로 간주됩니다.'),
+      page.getByText('로그인 시 Clink의 이용약관 및 개인정보 처리방침에 동의하는 것으로 간주됩니다.').first(),
     ).toBeVisible();
 
     await page.getByRole('link', { name: '이용약관', exact: true }).click();
@@ -47,7 +47,7 @@ test.describe('전자상거래 약관 및 동의 UI', () => {
     await page.goto('/login');
     await page.getByRole('button', { name: '회원가입' }).click();
     await page.getByPlaceholder('홍길동').fill('약관 테스트');
-    await page.getByPlaceholder('you@example.com').fill('legal-test@example.com');
+    await page.getByRole('textbox', { name: '이메일' }).fill('legal-test@example.com');
     await page.getByPlaceholder('6자 이상').fill('demo1234');
     await page.getByRole('button', { name: '가입하고 역할 선택' }).click();
     await expect(

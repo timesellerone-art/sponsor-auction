@@ -24,6 +24,7 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
     const createDialog = await openCreateAuction(page);
     await createDialog.getByLabel('제목').fill(title);
     await createDialog.getByLabel('플랫폼').selectOption('youtube_shorts');
+    await createDialog.locator('#auction-category').selectOption({ label: '육아·라이프' });
     await createDialog.getByLabel('예산').fill('150000');
     await createDialog.getByLabel('상세설명').fill(description);
     await createDialog.getByRole('button', { name: '캠페인 등록' }).click();
@@ -57,6 +58,12 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
     ).toBeVisible();
     await expect(page.getByRole('heading', { name: '제출된 크리에이터 제안 목록' })).toBeVisible();
     await expect(page.getByText(proposal)).toBeVisible();
+
+    await page.getByLabel('메시지').fill('E2E 매칭 채팅 확인');
+    await page.getByRole('button', { name: '보내기' }).click();
+    await expect(page.getByText('E2E 매칭 채팅 확인')).toBeVisible();
+    await page.getByRole('button', { name: /^알림/ }).first().click();
+    await expect(page.getByRole('region', { name: '알림 목록' })).toBeVisible();
   });
 
   await test.step('광고주가 제안을 낙찰하고 매칭을 완료한다', async () => {

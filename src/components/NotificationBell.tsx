@@ -51,13 +51,11 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => {
-          setOpen((value) => {
-            const next = !value;
-            if (next && user.id) {
-              markNotificationsRead(user.id);
-            }
-            return next;
-          });
+          const next = !open;
+          setOpen(next);
+          if (next && user.id) {
+            markNotificationsRead(user.id);
+          }
         }}
       >
         <Bell className="size-5" aria-hidden />

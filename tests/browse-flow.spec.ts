@@ -34,12 +34,12 @@ test.describe('역경매 검색·필터와 광고주 메인 노출', () => {
     await expect(page.getByRole('link', { name: ACTIVE_SHORTS })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_REELS })).toHaveCount(0);
 
-    await page.getByRole('button', { name: '전체' }).click();
+    await page.getByRole('button', { name: '전체', exact: true }).click();
     await page.getByRole('button', { name: 'TikTok' }).click();
     await expect(page.getByRole('link', { name: CLOSED_TIKTOK })).toBeVisible();
     await expect(page.getByRole('heading', { name: '모집 마감·완료된 캠페인' })).toBeVisible();
 
-    await page.getByRole('button', { name: '전체' }).click();
+    await page.getByRole('button', { name: '전체', exact: true }).click();
     await page.getByRole('button', { name: '높은 예산순' }).click();
     await expect(page.getByRole('link', { name: ACTIVE_SHORTS })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_REELS })).toBeVisible();

@@ -6,7 +6,9 @@ import {
   campaignCoverUrl,
   classifyCampaignCategory,
   displayCampaignDescription,
+  parseImageFromDescription,
   resolveCampaignCategory,
+  withImageMarker,
 } from '../../src/lib/campaign-presentation';
 
 test('테크·앱 키워드는 반려동물보다 우선한다', () => {
@@ -65,6 +67,21 @@ test('육아·라이프 키워드와 저장된 분야를 우선한다', () => {
   assert.equal(
     displayCampaignDescription('콘텐츠 분야: 육아·라이프\n\n이유식 루틴 브이로그'),
     '이유식 루틴 브이로그',
+  );
+});
+
+test('image_url 컬럼이 없어도 설명 마커로 대표 사진을 복원한다', () => {
+  const uploaded = 'https://cdn.example.com/cover-육아.jpg';
+  const marked = withImageMarker('콘텐츠 분야: 육아·라이프\n\n기저귀 루틴 숏폼', uploaded);
+  assert.equal(parseImageFromDescription(marked), uploaded);
+  assert.equal(displayCampaignDescription(marked), '기저귀 루틴 숏폼');
+  assert.equal(
+    campaignCoverUrl({
+      id: 'auc-parenting',
+      title: '육아템 리뷰',
+      description: marked,
+    }),
+    uploaded,
   );
 });
 

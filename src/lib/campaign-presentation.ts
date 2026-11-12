@@ -40,6 +40,28 @@ const CATEGORY_LABELS: Record<CampaignCategoryId, string> = {
 };
 
 const CATEGORY_MARKER = '콘텐츠 분야:';
+const IMAGE_MARKER = '대표사진:';
+const CAMPAIGN_META_PREFIXES = [CATEGORY_MARKER, IMAGE_MARKER] as const;
+
+function splitCampaignMeta(description?: string | null) {
+  const lines = (description ?? '').split(/\r?\n/);
+  const meta: string[] = [];
+  let index = 0;
+  while (index < lines.length) {
+    const trimmed = lines[index]?.trim() ?? '';
+    if (CAMPAIGN_META_PREFIXES.some((prefix) => trimmed.startsWith(prefix))) {
+      meta.push(trimmed);
+      index += 1;
+      continue;
+    }
+    if (trimmed === '' && meta.length > 0) {
+      index += 1;
+      continue;
+    }
+    break;
+  }
+  return { meta, body: lines.slice(index).join('\n') };
+}
 
 const CATEGORY_KEYWORDS: Record<CampaignCategoryId, string[]> = {
   tech: ['가계부', '스마트폰', 'saas', '노트북', '핀테크', '테크', '앱', '기기', '송금'],
@@ -89,25 +111,45 @@ export function campaignCategoryIdFromLabel(label: string): CampaignCategoryId |
 }
 
 export function parseCategoryFromDescription(description?: string | null): CampaignCategoryId | null {
-  const firstLine = (description ?? '').split(/\r?\n/, 1)[0]?.trim() ?? '';
-  if (!firstLine.startsWith(CATEGORY_MARKER)) {
+  const line = splitCampaignMeta(description).meta.find((item) => item.startsWith(CATEGORY_MARKER));
+  if (!line) {
     return null;
   }
-  return campaignCategoryIdFromLabel(firstLine.slice(CATEGORY_MARKER.length).trim());
+  return campaignCategoryIdFromLabel(line.slice(CATEGORY_MARKER.length).trim());
+}
+
+export function parseImageFromDescription(description?: string | null): string | null {
+  const line = splitCampaignMeta(description).meta.find((item) => item.startsWith(IMAGE_MARKER));
+  if (!line) {
+    return null;
+  }
+  const url = line.slice(IMAGE_MARKER.length).trim();
+  return /^https?:\/\//i.test(url) ? url : null;
 }
 
 export function withCategoryMarker(description: string, category: CampaignCategoryId) {
+  const imageUrl = parseImageFromDescription(description);
   const body = displayCampaignDescription(description).trim();
-  return `${CATEGORY_MARKER} ${campaignCategoryLabel(category)}\n\n${body}`;
+  const lines = [`${CATEGORY_MARKER} ${campaignCategoryLabel(category)}`];
+  if (imageUrl) {
+    lines.push(`${IMAGE_MARKER} ${imageUrl}`);
+  }
+  return `${lines.join('\n')}\n\n${body}`;
+}
+
+export function withImageMarker(description: string, imageUrl: string) {
+  const category = parseCategoryFromDescription(description);
+  const body = displayCampaignDescription(description).trim();
+  const lines: string[] = [];
+  if (category) {
+    lines.push(`${CATEGORY_MARKER} ${campaignCategoryLabel(category)}`);
+  }
+  lines.push(`${IMAGE_MARKER} ${imageUrl}`);
+  return `${lines.join('\n')}\n\n${body}`;
 }
 
 export function displayCampaignDescription(description?: string | null) {
-  const text = description ?? '';
-  const firstLine = text.split(/\r?\n/, 1)[0] ?? '';
-  if (!firstLine.trim().startsWith(CATEGORY_MARKER)) {
-    return text;
-  }
-  return text.replace(/^[^\n]*\n+/, '');
+  return splitCampaignMeta(description).body;
 }
 
 function haystackOf(title?: string | null, description?: string | null) {
@@ -176,7 +218,8 @@ export function campaignCoverUrl(
     publicImageUrl(auction.imageUrl) ||
     publicImageUrl(auction.thumbnailUrl) ||
     publicImageUrl((auction as { image_url?: string | null }).image_url) ||
-    publicImageUrl((auction as { thumbnail_url?: string | null }).thumbnail_url);
+    publicImageUrl((auction as { thumbnail_url?: string | null }).thumbnail_url) ||
+    publicImageUrl(parseImageFromDescription(auction.description));
   if (uploaded) {
     return uploaded;
   }

@@ -195,7 +195,7 @@ export function CreatorDashboard() {
               <div>
                 <h2 className="text-lg font-bold text-stone-900">진행 중인 제안</h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  아직 낙찰되지 않은 pending 상태의 제안입니다.
+                  아직 선정되지 않아 광고주 확인을 기다리는 제안입니다.
                 </p>
               </div>
               <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">

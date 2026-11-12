@@ -20,6 +20,23 @@ export async function uploadCampaignCover(file: File, userId?: string | null) {
     return { url: null, error: invalid };
   }
 
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const response = await fetch('/api/campaign-cover', {
+      method: 'POST',
+      body: form,
+    });
+    if (response.ok) {
+      const payload = (await response.json()) as { url?: string };
+      if (payload.url) {
+        return { url: payload.url, error: null };
+      }
+    }
+  } catch {
+    // 브라우저 Storage 직접 업로드로 한 번 더 시도합니다.
+  }
+
   const supabase = createClient();
   if (!supabase) {
     return { url: URL.createObjectURL(file), error: null };
@@ -36,7 +53,7 @@ export async function uploadCampaignCover(file: File, userId?: string | null) {
   });
 
   if (error) {
-    console.error('[SponsorAuction] 캠페인 대표 사진 업로드 실패:', error);
+    console.warn('[SponsorAuction] 캠페인 대표 사진 직접 업로드 실패:', error.message);
     return { url: null, error: '사진을 올리지 못했습니다. 캠페인은 기본 커버로 등록됩니다.' };
   }
 

@@ -169,7 +169,7 @@ export function AdvertiserDashboard() {
               <div>
                 <h2 className="text-lg font-bold text-zinc-950">결제 완료 목록</h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  payments · auctions · bids 기준으로 승인된 결제를 보여 줍니다.
+                  토스페이먼츠 승인이 끝난 캠페인과 선정된 크리에이터를 보여 줍니다.
                 </p>
               </div>
               <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">

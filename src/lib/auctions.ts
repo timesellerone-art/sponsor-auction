@@ -42,7 +42,9 @@ import { attachScore, getCreatorScoresByIds } from '@/lib/creator-metrics';
 import {
   isCampaignCategoryId,
   parseCategoryFromDescription,
+  parseImageFromDescription,
   withCategoryMarker,
+  withImageMarker,
 } from '@/lib/campaign-presentation';
 import { isPlatformType } from '@/lib/platforms';
 import type { Database } from '@/types/database';
@@ -58,8 +60,53 @@ export const UPDATE_FAIL_MESSAGE = '변경에 실패했습니다. 다시 시도�
 const AUCTION_COLUMNS =
   'id, title, platform, budget, description, status, is_blind, author_id, author_name, winner_bid_id, deadline, created_at, updated_at, bids_count, leading_bid_amount, highest_bid_amount, image_url, thumbnail_url, category';
 
+const AUCTION_COLUMNS_WITHOUT_IMAGES =
+  'id, title, platform, budget, description, status, is_blind, author_id, author_name, winner_bid_id, deadline, created_at, updated_at, bids_count, leading_bid_amount, highest_bid_amount, category';
+
+const AUCTION_COLUMNS_WITHOUT_CATEGORY =
+  'id, title, platform, budget, description, status, is_blind, author_id, author_name, winner_bid_id, deadline, created_at, updated_at, bids_count, leading_bid_amount, highest_bid_amount';
+
 const AUCTION_COLUMNS_CORE =
   'id, title, platform, budget, description, status, deadline, created_at, bids_count';
+
+const AUCTION_SELECT_CANDIDATES = [
+  AUCTION_COLUMNS,
+  AUCTION_COLUMNS_WITHOUT_IMAGES,
+  AUCTION_COLUMNS_WITHOUT_CATEGORY,
+  AUCTION_COLUMNS_CORE,
+] as const;
+
+let resolvedAuctionSelect: string | null = null;
+
+type AuctionQueryResult<T> = {
+  data: T;
+  error: { message?: string; code?: string } | null;
+};
+
+async function withAuctionSelect<T>(
+  run: (columns: string) => PromiseLike<AuctionQueryResult<T>>,
+): Promise<AuctionQueryResult<T>> {
+  const candidates = resolvedAuctionSelect
+    ? [
+        resolvedAuctionSelect,
+        ...AUCTION_SELECT_CANDIDATES.filter((item) => item !== resolvedAuctionSelect),
+      ]
+    : [...AUCTION_SELECT_CANDIDATES];
+
+  let last: AuctionQueryResult<T> | null = null;
+  for (const columns of candidates) {
+    const result = await run(columns);
+    last = result;
+    if (!result.error) {
+      resolvedAuctionSelect = columns;
+      return result;
+    }
+    if (!isSchemaMismatch(result.error)) {
+      return result;
+    }
+  }
+  return last as AuctionQueryResult<T>;
+}
 
 const BID_COLUMNS =
   'id, auction_id, creator_id, creator_name, creator_channel_url, bid_amount, proposal_text, status, created_at';
@@ -81,7 +128,7 @@ function ok<T>(data: T): DataResult<T> {
 function rowImageUrl(row: Partial<AuctionRow>) {
   const image = row.image_url?.trim() || '';
   const thumb = row.thumbnail_url?.trim() || '';
-  return image || thumb || null;
+  return image || thumb || parseImageFromDescription(row.description) || null;
 }
 
 function mapAuction(row: Partial<AuctionRow> & Pick<AuctionRow, 'id'>): AuctionItem {
@@ -171,6 +218,10 @@ function logDbError(action: string, error: unknown) {
     console.warn(`[SponsorAuction] ${action} UUID 형식이 아니어서 건너뜁니다.`, detail);
     return;
   }
+  if (isSchemaMismatch({ message: detail, code })) {
+    console.warn(`[SponsorAuction] ${action}: 스키마 호환 모드로 재시도합니다.`, detail);
+    return;
+  }
   console.error(`[SponsorAuction] ${action} 실패:`, detail, error);
 }
 
@@ -181,20 +232,9 @@ export async function getAuctions(): Promise<DataResult<AuctionItem[]>> {
   }
 
   try {
-    let { data, error } = await supabase
-      .from('auctions')
-      .select(AUCTION_COLUMNS)
-      .order('created_at', { ascending: false });
-
-    if (error && isSchemaMismatch(error)) {
-      logDbError('경매 목록 조회 컬럼 폴백', error);
-      const fallback = await supabase
-        .from('auctions')
-        .select(AUCTION_COLUMNS_CORE)
-        .order('created_at', { ascending: false });
-      data = fallback.data as typeof data;
-      error = fallback.error;
-    }
+    const { data, error } = await withAuctionSelect((columns) =>
+      supabase.from('auctions').select(columns).order('created_at', { ascending: false }),
+    );
 
     if (error) {
       logDbError('경매 목록 조회', error);
@@ -242,22 +282,13 @@ export async function getAuctionsByAuthor(
   }
 
   try {
-    let { data, error } = await supabase
-      .from('auctions')
-      .select(AUCTION_COLUMNS)
-      .eq('author_id', authorId)
-      .order('created_at', { ascending: false });
-
-    if (error && isSchemaMismatch(error)) {
-      logDbError('광고주 경매 목록 조회 컬럼 폴백', error);
-      const fallback = await supabase
+    const { data, error } = await withAuctionSelect((columns) =>
+      supabase
         .from('auctions')
-        .select(AUCTION_COLUMNS_CORE)
+        .select(columns)
         .eq('author_id', authorId)
-        .order('created_at', { ascending: false });
-      data = fallback.data as typeof data;
-      error = fallback.error;
-    }
+        .order('created_at', { ascending: false }),
+    );
 
     if (error) {
       logDbError('광고주 경매 목록 조회', error);
@@ -300,22 +331,9 @@ export async function getAuctionById(
       return getMockAuctionById(auctionId);
     }
 
-    let { data, error } = await supabase
-      .from('auctions')
-      .select(AUCTION_COLUMNS)
-      .eq('id', auctionId)
-      .maybeSingle();
-
-    if (error && isSchemaMismatch(error)) {
-      logDbError('경매 단건 조회 컬럼 폴백', error);
-      const fallback = await supabase
-        .from('auctions')
-        .select(AUCTION_COLUMNS_CORE)
-        .eq('id', auctionId)
-        .maybeSingle();
-      data = fallback.data as typeof data;
-      error = fallback.error;
-    }
+    const { data, error } = await withAuctionSelect((columns) =>
+      supabase.from('auctions').select(columns).eq('id', auctionId).maybeSingle(),
+    );
 
     if (error) {
       logDbError('경매 단건 조회', error);
@@ -377,21 +395,30 @@ export async function createAuction(
       ...(category ? { category } : {}),
     };
 
-    let { data, error } = await supabase
-      .from('auctions')
-      .insert(payload)
-      .select(AUCTION_COLUMNS)
-      .single();
-
-    if (error && isSchemaMismatch(error)) {
-      logDbError('경매 등록 컬럼 폴백', error);
-      const withoutCategory = await supabase
-        .from('auctions')
-        .insert({
+    const markedDescription = category ? withCategoryMarker(description, category) : description;
+    const attempts: { row: Record<string, unknown>; columns: string }[] = [
+      { row: payload, columns: AUCTION_COLUMNS },
+      {
+        row: {
           title: payload.title,
           platform: payload.platform,
           budget: payload.budget,
-          description: category ? withCategoryMarker(description, category) : description,
+          description: imageUrl ? withImageMarker(markedDescription, imageUrl) : markedDescription,
+          status: payload.status,
+          is_blind: payload.is_blind,
+          author_id: payload.author_id,
+          author_name: payload.author_name,
+          deadline: payload.deadline,
+          ...(category ? { category } : {}),
+        },
+        columns: AUCTION_COLUMNS_WITHOUT_IMAGES,
+      },
+      {
+        row: {
+          title: payload.title,
+          platform: payload.platform,
+          budget: payload.budget,
+          description: markedDescription,
           status: payload.status,
           is_blind: payload.is_blind,
           author_id: payload.author_id,
@@ -399,31 +426,36 @@ export async function createAuction(
           deadline: payload.deadline,
           image_url: imageUrl,
           thumbnail_url: imageUrl,
-        })
-        .select(
-          'id, title, platform, budget, description, status, is_blind, author_id, author_name, winner_bid_id, deadline, created_at, updated_at, bids_count, leading_bid_amount, highest_bid_amount, image_url, thumbnail_url',
-        )
-        .single();
-      data = withoutCategory.data as typeof data;
-      error = withoutCategory.error;
-    }
-
-    if (error && isSchemaMismatch(error)) {
-      logDbError('경매 등록 핵심 컬럼 폴백', error);
-      const retry = await supabase
-        .from('auctions')
-        .insert({
+        },
+        columns: AUCTION_COLUMNS_WITHOUT_CATEGORY,
+      },
+      {
+        row: {
           title: payload.title,
           platform: payload.platform,
           budget: payload.budget,
-          description: category ? withCategoryMarker(description, category) : description,
+          description: imageUrl ? withImageMarker(markedDescription, imageUrl) : markedDescription,
           status: payload.status,
           deadline: payload.deadline,
-        })
-        .select(AUCTION_COLUMNS_CORE)
-        .single();
-      data = retry.data as typeof data;
-      error = retry.error;
+        },
+        columns: AUCTION_COLUMNS_CORE,
+      },
+    ];
+
+    let data: Partial<AuctionRow> & Pick<AuctionRow, 'id'> | null = null;
+    let error: { message?: string; code?: string } | null = null;
+    for (const attempt of attempts) {
+      const result = await supabase.from('auctions').insert(attempt.row).select(attempt.columns).single();
+      data = result.data as typeof data;
+      error = result.error;
+      if (!error && data) {
+        resolvedAuctionSelect = attempt.columns;
+        break;
+      }
+      if (error && !isSchemaMismatch(error)) {
+        break;
+      }
+      logDbError('경매 등록 컬럼 폴백', error);
     }
 
     if (error || !data) {
@@ -772,12 +804,13 @@ export async function updateAuctionStatus(
       return updateMockAuctionStatus(id, status);
     }
 
-    let query = supabase.from('auctions').update({ status }).eq('id', id);
-    if (status === 'closed' || status === 'matched' || status === 'completed') {
-      query = query.eq('status', 'active');
-    }
-
-    const { data, error } = await query.select(AUCTION_COLUMNS).maybeSingle();
+    const { data, error } = await withAuctionSelect((columns) => {
+      let query = supabase.from('auctions').update({ status }).eq('id', id);
+      if (status === 'closed' || status === 'matched' || status === 'completed') {
+        query = query.eq('status', 'active');
+      }
+      return query.select(columns).maybeSingle();
+    });
 
     if (!error && !data) {
       return fail(null, VALIDATION.alreadyAwarded);
@@ -824,12 +857,9 @@ export async function updateAuctionBlind(
         );
       }
 
-      const { data, error } = await supabase
-        .from('auctions')
-        .update({ is_blind: isBlind })
-        .eq('id', id)
-        .select(AUCTION_COLUMNS)
-        .maybeSingle();
+      const { data, error } = await withAuctionSelect((columns) =>
+        supabase.from('auctions').update({ is_blind: isBlind }).eq('id', id).select(columns).maybeSingle(),
+      );
 
       if (error && isSchemaMismatch(error)) {
         logDbError('블라인드 변경 컬럼 없음', error);
@@ -990,22 +1020,26 @@ async function awardBidWithCheckAndSet(
     return fail(null, UPDATE_FAIL_MESSAGE);
   }
 
-  let { data, error } = await supabase
-    .from('auctions')
-    .update({ status: 'closed', winner_bid_id: bidId })
-    .eq('id', auctionId)
-    .eq('status', 'active')
-    .select(AUCTION_COLUMNS)
-    .maybeSingle();
-
-  if (error && isSchemaMismatch(error)) {
-    const fallback = await supabase
+  let { data, error } = await withAuctionSelect((columns) =>
+    supabase
       .from('auctions')
-      .update({ status: 'closed' })
+      .update({ status: 'closed', winner_bid_id: bidId })
       .eq('id', auctionId)
       .eq('status', 'active')
-      .select(AUCTION_COLUMNS_CORE)
-      .maybeSingle();
+      .select(columns)
+      .maybeSingle(),
+  );
+
+  if (error && isSchemaMismatch(error)) {
+    const fallback = await withAuctionSelect((columns) =>
+      supabase
+        .from('auctions')
+        .update({ status: 'closed' })
+        .eq('id', auctionId)
+        .eq('status', 'active')
+        .select(columns)
+        .maybeSingle(),
+    );
     data = fallback.data as typeof data;
     error = fallback.error;
   }
