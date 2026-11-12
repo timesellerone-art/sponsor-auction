@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  GEMINI_FLASH_MODELS,
   getGeminiApiKey,
   guideFingerprint,
   guideToAiReport,
@@ -69,5 +70,27 @@ describe('AI 가이드 JSON 정규화', () => {
     assert.equal(getGeminiApiKey({ GEMINI_API_KEY: '   ' }), '');
     assert.equal(getGeminiApiKey({ GEMINI_API_KEY: 'YOUR_GEMINI_API_KEY' }), '');
     assert.equal(getGeminiApiKey({ GEMINI_API_KEY: 'real-key-value' }), 'real-key-value');
+    assert.equal(
+      getGeminiApiKey({ GOOGLE_GENERATIVE_AI_API_KEY: 'alias-key-value' }),
+      'alias-key-value',
+    );
+  });
+
+  it('신규 키에서 막힌 2.5 Flash 대신 현재 Flash 모델을 쓴다', () => {
+    assert.equal((GEMINI_FLASH_MODELS as readonly string[]).includes('gemini-2.5-flash'), false);
+    assert.equal(GEMINI_FLASH_MODELS[0], 'gemini-3.5-flash-lite');
+  });
+
+  it('expected_effect 별칭도 허용한다', () => {
+    const parsed = parseGuidePayload({
+      concepts: [
+        { title: '훅', description: '첫 3초에 시음 리액션을 넣으세요.' },
+        { title: '루틴', description: '일상 장면에 제품을 자연스럽게 배치하세요.' },
+        { title: 'CTA', description: '마지막에 저장을 유도하세요.' },
+      ],
+      expected_effect: '숏폼 저장과 프로필 방문이 함께 늘어납니다. 1~2명으로 먼저 테스트하세요.',
+    });
+    assert.equal(parsed?.concepts.length, 3);
+    assert.equal(Boolean(parsed?.expectedEffect), true);
   });
 });

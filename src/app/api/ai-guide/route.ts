@@ -1,8 +1,10 @@
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
+  GEMINI_FLASH_MODELS,
   buildGuidePrompt,
   extractJsonPayload,
+  geminiGenerateUrl,
   getGeminiApiKey,
   guideFingerprint,
   isLowQualityDescription,
@@ -14,9 +16,7 @@ import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { isUuid } from '@/lib/uuid';
 import type { AiGuidePayload, AiGuideRequest, AiGuideResponse } from '@/types/ai';
 
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-const TIMEOUT_MS = 10_000;
+const TIMEOUT_MS = 15_000;
 const memoryCache = new Map<string, { fingerprint: string; payload: AiGuidePayload }>();
 
 function fallbackJson() {
@@ -137,65 +137,94 @@ async function writeDbGuide(campaignId: string, fingerprint: string, payload: Ai
   }
 }
 
-async function generateWithGemini(input: AiGuideRequest, apiKey: string) {
-  const response = await fetchWithTimeout(GEMINI_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: buildGuidePrompt(input) }],
-        },
-      ],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.7,
-        responseSchema: {
-          type: 'OBJECT',
-          properties: {
-            concepts: {
-              type: 'ARRAY',
-              items: {
-                type: 'OBJECT',
-                properties: {
-                  title: { type: 'STRING' },
-                  description: { type: 'STRING' },
-                },
-                required: ['title', 'description'],
-              },
-            },
-            expectedEffect: { type: 'STRING' },
-          },
-          required: ['concepts', 'expectedEffect'],
-        },
+function geminiRequestBody(input: AiGuideRequest) {
+  return {
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: buildGuidePrompt(input) }],
       },
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Gemini HTTP ${response.status}`);
-  }
-
-  const payload = (await response.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    ],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0.7,
+      responseSchema: {
+        type: 'OBJECT',
+        properties: {
+          concepts: {
+            type: 'ARRAY',
+            items: {
+              type: 'OBJECT',
+              properties: {
+                title: { type: 'STRING' },
+                description: { type: 'STRING' },
+              },
+              required: ['title', 'description'],
+            },
+          },
+          expectedEffect: { type: 'STRING' },
+        },
+        required: ['concepts', 'expectedEffect'],
+      },
+    },
   };
-  const text = payload.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text ?? '')
-    .join('')
-    .trim();
-  if (!text) {
-    throw new Error('Gemini empty content');
+}
+
+function readCandidateText(payload: {
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+}) {
+  return (
+    payload.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text ?? '')
+      .join('')
+      .trim() ?? ''
+  );
+}
+
+async function generateWithGemini(input: AiGuideRequest, apiKey: string) {
+  let lastError: Error | null = null;
+
+  for (const model of GEMINI_FLASH_MODELS) {
+    try {
+      const response = await fetchWithTimeout(geminiGenerateUrl(model), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify(geminiRequestBody(input)),
+      });
+
+      if (response.status === 404) {
+        lastError = new Error(`Gemini model unavailable: ${model}`);
+        continue;
+      }
+      if (!response.ok) {
+        lastError = new Error(`Gemini HTTP ${response.status}`);
+        continue;
+      }
+
+      const payload = (await response.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      const text = readCandidateText(payload);
+      if (!text) {
+        lastError = new Error('Gemini empty content');
+        continue;
+      }
+
+      const parsed = parseGuidePayload(extractJsonPayload(text));
+      if (!parsed) {
+        lastError = new Error('Gemini JSON schema mismatch');
+        continue;
+      }
+      return parsed;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Gemini request failed');
+    }
   }
 
-  const parsed = parseGuidePayload(extractJsonPayload(text));
-  if (!parsed) {
-    throw new Error('Gemini JSON schema mismatch');
-  }
-  return parsed;
+  throw lastError ?? new Error('Gemini request failed');
 }
 
 export async function POST(request: Request) {

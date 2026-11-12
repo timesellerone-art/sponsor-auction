@@ -7,15 +7,35 @@ import type {
 
 export const AI_GUIDE_CACHE_PREFIX = 'sa:ai-guide:v1:';
 
+export const GEMINI_FLASH_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.6-flash',
+  'gemini-flash-latest',
+] as const;
+
+export const GEMINI_GENERATE_PATH = 'https://generativelanguage.googleapis.com/v1beta/models';
+
 const TITLE_MAX = 15;
 const DESCRIPTION_SENTENCE_MAX = 2;
 
-export function getGeminiApiKey(env: Record<string, string | undefined> = process.env) {
-  const raw = env.GEMINI_API_KEY?.trim().replace(/^["']+|["']+$/g, '') ?? '';
+function cleanEnvValue(value: string | undefined) {
+  const raw = value?.trim().replace(/^["']+|["']+$/g, '') ?? '';
   if (!raw || /YOUR_|placeholder|_HERE$/i.test(raw)) {
     return '';
   }
   return raw;
+}
+
+export function getGeminiApiKey(env: Record<string, string | undefined> = process.env) {
+  return (
+    cleanEnvValue(env.GEMINI_API_KEY) ||
+    cleanEnvValue(env.GOOGLE_GENERATIVE_AI_API_KEY) ||
+    cleanEnvValue(env.GOOGLE_API_KEY)
+  );
+}
+
+export function geminiGenerateUrl(model: string) {
+  return `${GEMINI_GENERATE_PATH}/${model}:generateContent`;
 }
 
 export function guideFingerprint(input: Pick<AiGuideRequest, 'title' | 'description' | 'platform' | 'budget'>) {
@@ -103,14 +123,21 @@ export function parseGuidePayload(value: unknown): AiGuidePayload | null {
   if (!value || typeof value !== 'object') {
     return null;
   }
-  const raw = value as { concepts?: unknown; expectedEffect?: unknown };
+  const raw = value as {
+    concepts?: unknown;
+    expectedEffect?: unknown;
+    expected_effect?: unknown;
+  };
   const concepts = Array.isArray(raw.concepts)
     ? raw.concepts.map(conceptFromUnknown).filter((item): item is AiGuideConcept => item !== null).slice(0, 3)
     : [];
-  const expectedEffect =
+  const effectSource =
     typeof raw.expectedEffect === 'string'
-      ? clipSentences(raw.expectedEffect, DESCRIPTION_SENTENCE_MAX)
-      : '';
+      ? raw.expectedEffect
+      : typeof raw.expected_effect === 'string'
+        ? raw.expected_effect
+        : '';
+  const expectedEffect = clipSentences(effectSource, DESCRIPTION_SENTENCE_MAX);
   if (concepts.length < 3 || !expectedEffect) {
     return null;
   }

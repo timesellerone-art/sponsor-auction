@@ -11,9 +11,7 @@ test.describe('캠페인 AI 가이드', () => {
     await page.getByRole('link', { name: ACTIVE_SHORTS }).click();
 
     await expect(page.getByRole('heading', { name: 'AI 에이전트 가이드' })).toBeVisible();
-    await expect(
-      page.getByText('기본 추천 리포트').or(page.getByText('AI 맞춤 분석 리포트')),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('AI 맞춤 분석 리포트')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText('콘셉트 1')).toBeVisible();
     await expect(page.getByText('예상 효과', { exact: true })).toBeVisible();
     await expect(page.getByText('AI가 캠페인 맞춤 가이드를 분석 중입니다...')).toHaveCount(0);
