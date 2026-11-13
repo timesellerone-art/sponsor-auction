@@ -16,12 +16,18 @@ export type SessionMiddlewareResult = {
   secure: boolean;
 };
 
-export async function updateSession(request: NextRequest): Promise<SessionMiddlewareResult> {
+export async function updateSession(
+  request: NextRequest,
+  options?: { validate?: boolean },
+): Promise<SessionMiddlewareResult> {
   const bag = createCookieBag();
   const origin = requestAppOrigin(request);
   const secure = origin.startsWith('https://');
   const cookieOptions = sessionCookieOptions(secure, new URL(origin).hostname);
   let supabaseResponse = NextResponse.next({ request });
+  if (!options?.validate) {
+    return { response: supabaseResponse, cookies: [], secure };
+  }
   const env = getSupabaseEnv();
   if (!env) {
     return { response: supabaseResponse, cookies: [], secure };
@@ -51,7 +57,7 @@ export async function updateSession(request: NextRequest): Promise<SessionMiddle
   });
 
   try {
-    // getUser() validates the JWT and rotates refreshed tokens onto setAll cookies.
+    // 보호 경로에서만 getUser()로 JWT를 검증하고 쿠키를 회전한다.
     await supabase.auth.getUser();
   } catch (error) {
     console.warn('[SponsorAuction] 미들웨어 세션 갱신에 실패했습니다.', error);

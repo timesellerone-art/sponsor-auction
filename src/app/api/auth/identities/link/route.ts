@@ -10,6 +10,8 @@ import { getApiAuthUser } from '@/lib/auth-api-user';
 import { reconcileSocialIdentities } from '@/lib/auth-identity';
 import { expireAuthDebrisCookies } from '@/lib/auth-paths';
 
+export const preferredRegion = 'icn1';
+
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
 } as const;

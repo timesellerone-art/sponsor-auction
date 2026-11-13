@@ -6,6 +6,7 @@ import {
   hasAuthPresence,
   isAuthCallbackPath,
   isAuthPassthroughPath,
+  needsProtectedAuthValidation,
   onboardingCanonicalPath,
 } from '@/lib/auth-paths';
 import { parseAuthRoles } from '@/types/auth';
@@ -59,7 +60,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(callback);
   }
 
-  const session = await updateSession(request);
+  const session = await updateSession(request, {
+    validate: needsProtectedAuthValidation(pathname),
+  });
   const cookieRoles = parseAuthRoles(request.cookies.get(ROLE_COOKIE_NAME)?.value ?? '');
   const hasAdmin = cookieRoles.includes('admin');
   const hasAdvertiser = cookieRoles.includes('advertiser');

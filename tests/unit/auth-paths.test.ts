@@ -10,6 +10,7 @@ import {
   isAuthPassthroughPath,
   isPkceVerifierCookieName,
   isSupabaseAuthCookieName,
+  needsProtectedAuthValidation,
   onboardingCanonicalPath,
   sessionCookieOptions,
   shouldApplyRequestCookie,
@@ -25,6 +26,11 @@ describe('auth path helpers', () => {
     assert.equal(isAuthPassthroughPath('/onboarding/role-select'), true);
     assert.equal(isAuthPassthroughPath('/auth/oauth'), true);
     assert.equal(isAuthPassthroughPath('/my'), false);
+    assert.equal(needsProtectedAuthValidation('/'), false);
+    assert.equal(needsProtectedAuthValidation('/login'), false);
+    assert.equal(needsProtectedAuthValidation('/my'), true);
+    assert.equal(needsProtectedAuthValidation('/admin/users'), true);
+    assert.equal(needsProtectedAuthValidation('/payments/checkout'), true);
     assert.equal(onboardingCanonicalPath('/select-role'), '/');
     assert.equal(onboardingCanonicalPath('/onboarding'), '/');
     assert.equal(onboardingCanonicalPath('/onboarding/role-select'), '/');

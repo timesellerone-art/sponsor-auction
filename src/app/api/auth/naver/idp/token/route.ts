@@ -2,6 +2,8 @@ import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { readNaverIdpTicket } from '@/lib/naver-idp';
 
+export const preferredRegion = 'icn1';
+
 function json(status: number, body: Record<string, unknown>) {
   return NextResponse.json(body, {
     status,

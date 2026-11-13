@@ -1,6 +1,8 @@
 import { clientCookieSuffix } from '@/lib/site-origin';
 
 export const NAVER_AUTH_COOKIE_NAMES = [
+  'sa_naver_st',
+  'sa_naver_nx',
   'sa_naver_oauth_state',
   'sa_naver_oauth_next',
   'sa_account_link',

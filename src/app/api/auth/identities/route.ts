@@ -4,6 +4,8 @@ import { getApiAuthUser } from '@/lib/auth-api-user';
 import { listLinkedAccountStatuses } from '@/lib/auth-identities';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 
+export const preferredRegion = 'icn1';
+
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
 } as const;

@@ -39,6 +39,7 @@ import {
   primaryAuthRole,
   type SessionUser,
 } from '@/types/auth';
+export const preferredRegion = 'icn1';
 
 function callbackOrigin(request: Request) {
   return requestAppOrigin(request);

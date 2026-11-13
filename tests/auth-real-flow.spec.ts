@@ -110,10 +110,14 @@ test.describe('실전 소셜 로그인 / 콜백 / 온보딩', () => {
     expect(authorizeUrl.searchParams.get('auth_type')).toBeNull();
 
     const cookies = await context.cookies('http://localhost:3000');
-    expect(cookies.find((cookie) => cookie.name === 'sa_naver_oauth_state')?.httpOnly).toBe(true);
-    expect(
-      decodeURIComponent(cookies.find((cookie) => cookie.name === 'sa_naver_oauth_next')?.value ?? ''),
-    ).toBe('/');
+    const stateCookie =
+      cookies.find((cookie) => cookie.name === 'sa_naver_st') ??
+      cookies.find((cookie) => cookie.name === 'sa_naver_oauth_state');
+    const nextCookie =
+      cookies.find((cookie) => cookie.name === 'sa_naver_nx') ??
+      cookies.find((cookie) => cookie.name === 'sa_naver_oauth_next');
+    expect(stateCookie?.value).toBeTruthy();
+    expect(decodeURIComponent(nextCookie?.value ?? '')).toBe('/');
   });
 
   test('b) 콜백 교환 실패 시 상세 사유와 함께 /login?error=oauth_failed 로 보낸다', async ({

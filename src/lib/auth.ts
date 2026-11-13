@@ -25,7 +25,16 @@ import {
   buildAppOAuthCallbackUrl,
   sanitizeNextPath,
 } from '@/lib/auth-guard';
+import { sessionUserFromAuthUser } from '@/lib/auth-session';
 import { beginAuthLogout, expireBrowserAuthCookies } from '@/lib/auth-logout';
+import {
+  NAVER_NEXT_COOKIE,
+  NAVER_STATE_COOKIE,
+  buildNaverAuthorizeUrl,
+  createNaverState,
+  naverCallbackUrl,
+  publicNaverClientId,
+} from '@/lib/naver-oauth';
 import {
   kakaoOAuthScopeQuery,
   kakaoOAuthScopesOption,
@@ -384,9 +393,24 @@ export async function signInWithNaver(nextPath?: string | null) {
   }
   rememberOAuthStart('naver', nextPath);
   const next = sanitizeNextPath(nextPath) ?? POST_AUTH_HOME;
+  const wantsAccountLink = next.startsWith('/my/settings');
+  const clientId = publicNaverClientId();
+  if (clientId && !wantsAccountLink) {
+    const state = createNaverState();
+    const origin = publicAppOrigin();
+    const suffix = clientCookieSuffix();
+    document.cookie = `${NAVER_STATE_COOKIE}=${encodeURIComponent(state)}; Max-Age=600${suffix}`;
+    document.cookie = `${NAVER_NEXT_COOKIE}=${encodeURIComponent(next)}; Max-Age=600${suffix}`;
+    window.location.assign(
+      buildNaverAuthorizeUrl({
+        clientId,
+        redirectUri: naverCallbackUrl(origin),
+        state,
+      }),
+    );
+    return ok(true);
+  }
   const naverStart = `${publicAppOrigin()}/api/auth/naver?next=${encodeURIComponent(next)}`;
-  // 네이버는 PKCE 없이 자체 콜백으로 들어가 쿠키 유실을 피합니다.
-  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
   window.location.assign(naverStart);
   return ok(true);
 }
@@ -447,12 +471,6 @@ async function loadProfile(
   }
 }
 
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
 function hasClientAuthHint() {
   if (typeof document === 'undefined') {
     return false;
@@ -462,9 +480,10 @@ function hasClientAuthHint() {
 
 async function readBrowserAuthUser(
   supabase: NonNullable<ReturnType<typeof createClient>>,
+  options?: { verify?: boolean },
 ) {
   try {
-    const { data } = await withTimeout(supabase.auth.getSession(), 1500, '세션 조회');
+    const { data } = await withTimeout(supabase.auth.getSession(), 800, '세션 조회');
     if (data.session?.user) {
       return data.session.user;
     }
@@ -474,30 +493,21 @@ async function readBrowserAuthUser(
     }
   }
 
-  const attempts = hasClientAuthHint() ? 2 : 1;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      const { data, error } = await withTimeout(
-        supabase.auth.getUser(),
-        1500,
-        '세션 조회',
-      );
-      if (data.user) {
-        return data.user;
-      }
-      if (error && !isAuthSessionMissing(error)) {
-        console.warn('[SponsorAuction] 세션 조회에 실패했습니다.', error.message);
-      }
-    } catch (error) {
-      if (attempt === attempts - 1) {
-        if (!isAuthSessionMissing(error)) {
-          console.warn('[SponsorAuction] 세션 조회 중 예외가 발생했습니다.', error);
-        }
-        return null;
-      }
+  if (!options?.verify || !hasClientAuthHint()) {
+    return null;
+  }
+
+  try {
+    const { data, error } = await withTimeout(supabase.auth.getUser(), 1200, '세션 조회');
+    if (data.user) {
+      return data.user;
     }
-    if (attempt < attempts - 1) {
-      await sleep(300);
+    if (error && !isAuthSessionMissing(error)) {
+      console.warn('[SponsorAuction] 세션 조회에 실패했습니다.', error.message);
+    }
+  } catch (error) {
+    if (!isAuthSessionMissing(error)) {
+      console.warn('[SponsorAuction] 세션 조회 중 예외가 발생했습니다.', error);
     }
   }
   return null;
@@ -515,19 +525,34 @@ async function readMockSessionSafe(): Promise<DataResult<SessionUser | null> | n
   return null;
 }
 
-export async function getSessionUser(): Promise<DataResult<SessionUser | null>> {
+export async function getSessionUser(
+  options?: { profile?: boolean; verify?: boolean },
+): Promise<DataResult<SessionUser | null>> {
+  const loadProfileRow = options?.profile !== false;
   const supabase = createClient();
+
   if (supabase) {
     try {
-      const user = await readBrowserAuthUser(supabase);
-      if (user && isDemoAccountEmail(user.email)) {
-        const demo = rememberDemoSession(user.email);
+      const user = await readBrowserAuthUser(supabase, { verify: options?.verify });
+      if (user) {
+        const email = user.email?.trim() || '';
+        const demo = isDemoAccountEmail(email) ? rememberDemoSession(email) : null;
         if (demo) {
           return ok(demo);
         }
+        if (!loadProfileRow) {
+          return ok(sessionUserFromAuthUser(user));
+        }
+        const name =
+          (typeof user.user_metadata?.name === 'string'
+            ? user.user_metadata.name
+            : '') || email.split('@')[0] || '회원';
+        return ok(await loadProfile(supabase, user.id, email, name, user));
       }
-    } catch {
-      // 데모 매핑에 실패하면 Mock/일반 세션으로 이어갑니다.
+    } catch (error) {
+      if (!isAuthSessionMissing(error)) {
+        console.warn('[SponsorAuction] 세션 조회 중 예외가 발생했습니다.', error);
+      }
     }
   }
 
@@ -536,35 +561,7 @@ export async function getSessionUser(): Promise<DataResult<SessionUser | null>> 
     return mockSession;
   }
 
-  if (!supabase) {
-    return ok(null);
-  }
-
-  try {
-    const user = await readBrowserAuthUser(supabase);
-    if (!user) {
-      return ok(null);
-    }
-
-    const email = user.email?.trim() || '';
-    const demo = isDemoAccountEmail(email) ? rememberDemoSession(email) : null;
-    if (demo) {
-      return ok(demo);
-    }
-
-    const name =
-      (typeof user.user_metadata?.name === 'string'
-        ? user.user_metadata.name
-        : '') || email.split('@')[0] || '회원';
-    const session = await loadProfile(supabase, user.id, email, name, user);
-    return ok(session);
-  } catch (error) {
-    if (isAuthSessionMissing(error)) {
-      return ok(null);
-    }
-    console.warn('[SponsorAuction] 세션 조회 중 예외가 발생했습니다.', error);
-    return ok(null);
-  }
+  return ok(null);
 }
 
 export async function signUp(input: {

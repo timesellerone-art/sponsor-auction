@@ -25,6 +25,18 @@ export function isAuthCallbackPath(pathname: string) {
   );
 }
 
+/** getUser() JWT 검증이 필요한 보호 경로. 홈·로그인 등 공개 페이지는 쿠키 힌트만 쓴다. */
+export function needsProtectedAuthValidation(pathname: string) {
+  return (
+    pathname === '/my' ||
+    pathname.startsWith('/my/') ||
+    pathname === '/admin' ||
+    pathname.startsWith('/admin/') ||
+    pathname === '/payments' ||
+    pathname.startsWith('/payments/')
+  );
+}
+
 export type CookieToSet = {
   name: string;
   value: string;

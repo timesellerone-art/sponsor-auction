@@ -45,6 +45,46 @@ export function userHasNaverIdentity(user: User | null | undefined, naverId?: st
   return userHasProviderIdentity(user, 'naver', naverId);
 }
 
+/** 이미 네이버가 붙어 있고 메타데이터가 최신이면 updateUserById/프로필 upsert를 건너뛴다. */
+export function naverStampIsCurrent(user: User, profile: Pick<NaverProfile, 'id'>) {
+  if (!userHasNaverIdentity(user, profile.id)) {
+    return false;
+  }
+  const providers = stringList(user.app_metadata?.providers);
+  if (!providers.includes('naver')) {
+    return false;
+  }
+  return naverIdsOf(user).includes(profile.id);
+}
+
+export async function findUserIdByProfileEmail(
+  admin: AdminClient,
+  emails: Array<string | null | undefined>,
+) {
+  const wanted = [
+    ...new Set(
+      emails
+        .map((value) => normalizeContactEmail(value) || value?.trim().toLowerCase() || '')
+        .filter((email) => email.includes('@')),
+    ),
+  ];
+  if (wanted.length === 0) {
+    return null;
+  }
+  const rows = await Promise.all(
+    wanted.map((email) =>
+      admin.from('profiles').select('id').eq('email', email).limit(1).maybeSingle(),
+    ),
+  );
+  for (const row of rows) {
+    const id = typeof row.data?.id === 'string' ? row.data.id : '';
+    if (id) {
+      return id;
+    }
+  }
+  return null;
+}
+
 export { toE164Kr } from './contact';
 
 async function attachNaverIdentity(admin: AdminClient, userId: string, profile: NaverProfile) {
@@ -210,7 +250,35 @@ export async function linkNaverProfile(
   prepareSession?: (email: string) => Promise<string | null>,
   options?: { preferredUserId?: string | null },
 ): Promise<NaverLinkResult> {
+  const issueSession = async (user: User) => {
+    const sessionEmail =
+      collectAuthEmails(user)[0] ||
+      normalizeContactEmail(user.email) ||
+      normalizeContactEmail(profile.email);
+    if (!sessionEmail || !prepareSession) {
+      return null;
+    }
+    return prepareSession(sessionEmail);
+  };
+
   const preferredId = isAuthUserId(options?.preferredUserId) ? options?.preferredUserId ?? '' : '';
+
+  if (!preferredId) {
+    const existingId = await findUserIdByProfileEmail(admin, [
+      profile.email,
+      `naver.${profile.id}@oauth.sponsor-auction.local`,
+    ]);
+    if (existingId) {
+      const existing = (await admin.auth.admin.getUserById(existingId)).data.user;
+      if (existing) {
+        const user = naverStampIsCurrent(existing, profile)
+          ? existing
+          : await stampNaverOnUser(admin, existing, profile);
+        return { user, merged: false, tokenHash: await issueSession(user) };
+      }
+    }
+  }
+
   const [matchPack, preferredResult] = await Promise.all([
     collectNaverMatches(admin, profile),
     preferredId ? admin.auth.admin.getUserById(preferredId) : Promise.resolve(null),
@@ -234,17 +302,6 @@ export async function linkNaverProfile(
       );
     }
     return stampNaverOnUser(admin, target, profile);
-  };
-
-  const issueSession = async (user: User) => {
-    const sessionEmail =
-      collectAuthEmails(user)[0] ||
-      normalizeContactEmail(user.email) ||
-      normalizeContactEmail(profile.email);
-    if (!sessionEmail || !prepareSession) {
-      return null;
-    }
-    return prepareSession(sessionEmail);
   };
 
   if (canonical) {

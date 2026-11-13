@@ -1,4 +1,3 @@
-import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { oauthFailedLoginPath } from '@/lib/auth-guard';
 import { appOriginFromIdpRequest, signNaverIdpState } from '@/lib/naver-idp';
@@ -9,9 +8,10 @@ import {
 } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 
+export const preferredRegion = 'icn1';
+
 export async function GET(request: Request) {
   try {
-    await connection();
     const limited = consumeRateLimit(clientIp(request), '/api/auth/naver/idp/authorize');
     if (!limited.allowed) {
       return NextResponse.redirect(

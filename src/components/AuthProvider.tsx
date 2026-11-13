@@ -14,6 +14,7 @@ import { applyKnownSession, getSessionUser, onKnownSession, subscribeAuthState }
 import { AUTH_BOOT_TIMEOUT_MS } from '@/lib/auth-timeout';
 import { createClient } from '@/lib/supabase/client';
 import {
+  AUTH_PRESENT_COOKIE_NAME,
   readActiveRoleCookie,
   syncActiveRoleCookie,
   syncAuthPresentCookie,
@@ -64,14 +65,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const latestRequest = useRef(0);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (mode: 'fast' | 'full' = 'full') => {
     const request = ++latestRequest.current;
     try {
-      const result = await getSessionUser();
+      const result = await getSessionUser({
+        profile: mode === 'full',
+        verify: mode === 'full',
+      });
       if (request !== latestRequest.current) {
         return;
       }
       applyKnownSession(result.data);
+      if (mode === 'fast') {
+        setReady(true);
+        const hinted =
+          typeof document !== 'undefined' &&
+          document.cookie.split(';').some((part) => part.trim() === `${AUTH_PRESENT_COOKIE_NAME}=1`);
+        if (result.data || hinted) {
+          void refresh('full');
+        }
+      }
     } catch (error) {
       if (request !== latestRequest.current) {
         return;
@@ -96,9 +109,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRoleOverride(session ? readActiveRoleCookie() : null);
     });
     const unsubscribe = subscribeAuthState(() => {
-      void refresh();
+      void refresh('full');
     });
-    void refresh();
+    void refresh('fast');
     return () => {
       window.clearTimeout(failSafe);
       unsubKnown();

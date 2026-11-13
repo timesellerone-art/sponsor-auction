@@ -1,4 +1,3 @@
-import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   ACCOUNT_LINK_COOKIE,
@@ -11,13 +10,14 @@ import {
 } from '@/lib/auth-complete';
 import { describeOAuthError, oauthFailedLoginPath } from '@/lib/auth-guard';
 import { mergeUserInto } from '@/lib/auth-identity';
-import { expireAuthDebrisCookies, expireNamedCookies } from '@/lib/auth-paths';
+import { expireAuthDebrisCookies, expireNamedCookies, hasAuthPresence } from '@/lib/auth-paths';
 import { canonicalAppOrigin } from '@/lib/site-origin';
 import { shareOAuthAttempt } from '@/lib/oauth-once';
 import { readNaverIdpState, signNaverIdpTicket } from '@/lib/naver-idp';
 import { linkNaverProfile } from '@/lib/naver-link';
 import {
   NAVER_NEXT_COOKIE,
+  NAVER_OAUTH_COOKIE_NAMES,
   NAVER_STATE_COOKIE,
   exchangeNaverCode,
   fetchNaverProfile,
@@ -34,7 +34,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 export const preferredRegion = 'icn1';
 
 function expireNaverCookies(response: NextResponse, origin: string) {
-  expireNamedCookies(response.cookies, [NAVER_STATE_COOKIE, NAVER_NEXT_COOKIE], {
+  expireNamedCookies(response.cookies, [...NAVER_OAUTH_COOKIE_NAMES], {
     secure: origin.startsWith('https://'),
     hostname: new URL(origin).hostname,
   });
@@ -63,7 +63,6 @@ async function resumeOrLoginError(request: NextRequest, origin: string, next: st
 
 export async function GET(request: NextRequest) {
   try {
-    await connection();
     const limited = consumeRateLimit(clientIp(request), '/api/auth/naver/callback');
     if (!limited.allowed) {
       return loginError(request, requestOrigin(request), '요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.');
@@ -110,23 +109,23 @@ export async function GET(request: NextRequest) {
       return resumeOrLoginError(request, origin, next, '네이버 로그인 설정이 없습니다.');
     }
 
-    const sessionUser = await readRequestAuthUser(request, origin);
-    const preferredUserId =
-      readAccountLinkUserId(request.cookies.get(ACCOUNT_LINK_COOKIE)?.value) ??
-      sessionUser?.id ??
-      null;
+    const linkedUserId = readAccountLinkUserId(request.cookies.get(ACCOUNT_LINK_COOKIE)?.value);
+    const needSessionUser = !linkedUserId && hasAuthPresence(request.cookies.getAll());
     const callbackOrigin = idpState?.o || origin;
     const once = await shareOAuthAttempt(`naver:${code}`, async () => {
       try {
-        const profile = await fetchNaverProfile(
-          await exchangeNaverCode({
+        const [sessionUser, accessToken] = await Promise.all([
+          needSessionUser ? readRequestAuthUser(request, origin) : Promise.resolve(null),
+          exchangeNaverCode({
             clientId: env.clientId,
             clientSecret: env.clientSecret,
             code,
             state,
             redirectUri: naverCallbackUrl(canonicalAppOrigin(callbackOrigin)),
           }),
-        );
+        ]);
+        const preferredUserId = linkedUserId ?? sessionUser?.id ?? null;
+        const profile = await fetchNaverProfile(accessToken);
 
         if (idpState) {
           const ticket = signNaverIdpTicket(profile);

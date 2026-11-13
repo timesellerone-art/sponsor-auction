@@ -20,6 +20,8 @@ import { requestAppOrigin } from '@/lib/site-origin';
 import { createClient } from '@/lib/supabase/server';
 import { NAVER_NEXT_COOKIE, NAVER_STATE_COOKIE } from '@/lib/naver-oauth';
 
+export const preferredRegion = 'icn1';
+
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
 } as const;

@@ -24,8 +24,8 @@ function uniqueIds(values: Array<string | null | undefined>) {
 }
 
 async function profileIdsByEmail(admin: AdminClient, email: string) {
-  const result = await admin.from('profiles').select('id').eq('email', email);
-  return (result.data ?? []).map((row) => row.id);
+  const result = await admin.from('profiles').select('id').eq('email', email).limit(1).maybeSingle();
+  return result.data?.id ? [result.data.id] : [];
 }
 
 async function profileIdsByPhone(admin: AdminClient, phones: string[]) {

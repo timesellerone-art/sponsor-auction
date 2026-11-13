@@ -6,6 +6,8 @@ import { listLinkedAccountStatuses } from '@/lib/auth-identities';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+export const preferredRegion = 'icn1';
+
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
 } as const;

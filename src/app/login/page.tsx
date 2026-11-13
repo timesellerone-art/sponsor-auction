@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { AgreementFields } from '@/components/AgreementFields';
+import { InAppBrowserBanner } from '@/components/InAppBrowserBanner';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { SIGNUP_AGREEMENT_REQUIRED, validateSignupAgreement } from '@/lib/legal';
@@ -28,6 +29,12 @@ import { cn } from '@/lib/utils';
 import { type SessionUser } from '@/types/auth';
 
 type Mode = 'signin' | 'signup';
+
+const OAUTH_CONNECTING: Record<SocialOAuthProvider, string> = {
+  google: 'Google 연결 중...',
+  kakao: '카카오 연결 중...',
+  naver: '네이버 연결 중...',
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -66,7 +73,7 @@ export default function LoginPage() {
 
     const checkSession = async () => {
       try {
-        const result = await getSessionUser();
+        const result = await getSessionUser({ profile: false });
         if (cancelled) {
           return;
         }
@@ -124,7 +131,7 @@ export default function LoginPage() {
     return true;
   };
 
-  const handleOAuth = async (provider: SocialOAuthProvider) => {
+  const startOAuth = (provider: SocialOAuthProvider) => {
     if (submitting || oauthBusy || oauthInFlight.current) {
       return;
     }
@@ -134,6 +141,10 @@ export default function LoginPage() {
     oauthInFlight.current = true;
     setOauthBusy(provider);
     setError(null);
+    void handleOAuth(provider);
+  };
+
+  const handleOAuth = async (provider: SocialOAuthProvider) => {
     try {
       const next = sanitizeNextPath(
         new URLSearchParams(window.location.search).get('next'),
@@ -204,6 +215,9 @@ export default function LoginPage() {
       <p className="mt-2 text-sm text-zinc-500">
         소셜 계정으로 바로 시작하고, 캠페인 등록이나 제안할 때 필요한 정보만 입력하면 됩니다.
       </p>
+      <div className="mt-4">
+        <InAppBrowserBanner />
+      </div>
 
       <div className="mt-6 flex gap-1 rounded-full bg-zinc-100 p-1">
         <button
@@ -328,9 +342,9 @@ export default function LoginPage() {
           <button
             type="button"
             disabled={submitting || Boolean(oauthBusy)}
-            onClick={() => {
-              void handleOAuth('google');
-            }}
+            onPointerDown={() => startOAuth('google')}
+            onTouchStart={() => startOAuth('google')}
+            onClick={() => startOAuth('google')}
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-zinc-200 bg-white text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {oauthBusy === 'google' ? (
@@ -338,14 +352,14 @@ export default function LoginPage() {
             ) : (
               <GoogleMark />
             )}
-            Google로 계속하기
+            {oauthBusy === 'google' ? OAUTH_CONNECTING.google : 'Google로 계속하기'}
           </button>
           <button
             type="button"
             disabled={submitting || Boolean(oauthBusy)}
-            onClick={() => {
-              void handleOAuth('kakao');
-            }}
+            onPointerDown={() => startOAuth('kakao')}
+            onTouchStart={() => startOAuth('kakao')}
+            onClick={() => startOAuth('kakao')}
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-zinc-200 bg-[#FEE500] text-sm font-semibold text-zinc-900 hover:bg-[#f5dc00] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {oauthBusy === 'kakao' ? (
@@ -353,14 +367,14 @@ export default function LoginPage() {
             ) : (
               <KakaoMark />
             )}
-            카카오로 계속하기
+            {oauthBusy === 'kakao' ? OAUTH_CONNECTING.kakao : '카카오로 계속하기'}
           </button>
           <button
             type="button"
             disabled={submitting || Boolean(oauthBusy)}
-            onClick={() => {
-              void handleOAuth('naver');
-            }}
+            onPointerDown={() => startOAuth('naver')}
+            onTouchStart={() => startOAuth('naver')}
+            onClick={() => startOAuth('naver')}
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#03C75A] text-sm font-semibold text-white hover:bg-[#02b351] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {oauthBusy === 'naver' ? (
@@ -368,7 +382,7 @@ export default function LoginPage() {
             ) : (
               <NaverMark />
             )}
-            네이버로 계속하기
+            {oauthBusy === 'naver' ? OAUTH_CONNECTING.naver : '네이버로 계속하기'}
           </button>
         </div>
 

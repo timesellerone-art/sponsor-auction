@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { toE164Kr, userHasNaverIdentity } from '../../src/lib/naver-link';
+import { naverStampIsCurrent, toE164Kr, userHasNaverIdentity } from '../../src/lib/naver-link';
 
 describe('네이버 계정 연결 헬퍼', () => {
   it('국내 휴대전화를 E.164로 바꾼다', () => {
@@ -48,6 +48,27 @@ describe('네이버 계정 연결 헬퍼', () => {
         'naver-sub-2',
       ),
       true,
+    );
+  });
+
+  it('이미 네이버가 붙은 기존 회원은 stamp를 건너뛴다', () => {
+    const user = {
+      identities: [
+        { provider: 'naver', id: 'naver-sub-1', identity_data: { sub: 'naver-sub-1' } },
+      ],
+      app_metadata: { providers: ['naver'], naver_ids: ['naver-sub-1'] },
+    };
+    assert.equal(naverStampIsCurrent(user as never, { id: 'naver-sub-1' }), true);
+    assert.equal(naverStampIsCurrent(user as never, { id: 'other' }), false);
+    assert.equal(
+      naverStampIsCurrent(
+        {
+          identities: [{ provider: 'google', id: 'g-1' }],
+          app_metadata: { providers: ['google'] },
+        } as never,
+        { id: 'naver-sub-1' },
+      ),
+      false,
     );
   });
 });

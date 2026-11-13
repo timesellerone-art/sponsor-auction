@@ -1,10 +1,17 @@
-import { randomBytes } from 'crypto';
 import { POST_AUTH_HOME, sanitizeNextPath } from '@/lib/auth-guard';
 import { isPlaceholderOAuthEmail, normalizePhone } from '@/lib/contact';
 import { authCookieDomain, requestAppOrigin } from '@/lib/site-origin';
 
-export const NAVER_STATE_COOKIE = 'sa_naver_oauth_state';
-export const NAVER_NEXT_COOKIE = 'sa_naver_oauth_next';
+export const NAVER_STATE_COOKIE = 'sa_naver_st';
+export const NAVER_NEXT_COOKIE = 'sa_naver_nx';
+export const LEGACY_NAVER_STATE_COOKIE = 'sa_naver_oauth_state';
+export const LEGACY_NAVER_NEXT_COOKIE = 'sa_naver_oauth_next';
+export const NAVER_OAUTH_COOKIE_NAMES = [
+  NAVER_STATE_COOKIE,
+  NAVER_NEXT_COOKIE,
+  LEGACY_NAVER_STATE_COOKIE,
+  LEGACY_NAVER_NEXT_COOKIE,
+] as const;
 export const NAVER_AUTHORIZE_URL = 'https://nid.naver.com/oauth2.0/authorize';
 export const NAVER_TOKEN_URL = 'https://nid.naver.com/oauth2.0/token';
 export const NAVER_PROFILE_URL = 'https://openapi.naver.com/v1/nid/me';
@@ -109,8 +116,22 @@ export function naverCallbackUrl(origin: string) {
   return `${origin}/api/auth/naver/callback`;
 }
 
+function bytesToBase64Url(bytes: Uint8Array) {
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
 export function createNaverState() {
-  return randomBytes(24).toString('base64url');
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return bytesToBase64Url(bytes);
+}
+
+export function publicNaverClientId() {
+  return cleanEnv(readServerEnv('NEXT_PUBLIC_NAVER_CLIENT_ID'));
 }
 
 export function cookieOptions(secure = false, hostname?: string | null) {

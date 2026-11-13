@@ -8,6 +8,8 @@ import {
 import { requestOrigin } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 
+export const preferredRegion = 'icn1';
+
 export async function GET(request: NextRequest) {
   try {
     await connection();

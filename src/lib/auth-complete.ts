@@ -80,8 +80,8 @@ export async function readRequestAuthUser(request: NextRequest, origin: string):
   if (!created) {
     return null;
   }
-  const { data } = await created.supabase.auth.getUser();
-  return data.user ?? null;
+  const { data } = await created.supabase.auth.getSession();
+  return data.session?.user ?? null;
 }
 
 async function loadAuthSessionLike(user: User) {

@@ -280,7 +280,7 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
         expect(
           setCookies.some(
             (value) =>
-              value.includes('sa_naver_oauth_state') &&
+              (value.includes('sa_naver_st') || value.includes('sa_naver_oauth_state')) &&
               /Path=\//i.test(value) &&
               /SameSite=Lax/i.test(value),
           ),
@@ -288,7 +288,7 @@ test.describe('네이버 로그인 즉시 계정 병합', () => {
         expect(
           setCookies.some(
             (value) =>
-              value.includes('sa_naver_oauth_next') &&
+              (value.includes('sa_naver_nx') || value.includes('sa_naver_oauth_next')) &&
               /Path=\//i.test(value) &&
               /SameSite=Lax/i.test(value),
           ),

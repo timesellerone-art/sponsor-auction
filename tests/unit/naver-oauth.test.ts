@@ -3,6 +3,7 @@ import { afterEach, describe, it } from 'node:test';
 import {
   buildNaverAuthorizeUrl,
   cookieOptions,
+  createNaverState,
   getNaverOAuthEnv,
   missingNaverOAuthEnvKeys,
   parseNaverProfilePayload,
@@ -92,6 +93,14 @@ describe('네이버 OAuth 환경변수', () => {
     });
     assert.equal(fromE164.email, 'naver.naver-sub-2@oauth.sponsor-auction.local');
     assert.equal(fromE164.phone, '01055551234');
+  });
+
+  it('state는 Web Crypto로 만들고 매번 다르다', () => {
+    const left = createNaverState();
+    const right = createNaverState();
+    assert.notEqual(left, right);
+    assert.match(left, /^[A-Za-z0-9_-]+$/);
+    assert.ok(left.length >= 24);
   });
 
   it('인가 URL은 구글·카카오처럼 바로 로그인 창이 뜨도록 재인증을 강제하지 않는다', () => {
