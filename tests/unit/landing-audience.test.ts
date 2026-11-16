@@ -13,11 +13,16 @@ function allCopy() {
 }
 
 describe('랜딩 역할별 소개 카피', () => {
-  it('광고주/크리에이터 헤드라인과 1:1 단독 매칭 기준을 고정한다', () => {
+  it('광고주/크리에이터 헤드라인과 다수 제안·선정 기준을 고정한다', () => {
     assert.equal(
       LANDING_INTRO.advertiser.headline,
       '예산과 제품만 올리면, 핏이 맞는 크리에이터가 기획안을 제안합니다',
     );
+    assert.equal(
+      LANDING_INTRO.advertiser.sub,
+      '제품 정보와 예산을 등록하면 AI가 촬영 가이드를 정리하고, 여러 크리에이터가 경쟁력 있는 맞춤 기획안과 제안 금액을 올립니다.',
+    );
+    assert.equal(LANDING_INTRO.advertiser.sub.includes('1명'), false);
     assert.equal(
       LANDING_INTRO.creator.headline,
       '내 채널에 어울리는 캠페인을 찾고, AI 제안서로 빠르게 스폰서십을 수주하세요',
