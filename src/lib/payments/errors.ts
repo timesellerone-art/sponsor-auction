@@ -52,6 +52,11 @@ const HINTS: Record<string, string> = {
   PROVIDER_ERROR: '결제사(토스페이먼츠) 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.',
   FDS_ERROR: '이상 거래로 결제가 차단되었습니다.',
   TOSS_SECRET_KEY_MISSING: '서버에 TOSS_SECRET_KEY가 없어 승인을 완료할 수 없습니다.',
+  TOSS_TEST_KEY_IN_PRODUCTION:
+    '운영(Vercel Production)에는 토스페이먼츠 live_ 키를 등록해야 합니다. test_ 키로는 실결제를 진행할 수 없습니다.',
+  TOSS_LIVE_KEY_MISSING:
+    '운영 환경에 토스페이먼츠 라이브 클라이언트/시크릿 키가 없습니다. Vercel Production 환경 변수를 확인해 주세요.',
+  TOSS_WEBHOOK_INVALID: '토스페이먼츠 웹훅 서명이 올바르지 않습니다.',
   INTENT_NOT_FOUND: '결제 세션이 만료되었거나 서버가 주문을 찾지 못했습니다.',
   AMOUNT_MISMATCH: '승인 금액이 주문 금액과 다릅니다.',
   INVALID_SUCCESS_PARAMS: '결제 성공 URL 파라미터가 올바르지 않습니다.',

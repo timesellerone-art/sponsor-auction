@@ -37,7 +37,7 @@ export function shouldRateLimitPath(pathname: string) {
   if (!pathname.startsWith('/api/')) {
     return false;
   }
-  if (pathname === '/api/notifications/deadline') {
+  if (pathname === '/api/notifications/deadline' || pathname === '/api/webhooks/toss') {
     return false;
   }
   return (

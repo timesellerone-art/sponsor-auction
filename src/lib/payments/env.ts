@@ -28,14 +28,22 @@ export function getTossSecretKey() {
   return normalizeTossSecret(trimEnv(process.env.TOSS_SECRET_KEY));
 }
 
-export function describeTossSecret(secretKey: string) {
-  const prefix = secretKey.slice(0, 8);
-  const kind = secretKey.startsWith('test_')
+export function describeTossKeyKind(key: string) {
+  const kind = key.startsWith('test_')
     ? 'test'
-    : secretKey.startsWith('live_')
+    : key.startsWith('live_')
       ? 'live'
       : 'unknown';
-  return { kind, prefix, length: secretKey.length };
+  return { kind, prefix: key.slice(0, 8), length: key.length };
+}
+
+export function describeTossSecret(secretKey: string) {
+  return describeTossKeyKind(secretKey);
+}
+
+/** 토스 개발자센터 웹훅 보안 키. API 시크릿(TOSS_SECRET_KEY)과 다릅니다. */
+export function getTossWebhookSecret() {
+  return trimEnv(process.env.TOSS_WEBHOOK_SECRET || process.env.TOSS_SECURITY_KEY);
 }
 
 export function isTossClientConfigured() {

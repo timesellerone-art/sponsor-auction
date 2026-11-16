@@ -49,6 +49,73 @@ function logSupabaseError(
   });
 }
 
+function paymentWriteClient(config: PaymentSupabaseConfig) {
+  const writeKey = config.serviceKey || config.anonKey;
+  if (!config.url || !writeKey) {
+    return null;
+  }
+  return createClient<Database>(config.url, writeKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
+}
+
+export type StoredPayment = {
+  orderId: string;
+  auctionId: string;
+  bidId: string;
+  amount: number;
+  orderName: string;
+  status: PaymentIntentStatus;
+  paymentKey: string | null;
+};
+
+export async function loadPaymentByOrderId(
+  orderId: string,
+  configOverride?: Partial<PaymentSupabaseConfig>,
+): Promise<StoredPayment | null> {
+  const id = orderId.trim();
+  if (!id) {
+    return null;
+  }
+  const config = readPaymentSupabaseConfig(configOverride);
+  const client = paymentWriteClient(config);
+  if (!client) {
+    return null;
+  }
+
+  const result = await client
+    .from('payments')
+    .select('order_id, auction_id, bid_id, amount, order_name, status, payment_key')
+    .eq('order_id', id)
+    .maybeSingle();
+
+  if (result.error || !result.data) {
+    if (result.error) {
+      console.warn('[SponsorAuction] payments 조회 실패', {
+        order_id: id,
+        message: result.error.message,
+        code: result.error.code,
+      });
+    }
+    return null;
+  }
+
+  const row = result.data;
+  return {
+    orderId: row.order_id,
+    auctionId: row.auction_id,
+    bidId: row.bid_id,
+    amount: row.amount,
+    orderName: row.order_name,
+    status: row.status,
+    paymentKey: row.payment_key,
+  };
+}
+
 function toRow(
   intent: Pick<PaymentIntent, 'orderId' | 'auctionId' | 'bidId' | 'amount' | 'orderName'>,
   status: PaymentIntentStatus,
@@ -82,8 +149,9 @@ export async function persistPayment(
     : config.anonKey
       ? 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
       : null;
+  const client = paymentWriteClient(config);
 
-  if (!config.url || !writeKey) {
+  if (!config.url || !writeKey || !client) {
     const described = describePaymentSupabaseConfig(config);
     const errorMessage =
       'Supabase 환경 변수를 읽지 못해 payments를 저장하지 못했습니다. Vercel Production에 NEXT_PUBLIC_SUPABASE_URL과 NEXT_PUBLIC_SUPABASE_ANON_KEY(또는 SUPABASE_SERVICE_ROLE_KEY)가 있는지 확인하세요.';
@@ -104,14 +172,6 @@ export async function persistPayment(
       },
     };
   }
-
-  const client = createClient<Database>(config.url, writeKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-  });
 
   const row = toRow(intent, status, paymentKey);
 

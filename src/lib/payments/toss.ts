@@ -1,6 +1,52 @@
 import { describeTossSecret, getTossSecretKey } from '@/lib/payments/env';
 
-const TOSS_CONFIRM_URL = 'https://api.tosspayments.com/v1/payments/confirm';
+const TOSS_API_BASE = 'https://api.tosspayments.com/v1/payments';
+const TOSS_CONFIRM_URL = `${TOSS_API_BASE}/confirm`;
+
+export type TossPaymentSnapshot = {
+  paymentKey: string;
+  orderId: string;
+  status: string;
+  totalAmount: number;
+  secret: string;
+};
+
+function tossAuthorization(secretKey: string) {
+  return `Basic ${Buffer.from(`${secretKey}:`, 'utf8').toString('base64')}`;
+}
+
+function parseTossPaymentPayload(value: unknown): TossPaymentSnapshot | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const body = value as Record<string, unknown>;
+  const paymentKey = typeof body.paymentKey === 'string' ? body.paymentKey.trim() : '';
+  const orderId = typeof body.orderId === 'string' ? body.orderId.trim() : '';
+  const status = typeof body.status === 'string' ? body.status.trim() : '';
+  const secret = typeof body.secret === 'string' ? body.secret.trim() : '';
+  const totalAmount = Number(body.totalAmount ?? body.balanceAmount);
+  if (!paymentKey || !orderId || !status || !Number.isInteger(totalAmount) || totalAmount <= 0) {
+    return null;
+  }
+  return { paymentKey, orderId, status, totalAmount, secret };
+}
+
+async function tossGetJson(url: string, secretKey: string) {
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: tossAuthorization(secretKey),
+    },
+  });
+  const rawBody = await response.text();
+  let payload: unknown = null;
+  try {
+    payload = rawBody ? JSON.parse(rawBody) : null;
+  } catch {
+    payload = null;
+  }
+  return { response, rawBody, payload };
+}
 
 export type TossConfirmResult = {
   ok: boolean;
@@ -30,7 +76,7 @@ export async function confirmTossPayment(input: {
     };
   }
 
-  const authorization = `Basic ${Buffer.from(`${secretKey}:`, 'utf8').toString('base64')}`;
+  const authorization = tossAuthorization(secretKey);
   const secretMeta = describeTossSecret(secretKey);
 
   try {
@@ -117,6 +163,70 @@ export async function confirmTossPayment(input: {
       errorMessage: message,
       error: `[CONFIRM_EXCEPTION] ${message}`,
     };
+  }
+}
+
+export async function fetchTossPayment(
+  paymentKey: string,
+): Promise<{ ok: true; payment: TossPaymentSnapshot } | { ok: false; errorCode: string; httpStatus?: number }> {
+  const secretKey = getTossSecretKey();
+  if (!secretKey) {
+    return { ok: false, errorCode: 'TOSS_SECRET_KEY_MISSING' };
+  }
+  const key = paymentKey.trim();
+  if (!key) {
+    return { ok: false, errorCode: 'NOT_FOUND_PAYMENT' };
+  }
+
+  try {
+    const { response, payload } = await tossGetJson(
+      `${TOSS_API_BASE}/${encodeURIComponent(key)}`,
+      secretKey,
+    );
+    const payment = parseTossPaymentPayload(payload);
+    if (!response.ok || !payment) {
+      const code =
+        payload && typeof payload === 'object' && typeof (payload as { code?: unknown }).code === 'string'
+          ? (payload as { code: string }).code
+          : `HTTP_${response.status}`;
+      return { ok: false, errorCode: code, httpStatus: response.status };
+    }
+    return { ok: true, payment };
+  } catch (error) {
+    console.error('[SponsorAuction] Toss 결제 조회 예외', { paymentKeyPrefix: key.slice(0, 8), error });
+    return { ok: false, errorCode: 'TOSS_LOOKUP_EXCEPTION' };
+  }
+}
+
+export async function fetchTossPaymentByOrderId(
+  orderId: string,
+): Promise<{ ok: true; payment: TossPaymentSnapshot } | { ok: false; errorCode: string; httpStatus?: number }> {
+  const secretKey = getTossSecretKey();
+  if (!secretKey) {
+    return { ok: false, errorCode: 'TOSS_SECRET_KEY_MISSING' };
+  }
+  const id = orderId.trim();
+  if (!id) {
+    return { ok: false, errorCode: 'NOT_FOUND_PAYMENT' };
+  }
+
+  try {
+    const { response, payload } = await tossGetJson(
+      `${TOSS_API_BASE}/orders/${encodeURIComponent(id)}`,
+      secretKey,
+    );
+    const payment = parseTossPaymentPayload(payload);
+    if (!response.ok || !payment) {
+      const code =
+        payload && typeof payload === 'object' && typeof (payload as { code?: unknown }).code === 'string'
+          ? (payload as { code: string }).code
+          : `HTTP_${response.status}`;
+      return { ok: false, errorCode: code, httpStatus: response.status };
+    }
+    return { ok: true, payment };
+  } catch (error) {
+    console.error('[SponsorAuction] Toss 주문 조회 예외', { orderId: id, error });
+    return { ok: false, errorCode: 'TOSS_LOOKUP_EXCEPTION' };
   }
 }
 

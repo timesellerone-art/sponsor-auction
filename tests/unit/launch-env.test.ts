@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  isLiveTossClientKey,
   isLiveTossSecret,
   isProductionRuntime,
+  isTestTossClientKey,
   isTestTossSecret,
+  isVercelProduction,
   missingProductionEnvKeys,
+  productionTossLiveKeyError,
 } from '../../src/lib/launch-env';
 
 describe('production launch env', () => {
@@ -24,7 +28,42 @@ describe('production launch env', () => {
   it('Toss live/test 접두사만 구분한다', () => {
     assert.equal(isLiveTossSecret('live_gsk_example'), true);
     assert.equal(isTestTossSecret('test_gsk_example'), true);
+    assert.equal(isLiveTossClientKey('live_gck_example'), true);
+    assert.equal(isTestTossClientKey('test_gck_example'), true);
     assert.equal(isProductionRuntime({ NODE_ENV: 'production' }), true);
     assert.equal(isProductionRuntime({ NODE_ENV: 'development' }), false);
+  });
+
+  it('Vercel Production에서만 test_ 키를 거절한다', () => {
+    assert.equal(isVercelProduction({ VERCEL_ENV: 'production' }), true);
+    assert.equal(isVercelProduction({ VERCEL_ENV: 'preview' }), false);
+    assert.equal(
+      productionTossLiveKeyError(
+        { VERCEL_ENV: 'production' },
+        { clientKey: 'test_gck_x', secretKey: 'test_gsk_x' },
+      ),
+      'TOSS_TEST_KEY_IN_PRODUCTION',
+    );
+    assert.equal(
+      productionTossLiveKeyError(
+        { VERCEL_ENV: 'preview' },
+        { clientKey: 'test_gck_x', secretKey: 'test_gsk_x' },
+      ),
+      null,
+    );
+    assert.equal(
+      productionTossLiveKeyError(
+        { VERCEL_ENV: 'production' },
+        { clientKey: 'live_gck_x', secretKey: 'live_gsk_x' },
+      ),
+      null,
+    );
+    assert.equal(
+      productionTossLiveKeyError(
+        { VERCEL_ENV: 'production' },
+        { clientKey: 'live_gck_x', secretKey: '' },
+      ),
+      'TOSS_LIVE_KEY_MISSING',
+    );
   });
 });

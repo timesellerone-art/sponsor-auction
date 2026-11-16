@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { describeTossSecret, getTossSecretKey, isTossSecretConfigured } from '@/lib/payments/env';
-import { isProductionRuntime, isTestTossSecret } from '@/lib/launch-env';
+import { describeTossSecret, getTossClientKey, getTossSecretKey, isTossSecretConfigured } from '@/lib/payments/env';
+import { productionTossLiveKeyError } from '@/lib/launch-env';
 import {
   PAYMENT_INTENT_COOKIE,
   getIntent,
@@ -10,41 +10,16 @@ import {
   updateIntent,
 } from '@/lib/payments/intent';
 import { getBidsByAuctionId } from '@/lib/auctions';
-import { advertiserPayableAmount, bidAmountFromAdvertiserCharge } from '@/lib/fees';
-import { applyPaidAuctionStatus } from '@/lib/payments/apply-paid-status';
-import { issueTaxInvoice } from '@/lib/popbill';
+import { advertiserPayableAmount } from '@/lib/fees';
 import { canPreparePayment, getPaymentActor } from '@/lib/payments/guard';
-import { persistPayment } from '@/lib/payments/persist';
+import { finalizeConfirmedPayment } from '@/lib/payments/finalize';
+import { loadPaymentByOrderId, persistPayment } from '@/lib/payments/persist';
 import { confirmTossPayment, isDemoPaymentKey } from '@/lib/payments/toss';
 import { captureException } from '@/lib/monitoring';
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
 import type { ConfirmPaymentInput, ConfirmPaymentResult } from '@/types/payment';
 
-async function issuePaidTaxInvoice(intent: {
-  orderId: string;
-  auctionId: string;
-  bidId: string;
-  amount: number;
-  orderName: string;
-}) {
-  try {
-    const result = await issueTaxInvoice({
-      paymentOrderId: intent.orderId,
-      auctionId: intent.auctionId,
-      bidId: intent.bidId,
-      bidAmount: bidAmountFromAdvertiserCharge(intent.amount),
-      itemName: intent.orderName,
-    });
-    return {
-      status: result.status,
-      mgtKey: result.mgtKey,
-      message: result.message,
-    };
-  } catch (error) {
-    console.warn('[SponsorAuction] 결제 후 세금계산서 신청 예외', error);
-    return null;
-  }
-}
+export const preferredRegion = 'icn1';
 
 function jsonError(
   status: number,
@@ -128,8 +103,23 @@ export async function POST(request: Request) {
     });
 
     const tossSecretKind = describeTossSecret(getTossSecretKey()).kind;
-    if (isProductionRuntime() && isTestTossSecret(getTossSecretKey())) {
-      console.warn('[SponsorAuction] 운영 환경에서 Toss test 시크릿이 사용되고 있습니다.');
+    const liveKeyError = productionTossLiveKeyError(process.env, {
+      clientKey: getTossClientKey(),
+      secretKey: getTossSecretKey(),
+    });
+    if (liveKeyError) {
+      console.error('[SponsorAuction] 결제 승인 거부: 운영 라이브 키 아님', {
+        orderId: parsed.orderId,
+        liveKeyError,
+        tossSecretKind,
+      });
+      return jsonError(
+        503,
+        liveKeyError,
+        liveKeyError === 'TOSS_TEST_KEY_IN_PRODUCTION'
+          ? '운영 환경에는 토스페이먼츠 live_ 키를 등록해야 합니다.'
+          : '운영 환경에 토스페이먼츠 라이브 키가 없습니다.',
+      );
     }
 
     console.info('[SponsorAuction] 결제 승인 요청', {
@@ -153,6 +143,23 @@ export async function POST(request: Request) {
       parsed.orderId,
       cookieStore.get(PAYMENT_INTENT_COOKIE)?.value,
     );
+
+    if (!intent) {
+      const stored = await loadPaymentByOrderId(parsed.orderId, dbConfig);
+      if (stored) {
+        intent = {
+          orderId: stored.orderId,
+          auctionId: stored.auctionId,
+          bidId: stored.bidId,
+          amount: stored.amount,
+          orderName: stored.orderName,
+          status: stored.status,
+          paymentKey: stored.paymentKey,
+          createdAt: Date.now(),
+        };
+        putIntent(intent);
+      }
+    }
 
     const auctionId = parsed.auctionId || intent?.auctionId || '';
     const bidId = parsed.bidId || intent?.bidId || '';
@@ -219,37 +226,30 @@ export async function POST(request: Request) {
       }
 
       const replayKey = existing.paymentKey ?? parsed.paymentKey;
-      const replaySaved = await persistPayment(intent, 'confirmed', replayKey, dbConfig);
-      if (!replaySaved.ok && !isDemoPaymentKey(parsed.paymentKey)) {
-        captureException(new Error(replaySaved.errorMessage), {
+      const replay = await finalizeConfirmedPayment(intent, replayKey, dbConfig, {
+        allowUnsaved: isDemoPaymentKey(parsed.paymentKey),
+      });
+      if (!replay.ok) {
+        captureException(new Error(replay.errorMessage), {
           area: 'payment_confirm',
-          errorCode: replaySaved.errorCode,
+          errorCode: replay.errorCode,
           orderId: parsed.orderId,
         });
-        return jsonError(500, replaySaved.errorCode, replaySaved.errorMessage, {
-          supabaseError: replaySaved.supabaseError,
+        return jsonError(500, replay.errorCode, replay.errorMessage, {
+          supabaseError: replay.supabaseError,
         });
       }
-      if (!replaySaved.ok) {
-        console.error('[SponsorAuction] demo 결제 저장 실패, 낙찰은 계속 진행', replaySaved);
-      }
-      await applyPaidAuctionStatus(intent.auctionId, intent.bidId, dbConfig, {
-        orderId: intent.orderId,
-        amount: intent.amount,
-        orderName: intent.orderName,
-      });
-      const replayTax = await issuePaidTaxInvoice(intent);
-      const replay: ConfirmPaymentResult = {
+      const replayResult: ConfirmPaymentResult = {
         orderId: intent.orderId,
         auctionId: intent.auctionId,
         bidId: intent.bidId,
         amount: intent.amount,
         paymentKey: replayKey,
         alreadyConfirmed: true,
-        saved: replaySaved.ok,
-        taxInvoice: replayTax,
+        saved: replay.saved,
+        taxInvoice: replay.taxInvoice,
       };
-      return NextResponse.json(replay, { status: 200 });
+      return NextResponse.json(replayResult, { status: 200 });
     }
 
     if (existing?.status === 'failed' || existing?.status === 'expired') {
@@ -304,7 +304,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const demoAllowed = !isTossSecretConfigured() && isDemoPaymentKey(parsed.paymentKey);
+    const demoAllowed =
+      !liveKeyError &&
+      !isTossSecretConfigured() &&
+      isDemoPaymentKey(parsed.paymentKey);
     if (!demoAllowed) {
       if (!isTossSecretConfigured()) {
         updateIntent(intent.orderId, { status: 'failed', paymentKey: parsed.paymentKey });
@@ -342,37 +345,19 @@ export async function POST(request: Request) {
       }
     }
 
-    const saved = await persistPayment(
-      intent,
-      'confirmed',
-      parsed.paymentKey,
-      dbConfig,
-    );
-    if (!saved.ok && !isDemoPaymentKey(parsed.paymentKey)) {
-      captureException(new Error(saved.errorMessage), {
+    const finalized = await finalizeConfirmedPayment(intent, parsed.paymentKey, dbConfig, {
+      allowUnsaved: isDemoPaymentKey(parsed.paymentKey),
+    });
+    if (!finalized.ok) {
+      captureException(new Error(finalized.errorMessage), {
         area: 'payment_confirm',
-        errorCode: saved.errorCode,
+        errorCode: finalized.errorCode,
         orderId: parsed.orderId,
       });
-      return jsonError(500, saved.errorCode, saved.errorMessage, {
-        supabaseError: saved.supabaseError,
+      return jsonError(500, finalized.errorCode, finalized.errorMessage, {
+        supabaseError: finalized.supabaseError,
       });
     }
-    if (!saved.ok) {
-      console.error('[SponsorAuction] demo 결제 저장 실패, 낙찰은 계속 진행', saved);
-    }
-
-    await applyPaidAuctionStatus(intent.auctionId, intent.bidId, dbConfig, {
-      orderId: intent.orderId,
-      amount: intent.amount,
-      orderName: intent.orderName,
-    });
-    const taxInvoice = await issuePaidTaxInvoice(intent);
-
-    updateIntent(intent.orderId, {
-      status: 'confirmed',
-      paymentKey: parsed.paymentKey,
-    });
 
     const result: ConfirmPaymentResult = {
       orderId: intent.orderId,
@@ -381,8 +366,8 @@ export async function POST(request: Request) {
       amount: intent.amount,
       paymentKey: parsed.paymentKey,
       alreadyConfirmed: false,
-      saved: saved.ok,
-      taxInvoice,
+      saved: finalized.saved,
+      taxInvoice: finalized.taxInvoice,
     };
 
     console.info('[SponsorAuction] 결제 승인 완료', {

@@ -5,6 +5,8 @@ import { canPreparePayment, forbiddenJson, getPaymentActor, unauthorizedJson } f
 import { persistPayment } from '@/lib/payments/persist';
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
 
+export const preferredRegion = 'icn1';
+
 export async function POST(request: Request) {
   try {
     const actor = await getPaymentActor();

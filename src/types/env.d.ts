@@ -17,6 +17,9 @@ declare namespace NodeJS {
     WEBHOOK_SECRET?: string;
     NEXT_PUBLIC_TOSS_CLIENT_KEY?: string;
     TOSS_SECRET_KEY?: string;
+    TOSS_WEBHOOK_SECRET?: string;
+    TOSS_SECURITY_KEY?: string;
+    VERCEL_ENV?: 'production' | 'preview' | 'development';
     NAVER_CLIENT_ID?: string;
     NAVER_CLIENT_SECRET?: string;
     GEMINI_API_KEY?: string;

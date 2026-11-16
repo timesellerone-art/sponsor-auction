@@ -10,7 +10,8 @@ import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { showToast } from '@/components/Toast';
 import { REFUND_REQUIRED } from '@/lib/legal';
 import { rememberCheckoutContext } from '@/lib/payments/client';
-import { getTossClientKey } from '@/lib/payments/env';
+import { isProductionClinkHost } from '@/lib/site-origin';
+import { describeTossKeyKind, getTossClientKey } from '@/lib/payments/env';
 import {
   formatPaymentError,
   formatPaymentToast,
@@ -87,6 +88,14 @@ export function PaymentCheckoutModal({
       setLoadError(null);
 
       const clientKey = resolveClientKey(checkout);
+      const liveHost = isProductionClinkHost(window.location.hostname);
+      if (liveHost && (!clientKey || describeTossKeyKind(clientKey).kind === 'test')) {
+        setLoadError(
+          '운영 환경에서는 토스페이먼츠 라이브 키가 필요합니다. 데모 결제는 사용할 수 없습니다.',
+        );
+        setReady(true);
+        return;
+      }
       if (!clientKey) {
         setReady(true);
         return;
@@ -121,7 +130,9 @@ export function PaymentCheckoutModal({
         });
         if (!cancelled) {
           setLoadError(
-            `${formatPaymentError(info)} 결제 수단을 불러오지 못했습니다. 데모 결제로 진행할 수 있습니다.`,
+            liveHost
+              ? `${formatPaymentError(info)} 결제 수단을 불러오지 못했습니다. 운영 환경에서는 데모 결제를 사용할 수 없습니다.`
+              : `${formatPaymentError(info)} 결제 수단을 불러오지 못했습니다. 데모 결제로 진행할 수 있습니다.`,
           );
           setReady(true);
         }
@@ -145,8 +156,10 @@ export function PaymentCheckoutModal({
   const successUrl = `${window.location.origin}/payments/success?${checkoutQuery.toString()}`;
   const failUrl = `${window.location.origin}/payments/fail?${checkoutQuery.toString()}`;
   const clientKey = resolveClientKey(checkout);
-  const isDemoCheckout = !clientKey;
-  const useToss = ready && !isDemoCheckout && !loadError;
+  const liveHost = isProductionClinkHost(window.location.hostname);
+  const isDemoCheckout = !clientKey && !liveHost;
+  const blockTestOnLive = liveHost && describeTossKeyKind(clientKey).kind === 'test';
+  const useToss = ready && Boolean(clientKey) && !loadError && !blockTestOnLive;
   const bidAmount =
     checkout.bidAmount && checkout.bidAmount > 0
       ? checkout.bidAmount
@@ -189,6 +202,17 @@ export function PaymentCheckoutModal({
           successUrl,
           failUrl,
         });
+        return;
+      }
+
+      if (liveHost) {
+        const info = parsePaymentError({
+          code: 'TOSS_LIVE_KEY_MISSING',
+          message: '운영 환경에서는 데모 결제를 사용할 수 없습니다.',
+        });
+        setPayError(info);
+        showToast(formatPaymentToast(info).text, 'error', 9000);
+        setBusy(false);
         return;
       }
 
@@ -287,7 +311,11 @@ export function PaymentCheckoutModal({
             </div>
           ) : null}
 
-          {isDemoCheckout || loadError ? (
+          {liveHost && loadError ? (
+            <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-950" role="alert">
+              {loadError}
+            </p>
+          ) : isDemoCheckout || loadError ? (
             <fieldset className="min-w-0">
               <legend className="text-sm font-medium text-zinc-800">결제 수단</legend>
               {loadError ? (
@@ -375,7 +403,7 @@ export function PaymentCheckoutModal({
           </button>
           <button
             type="button"
-            disabled={busy || !ready || !agreeRefund}
+            disabled={busy || !ready || !agreeRefund || (liveHost && !useToss)}
             onClick={() => {
               void handlePay();
             }}

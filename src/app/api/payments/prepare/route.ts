@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { advertiserChargeMatchesBid, advertiserPayableAmount } from '@/lib/fees';
-import { getTossClientKey, isTossClientConfigured } from '@/lib/payments/env';
+import { productionTossLiveKeyError } from '@/lib/launch-env';
+import { getTossClientKey, getTossSecretKey, isTossClientConfigured } from '@/lib/payments/env';
 import {
   PAYMENT_INTENT_COOKIE,
   PAYMENT_INTENT_TTL_MS,
@@ -19,6 +20,8 @@ import {
 import { persistPayment } from '@/lib/payments/persist';
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
 import type { PreparePaymentInput, PreparePaymentResult } from '@/types/payment';
+
+export const preferredRegion = 'icn1';
 
 function parseBody(value: unknown): PreparePaymentInput | null {
   if (!value || typeof value !== 'object') {
@@ -59,6 +62,23 @@ export async function POST(request: Request) {
     }
     if (!canPreparePayment(actor)) {
       return forbiddenJson('결제 준비는 광고주 계정만 할 수 있습니다.');
+    }
+
+    const liveKeyError = productionTossLiveKeyError(process.env, {
+      clientKey: getTossClientKey(),
+      secretKey: getTossSecretKey(),
+    });
+    if (liveKeyError) {
+      return NextResponse.json(
+        {
+          error:
+            liveKeyError === 'TOSS_TEST_KEY_IN_PRODUCTION'
+              ? '운영 환경에는 토스페이먼츠 live_ 키를 등록해야 합니다. test_ 키로는 실결제를 진행할 수 없습니다.'
+              : '운영 환경에 토스페이먼츠 라이브 키가 없습니다. Vercel Production 환경 변수를 확인해 주세요.',
+          errorCode: liveKeyError,
+        },
+        { status: 503 },
+      );
     }
 
     const parsed = parseBody(await request.json().catch(() => null));
@@ -107,6 +127,15 @@ export async function POST(request: Request) {
     const pending = await persistPayment(intent, 'pending', null, dbConfig);
     if (!pending.ok) {
       console.error('[SponsorAuction] pending payment 저장 실패', pending);
+      if (process.env.VERCEL_ENV === 'production') {
+        return NextResponse.json(
+          {
+            error: pending.errorMessage,
+            errorCode: pending.errorCode,
+          },
+          { status: 500 },
+        );
+      }
     }
 
     const result: PreparePaymentResult = {
