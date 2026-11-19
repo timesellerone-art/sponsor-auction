@@ -6,6 +6,7 @@ import {
   campaignCoverUrl,
   classifyCampaignCategory,
   displayCampaignDescription,
+  isTestCampaignCopy,
   parseImageFromDescription,
   resolveCampaignCategory,
   withImageMarker,
@@ -83,6 +84,23 @@ test('image_url 컬럼이 없어도 설명 마커로 대표 사진을 복원한�
     }),
     uploaded,
   );
+});
+
+test('키보드 연타·한글 자모 장난 입력은 테스트 캠페인으로 본다', () => {
+  assert.equal(isTestCampaignCopy('ㄴㅁㄹㅇㄴㅁㄹㅇ', '테스트'), true);
+  assert.equal(isTestCampaignCopy('xdcgvsdf', '설명'), true);
+  assert.equal(isTestCampaignCopy('미나어재어나ㅓ이미마넝', '캠페인'), true);
+  assert.equal(isTestCampaignCopy('qwesadzxcvgfhjhgjnxfgbhcfgbcd', '캠페인'), true);
+  assert.equal(isTestCampaignCopy('니ㅏ어린ㄴㄴ', '캠페인'), true);
+  assert.equal(
+    isTestCampaignCopy(
+      '강아지 슬개골 보호 논슬립 거실 매트 언박싱 및 적응기',
+      '미끄러운 마루 바닥에서 우다다 뛰어다니는 소형견',
+    ),
+    false,
+  );
+  assert.equal(isTestCampaignCopy('여름 무알콜 맥주 숏폼 캠페인', '20대 타깃 무알콜 맥주 신제품 론칭'), false);
+  assert.equal(isTestCampaignCopy('여름 신제품', '캠페인 목적 납품형식을 적어 주세요'), false);
 });
 
 test('가계부 앱 기본 커버는 동물이 아니다', () => {

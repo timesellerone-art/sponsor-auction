@@ -254,6 +254,16 @@ export function closedCampaignBadge(status?: AuctionStatus) {
   return '최종 매칭 완료';
 }
 
+const HANGUL_JAMO = /[\u1100-\u11FF\u3131-\u318E]/;
+const KEYBOARD_SMASH = /asdf|qwer|zxcv|qweasd|asdzxc|hjkl|dfgh|cvbn/i;
+
+function latinVowelRatio(compact: string) {
+  if (!compact) {
+    return 1;
+  }
+  return (compact.match(/[aeiou]/gi) ?? []).length / compact.length;
+}
+
 function isGibberishField(value?: string | null) {
   const raw = value?.trim() ?? '';
   if (!raw) {
@@ -266,11 +276,19 @@ function isGibberishField(value?: string | null) {
   if (compact.length >= 4 && compact.length <= 24 && /^([a-z가-힣0-9]{2,4})\1+$/i.test(compact)) {
     return true;
   }
+  if (HANGUL_JAMO.test(compact)) {
+    return true;
+  }
   if (/^[a-z]+$/i.test(compact) && compact.length >= 4 && compact.length <= 16) {
-    const vowels = (compact.match(/[aeiou]/gi) ?? []).length;
-    if (vowels === 0) {
+    if (latinVowelRatio(compact) === 0) {
       return true;
     }
+  }
+  if (/^[a-z]+$/i.test(compact) && compact.length >= 12 && latinVowelRatio(compact) <= 0.2) {
+    return true;
+  }
+  if (KEYBOARD_SMASH.test(compact) && compact.length >= 8 && !/[가-힣]/.test(compact)) {
+    return true;
   }
   return false;
 }

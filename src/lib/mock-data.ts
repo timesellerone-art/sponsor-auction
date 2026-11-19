@@ -27,6 +27,7 @@ import {
   expiredAuctionStatus,
 } from '@/lib/auction-engine';
 import { attachScore } from '@/lib/creator-metrics';
+import { isTestCampaignCopy } from '@/lib/campaign-presentation';
 import { maskOffPlatformContact, sanitizeUserText } from '@/utils/filter';
 
 export const mockAuctions: AuctionItem[] = [
@@ -403,10 +404,29 @@ function persistAdminStores() {
   }
 }
 
-let auctionsStore: AuctionItem[] = readPersistedList(AUCTIONS_STORAGE_KEY, mockAuctions);
-let bidsStore: BidItem[] = readPersistedList(BIDS_STORAGE_KEY, mockBids);
+const SEED_AUCTION_IDS = new Set(mockAuctions.map((item) => item.id));
+
+function sanitizeMockAuctionStore(items: AuctionItem[]): AuctionItem[] {
+  const kept = items.filter(
+    (item) => SEED_AUCTION_IDS.has(item.id) || !isTestCampaignCopy(item.title, item.description),
+  );
+  const keptIds = new Set(kept.map((item) => item.id));
+  const missingSeeds = mockAuctions.filter((seed) => !keptIds.has(seed.id));
+  return [...kept, ...missingSeeds];
+}
+
+let auctionsStore: AuctionItem[] = sanitizeMockAuctionStore(
+  readPersistedList(AUCTIONS_STORAGE_KEY, mockAuctions),
+);
+let bidsStore: BidItem[] = readPersistedList(BIDS_STORAGE_KEY, mockBids).filter((bid) =>
+  auctionsStore.some((auction) => auction.id === bid.auctionId),
+);
 let profilesStore: ProfileItem[] = readPersistedList(PROFILES_STORAGE_KEY, mockProfiles);
 let payoutsStore: PayoutItem[] = readPersistedList(PAYOUTS_STORAGE_KEY, mockPayouts);
+
+if (typeof window !== 'undefined') {
+  persistCampaignStores();
+}
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
