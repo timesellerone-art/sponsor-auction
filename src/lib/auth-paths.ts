@@ -12,7 +12,9 @@ export function isAuthPassthroughPath(pathname: string) {
     pathname.startsWith('/api/auth') ||
     pathname === '/privacy' ||
     pathname === '/terms' ||
-    pathname === '/refund'
+    pathname === '/refund' ||
+    pathname === '/payment-verify' ||
+    pathname.startsWith('/payment-verify/')
   );
 }
 

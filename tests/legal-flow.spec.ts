@@ -21,25 +21,28 @@ test.describe('전자상거래 약관 및 동의 UI', () => {
   test('푸터에서 이용약관·개인정보·환불 규정 페이지로 이동한다', async ({ page }) => {
     await page.goto('/');
     const footer = page.getByRole('contentinfo');
-    await expect(footer.getByText('스폰서옥션')).toBeVisible();
-    await expect(footer.getByRole('link', { name: '서비스 이용약관' })).toBeVisible();
-    await expect(footer.getByRole('link', { name: '개인정보 처리방침' })).toBeVisible();
-    await expect(footer.getByRole('link', { name: '취소 및 환불 규정' })).toBeVisible();
+    await expect(footer.getByText('하람커넥트')).toBeVisible();
+    await expect(footer.getByText('533-06-03737')).toBeVisible();
+    await expect(footer.getByText('070-8027-8425')).toBeVisible();
+    await expect(footer.getByText('help@clinkapp.kr')).toBeVisible();
+    await expect(footer.getByRole('link', { name: '이용약관' })).toBeVisible();
+    await expect(footer.getByRole('link', { name: '개인정보처리방침' })).toBeVisible();
+    await expect(footer.getByRole('link', { name: '환불 및 취소 규정' })).toBeVisible();
 
-    await footer.getByRole('link', { name: '서비스 이용약관' }).click();
+    await footer.getByRole('link', { name: '이용약관' }).click();
     await expect(page).toHaveURL(/\/terms/);
     await expect(page.getByRole('heading', { name: '서비스 이용약관' })).toBeVisible();
     await expect(page.getByText('중개 책임의 한계')).toBeVisible();
 
-    await page.getByRole('contentinfo').getByRole('link', { name: '개인정보 처리방침' }).click();
+    await page.getByRole('contentinfo').getByRole('link', { name: '개인정보처리방침' }).click();
     await expect(page).toHaveURL(/\/privacy/);
     await expect(page.getByRole('heading', { name: '개인정보 처리방침' })).toBeVisible();
     await expect(page.getByRole('heading', { name: /제3자 제공/ })).toBeVisible();
 
-    await page.getByRole('contentinfo').getByRole('link', { name: '취소 및 환불 규정' }).click();
+    await page.getByRole('contentinfo').getByRole('link', { name: '환불 및 취소 규정' }).click();
     await expect(page).toHaveURL(/\/refund/);
-    await expect(page.getByRole('heading', { name: '취소 및 환불 / 분쟁 해결 규정' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /100% 환불/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '환불 및 취소 규정' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /100% 전액 환불/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: /크리에이터 제재/ })).toBeVisible();
   });
 

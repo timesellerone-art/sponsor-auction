@@ -1,4 +1,5 @@
 import { downloadBytes } from '@/lib/admin-csv';
+import { COMPANY } from '@/lib/company';
 import { DELETED_CAMPAIGN_LABEL, enrichPayoutAmounts } from '@/lib/admin-integrity';
 import { floorToTenWon } from '@/lib/fees';
 import { calculateCreatorPayout } from '@/lib/payments/payout';
@@ -12,7 +13,7 @@ export const TRANSFER_XLSX_HEADERS = [
   '내통장표시',
 ] as const;
 
-export const TRANSFER_RECIPIENT_LABEL = '스폰서옥션';
+export const TRANSFER_RECIPIENT_LABEL = COMPANY.legalName;
 export const TRANSFER_XLSX_MIME =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 

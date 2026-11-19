@@ -22,11 +22,18 @@ export function SiteFooter() {
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1 leading-5">
             <p className="font-semibold text-zinc-700">
-              {COMPANY.legalName} ({COMPANY.brand})
+              상호명: {COMPANY.legalName} ({COMPANY.brand})
             </p>
-            <p>대표 {COMPANY.ceo} · {COMPANY.address}</p>
-            <p>{COMPANY.businessNo}</p>
-            <p>{COMPANY.mailOrderNo}</p>
+            <p>대표자: {COMPANY.ceo}</p>
+            <p>사업자등록번호: {COMPANY.businessNo}</p>
+            <p>통신판매업신고번호: {COMPANY.mailOrderNo}</p>
+            <p>
+              고객센터:{' '}
+              <a href={`tel:${COMPANY.phone}`} className="hover:text-zinc-800 hover:underline">
+                {COMPANY.phone}
+              </a>{' '}
+              ({COMPANY.phoneHours})
+            </p>
             <p>
               이메일{' '}
               <a href={`mailto:${COMPANY.email}`} className="hover:text-zinc-800 hover:underline">
@@ -37,13 +44,13 @@ export function SiteFooter() {
           </div>
           <nav className="flex flex-wrap gap-x-4 gap-y-1" aria-label="약관">
             <Link href="/terms" className="hover:text-zinc-800 hover:underline">
-              서비스 이용약관
+              이용약관
             </Link>
             <Link href="/privacy" className="hover:text-zinc-800 hover:underline">
-              개인정보 처리방침
+              개인정보처리방침
             </Link>
             <Link href="/refund" className="hover:text-zinc-800 hover:underline">
-              취소 및 환불 규정
+              환불 및 취소 규정
             </Link>
           </nav>
         </div>

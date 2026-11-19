@@ -1,5 +1,5 @@
 import { LegalDocument, LegalSection } from '@/components/LegalDocument';
-import { COMPANY } from '@/lib/company';
+import { COMPANY, COMPANY_OPERATOR_LINE } from '@/lib/company';
 import {
   ADVERTISER_FEE_PERCENT,
   VAT_PERCENT,
@@ -9,7 +9,13 @@ import {
 
 export default function TermsPage() {
   return (
-    <LegalDocument kicker="Legal" title="서비스 이용약관" updated="2026년 10월 16일">
+    <LegalDocument kicker="Legal" title="서비스 이용약관" updated="2026년 11월 19일">
+      <LegalSection title="운영 주체">
+        <p>
+          본 서비스 {COMPANY.brand}의 운영 주체는 {COMPANY_OPERATOR_LINE}입니다.
+          고객센터 운영시간은 {COMPANY.phoneHours}입니다.
+        </p>
+      </LegalSection>
       <LegalSection title="제1조 (목적)">
         <p>
           이 약관은 {COMPANY.legalName}(서비스명 {COMPANY.brand}, 이하 &quot;회사&quot;)가
@@ -84,7 +90,7 @@ export default function TermsPage() {
         <p>
           이 약관은 대한민국 법령을 따릅니다. 분쟁은 우선 회사 고객센터({COMPANY.email})를
           통해 협의하며, 협의가 이루어지지 않으면 민사소송법상의 관할 법원에 제소합니다.
-          상세 환불·분쟁 절차는 취소 및 환불 규정을 따릅니다.
+          상세 환불·분쟁 절차는 환불 및 취소 규정을 따릅니다.
         </p>
       </LegalSection>
     </LegalDocument>

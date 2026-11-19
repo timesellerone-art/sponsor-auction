@@ -1,9 +1,12 @@
 import { LegalDocument, LegalSection } from '@/components/LegalDocument';
-import { COMPANY } from '@/lib/company';
+import { COMPANY, COMPANY_OPERATOR_LINE } from '@/lib/company';
 
 export default function PrivacyPage() {
   return (
-    <LegalDocument kicker="Legal" title="개인정보 처리방침" updated="2026년 10월 16일">
+    <LegalDocument kicker="Legal" title="개인정보 처리방침" updated="2026년 11월 19일">
+      <LegalSection title="운영 주체">
+        <p>개인정보 처리자는 {COMPANY_OPERATOR_LINE}입니다.</p>
+      </LegalSection>
       <LegalSection title="1. 개인정보 처리 목적">
         <p>
           {COMPANY.legalName}(이하 &quot;회사&quot;)는 회원가입, 캠페인 매칭, 선정·결제, 정산,
@@ -17,6 +20,7 @@ export default function PrivacyPage() {
           <li>서비스 이용: 캠페인·제안 내용, 채널 URL, 제안 금액, 접속 로그·기기 정보</li>
           <li>결제: 주문번호, 결제금액, 결제수단 유형, 승인 시각(카드번호 등 민감 정보는 결제사가 처리)</li>
           <li>정산: 크리에이터 이름·이메일, 계좌 정보(운영자가 수집하는 경우)</li>
+          <li>고객 지원: 문의 내용, 연락 가능한 전화번호·이메일</li>
         </ul>
       </LegalSection>
       <LegalSection title="3. 보유 및 이용 기간">
@@ -45,8 +49,8 @@ export default function PrivacyPage() {
       <LegalSection title="5. 이용자의 권리">
         <p>
           회원은 개인정보 열람·정정·삭제·처리정지·동의 철회를 요청할 수 있습니다. 문의는{' '}
-          {COMPANY.email} 또는 서비스 내 고객 지원 채널을 이용해 주세요. 결제 기록이 법령상
-          보관 대상인 경우 삭제 요청이 제한될 수 있습니다.
+          {COMPANY.email} 또는 고객센터 {COMPANY.phone}({COMPANY.phoneHours})를 이용해 주세요.
+          결제 기록이 법령상 보관 대상인 경우 삭제 요청이 제한될 수 있습니다.
         </p>
       </LegalSection>
       <LegalSection title="6. 안전성 확보조치">
@@ -57,7 +61,7 @@ export default function PrivacyPage() {
       </LegalSection>
       <LegalSection title="7. 개인정보 보호책임자">
         <p>
-          성명: {COMPANY.ceo} · 이메일: {COMPANY.email}
+          성명: {COMPANY.ceo} · 이메일: {COMPANY.email} · 전화: {COMPANY.phone}
         </p>
       </LegalSection>
     </LegalDocument>

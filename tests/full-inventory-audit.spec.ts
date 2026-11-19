@@ -23,7 +23,8 @@ const PUBLIC_PAGES = [
   { path: '/login', heading: '로그인' },
   { path: '/terms', heading: '서비스 이용약관' },
   { path: '/privacy', heading: '개인정보 처리방침' },
-  { path: '/refund', heading: /취소 및 환불/ },
+  { path: '/refund', heading: '환불 및 취소 규정' },
+  { path: '/payment-verify', heading: '결제 테스트' },
   { path: '/inventory', heading: '타임슬롯 마켓플레이스' },
 ] as const;
 
@@ -116,9 +117,9 @@ test.describe('전수 검증 A · 공통 랜딩·약관·인증', () => {
     const rootBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
     expect(rootBg.replace(/\s/g, '')).toMatch(/rgb\(250,\s*248,\s*245\)|rgb\(250,248,245\)/);
 
-    await expect(page.getByRole('link', { name: '서비스 이용약관' }).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: '개인정보 처리방침' }).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: '취소 및 환불 규정' }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: '이용약관' }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: '개인정보처리방침' }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: '환불 및 취소 규정' }).first()).toBeVisible();
 
     for (const item of PUBLIC_PAGES) {
       const response = await page.goto(item.path);

@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { COMPANY } from '@/lib/company';
 import { describeSettlementTax, splitAdvertiserInvoiceFromTotal } from '@/lib/tax';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -186,7 +187,7 @@ export async function issueTaxInvoice(
       },
       body: JSON.stringify({
         mgtKey,
-        invoicerCorpName: 'SponsorAuction',
+        invoicerCorpName: COMPANY.legalName,
         invoiceeCorpName: input.buyerName || '광고주',
         invoiceeEmail: input.buyerEmail || '',
         supplyCostTotal: String(advertiserInvoice.supplyAmount),
