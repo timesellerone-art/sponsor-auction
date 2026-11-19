@@ -80,10 +80,9 @@ export function HomeHero() {
         </AnimatePresence>
 
         <motion.div
-          initial={{ opacity: 0, y: 28 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.22 }}
-          className="mt-12 w-full max-w-4xl overflow-hidden"
+          className="mt-12 w-full max-w-4xl overflow-visible"
         >
           <ShortformShowcase />
         </motion.div>
@@ -94,7 +93,7 @@ export function HomeHero() {
 
 function ShortformShowcase() {
   return (
-    <div className="flex items-center justify-center overflow-hidden py-4 sm:py-6">
+    <div className="flex items-center justify-center overflow-visible py-6 sm:py-8">
       {SHORTFORM_CARDS.map((card, index) => {
         const creator = getShowcaseCreator(card.creatorId);
         return (
@@ -114,6 +113,8 @@ function ShortformShowcase() {
                 alt={`${card.title} 숏폼 프리뷰`}
                 width={196}
                 height={348}
+                decoding="async"
+                fetchPriority={index === 1 ? 'high' : 'low'}
                 className="absolute inset-0 size-full object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-black/10" />

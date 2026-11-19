@@ -8,7 +8,7 @@ import { POST_AUTH_HOME } from '@/lib/auth-guard';
 import { isAuthLoggingOut } from '@/lib/auth-logout';
 import { resolveActiveMemberRole } from '@/types/auth';
 
-function RoleRouteGuardInner({ children }: { children: ReactNode }) {
+function RoleRouteEffects() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, ready } = useAuth();
@@ -29,13 +29,16 @@ function RoleRouteGuardInner({ children }: { children: ReactNode }) {
     }
   }, [pathname, ready, router, user]);
 
-  return children;
+  return null;
 }
 
 export function RoleRouteGuard({ children }: { children: ReactNode }) {
   return (
-    <Suspense fallback={children}>
-      <RoleRouteGuardInner>{children}</RoleRouteGuardInner>
-    </Suspense>
+    <>
+      <Suspense fallback={null}>
+        <RoleRouteEffects />
+      </Suspense>
+      {children}
+    </>
   );
 }

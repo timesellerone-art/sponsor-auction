@@ -91,6 +91,6 @@ test('가계부 앱 기본 커버는 동물이 아니다', () => {
     title: '똑똑한 가계부 앱',
     description: '가계부 앱 온보딩 숏폼',
   });
-  assert.match(cover, /photo-1512941937669-90a1b58e7e9c/);
-  assert.doesNotMatch(cover, /1548199973|1514888286974/);
+  assert.match(cover, /\/covers\/tech\.jpg/);
+  assert.doesNotMatch(cover, /\/covers\/pet\.jpg|\/covers\/default-cat\.jpg/);
 });

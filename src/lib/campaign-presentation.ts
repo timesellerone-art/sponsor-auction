@@ -74,16 +74,14 @@ const CATEGORY_KEYWORDS: Record<CampaignCategoryId, string[]> = {
 };
 
 const CATEGORY_COVERS: Record<CampaignCategoryId | 'default', string> = {
-  tech: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=1200&h=704&q=80',
-  pet: 'https://images.unsplash.com/photo-1548199973-03cce0bbc87b?auto=format&fit=crop&w=1200&h=704&q=80',
-  beauty: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&w=1200&h=704&q=80',
-  food: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&h=704&q=80',
-  living: 'https://images.unsplash.com/photo-1616046229478-9901c5536a45?auto=format&fit=crop&w=1200&h=704&q=80',
-  fitness: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1200&h=704&q=80',
-  parenting:
-    'https://images.unsplash.com/photo-1476703993599-0035a21b17a9?auto=format&fit=crop&w=1200&h=704&q=80',
-  default:
-    'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&h=704&q=80',
+  tech: '/covers/tech.jpg',
+  pet: '/covers/pet.jpg',
+  beauty: '/covers/beauty.jpg',
+  food: '/covers/food.jpg',
+  living: '/covers/living.jpg',
+  fitness: '/covers/fitness.jpg',
+  parenting: '/covers/parenting.jpg',
+  default: '/covers/default-cat.jpg',
 };
 
 const CATEGORY_ORDER: CampaignCategoryId[] = [

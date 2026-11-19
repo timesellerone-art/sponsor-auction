@@ -30,7 +30,6 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
     <html lang="ko" className={`${geistMono.variable} h-full w-full antialiased`}>
       <head>
         <link rel="preconnect" href="https://cdn.jsdelivr.net" />
-        <link rel="preconnect" href="https://images.unsplash.com" />
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
