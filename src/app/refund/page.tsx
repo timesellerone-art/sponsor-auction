@@ -6,8 +6,9 @@ export default function RefundPage() {
     <LegalDocument kicker="Legal" title="환불 및 취소 규정" updated="2026년 11월 19일">
       <LegalSection title="운영 주체">
         <p>
-          본 규정의 운영 주체는 {COMPANY_OPERATOR_LINE}입니다. 결제는 토스페이먼츠를 통해
-          이루어지며, 환불은 결제 수단의 정책과 관련 법령을 따릅니다.
+          본 규정의 운영 주체는 {COMPANY_OPERATOR_LINE}입니다. 사업장 소재지는{' '}
+          {COMPANY.address}입니다. 결제는 토스페이먼츠를 통해 이루어지며, 환불은 결제 수단의
+          정책과 관련 법령을 따릅니다.
         </p>
       </LegalSection>
       <LegalSection title="제1조 (목적)">

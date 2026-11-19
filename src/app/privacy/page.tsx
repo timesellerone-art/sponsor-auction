@@ -5,7 +5,9 @@ export default function PrivacyPage() {
   return (
     <LegalDocument kicker="Legal" title="개인정보 처리방침" updated="2026년 11월 19일">
       <LegalSection title="운영 주체">
-        <p>개인정보 처리자는 {COMPANY_OPERATOR_LINE}입니다.</p>
+        <p>
+          개인정보 처리자는 {COMPANY_OPERATOR_LINE}입니다. 사업장 소재지는 {COMPANY.address}입니다.
+        </p>
       </LegalSection>
       <LegalSection title="1. 개인정보 처리 목적">
         <p>
@@ -61,7 +63,8 @@ export default function PrivacyPage() {
       </LegalSection>
       <LegalSection title="7. 개인정보 보호책임자">
         <p>
-          성명: {COMPANY.ceo} · 이메일: {COMPANY.email} · 전화: {COMPANY.phone}
+          성명: {COMPANY.privacyOfficer} · 이메일: {COMPANY.email} · 전화: {COMPANY.phone} ·
+          사업장 소재지: {COMPANY.address}
         </p>
       </LegalSection>
     </LegalDocument>

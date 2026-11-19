@@ -27,6 +27,14 @@ export function SiteFooter() {
             <p>대표자: {COMPANY.ceo}</p>
             <p>사업자등록번호: {COMPANY.businessNo}</p>
             <p>통신판매업신고번호: {COMPANY.mailOrderNo}</p>
+            <p>사업장 소재지: {COMPANY.address}</p>
+            <p>
+              개인정보보호책임자: {COMPANY.privacyOfficer} (
+              <a href={`mailto:${COMPANY.email}`} className="hover:text-zinc-800 hover:underline">
+                {COMPANY.email}
+              </a>
+              )
+            </p>
             <p>
               고객센터:{' '}
               <a href={`tel:${COMPANY.phone}`} className="hover:text-zinc-800 hover:underline">
@@ -35,7 +43,7 @@ export function SiteFooter() {
               ({COMPANY.phoneHours})
             </p>
             <p>
-              이메일{' '}
+              이메일:{' '}
               <a href={`mailto:${COMPANY.email}`} className="hover:text-zinc-800 hover:underline">
                 {COMPANY.email}
               </a>

@@ -24,7 +24,9 @@ test.describe('전자상거래 약관 및 동의 UI', () => {
     await expect(footer.getByText('하람커넥트')).toBeVisible();
     await expect(footer.getByText('533-06-03737')).toBeVisible();
     await expect(footer.getByText('070-8027-8425')).toBeVisible();
-    await expect(footer.getByText('help@clinkapp.kr')).toBeVisible();
+    await expect(footer.getByText('help@clinkapp.kr').first()).toBeVisible();
+    await expect(footer.getByText('충청남도 아산시 번영로217번길 31, 2층 오즈 오피스(모종동)')).toBeVisible();
+    await expect(footer.getByText(/개인정보보호책임자:\s*권경환/)).toBeVisible();
     await expect(footer.getByRole('link', { name: '이용약관' })).toBeVisible();
     await expect(footer.getByRole('link', { name: '개인정보처리방침' })).toBeVisible();
     await expect(footer.getByRole('link', { name: '환불 및 취소 규정' })).toBeVisible();

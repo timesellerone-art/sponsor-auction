@@ -205,8 +205,8 @@ export function PaymentVerifyCheckout() {
           {busy ? '결제 요청 중...' : `${formatWon(amount)} 결제하기`}
         </button>
         <p className="text-xs text-zinc-500">
-          운영 주체 {COMPANY.legalName} · 사업자등록번호 {COMPANY.businessNo} · 고객센터{' '}
-          {COMPANY.phone}
+          운영 주체 {COMPANY.legalName} · 사업자등록번호 {COMPANY.businessNo} · 사업장 소재지{' '}
+          {COMPANY.address} · 고객센터 {COMPANY.phone}
         </p>
       </div>
     </section>
