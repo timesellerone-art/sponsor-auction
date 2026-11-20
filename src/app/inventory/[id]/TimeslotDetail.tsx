@@ -11,7 +11,8 @@ import { TimeslotBidModal } from '@/components/TimeslotBidModal';
 import { showToast } from '@/components/Toast';
 import { isDeadlinePassed } from '@/lib/auction-engine';
 import { PLATFORM_LABELS } from '@/lib/platforms';
-import { awardTimeSlotBid, getTimeSlotById, listTimeSlotBids } from '@/lib/timeslots';
+import { authRequestInit } from '@/lib/auth-request';
+import { getTimeSlotById, listTimeSlotBids } from '@/lib/timeslots';
 import { formatDateTime, formatViews, formatWon } from '@/lib/utils';
 import type { TimeSlotBidItem, TimeSlotItem } from '@/types/timeslot';
 
@@ -177,9 +178,19 @@ export function TimeslotDetail({ id }: { id: string }) {
                         onClick={async () => {
                           setBusyId(bid.id);
                           try {
-                            const result = await awardTimeSlotBid(slot.id, bid.id, user?.id);
-                            if (result.error) {
-                              showToast(result.error);
+                            const response = await fetch(
+                              `/api/timeslots/${slot.id}/award`,
+                              await authRequestInit({
+                                method: 'POST',
+                                body: JSON.stringify({ bidId: bid.id }),
+                              }),
+                            );
+                            const payload = (await response.json().catch(() => null)) as {
+                              error?: string;
+                              errorMessage?: string;
+                            } | null;
+                            if (!response.ok) {
+                              showToast(payload?.errorMessage || payload?.error || '낙찰하지 못했습니다.');
                               return;
                             }
                             showToast('낙찰했습니다.', 'success');

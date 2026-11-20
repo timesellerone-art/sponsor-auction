@@ -4,6 +4,7 @@ import { updateIntent } from '@/lib/payments/intent';
 import { persistPayment, type PersistPaymentResult } from '@/lib/payments/persist';
 import { issueTaxInvoice } from '@/lib/popbill';
 import type { PaymentSupabaseConfig } from '@/lib/supabase/payment-config';
+import { isUuid } from '@/lib/uuid';
 import type { PaymentIntent } from '@/types/payment';
 
 export type FinalizeIntent = Pick<
@@ -57,11 +58,19 @@ export async function finalizeConfirmedPayment(
     console.error('[SponsorAuction] demo 결제 저장 실패, 낙찰은 계속 진행', saved);
   }
 
-  await applyPaidAuctionStatus(intent.auctionId, intent.bidId, dbConfig, {
+  const awarded = await applyPaidAuctionStatus(intent.auctionId, intent.bidId, dbConfig, {
     orderId: intent.orderId,
     amount: intent.amount,
     orderName: intent.orderName,
   });
+  if (!awarded && isUuid(intent.auctionId) && isUuid(intent.bidId)) {
+    return {
+      ok: false,
+      errorCode: 'AWARD_FAILED',
+      errorMessage: '캠페인 채택을 저장하지 못했습니다. 낙찰은 진행되지 않았습니다.',
+      supabaseError: { message: 'auction award was not saved' },
+    };
+  }
   const taxInvoice = await issuePaidTaxInvoice(intent);
   updateIntent(intent.orderId, {
     status: 'confirmed',

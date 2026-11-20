@@ -1,12 +1,14 @@
 import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
+import { holdCampaignCredit, releaseCampaignCredit, timeslotAwardReference } from '@/lib/campaign-credit';
 import {
   forbiddenJson,
   getPaymentActor,
   unauthorizedJson,
 } from '@/lib/payments/guard';
-import { awardTimeSlotBid, getTimeSlotById } from '@/lib/timeslots';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { awardTimeSlotBid, getTimeSlotById, listTimeSlotBids } from '@/lib/timeslots';
 import { isUuid } from '@/lib/uuid';
 import { hasAuthRole } from '@/types/auth';
 
@@ -45,8 +47,54 @@ export async function POST(
       return forbiddenJson('본인 슬롯만 낙찰할 수 있습니다.');
     }
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-    const result = await awardTimeSlotBid(id, asText(body?.bidId), actor.userId);
+    const bidId = asText(body?.bidId);
+    let creditReference: string | null = null;
+    const admin = createAdminClient();
+    if (isUuid(id) && isUuid(bidId)) {
+      if (!admin) {
+        return NextResponse.json(
+          {
+            error: '크레딧 원장을 확인하지 못했습니다. 선정은 진행되지 않았습니다.',
+            errorCode: 'CREDIT_LEDGER_UNAVAILABLE',
+          },
+          { status: 503, headers: NO_STORE },
+        );
+      }
+      const bids = await listTimeSlotBids(id);
+      const winner = bids.data.find((item) => item.id === bidId);
+      const payerId = winner?.advertiserId ?? '';
+      if (!winner || winner.bidAmount <= 0 || !isUuid(payerId)) {
+        return NextResponse.json(
+          {
+            error: '광고주 크레딧을 차감할 제안을 찾지 못했습니다.',
+            errorCode: 'AWARD_TARGET_NOT_FOUND',
+          },
+          { status: 400, headers: NO_STORE },
+        );
+      }
+      creditReference = timeslotAwardReference(id, bidId, crypto.randomUUID());
+      const held = await holdCampaignCredit(admin, {
+        userId: payerId,
+        referenceId: creditReference,
+        bidAmount: winner.bidAmount,
+        title: slot.data?.title ?? '타임슬롯',
+      });
+      if (!held.ok) {
+        const status = held.code === 'INSUFFICIENT_CREDIT' ? 402 : 400;
+        return NextResponse.json(
+          { error: held.message, errorCode: held.code },
+          { status, headers: NO_STORE },
+        );
+      }
+    }
+    const result = await awardTimeSlotBid(id, bidId, actor.userId);
     if (result.error || !result.data) {
+      if (admin && creditReference) {
+        await releaseCampaignCredit(admin, {
+          referenceId: creditReference,
+          reason: '타임슬롯 채택 실패로 크레딧 복구',
+        });
+      }
       const message = result.error ?? '낙찰하지 못했습니다.';
       return NextResponse.json(
         { error: message, errorMessage: message },

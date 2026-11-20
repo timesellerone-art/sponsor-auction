@@ -1,6 +1,14 @@
 import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { NextResponse } from 'next/server';
+import {
+  campaignPayReference,
+  holdCampaignPayment,
+  releaseCampaignCredit,
+  releaseCampaignPaymentIfOpen,
+} from '@/lib/campaign-credit';
 import { advertiserChargeMatchesBid, advertiserPayableAmount } from '@/lib/fees';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { isUuid } from '@/lib/uuid';
 import { productionTossLiveKeyError } from '@/lib/launch-env';
 import { getTossClientKey, getTossSecretKey, isTossClientConfigured } from '@/lib/payments/env';
 import {
@@ -20,6 +28,7 @@ import {
 } from '@/lib/payments/guard';
 import { persistPayment } from '@/lib/payments/persist';
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
+import { hasAuthRole } from '@/types/auth';
 import type { PreparePaymentInput, PreparePaymentResult } from '@/types/payment';
 
 
@@ -119,6 +128,50 @@ export async function POST(request: Request) {
       createdAt: Date.now(),
     };
 
+    if (isUuid(intent.auctionId) && isUuid(intent.bidId)) {
+      if (!actor.userId) {
+        return NextResponse.json(
+          { error: '결제를 준비하려면 로그인해 주세요.', errorCode: 'UNAUTHORIZED' },
+          { status: 401 },
+        );
+      }
+      const admin = createAdminClient();
+      if (!admin) {
+        return NextResponse.json(
+          {
+            error: '크레딧 원장을 확인하지 못했습니다. 채택은 진행되지 않았습니다.',
+            errorCode: 'CREDIT_LEDGER_UNAVAILABLE',
+          },
+          { status: 503 },
+        );
+      }
+      const held = await holdCampaignPayment(admin, {
+        orderId: intent.orderId,
+        auctionId: intent.auctionId,
+        bidId: intent.bidId,
+        actorUserId: actor.userId,
+        actorIsAdmin: hasAuthRole(actor, 'admin'),
+      });
+      if (!held.ok) {
+        const status =
+          held.code === 'INSUFFICIENT_CREDIT' ? 402 : held.code === 'ALREADY_AWARDED' ? 409 : held.code === 'FORBIDDEN' ? 403 : 400;
+        return NextResponse.json({ error: held.message, errorCode: held.code }, { status });
+      }
+      if (!held.skipped && held.amount !== intent.amount) {
+        await releaseCampaignCredit(admin, {
+          referenceId: campaignPayReference(intent.orderId),
+          reason: '결제 금액이 차감 금액과 달라 채택을 취소',
+        });
+        return NextResponse.json(
+          {
+            error: '결제 금액이 제안 금액과 수수료에 맞지 않습니다. 채택은 진행되지 않았습니다.',
+            errorCode: 'AMOUNT_MISMATCH',
+          },
+          { status: 400 },
+        );
+      }
+    }
+
     putIntent(intent);
     const dbConfig = await paymentDbConfigForRequest({
       supabaseUrl: parsed.supabaseUrl,
@@ -128,6 +181,15 @@ export async function POST(request: Request) {
     if (!pending.ok) {
       console.error('[SponsorAuction] pending payment 저장 실패', pending);
       if (process.env.VERCEL_ENV === 'production') {
+        const admin = createAdminClient();
+        if (admin) {
+          await releaseCampaignPaymentIfOpen(admin, {
+            orderId: intent.orderId,
+            auctionId: intent.auctionId,
+            bidId: intent.bidId,
+            reason: '결제 준비 저장 실패로 크레딧 복구',
+          });
+        }
         return NextResponse.json(
           {
             error: pending.errorMessage,

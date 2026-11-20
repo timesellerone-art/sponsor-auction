@@ -5,6 +5,7 @@ import { isCreditChargeOrderId, loadCreditChargeOrder, settleCreditCharge } from
 import { captureException } from '@/lib/monitoring';
 import { productionTossLiveKeyError } from '@/lib/launch-env';
 import { getTossClientKey, getTossSecretKey, isTossSecretConfigured } from '@/lib/payments/env';
+import { holdCampaignPayment, releaseCampaignPaymentIfOpen } from '@/lib/campaign-credit';
 import { finalizeConfirmedPayment } from '@/lib/payments/finalize';
 import { getIntent, putIntent } from '@/lib/payments/intent';
 import { loadPaymentByOrderId, persistPayment } from '@/lib/payments/persist';
@@ -310,19 +311,58 @@ export async function POST(request: Request) {
 
     const mapped = mapTossPaymentStatus(payment.status);
     if (mapped === 'confirmed') {
-      const finalized = await finalizeConfirmedPayment(source, payment.paymentKey, dbConfig);
-      if (!finalized.ok) {
-        captureException(new Error(finalized.errorMessage), {
-          area: 'toss_webhook',
-          errorCode: finalized.errorCode,
-          orderId: payment.orderId,
-        });
-        return json(500, {
-          error: finalized.errorCode,
-          errorCode: finalized.errorCode,
-          errorMessage: finalized.errorMessage,
+      const admin = createAdminClient();
+      if (!admin) {
+        return json(503, {
+          error: 'CREDIT_LEDGER_UNAVAILABLE',
+          errorCode: 'CREDIT_LEDGER_UNAVAILABLE',
+          errorMessage: '크레딧 원장을 확인하지 못했습니다.',
         });
       }
+      const held = await holdCampaignPayment(admin, {
+        orderId: source.orderId,
+        auctionId: source.auctionId,
+        bidId: source.bidId,
+      });
+      if (!held.ok) {
+        console.error('[SponsorAuction] Toss 웹훅 크레딧 차감 실패', {
+          orderId: source.orderId,
+          code: held.code,
+        });
+        if (held.code === 'INSUFFICIENT_CREDIT' || held.code === 'ALREADY_AWARDED' || held.code === 'FORBIDDEN') {
+          return json(200, {
+            ok: false,
+            awarded: false,
+            orderId: payment.orderId,
+            errorCode: held.code,
+            errorMessage: held.message,
+          });
+        }
+        return json(500, {
+          error: held.code,
+          errorCode: held.code,
+          errorMessage: held.message,
+        });
+      }
+      const finalized = await finalizeConfirmedPayment(source, payment.paymentKey, dbConfig);
+        if (!finalized.ok) {
+          captureException(new Error(finalized.errorMessage), {
+            area: 'toss_webhook',
+            errorCode: finalized.errorCode,
+            orderId: payment.orderId,
+          });
+          await releaseCampaignPaymentIfOpen(admin, {
+            orderId: source.orderId,
+            auctionId: source.auctionId,
+            bidId: source.bidId,
+            reason: '웹훅 채택 실패로 크레딧 복구',
+          });
+          return json(500, {
+            error: finalized.errorCode,
+            errorCode: finalized.errorCode,
+            errorMessage: finalized.errorMessage,
+          });
+        }
       console.info('[SponsorAuction] Toss 웹훅 결제 확정', {
         orderId: payment.orderId,
         tossStatus: payment.status,
@@ -339,6 +379,39 @@ export async function POST(request: Request) {
     if (mapped === 'ignored') {
       const confirmable = /^(READY|IN_PROGRESS)$/i.test(payment.status);
       if (confirmable && source.status === 'pending') {
+        const retryAdmin = createAdminClient();
+        if (!retryAdmin) {
+          return json(503, {
+            error: 'CREDIT_LEDGER_UNAVAILABLE',
+            errorCode: 'CREDIT_LEDGER_UNAVAILABLE',
+            errorMessage: '크레딧 원장을 확인하지 못했습니다.',
+          });
+        }
+        const retryHeld = await holdCampaignPayment(retryAdmin, {
+          orderId: source.orderId,
+          auctionId: source.auctionId,
+          bidId: source.bidId,
+        });
+        if (!retryHeld.ok) {
+          if (
+            retryHeld.code === 'INSUFFICIENT_CREDIT' ||
+            retryHeld.code === 'ALREADY_AWARDED' ||
+            retryHeld.code === 'FORBIDDEN'
+          ) {
+            return json(200, {
+              ok: false,
+              awarded: false,
+              orderId: payment.orderId,
+              errorCode: retryHeld.code,
+              errorMessage: retryHeld.message,
+            });
+          }
+          return json(500, {
+            error: retryHeld.code,
+            errorCode: retryHeld.code,
+            errorMessage: retryHeld.message,
+          });
+        }
         const confirmed = await confirmTossPayment({
           paymentKey: payment.paymentKey,
           orderId: payment.orderId,
@@ -349,6 +422,12 @@ export async function POST(request: Request) {
             orderId: payment.orderId,
             errorCode: confirmed.errorCode,
           });
+          await releaseCampaignPaymentIfOpen(retryAdmin, {
+            orderId: source.orderId,
+            auctionId: source.auctionId,
+            bidId: source.bidId,
+            reason: '웹훅 자동 승인 실패로 크레딧 복구',
+          });
           return json(500, {
             error: confirmed.errorCode || 'TOSS_CONFIRM_FAILED',
             errorCode: confirmed.errorCode || 'TOSS_CONFIRM_FAILED',
@@ -357,6 +436,12 @@ export async function POST(request: Request) {
         }
         const finalized = await finalizeConfirmedPayment(source, payment.paymentKey, dbConfig);
         if (!finalized.ok) {
+          await releaseCampaignPaymentIfOpen(retryAdmin, {
+            orderId: source.orderId,
+            auctionId: source.auctionId,
+            bidId: source.bidId,
+            reason: '웹훅 재승인 채택 실패로 크레딧 복구',
+          });
           return json(500, {
             error: finalized.errorCode,
             errorCode: finalized.errorCode,
@@ -381,6 +466,15 @@ export async function POST(request: Request) {
 
     if (mapped === 'failed' || mapped === 'expired') {
       await persistPayment(source, mapped, payment.paymentKey, dbConfig);
+      const admin = createAdminClient();
+      if (admin) {
+        await releaseCampaignPaymentIfOpen(admin, {
+          orderId: source.orderId,
+          auctionId: source.auctionId,
+          bidId: source.bidId,
+          reason: '결제 실패로 캠페인 크레딧 복구',
+        });
+      }
       console.info('[SponsorAuction] Toss 웹훅 결제 종료', {
         orderId: payment.orderId,
         status: mapped,

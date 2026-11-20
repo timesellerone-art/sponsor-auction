@@ -7,6 +7,7 @@ import { CheckCircle2, Loader2 } from 'lucide-react';
 import { EscrowNotice } from '@/components/EscrowNotice';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
+import { authRequestInit } from '@/lib/auth-request';
 import { notifyLifecycleEvent } from '@/lib/notification';
 import { pushNotification } from '@/lib/notifications';
 import { UPDATE_FAIL_MESSAGE, awardBid, getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
@@ -187,6 +188,25 @@ function PaymentSuccessContent() {
 
         const awarded = await awardBid(confirmPayload.auctionId, confirmPayload.bidId);
         if (awarded.error && awarded.error !== VALIDATION.alreadyAwarded) {
+          const latestAuction = await getAuctionById(confirmPayload.auctionId);
+          const latest = latestAuction.data;
+          const executed =
+            latest?.winnerBidId === confirmPayload.bidId &&
+            (latest.status === 'completed' || latest.status === 'closed' || latest.status === 'matched');
+          if (!executed && confirmPayload.orderId) {
+            await fetch(
+              '/api/payments/cancel',
+              await authRequestInit({
+                method: 'POST',
+                body: JSON.stringify({
+                  orderId: confirmPayload.orderId,
+                  ...publicSupabasePayload(),
+                }),
+              }),
+            ).catch((error) => {
+              console.error('[SponsorAuction] 채택 실패 후 크레딧 복구 요청 실패', error);
+            });
+          }
           const info = parsePaymentError({
             code: 'AWARD_FAILED',
             message: awarded.error || UPDATE_FAIL_MESSAGE,

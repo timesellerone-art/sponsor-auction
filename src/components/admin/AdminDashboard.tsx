@@ -11,6 +11,8 @@ import { AdminPayoutTable } from '@/components/admin/AdminPayoutTable';
 import { AdminStats } from '@/components/admin/AdminStats';
 import { AdminUserTable } from '@/components/admin/AdminUserTable';
 import { showToast } from '@/components/Toast';
+import { authRequestInit } from '@/lib/auth-request';
+import { isUuid } from '@/lib/uuid';
 import { useActionLock } from '@/hooks/useActionLock';
 import {
   ADMIN_UPDATE_FAIL_MESSAGE,
@@ -311,6 +313,25 @@ export function AdminDashboard({
         if (!exists) {
           showToast(VALIDATION.alreadyProcessed);
           return;
+        }
+
+        if (isUuid(auction.id)) {
+          const creditResponse = await fetch(
+            `/api/campaigns/${auction.id}/cancel`,
+            await authRequestInit({ method: 'POST' }),
+          );
+          const creditPayload = (await creditResponse.json().catch(() => null)) as {
+            error?: string;
+            errorMessage?: string;
+          } | null;
+          if (!creditResponse.ok) {
+            showToast(
+              creditPayload?.errorMessage ||
+                creditPayload?.error ||
+                '크레딧을 복구하지 못해 캠페인을 삭제하지 않았습니다.',
+            );
+            return;
+          }
         }
 
         const result = await deleteAuction(auction.id);

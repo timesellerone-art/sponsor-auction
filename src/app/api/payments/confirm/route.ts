@@ -11,15 +11,42 @@ import {
   updateIntent,
 } from '@/lib/payments/intent';
 import { getBidsByAuctionId } from '@/lib/auctions';
+import { holdCampaignPayment, releaseCampaignPaymentIfOpen } from '@/lib/campaign-credit';
 import { advertiserPayableAmount } from '@/lib/fees';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { isUuid } from '@/lib/uuid';
 import { canPreparePayment, getPaymentActor } from '@/lib/payments/guard';
 import { finalizeConfirmedPayment } from '@/lib/payments/finalize';
 import { loadPaymentByOrderId, persistPayment } from '@/lib/payments/persist';
 import { confirmTossPayment, isDemoPaymentKey } from '@/lib/payments/toss';
 import { captureException } from '@/lib/monitoring';
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
+import { hasAuthRole } from '@/types/auth';
 import type { ConfirmPaymentInput, ConfirmPaymentResult } from '@/types/payment';
 
+
+async function unwindCampaignCredit(
+  order: { orderId: string; auctionId: string; bidId: string } | null,
+  reason: string,
+) {
+  if (!order?.orderId) {
+    return;
+  }
+  const admin = createAdminClient();
+  if (!admin) {
+    console.error('[SponsorAuction] 캠페인 크레딧 복구 생략: 관리자 클라이언트 없음', {
+      orderId: order.orderId,
+    });
+    return;
+  }
+  const released = await releaseCampaignPaymentIfOpen(admin, { ...order, reason });
+  if (!released.ok) {
+    console.error('[SponsorAuction] 캠페인 크레딧 복구 실패', {
+      orderId: order.orderId,
+      code: released.code,
+    });
+  }
+}
 
 function jsonError(
   status: number,
@@ -83,6 +110,7 @@ function parseBody(value: unknown): ConfirmPaymentInput | null {
 }
 
 export async function POST(request: Request) {
+  let creditOrder: { orderId: string; auctionId: string; bidId: string } | null = null;
   try {
     const actor = await getPaymentActor();
     if (!actor) {
@@ -200,12 +228,19 @@ export async function POST(request: Request) {
     };
     putIntent(intent);
 
+    creditOrder = {
+      orderId: intent.orderId,
+      auctionId: intent.auctionId,
+      bidId: intent.bidId,
+    };
+
     if (!intent.auctionId || !intent.bidId) {
       console.error('[SponsorAuction] 결제 승인 실패: auctionId/bidId 없음', {
         orderId: parsed.orderId,
         auctionId: intent.auctionId,
         bidId: intent.bidId,
       });
+      await unwindCampaignCredit(creditOrder, '캠페인 정보 없이 결제 승인이 거절되어 크레딧 복구');
       return jsonError(
         400,
         'PAYMENT_IDS_MISSING',
@@ -219,6 +254,7 @@ export async function POST(request: Request) {
         console.error('[SponsorAuction] 결제 승인 실패: 이미 다른 paymentKey로 처리됨', {
           orderId: parsed.orderId,
         });
+        await unwindCampaignCredit(creditOrder, '다른 결제 키로 처리된 주문의 미채택 크레딧 복구');
         return jsonError(
           409,
           'ALREADY_CONFIRMED_OTHER_KEY',
@@ -236,6 +272,7 @@ export async function POST(request: Request) {
           errorCode: replay.errorCode,
           orderId: parsed.orderId,
         });
+        await unwindCampaignCredit(creditOrder, '재승인 중 채택 실패로 크레딧 복구');
         return jsonError(500, replay.errorCode, replay.errorMessage, {
           supabaseError: replay.supabaseError,
         });
@@ -258,6 +295,7 @@ export async function POST(request: Request) {
         orderId: parsed.orderId,
         status: existing.status,
       });
+      await unwindCampaignCredit(creditOrder, '취소되었거나 만료된 결제의 크레딧 복구');
       return jsonError(
         409,
         'INTENT_NOT_PENDING',
@@ -282,6 +320,7 @@ export async function POST(request: Request) {
         });
         updateIntent(intent.orderId, { status: 'failed' });
         await persistPayment(intent, 'failed', parsed.paymentKey, dbConfig);
+        await unwindCampaignCredit(creditOrder, '수수료 금액 불일치로 크레딧 복구');
         return jsonError(
           400,
           'AMOUNT_MISMATCH',
@@ -298,11 +337,44 @@ export async function POST(request: Request) {
       });
       updateIntent(intent.orderId, { status: 'failed' });
       await persistPayment(intent, 'failed', parsed.paymentKey, dbConfig);
+      await unwindCampaignCredit(creditOrder, '주문 금액 불일치로 크레딧 복구');
       return jsonError(
         400,
         'AMOUNT_MISMATCH',
         '결제 금액이 주문 정보와 일치하지 않습니다. 낙찰은 진행되지 않았습니다.',
       );
+    }
+
+    if (isUuid(intent.auctionId) && isUuid(intent.bidId)) {
+      const admin = createAdminClient();
+      if (!admin) {
+        await unwindCampaignCredit(creditOrder, '크레딧 원장을 열지 못해 결제 승인을 취소');
+        return jsonError(
+          503,
+          'CREDIT_LEDGER_UNAVAILABLE',
+          '크레딧 원장을 확인하지 못했습니다. 낙찰은 진행되지 않았습니다.',
+        );
+      }
+      const held = await holdCampaignPayment(admin, {
+        orderId: intent.orderId,
+        auctionId: intent.auctionId,
+        bidId: intent.bidId,
+        actorUserId: actor.userId,
+        actorIsAdmin: hasAuthRole(actor, 'admin'),
+      });
+      if (!held.ok) {
+        const status =
+          held.code === 'INSUFFICIENT_CREDIT' ? 402 : held.code === 'FORBIDDEN' ? 403 : held.code === 'ALREADY_AWARDED' ? 409 : 400;
+        return jsonError(status, held.code, held.message);
+      }
+      if (!held.skipped && held.amount !== parsed.amount) {
+        await unwindCampaignCredit(creditOrder, '승인 금액이 차감 금액과 달라 크레딧 복구');
+        return jsonError(
+          400,
+          'AMOUNT_MISMATCH',
+          '결제 금액이 제안 금액과 수수료에 맞지 않습니다. 낙찰은 진행되지 않았습니다.',
+        );
+      }
     }
 
     const demoAllowed =
@@ -315,6 +387,7 @@ export async function POST(request: Request) {
         console.error('[SponsorAuction] 결제 승인 실패: TOSS_SECRET_KEY 없음', {
           orderId: parsed.orderId,
         });
+        await unwindCampaignCredit(creditOrder, '결제 승인 키 없음으로 크레딧 복구');
         return jsonError(
           502,
           'TOSS_SECRET_KEY_MISSING',
@@ -340,6 +413,7 @@ export async function POST(request: Request) {
           errorCode,
           orderId: parsed.orderId,
         });
+        await unwindCampaignCredit(creditOrder, '토스 승인 실패로 크레딧 복구');
         return jsonError(402, errorCode, errorMessage, {
           httpStatus: toss.httpStatus,
         });
@@ -355,6 +429,7 @@ export async function POST(request: Request) {
         errorCode: finalized.errorCode,
         orderId: parsed.orderId,
       });
+      await unwindCampaignCredit(creditOrder, '채택 저장 실패로 크레딧 복구');
       return jsonError(500, finalized.errorCode, finalized.errorMessage, {
         supabaseError: finalized.supabaseError,
       });
@@ -386,6 +461,7 @@ export async function POST(request: Request) {
     captureException(error, { area: 'payment_confirm' });
     const errorMessage =
       error instanceof Error ? error.message : '결제 승인에 실패했습니다. 낙찰은 진행되지 않았습니다.';
+    await unwindCampaignCredit(creditOrder, '결제 승인 예외로 크레딧 복구');
     return jsonError(500, 'CONFIRM_EXCEPTION', errorMessage);
   }
 }

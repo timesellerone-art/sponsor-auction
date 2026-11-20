@@ -24,7 +24,7 @@ function createSupabaseAdmin(config: PaymentSupabaseConfig) {
   });
 }
 
-/** 결제 승인 이후 경매/입찰 상태만 맞춥니다. 실패해도 결제 승인을 되돌리지 않습니다. */
+/** 결제 승인 이후 경매/입찰 상태를 맞춥니다. 실캠페인 반영에 실패하면 false입니다. */
 export async function applyPaidAuctionStatus(
   auctionId: string,
   bidId: string,
@@ -37,14 +37,14 @@ export async function applyPaidAuctionStatus(
         auctionId,
         bidId,
       });
-      return;
+      return false;
     }
     if (!isUuid(auctionId) || !isUuid(bidId)) {
       console.info('[SponsorAuction] 결제 후 상태 업데이트 생략: mock ID는 UUID 컬럼에 쓰지 않습니다.', {
         auctionId,
         bidId,
       });
-      return;
+      return true;
     }
 
     const supabaseAdmin = createSupabaseAdmin(config);
@@ -56,7 +56,7 @@ export async function applyPaidAuctionStatus(
         hasServiceKey: Boolean(config.serviceKey),
         hasAnonKey: Boolean(config.anonKey),
       });
-      return;
+      return false;
     }
 
     const currentAuction = await supabaseAdmin
@@ -71,7 +71,7 @@ export async function applyPaidAuctionStatus(
         bidId,
         existingWinner,
       });
-      return;
+      return false;
     }
 
     const bidUpdate = await supabaseAdmin
@@ -98,19 +98,27 @@ export async function applyPaidAuctionStatus(
       .from('auctions')
       .update({ status: 'completed', winner_bid_id: bidId })
       .eq('id', auctionId)
-      .or(`winner_bid_id.is.null,winner_bid_id.eq.${bidId}`);
+      .or(`winner_bid_id.is.null,winner_bid_id.eq.${bidId}`)
+      .select('id');
 
-    if (auctionUpdate.error) {
-      console.error('[SponsorAuction] 결제 후 auctions.status=completed 업데이트 실패', {
-        auctionId,
-        bidId,
-        supabaseError: {
-          message: auctionUpdate.error.message,
-          code: auctionUpdate.error.code,
-          details: auctionUpdate.error.details,
-          hint: auctionUpdate.error.hint,
-        },
-      });
+    if (auctionUpdate.error || !auctionUpdate.data?.length) {
+      if (existingWinner === bidId) {
+        console.info('[SponsorAuction] 결제 후 낙찰 상태가 이미 반영되어 있습니다.', { auctionId, bidId });
+      } else {
+        console.error('[SponsorAuction] 결제 후 auctions.status=completed 업데이트 실패', {
+          auctionId,
+          bidId,
+          supabaseError: auctionUpdate.error
+            ? {
+                message: auctionUpdate.error.message,
+                code: auctionUpdate.error.code,
+                details: auctionUpdate.error.details,
+                hint: auctionUpdate.error.hint,
+              }
+            : null,
+        });
+        return false;
+      }
     } else {
       console.info('[SponsorAuction] 결제 후 auctions.status=completed 반영', { auctionId, bidId });
     }
@@ -124,11 +132,13 @@ export async function applyPaidAuctionStatus(
         orderName: payment.orderName,
       });
     }
+    return true;
   } catch (error) {
     console.error('[SponsorAuction] 결제 후 경매/입찰 상태 업데이트 예외', {
       auctionId,
       bidId,
       error,
     });
+    return false;
   }
 }
