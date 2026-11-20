@@ -1,3 +1,4 @@
+import { ACTIVE_ROLE_HEADER, readActiveRoleCookie } from '@/lib/access';
 import { createClient } from '@/lib/supabase/client';
 
 export function readBearerToken(authorization: string | null | undefined) {
@@ -17,6 +18,12 @@ export async function authRequestInit(init: RequestInit = {}): Promise<RequestIn
       }
     } catch {
       // 쿠키 세션만으로도 호출할 수 있습니다.
+    }
+  }
+  if (!headers.has(ACTIVE_ROLE_HEADER)) {
+    const mode = readActiveRoleCookie();
+    if (mode) {
+      headers.set(ACTIVE_ROLE_HEADER, mode);
     }
   }
   if (init.body && !headers.has('Content-Type')) {

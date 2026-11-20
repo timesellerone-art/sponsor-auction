@@ -6,6 +6,7 @@ import {
   isCreditChargeAmount,
   isCreditChargeOrderId,
 } from '../../src/lib/credit-charge-shared';
+import { allowsCreditCharge } from '../../src/types/auth';
 
 describe('credit charge assessment', () => {
   it('충전 금액은 1만, 5만, 10만, 50만, 100만, 500만 원이다', () => {
@@ -14,6 +15,19 @@ describe('credit charge assessment', () => {
     assert.equal(isCreditChargeAmount(1_000_000), true);
     assert.equal(isCreditChargeAmount(5_000_000), true);
     assert.equal(isCreditChargeAmount(5_000_001), false);
+  });
+
+  it('광고주 모드이면 프로필 역할과 관계없이 충전할 수 있다', () => {
+    assert.equal(
+      allowsCreditCharge({ userId: 'user-1', activeRole: 'advertiser', roles: ['creator'] }),
+      true,
+    );
+    assert.equal(
+      allowsCreditCharge({ userId: 'user-1', activeRole: 'creator', roles: ['advertiser'] }),
+      false,
+    );
+    assert.equal(allowsCreditCharge({ userId: 'user-1', roles: ['advertiser'] }), true);
+    assert.equal(allowsCreditCharge({ activeRole: 'advertiser', roles: ['advertiser'] }), false);
   });
 
   it('캠페인 주문과 크레딧 주문을 구분한다', () => {

@@ -53,7 +53,7 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
   const [transactions, setTransactions] = useState<CreditTx[]>([]);
   const [amounts, setAmounts] = useState<number[]>([...CREDIT_CHARGE_AMOUNTS]);
   const [selected, setSelected] = useState<CreditChargeAmount>(CREDIT_CHARGE_AMOUNTS[0]);
-  const { user } = useAuth();
+  const { user, activeRole } = useAuth();
   const [serverCanCharge, setServerCanCharge] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +65,13 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
   const [agreed, setAgreed] = useState(false);
 
   const load = async () => {
-    const response = await fetch('/api/credits/wallet', await authRequestInit({ cache: 'no-store' }));
+    const response = await fetch(
+      '/api/credits/wallet',
+      await authRequestInit({
+        cache: 'no-store',
+        headers: activeRole ? { 'x-clink-active-role': activeRole } : undefined,
+      }),
+    );
     const body = (await response.json().catch(() => null)) as {
       balance?: number;
       transactions?: CreditTx[];
@@ -114,7 +120,7 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [activeRole, user?.id]);
 
   useEffect(() => {
     if (!checkout) {
@@ -170,6 +176,7 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
         '/api/credits/charge/prepare',
         await authRequestInit({
           method: 'POST',
+          headers: activeRole ? { 'x-clink-active-role': activeRole } : undefined,
           body: JSON.stringify({ amount: selected }),
         }),
       );
@@ -274,7 +281,7 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
           </>
         ) : (
           <p className="mt-5 text-sm leading-6 text-zinc-500">
-            1만·5만·10만·50만·100만·500만 원 선불 충전은 광고주 계정에서 할 수 있습니다.
+            1만·5만·10만·50만·100만·500만 원 선불 충전은 광고주 모드에서 할 수 있습니다.
           </p>
         )}
         {error ? (

@@ -8,7 +8,7 @@ import {
   settleCreditCharge,
 } from '@/lib/credit-charge';
 import { getTossClientKey, getTossSecretKey, isTossSecretConfigured } from '@/lib/payments/env';
-import { canPreparePayment, forbiddenJson, getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
+import { canChargeCredit, forbiddenJson, getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
 import { confirmTossPayment, fetchTossPayment } from '@/lib/payments/toss';
 import { mapTossPaymentStatus } from '@/lib/payments/toss-webhook';
 import { productionTossLiveKeyError } from '@/lib/launch-env';
@@ -38,8 +38,8 @@ export async function POST(request: Request) {
     if (!actor?.userId) {
       return unauthorizedJson('크레딧 충전을 승인하려면 로그인해 주세요.');
     }
-    if (!canPreparePayment(actor)) {
-      return forbiddenJson('크레딧 충전은 광고주 계정만 할 수 있습니다.');
+    if (!canChargeCredit(actor)) {
+      return forbiddenJson('크레딧 충전은 광고주 모드에서 할 수 있습니다.');
     }
 
     const liveKeyError = productionTossLiveKeyError(process.env, {

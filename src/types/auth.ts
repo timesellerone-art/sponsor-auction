@@ -121,9 +121,18 @@ export function needsRoleOnboarding(user: SessionUser | null | undefined): boole
   return true;
 }
 
+function hasSessionIdentity(source: unknown) {
+  return Boolean(
+    source &&
+      typeof source === 'object' &&
+      typeof (source as { id?: unknown }).id === 'string' &&
+      (source as { id: string }).id.length > 0,
+  );
+}
+
 export function switchableMemberRoles(source: unknown): MemberRole[] {
   const owned = parseAuthRoles(source).filter(isMemberRole);
-  if (owned.length === 0) {
+  if (owned.length === 0 && !hasSessionIdentity(source)) {
     return [];
   }
   return [...MEMBER_ROLES];
@@ -134,10 +143,28 @@ export function resolveActiveMemberRole(
   preferred?: unknown,
 ): MemberRole | null {
   const ownedRoles = switchableMemberRoles(owned);
-  if (isMemberRole(preferred) && ownedRoles.includes(preferred)) {
+  if (isMemberRole(preferred) && (ownedRoles.length === 0 || ownedRoles.includes(preferred))) {
     return preferred;
   }
   return ownedRoles[0] ?? null;
+}
+
+export function allowsCreditCharge(input: {
+  userId?: string | null;
+  activeRole?: unknown;
+  roles?: unknown;
+}) {
+  if (!input.userId) {
+    return false;
+  }
+  if (input.activeRole === 'advertiser') {
+    return true;
+  }
+  if (input.activeRole === 'creator') {
+    return false;
+  }
+  const roles = parseAuthRoles(input.roles);
+  return roles.includes('advertiser') || roles.includes('admin');
 }
 
 export function canCreateAuction(source: unknown): boolean {

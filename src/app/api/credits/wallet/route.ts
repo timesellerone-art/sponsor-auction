@@ -3,7 +3,7 @@ import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { CREDIT_CHARGE_AMOUNTS } from '@/lib/credit-charge';
 import { getCreditBalance, listCreditTransactions, summarizeCreditTransactions } from '@/lib/credits';
-import { canPreparePayment, getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
+import { canChargeCredit, getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
 import { clientIp, consumeRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
         balance: balance ?? 0,
         transactions,
         amounts: CREDIT_CHARGE_AMOUNTS,
-        canCharge: canPreparePayment(actor),
+        canCharge: canChargeCredit(actor),
       },
       { headers: NO_STORE },
     );

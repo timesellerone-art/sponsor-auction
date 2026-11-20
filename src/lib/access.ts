@@ -8,6 +8,7 @@ import { authCookieDomain, clientCookieSuffix } from '@/lib/site-origin';
 
 export const ROLE_COOKIE_NAME = 'sponsor-auction-role';
 export const ACTIVE_ROLE_COOKIE_NAME = 'sponsor-auction-active-role';
+export const ACTIVE_ROLE_HEADER = 'x-clink-active-role';
 export const AUTH_PRESENT_COOKIE_NAME = 'sponsor-auction-auth';
 
 export const ACCESS_REASON = {
@@ -109,9 +110,6 @@ export function syncRoleCookie(role: string | null | undefined, roles?: unknown)
   const value = roleCookieValue(roles, role);
   const maxAge = value ? AUTH_COOKIE_MAX_AGE : 0;
   document.cookie = `${ROLE_COOKIE_NAME}=${value}; Max-Age=${maxAge}${clientCookieSuffix()}`;
-  if (!value) {
-    syncActiveRoleCookie(null);
-  }
 }
 
 export function syncAuthPresentCookie(present: boolean) {

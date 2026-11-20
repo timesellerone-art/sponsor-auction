@@ -3,7 +3,7 @@
 import { Suspense, useEffect, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
-import { syncActiveRoleCookie, syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
+import { readActiveRoleCookie, syncActiveRoleCookie, syncAuthPresentCookie, syncRoleCookie } from '@/lib/access';
 import { POST_AUTH_HOME } from '@/lib/auth-guard';
 import { isAuthLoggingOut } from '@/lib/auth-logout';
 import { resolveActiveMemberRole } from '@/types/auth';
@@ -21,7 +21,9 @@ function RoleRouteEffects() {
     if (user) {
       syncRoleCookie(user.role, user.roles);
       syncAuthPresentCookie(true);
-      syncActiveRoleCookie(resolveActiveMemberRole(user, user.currentMode));
+      syncActiveRoleCookie(
+        resolveActiveMemberRole(user, readActiveRoleCookie() ?? user.currentMode),
+      );
     }
 
     if (pathname.startsWith('/onboarding') || pathname === '/select-role') {

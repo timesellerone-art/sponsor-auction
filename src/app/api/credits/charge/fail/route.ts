@@ -2,7 +2,7 @@ import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { isCreditChargeOrderId, loadCreditChargeOrder, settleCreditCharge } from '@/lib/credit-charge';
-import { canPreparePayment, forbiddenJson, getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
+import { canChargeCredit, forbiddenJson, getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
 import { clientIp, consumeRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -21,8 +21,8 @@ export async function POST(request: Request) {
     if (!actor?.userId) {
       return unauthorizedJson('로그인해 주세요.');
     }
-    if (!canPreparePayment(actor)) {
-      return forbiddenJson('크레딧 충전은 광고주 계정만 할 수 있습니다.');
+    if (!canChargeCredit(actor)) {
+      return forbiddenJson('크레딧 충전은 광고주 모드에서 할 수 있습니다.');
     }
 
     const limited = consumeRateLimit(clientIp(request), '/api/credits/charge/fail');

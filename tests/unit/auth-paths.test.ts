@@ -92,6 +92,19 @@ describe('post-auth destination', () => {
     ]);
   });
 
+  it('로그인한 회원은 저장된 역할과 별도로 광고주 모드를 유지한다', () => {
+    assert.deepEqual(switchableMemberRoles({ id: 'user-1', roles: [] }), [
+      'advertiser',
+      'creator',
+    ]);
+    assert.equal(
+      resolveActiveMemberRole({ id: 'user-1', roles: ['creator'] }, 'advertiser'),
+      'advertiser',
+    );
+    assert.equal(resolveActiveMemberRole({ id: 'user-1', roles: [] }, 'advertiser'), 'advertiser');
+    assert.equal(resolveActiveMemberRole({ id: 'user-1', roles: [] }), 'advertiser');
+  });
+
   it('Supabase 세션 쿠키 옵션을 그대로 보존해 응답에 기록한다', () => {
     assert.equal(isSupabaseAuthCookieName('sb-access-token'), true);
     assert.equal(isSupabaseAuthCookieName('sb-xxxx-auth-token'), true);
