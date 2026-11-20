@@ -612,6 +612,20 @@ export type Database = {
           type: 'HOLD';
         };
       };
+      restore_user_credit: {
+        Args: {
+          p_user_id: string;
+          p_amount: number;
+          p_type: 'RELEASE' | 'REFUND';
+          p_reference_id?: string | null;
+          p_description?: string | null;
+        };
+        Returns: {
+          balance_after: number;
+          transaction_id: string;
+          type: 'RELEASE' | 'REFUND';
+        };
+      };
     };
     Enums: {
       platform_type:

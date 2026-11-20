@@ -1,8 +1,4 @@
-import {
-  creatorPlatformFeeAmount,
-  creatorPayoutAmount,
-  bidAmountFromCreatorPayout,
-} from '@/lib/fee-policy';
+import { creatorPlatformFeeAmount, creatorPayoutAmount } from '@/lib/fee-policy';
 
 export function creatorCombinedFeeAmount(bidAmount: number) {
   return creatorPlatformFeeAmount(bidAmount);
@@ -11,5 +7,3 @@ export function creatorCombinedFeeAmount(bidAmount: number) {
 export function calculateCreatorPayout(bidAmount: number) {
   return creatorPayoutAmount(bidAmount);
 }
-
-export { bidAmountFromCreatorPayout };
