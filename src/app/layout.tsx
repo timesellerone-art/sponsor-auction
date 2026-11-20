@@ -30,7 +30,6 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="ko" className={`${geistMono.variable} h-full w-full antialiased`}>
       <head>
-        <SupabasePublicBootstrap />
         <link rel="preconnect" href="https://cdn.jsdelivr.net" />
         <link
           rel="stylesheet"
@@ -38,6 +37,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         />
       </head>
       <body className="flex min-h-full w-full min-w-0 flex-col overflow-x-clip bg-background font-sans text-foreground">
+        <SupabasePublicBootstrap />
         <AuthProvider>
           <RoleIntentProvider>
             <RealtimeNotifications />
