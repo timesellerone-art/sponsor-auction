@@ -7,7 +7,9 @@ import { getTossClientKey, getTossSecretKey, isTossClientConfigured } from '@/li
 import { canChargeCredit, forbiddenJson, getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
 import { sanitizeCustomerKey } from '@/lib/payments/intent';
 import { clientIp, consumeRateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import { businessActionBlock } from '@/lib/business-registration';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isSchemaMismatch } from '@/lib/supabase/errors';
 
 
 const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate' } as const;
@@ -63,6 +65,26 @@ export async function POST(request: Request) {
     if (!admin) {
       return NextResponse.json(
         { error: '충전 주문을 만들지 못했습니다.', errorCode: 'ADMIN_UNAVAILABLE' },
+        { status: 503, headers: NO_STORE },
+      );
+    }
+
+    const business = await admin
+      .from('profiles')
+      .select('business_verification_status')
+      .eq('id', actor.userId)
+      .maybeSingle();
+    if (!business.error) {
+      const blocked = businessActionBlock(business.data?.business_verification_status, 'charge');
+      if (blocked) {
+        return NextResponse.json(
+          { error: blocked, errorCode: 'BUSINESS_BLOCKED' },
+          { status: 403, headers: NO_STORE },
+        );
+      }
+    } else if (!isSchemaMismatch(business.error)) {
+      return NextResponse.json(
+        { error: '사업자 상태를 확인하지 못했습니다.', errorCode: 'BUSINESS_LOOKUP_FAILED' },
         { status: 503, headers: NO_STORE },
       );
     }

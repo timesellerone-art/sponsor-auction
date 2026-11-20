@@ -2,7 +2,14 @@ export type ProfileRole = 'advertiser' | 'creator' | 'admin';
 
 export type ProfileStatus = 'active' | 'suspended';
 
-export type PayoutStatus = 'pending' | 'paid' | 'cancelled';
+export type PayoutStatus = 'pending' | 'paid' | 'cancelled' | 'hold';
+
+export type BusinessVerificationStatus =
+  | 'unregistered'
+  | 'verified'
+  | 'closed'
+  | 'review_required'
+  | 'rejected';
 
 export interface ProfileItem {
   id: string;
@@ -16,6 +23,10 @@ export interface ProfileItem {
   completionRate?: number;
   penaltyCount?: number;
   youtubeVerified?: boolean;
+  businessRegistrationNumber?: string;
+  businessVerificationStatus?: BusinessVerificationStatus;
+  businessStatusDetail?: string;
+  businessReviewNote?: string;
 }
 
 export interface PayoutItem {
@@ -53,6 +64,6 @@ export type AuctionAdminFilter = 'all' | 'active' | 'awarded' | 'ended';
 
 export type ProfileAdminFilter = 'all' | 'active' | 'suspended';
 
-export type PayoutAdminFilter = 'all' | 'pending' | 'paid' | 'cancelled';
+export type PayoutAdminFilter = 'all' | 'pending' | 'paid' | 'cancelled' | 'hold';
 
 export type BidAdminFilter = 'all' | 'pending' | 'awarded' | 'paid' | 'rejected';

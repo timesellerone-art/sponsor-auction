@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
+import { BusinessStatusNotice } from '@/components/BusinessStatusNotice';
 import { authRequestInit } from '@/lib/auth-request';
 import {
   CREDIT_CHARGE_AMOUNTS,
@@ -63,6 +64,7 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [agreed, setAgreed] = useState(false);
+  const [businessBlocked, setBusinessBlocked] = useState(false);
 
   const load = async () => {
     const response = await fetch(
@@ -169,6 +171,10 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
   }, [checkout]);
 
   const startCharge = async () => {
+    if (businessBlocked) {
+      setError('사업자 상태를 확인한 뒤 충전해 주세요.');
+      return;
+    }
     setPreparing(true);
     setError(null);
     try {
@@ -253,6 +259,9 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
         </p>
         {showCharge ? (
           <>
+            <div className="mt-4">
+              <BusinessStatusNotice intent="charge" onChange={setBusinessBlocked} />
+            </div>
             <div className="mt-5 grid grid-cols-2 gap-2">
               {amounts.map((amount) => (
                 <button
@@ -273,7 +282,7 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
             <button
               type="button"
               className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
-              disabled={preparing || loading}
+              disabled={preparing || loading || businessBlocked}
               onClick={() => void startCharge()}
             >
               {preparing ? '주문 생성 중' : `${formatWon(selected)} 충전하기`}

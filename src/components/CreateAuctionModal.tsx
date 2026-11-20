@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { createPortal } from 'react-dom';
 import { Loader2, X } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
+import { BusinessStatusNotice } from '@/components/BusinessStatusNotice';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
@@ -56,6 +57,7 @@ export function CreateAuctionModal({
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [businessBlocked, setBusinessBlocked] = useState(false);
   const { isBusy: isSubmitting, run } = useActionLock();
 
   useEffect(() => {
@@ -101,6 +103,10 @@ export function CreateAuctionModal({
     await run('create-auction', async () => {
       if (!requireAdvertiser('advertiser-auth', '/')) {
         onClose();
+        return;
+      }
+      if (businessBlocked) {
+        setSubmitError('사업자 상태를 확인한 뒤 캠페인을 등록해 주세요.');
         return;
       }
 
@@ -204,6 +210,7 @@ export function CreateAuctionModal({
           noValidate
         >
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
+            <BusinessStatusNotice intent="campaign" onChange={setBusinessBlocked} />
             <Field
               label="제목"
               htmlFor="auction-title"
@@ -351,7 +358,7 @@ export function CreateAuctionModal({
           <div className="shrink-0 border-t border-zinc-200 bg-white px-4 py-3 sm:px-5">
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || businessBlocked}
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? (

@@ -17,6 +17,7 @@ import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { notifyLifecycleEvent } from '@/lib/notification';
 import { type SponsorAuctionClient } from '@/lib/supabase';
 import { getDataClient } from '@/lib/supabase/data-client';
+import { businessActionBlock } from '@/lib/business-registration';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { isInvalidUuidError, isUuid, uuidIds } from '@/lib/uuid';
 import {
@@ -382,6 +383,19 @@ export async function createAuction(
 
   try {
     const authorId = await resolveAuthUserId(supabase, input.authorId);
+    if (authorId && isUuid(authorId)) {
+      const business = await supabase
+        .from('profiles')
+        .select('business_verification_status')
+        .eq('id', authorId)
+        .maybeSingle();
+      if (!business.error) {
+        const blocked = businessActionBlock(business.data?.business_verification_status, 'campaign');
+        if (blocked) {
+          return fail(null, blocked);
+        }
+      }
+    }
     const imageUrl = input.imageUrl?.trim() || null;
     const category = isCampaignCategoryId(input.category) ? input.category : null;
     const description = input.description.trim();

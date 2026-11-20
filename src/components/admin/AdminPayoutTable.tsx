@@ -31,6 +31,7 @@ const STATUS_LABEL: Record<PayoutStatus, string> = {
   pending: '지급 대기',
   paid: '지급 완료',
   cancelled: '취소/무효',
+  hold: '보류',
 };
 
 const STATUS_FILTERS: { id: PayoutAdminFilter; label: string }[] = [
@@ -38,6 +39,7 @@ const STATUS_FILTERS: { id: PayoutAdminFilter; label: string }[] = [
   { id: 'pending', label: '지급 대기' },
   { id: 'paid', label: '지급 완료' },
   { id: 'cancelled', label: '취소/무효' },
+  { id: 'hold', label: '보류' },
 ];
 
 const PERIODS: { id: PayoutPeriodFilter; label: string }[] = [
@@ -57,6 +59,7 @@ type AdminPayoutTableProps = {
   ) => void | Promise<void | PayoutItem | null>;
   onSaveMemo?: (payout: PayoutItem, memo: string) => Promise<PayoutItem | null>;
   onRefresh?: () => void | Promise<void>;
+  onHold?: (payout: PayoutItem, hold: boolean) => void | Promise<void>;
 };
 
 export function AdminPayoutTable({
@@ -65,6 +68,7 @@ export function AdminPayoutTable({
   onApprove,
   onSaveMemo,
   onRefresh,
+  onHold,
 }: AdminPayoutTableProps) {
   const router = useRouter();
   const [period, setPeriod] = useState<PayoutPeriodFilter>('all');
@@ -382,6 +386,7 @@ export function AdminPayoutTable({
                 {filtered.map((payout) => {
                   const row = enrichPayout(payout);
                   const pending = row.status === 'pending';
+                  const held = row.status === 'hold';
                   const cancelled = row.status === 'cancelled';
                   const busy = busyId === payout.id || busyId === 'bulk';
                   const anyBusy = Boolean(busyId);
@@ -476,6 +481,8 @@ export function AdminPayoutTable({
                           className={
                             cancelled
                               ? 'inline-block max-w-full truncate rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600'
+                              : held
+                                ? 'inline-block max-w-full truncate rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700'
                               : pending
                                 ? 'inline-block max-w-full truncate rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800'
                                 : 'inline-block max-w-full truncate rounded-full bg-clink-peach px-2 py-0.5 text-xs font-semibold text-clink-accent'
@@ -497,6 +504,25 @@ export function AdminPayoutTable({
                             >
                               {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
                               {busy ? '처리 중...' : '지급 처리'}
+                            </button>
+                          ) : null}
+                          {pending ? (
+                            <button
+                              type="button"
+                              disabled={anyBusy}
+                              onClick={() => void onHold?.(payout, true)}
+                              className="inline-flex w-full min-w-0 items-center justify-center rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                            >
+                              보류
+                            </button>
+                          ) : held ? (
+                            <button
+                              type="button"
+                              disabled={anyBusy}
+                              onClick={() => void onHold?.(payout, false)}
+                              className="inline-flex w-full min-w-0 items-center justify-center rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                            >
+                              보류 해제
                             </button>
                           ) : cancelled ? (
                             <span className="text-xs font-semibold text-zinc-400">지급 불가</span>

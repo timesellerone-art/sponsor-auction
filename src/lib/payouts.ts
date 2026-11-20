@@ -42,7 +42,7 @@ type PaymentSeed = {
 };
 
 function isPayoutStatus(value: string): value is PayoutStatus {
-  return value === 'pending' || value === 'paid';
+  return value === 'pending' || value === 'paid' || value === 'hold';
 }
 
 function isEphemeralPayoutId(value: string) {
@@ -995,12 +995,66 @@ async function persistPaidPayout(
   };
 }
 
+export async function setPayoutHold(
+  client: SponsorAuctionClient,
+  input: { id: string; hold: boolean },
+): Promise<{ ok: true; data: PayoutItem } | { ok: false; message: string }> {
+  const id = input.id.trim();
+  if (!id) {
+    return { ok: false, message: '정산 ID가 필요합니다.' };
+  }
+  const current = await client.from('payouts').select('id, status').eq('id', id).maybeSingle();
+  if (current.error) {
+    if (isSchemaMismatch(current.error) || /payout_status|invalid input value/i.test(current.error.message)) {
+      return { ok: false, message: '정산 보류 상태가 데이터베이스에 없습니다. 마이그레이션을 적용해 주세요.' };
+    }
+    return { ok: false, message: '정산 상태를 확인하지 못했습니다.' };
+  }
+  if (!current.data) {
+    return { ok: false, message: '정산 행을 찾지 못했습니다.' };
+  }
+  const status = String(current.data.status);
+  if (status === 'paid' || status === 'cancelled') {
+    return { ok: false, message: '지급 완료이거나 취소된 정산은 보류할 수 없습니다.' };
+  }
+  const next = input.hold ? 'hold' : 'pending';
+  if (input.hold && status !== 'pending' && status !== 'hold') {
+    return { ok: false, message: '지급 대기 건만 보류할 수 있습니다.' };
+  }
+  if (!input.hold && status !== 'hold') {
+    return { ok: false, message: '보류 중인 정산만 해제할 수 있습니다.' };
+  }
+  const updated = await client
+    .from('payouts')
+    .update({ status: next })
+    .eq('id', id)
+    .select(PAYOUT_COLUMNS_BANK)
+    .maybeSingle();
+  if (updated.error) {
+    if (isSchemaMismatch(updated.error) || /payout_status|invalid input value/i.test(updated.error.message)) {
+      return { ok: false, message: '정산 보류 상태가 데이터베이스에 없습니다. 마이그레이션을 적용해 주세요.' };
+    }
+    return { ok: false, message: '정산 보류를 저장하지 못했습니다.' };
+  }
+  const mapped = updated.data ? mapPayout(updated.data) : null;
+  if (!mapped) {
+    return { ok: false, message: '정산 보류 결과를 읽지 못했습니다.' };
+  }
+  return { ok: true, data: mapped };
+}
+
 export async function markPayoutPaid(
   client: SponsorAuctionClient,
   input: MarkPayoutPaidInput,
 ): Promise<{ ok: true; data: PayoutItem } | { ok: false; message: string }> {
   const paidAt = new Date().toISOString();
   const rawId = (input.id || '').trim();
+  if (isUuid(rawId)) {
+    const existing = await client.from('payouts').select('status').eq('id', rawId).maybeSingle();
+    if (existing.data?.status === 'hold') {
+      return { ok: false, message: '보류 중인 정산은 지급할 수 없습니다. 보류를 해제한 뒤 지급해 주세요.' };
+    }
+  }
   let orderId = (input.paymentOrderId || '').trim();
   let auctionId = (input.auctionId || '').trim();
   let bidId = (input.bidId || '').trim();

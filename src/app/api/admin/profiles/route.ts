@@ -9,6 +9,10 @@ import {
 import { createAdminClient } from '@/lib/supabase/admin';
 import { listAndBackfillProfiles } from '@/lib/supabase/profile-sync';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
+import {
+  formatBusinessNumber,
+  isBusinessVerificationStatus,
+} from '@/lib/business-registration';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -37,6 +41,27 @@ export async function GET() {
     }
 
     const { profiles, error } = await listAndBackfillProfiles(client);
+    const business = await client
+      .from('profiles')
+      .select(
+        'id, business_registration_number, business_verification_status, business_status_detail, business_review_note',
+      );
+    const businessById = new Map(
+      (business.error ? [] : business.data ?? []).map((row) => [row.id, row]),
+    );
+    const withBusiness = profiles.map((profile) => {
+      const extra = businessById.get(profile.id);
+      const status = isBusinessVerificationStatus(extra?.business_verification_status ?? '')
+        ? extra?.business_verification_status
+        : 'unregistered';
+      return {
+        ...profile,
+        businessRegistrationNumber: formatBusinessNumber(extra?.business_registration_number ?? ''),
+        businessVerificationStatus: status,
+        businessStatusDetail: extra?.business_status_detail ?? '',
+        businessReviewNote: extra?.business_review_note ?? '',
+      };
+    });
     if (error && isSchemaMismatch({ message: error })) {
       return NextResponse.json({ fallbackMock: true }, { status: 409, headers: NO_STORE });
     }
@@ -48,7 +73,7 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json({ data: profiles }, { headers: NO_STORE });
+    return NextResponse.json({ data: withBusiness }, { headers: NO_STORE });
   } catch (error) {
     rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 관리자 회원 목록 API 예외', error);

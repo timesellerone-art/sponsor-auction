@@ -276,6 +276,16 @@ export type Database = {
           status: 'active' | 'suspended';
           credit_balance: number;
           created_at: string;
+          business_registration_number: string;
+          business_verification_status:
+            | 'unregistered'
+            | 'verified'
+            | 'closed'
+            | 'review_required'
+            | 'rejected';
+          business_status_detail: string;
+          business_review_note: string;
+          business_checked_at: string | null;
         };
         Insert: {
           id?: string;
@@ -287,6 +297,16 @@ export type Database = {
           status?: 'active' | 'suspended';
           credit_balance?: number;
           created_at?: string;
+          business_registration_number?: string;
+          business_verification_status?:
+            | 'unregistered'
+            | 'verified'
+            | 'closed'
+            | 'review_required'
+            | 'rejected';
+          business_status_detail?: string;
+          business_review_note?: string;
+          business_checked_at?: string | null;
         };
         Update: {
           name?: string;
@@ -296,6 +316,16 @@ export type Database = {
           roles?: Array<'advertiser' | 'creator' | 'admin'>;
           status?: 'active' | 'suspended';
           credit_balance?: number;
+          business_registration_number?: string;
+          business_verification_status?:
+            | 'unregistered'
+            | 'verified'
+            | 'closed'
+            | 'review_required'
+            | 'rejected';
+          business_status_detail?: string;
+          business_review_note?: string;
+          business_checked_at?: string | null;
         };
         Relationships: [];
       };
@@ -387,7 +417,7 @@ export type Database = {
           creator_name: string;
           creator_email: string;
           amount: number;
-          status: 'pending' | 'paid';
+          status: 'pending' | 'paid' | 'hold';
           auction_title: string;
           requested_at: string;
           paid_at: string | null;
@@ -407,7 +437,7 @@ export type Database = {
           creator_name: string;
           creator_email?: string;
           amount: number;
-          status?: 'pending' | 'paid';
+          status?: 'pending' | 'paid' | 'hold';
           auction_title?: string;
           requested_at?: string;
           paid_at?: string | null;
@@ -426,7 +456,7 @@ export type Database = {
           creator_name?: string;
           creator_email?: string;
           amount?: number;
-          status?: 'pending' | 'paid';
+          status?: 'pending' | 'paid' | 'hold';
           auction_title?: string;
           requested_at?: string;
           paid_at?: string | null;
@@ -689,7 +719,7 @@ export type Database = {
       bid_status: 'pending' | 'selected';
       profile_role: 'advertiser' | 'creator' | 'admin';
       profile_status: 'active' | 'suspended';
-      payout_status: 'pending' | 'paid';
+      payout_status: 'pending' | 'paid' | 'hold';
       payment_status: 'pending' | 'confirmed' | 'failed' | 'expired';
     };
     CompositeTypes: Record<string, never>;

@@ -6,6 +6,7 @@ import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
 import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
 import { formatAdminTimestamp } from '@/lib/utils';
+import { businessVerificationLabel } from '@/lib/business-registration';
 import type { ProfileAdminFilter, ProfileItem, ProfileStatus } from '@/types/admin';
 import { isAdmin, memberPrimaryRoleLabel } from '@/types/auth';
 
@@ -24,12 +25,14 @@ type AdminUserTableProps = {
   profiles: ProfileItem[];
   busyId: string | null;
   onToggleStatus: (profile: ProfileItem) => void;
+  onReviewBusiness?: (profile: ProfileItem, decision: 'approve' | 'reject') => void;
 };
 
 export function AdminUserTable({
   profiles,
   busyId,
   onToggleStatus,
+  onReviewBusiness,
 }: AdminUserTableProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ProfileAdminFilter>('all');
@@ -144,6 +147,35 @@ export function AdminUserTable({
                       >
                         {profile.email || '이메일 없음'}
                       </p>
+                      <p className="mt-1 text-[11px] text-zinc-500">
+                        사업자 {businessVerificationLabel(profile.businessVerificationStatus ?? 'unregistered')}
+                        {profile.businessRegistrationNumber
+                          ? ` · ${profile.businessRegistrationNumber}`
+                          : ''}
+                      </p>
+                      {profile.businessRegistrationNumber &&
+                      profile.businessVerificationStatus &&
+                      profile.businessVerificationStatus !== 'unregistered' &&
+                      profile.businessVerificationStatus !== 'closed' ? (
+                        <div className="mt-1 flex gap-1">
+                          <button
+                            type="button"
+                            disabled={anyBusy || profile.businessVerificationStatus === 'verified'}
+                            onClick={() => onReviewBusiness?.(profile, 'approve')}
+                            className="rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 disabled:opacity-40"
+                          >
+                            승인
+                          </button>
+                          <button
+                            type="button"
+                            disabled={anyBusy || profile.businessVerificationStatus === 'rejected'}
+                            onClick={() => onReviewBusiness?.(profile, 'reject')}
+                            className="rounded-md border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 disabled:opacity-40"
+                          >
+                            반려
+                          </button>
+                        </div>
+                      ) : null}
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
                       <span className="inline-flex max-w-full truncate rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700">

@@ -1,6 +1,7 @@
 'use client';
 
 import { AccessGuard } from '@/components/AccessGuard';
+import { BusinessRegistrationForm } from '@/components/BusinessRegistrationForm';
 import { LinkedAccountsPanel } from '@/components/LinkedAccountsPanel';
 import { MyWorkspaceNav } from '@/components/MyWorkspaceNav';
 import { PageContainer } from '@/components/PageContainer';
@@ -16,6 +17,7 @@ export default function AccountSettingsPage() {
           연동된 소셜 계정과 휴대전화를 관리할 수 있습니다.
         </p>
         <LinkedAccountsPanel />
+        <BusinessRegistrationForm />
       </PageContainer>
     </AccessGuard>
   );

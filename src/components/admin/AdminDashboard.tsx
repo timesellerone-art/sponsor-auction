@@ -9,6 +9,7 @@ import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AccessGuard } from '@/components/AccessGuard';
 import { AdminPayoutTable } from '@/components/admin/AdminPayoutTable';
 import { AdminStats } from '@/components/admin/AdminStats';
+import { AdminCreditLedger } from '@/components/admin/AdminCreditLedger';
 import { AdminUserTable } from '@/components/admin/AdminUserTable';
 import { showToast } from '@/components/Toast';
 import { authRequestInit } from '@/lib/auth-request';
@@ -38,7 +39,7 @@ import { isAdmin, isAdvertiser, isCreator } from '@/types/auth';
 import type { AuctionItem, BidItem } from '@/types/auction';
 import type { ComplianceLog } from '@/types/compliance';
 
-type TabId = 'auctions' | 'users' | 'payouts' | 'bids' | 'compliance';
+type TabId = 'auctions' | 'users' | 'payouts' | 'bids' | 'compliance' | 'credits';
 
 function asAuctionList(value: unknown): AuctionItem[] {
   if (!Array.isArray(value)) {
@@ -487,6 +488,72 @@ export function AdminDashboard({
     return paidItem;
   };
 
+  const handleHoldPayout = async (payout: PayoutItem, hold: boolean) => {
+    await run(payout.id, async () => {
+      try {
+        const response = await fetch(
+          '/api/admin/payouts/hold',
+          await authRequestInit({
+            method: 'POST',
+            body: JSON.stringify({ id: payout.id, hold }),
+          }),
+        );
+        const body = (await response.json().catch(() => null)) as {
+          data?: PayoutItem;
+          error?: string;
+          fallbackMock?: boolean;
+        } | null;
+        if (!response.ok || !body?.data) {
+          showToast(body?.error || '정산 보류를 저장하지 못했습니다.');
+          return;
+        }
+        setPayouts((prev) =>
+          prev.map((item) => (item.id === payout.id ? { ...item, ...body.data, id: item.id } : item)),
+        );
+        showToast(hold ? '정산을 보류했습니다.' : '정산 보류를 해제했습니다.', 'success');
+      } catch {
+        showToast('정산 보류를 저장하지 못했습니다.');
+      }
+    });
+  };
+
+  const handleReviewBusiness = async (
+    profile: ProfileItem,
+    decision: 'approve' | 'reject',
+  ) => {
+    await run(profile.id, async () => {
+      try {
+        const response = await fetch(
+          '/api/admin/business/review',
+          await authRequestInit({
+            method: 'POST',
+            body: JSON.stringify({ userId: profile.id, decision }),
+          }),
+        );
+        const body = (await response.json().catch(() => null)) as {
+          data?: Pick<
+            ProfileItem,
+            | 'businessRegistrationNumber'
+            | 'businessVerificationStatus'
+            | 'businessStatusDetail'
+            | 'businessReviewNote'
+          >;
+          error?: string;
+        } | null;
+        if (!response.ok || !body?.data) {
+          showToast(body?.error || '사업자 검수를 저장하지 못했습니다.');
+          return;
+        }
+        setProfiles((prev) =>
+          prev.map((item) => (item.id === profile.id ? { ...item, ...body.data } : item)),
+        );
+        showToast(decision === 'approve' ? '사업자를 승인했습니다.' : '사업자를 반려했습니다.', 'success');
+      } catch {
+        showToast('사업자 검수를 저장하지 못했습니다.');
+      }
+    });
+  };
+
   const handleSavePayoutMemo = async (payout: PayoutItem, memo: string) => {
     try {
       const result = await savePayoutMemo(payout, memo);
@@ -515,6 +582,7 @@ export function AdminDashboard({
     { id: 'payouts', label: '정산 관리' },
     { id: 'bids', label: '제안 관리' },
     { id: 'compliance', label: '우회 모니터링' },
+    { id: 'credits', label: '크레딧 원장' },
   ];
 
   return (
@@ -590,6 +658,7 @@ export function AdminDashboard({
               profiles={asProfileList(profiles)}
               busyId={busyId}
               onToggleStatus={handleToggleProfileStatus}
+              onReviewBusiness={handleReviewBusiness}
             />
           )
         ) : tab === 'payouts' ? (
@@ -602,8 +671,11 @@ export function AdminDashboard({
               onApprove={handleApprovePayout}
               onSaveMemo={handleSavePayoutMemo}
               onRefresh={() => fetchPayouts()}
+              onHold={handleHoldPayout}
             />
           )
+        ) : tab === 'credits' ? (
+          <AdminCreditLedger />
         ) : tab === 'compliance' ? (
           complianceLogs.length === 0 ? (
             <AdminEmptyState message="감지된 우회 키워드 기록이 없습니다." />
