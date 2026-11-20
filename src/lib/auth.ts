@@ -158,10 +158,11 @@ function mapSessionUser(
   roles?: unknown,
   phone?: string | null,
 ): SessionUser {
-  const parsed = parseAuthRoles(roles, role);
-  const modeRaw = authUser?.user_metadata?.current_mode;
-  const metaPhone =
-    typeof authUser?.user_metadata?.phone === 'string' ? authUser.user_metadata.phone.trim() : '';
+  const meta = authUser?.user_metadata ?? {};
+  const explicit = parseAuthRoles(roles, role);
+  const parsed = explicit.length > 0 ? explicit : parseAuthRoles(meta.roles, meta.role);
+  const modeRaw = meta.current_mode;
+  const metaPhone = typeof meta.phone === 'string' ? meta.phone.trim() : '';
   return {
     id,
     email,
@@ -171,7 +172,7 @@ function mapSessionUser(
     roles: parsed,
     createdAt: authUser?.created_at,
     lastSignInAt: authUser?.last_sign_in_at,
-    onboardingComplete: authUser?.user_metadata?.onboarding_complete === true,
+    onboardingComplete: meta.onboarding_complete === true,
     currentMode: isMemberRole(modeRaw) ? modeRaw : null,
   };
 }

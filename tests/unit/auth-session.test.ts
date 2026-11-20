@@ -35,4 +35,22 @@ describe('sessionUserFromAuthUser', () => {
     assert.deepEqual(session.roles, ['advertiser']);
     assert.equal(needsRoleOnboarding(session), false);
   });
+
+  it('프로필 행이 비어도 메타데이터의 광고주 역할을 유지한다', () => {
+    const session = sessionUserWithProfileRoles(
+      {
+        id: '11111111-1111-1111-1111-111111111111',
+        email: 'owner@example.com',
+        user_metadata: {
+          roles: ['advertiser'],
+          role: 'advertiser',
+          current_mode: 'advertiser',
+        },
+      },
+      null,
+    );
+    assert.equal(session.role, 'advertiser');
+    assert.deepEqual(session.roles, ['advertiser']);
+    assert.equal(session.currentMode, 'advertiser');
+  });
 });

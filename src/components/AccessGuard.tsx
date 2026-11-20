@@ -8,7 +8,7 @@ import { ACCESS_REASON, syncRoleCookie } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
 import { isAuthLoggingOut } from '@/lib/auth-logout';
 import { useSafetyTimeout } from '@/lib/auth-timeout';
-import { hasAuthRole, type AuthProfileRole } from '@/types/auth';
+import { hasAuthRole, parseAuthRoles, type AuthProfileRole } from '@/types/auth';
 
 type AccessRole = 'admin' | 'advertiser' | 'creator' | 'signed-in';
 
@@ -21,9 +21,25 @@ function allowedRoles(allow: AccessRole | readonly AccessRole[]) {
   return Array.isArray(allow) ? [...allow] : [allow];
 }
 
+function denialReason(
+  allowed: AccessRole[],
+  activeRole: 'advertiser' | 'creator' | null,
+): 'admin-forbidden' | 'advertiser-forbidden' | 'creator-forbidden' {
+  if (allowed.includes('admin') && allowed.length === 1) {
+    return 'admin-forbidden';
+  }
+  if (activeRole === 'advertiser' || (allowed.includes('advertiser') && !allowed.includes('creator'))) {
+    return 'advertiser-forbidden';
+  }
+  if (activeRole === 'creator' || (allowed.includes('creator') && !allowed.includes('advertiser'))) {
+    return 'creator-forbidden';
+  }
+  return 'advertiser-forbidden';
+}
+
 export function AccessGuard({ allow, children }: AccessGuardProps) {
   const router = useRouter();
-  const { user, ready, profileReady } = useAuth();
+  const { user, ready, profileReady, activeRole } = useAuth();
   const timedOut = useSafetyTimeout();
   const roles = allowedRoles(allow);
   const roleRestricted = !roles.includes('signed-in');
@@ -33,6 +49,7 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
     settled &&
       user &&
       (roles.includes('signed-in') ||
+        (activeRole !== null && roles.includes(activeRole)) ||
         roles.some((role) => role !== 'signed-in' && hasAuthRole(user, role as AuthProfileRole))),
   );
 
@@ -40,14 +57,12 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
     if (isAuthLoggingOut()) {
       return;
     }
+    if (settled && parseAuthRoles(user?.roles, user?.role).length > 0) {
+      syncRoleCookie(user?.role, user?.roles);
+    }
     if (!settled || hasAccess) {
-      if (settled) {
-        syncRoleCookie(user?.role, user?.roles);
-      }
       return;
     }
-
-    syncRoleCookie(user?.role, user?.roles);
     const allowed = allowKey.split('|') as AccessRole[];
     const wantsAdmin = allowed.includes('admin') && allowed.length === 1;
     if (!user) {
@@ -58,16 +73,10 @@ export function AccessGuard({ allow, children }: AccessGuardProps) {
       return;
     }
 
-    const forbidden = wantsAdmin
-      ? ACCESS_REASON['admin-forbidden']
-      : allowed.includes('advertiser') && !allowed.includes('creator')
-        ? ACCESS_REASON['advertiser-forbidden']
-        : ACCESS_REASON['creator-forbidden'];
-    showToast(forbidden);
-    router.replace(
-      `/?reason=${wantsAdmin ? 'admin-forbidden' : allowed.includes('advertiser') && !allowed.includes('creator') ? 'advertiser-forbidden' : 'creator-forbidden'}`,
-    );
-  }, [allowKey, hasAccess, router, settled, user]);
+    const reason = denialReason(allowed, activeRole);
+    showToast(ACCESS_REASON[reason]);
+    router.replace(`/?reason=${reason}`);
+  }, [activeRole, allowKey, hasAccess, router, settled, user]);
 
   if (isAuthLoggingOut()) {
     return (

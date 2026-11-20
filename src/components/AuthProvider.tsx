@@ -22,6 +22,7 @@ import {
 } from '@/lib/access';
 import {
   isMemberRole,
+  parseAuthRoles,
   resolveActiveMemberRole,
   switchableMemberRoles,
   type MemberRole,
@@ -139,6 +140,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready || !profileReady) {
+      return;
+    }
+    if (user && parseAuthRoles(user.roles, user.role).length === 0) {
+      syncAuthPresentCookie(true);
       return;
     }
     syncRoleCookie(user?.role ?? null, user?.roles);

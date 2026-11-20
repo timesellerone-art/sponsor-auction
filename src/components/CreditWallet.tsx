@@ -43,7 +43,13 @@ const TYPE_LABEL: Record<CreditTx['type'], string> = {
   REFUND: '환불',
 };
 
-export function CreditWallet({ canCharge }: { canCharge: boolean }) {
+export function CreditWallet({
+  canCharge,
+  chargePending = false,
+}: {
+  canCharge: boolean;
+  chargePending?: boolean;
+}) {
   const router = useRouter();
   const titleId = useId();
   const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
@@ -225,7 +231,9 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
             ? '충전한 금액은 캠페인 이용 시 차감됩니다. 결제 금액은 서버에 저장한 주문과 같을 때만 잔액에 반영됩니다.'
             : '이용·환불 내역이 이 계정 잔액에 반영됩니다.'}
         </p>
-        {canCharge ? (
+        {chargePending ? (
+          <p className="mt-5 text-sm text-zinc-500">계정 역할을 확인하고 있습니다.</p>
+        ) : canCharge ? (
           <>
             <div className="mt-5 grid grid-cols-2 gap-2">
               {amounts.map((amount) => (
