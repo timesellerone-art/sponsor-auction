@@ -4,7 +4,12 @@ import {
   resolveActiveMemberRole,
   type MemberRole,
 } from '@/types/auth';
-import { authCookieDomain, clientCookieSuffix } from '@/lib/site-origin';
+import {
+  authCookieDomain,
+  clientCookieSuffix,
+  isProductionClinkHost,
+  PRODUCTION_COOKIE_DOMAIN,
+} from '@/lib/site-origin';
 
 export const ROLE_COOKIE_NAME = 'sponsor-auction-role';
 export const ACTIVE_ROLE_COOKIE_NAME = 'sponsor-auction-active-role';
@@ -79,16 +84,60 @@ export function applyAuthCookies(
   });
 }
 
-export function readActiveRoleCookie(): MemberRole | null {
-  if (typeof document === 'undefined') {
-    return null;
+export function lastCookieValue(cookieHeader: string, name: string) {
+  const prefix = `${name}=`;
+  let value = '';
+  for (const part of cookieHeader.split(';')) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(prefix)) {
+      value = trimmed.slice(prefix.length);
+    }
   }
+  if (!value) {
+    return '';
+  }
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
-  const raw = document.cookie
+function clientCookieValues(name: string) {
+  const prefix = `${name}=`;
+  return document.cookie
     .split(';')
     .map((part) => part.trim())
-    .find((part) => part.startsWith(`${ACTIVE_ROLE_COOKIE_NAME}=`));
-  const value = raw?.slice(`${ACTIVE_ROLE_COOKIE_NAME}=`.length) ?? '';
+    .filter((part) => part.startsWith(prefix))
+    .map((part) => part.slice(prefix.length));
+}
+
+function expireHostOnlyCookie(name: string) {
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
+}
+
+function readClientCookie(name: string) {
+  if (typeof document === 'undefined') {
+    return '';
+  }
+  const values = clientCookieValues(name);
+  if (values.length > 1 && isProductionClinkHost(window.location.hostname)) {
+    expireHostOnlyCookie(name);
+    return clientCookieValues(name).at(-1) ?? '';
+  }
+  return values.at(-1) ?? '';
+}
+
+function writeClientCookie(name: string, value: string, maxAge: number) {
+  expireHostOnlyCookie(name);
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax; Domain=${PRODUCTION_COOKIE_DOMAIN}`;
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax; Secure; Domain=${PRODUCTION_COOKIE_DOMAIN}`;
+  document.cookie = `${name}=${value}; Max-Age=${maxAge}${clientCookieSuffix()}`;
+}
+
+export function readActiveRoleCookie(): MemberRole | null {
+  const value = readClientCookie(ACTIVE_ROLE_COOKIE_NAME);
   return isMemberRole(value) ? value : null;
 }
 
@@ -96,27 +145,21 @@ export function syncActiveRoleCookie(role: MemberRole | null | undefined) {
   if (typeof document === 'undefined') {
     return;
   }
-
   const value = isMemberRole(role) ? role : '';
-  const maxAge = value ? AUTH_COOKIE_MAX_AGE : 0;
-  document.cookie = `${ACTIVE_ROLE_COOKIE_NAME}=${value}; Max-Age=${maxAge}${clientCookieSuffix()}`;
+  writeClientCookie(ACTIVE_ROLE_COOKIE_NAME, value, value ? AUTH_COOKIE_MAX_AGE : 0);
 }
 
 export function syncRoleCookie(role: string | null | undefined, roles?: unknown) {
   if (typeof document === 'undefined') {
     return;
   }
-
   const value = roleCookieValue(roles, role);
-  const maxAge = value ? AUTH_COOKIE_MAX_AGE : 0;
-  document.cookie = `${ROLE_COOKIE_NAME}=${value}; Max-Age=${maxAge}${clientCookieSuffix()}`;
+  writeClientCookie(ROLE_COOKIE_NAME, value, value ? AUTH_COOKIE_MAX_AGE : 0);
 }
 
 export function syncAuthPresentCookie(present: boolean) {
   if (typeof document === 'undefined') {
     return;
   }
-
-  const maxAge = present ? 60 * 60 * 24 * 7 : 0;
-  document.cookie = `${AUTH_PRESENT_COOKIE_NAME}=${present ? '1' : ''}; Max-Age=${maxAge}${clientCookieSuffix()}`;
+  writeClientCookie(AUTH_PRESENT_COOKIE_NAME, present ? '1' : '', present ? AUTH_COOKIE_MAX_AGE : 0);
 }

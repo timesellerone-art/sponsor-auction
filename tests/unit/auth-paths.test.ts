@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { AUTH_COOKIE_MAX_AGE, AUTH_PRESENT_COOKIE_NAME } from '../../src/lib/access';
+import { AUTH_COOKIE_MAX_AGE, AUTH_PRESENT_COOKIE_NAME, lastCookieValue } from '../../src/lib/access';
 import { describeOAuthError, postAuthPath, postSocialAuthPath } from '../../src/lib/auth-guard';
 import {
   expirePkceVerifierCookies,
@@ -90,6 +90,20 @@ describe('post-auth destination', () => {
       'advertiser',
       'creator',
     ]);
+  });
+
+  it('같은 이름 쿠키가 겹치면 나중에 기록된 모드를 사용한다', () => {
+    assert.equal(
+      lastCookieValue(
+        'sponsor-auction-active-role=creator; sponsor-auction-active-role=advertiser',
+        'sponsor-auction-active-role',
+      ),
+      'advertiser',
+    );
+    assert.equal(
+      lastCookieValue('sponsor-auction-active-role=creator', 'sponsor-auction-active-role'),
+      'creator',
+    );
   });
 
   it('로그인한 회원은 저장된 역할과 별도로 광고주 모드를 유지한다', () => {

@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { ACTIVE_ROLE_COOKIE_NAME, ACTIVE_ROLE_HEADER, ROLE_COOKIE_NAME } from '@/lib/access';
+import { ACTIVE_ROLE_COOKIE_NAME, ACTIVE_ROLE_HEADER, lastCookieValue, ROLE_COOKIE_NAME } from '@/lib/access';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import {
@@ -52,8 +52,14 @@ function cookieOnlyActor(roles: AuthProfileRole[], activeRole: MemberRole | null
 
 export async function getPaymentActor(request?: Request): Promise<PaymentActor | null> {
   const cookieStore = await cookies();
-  const cookieRoles = parseAuthRoles(cookieStore.get(ROLE_COOKIE_NAME)?.value ?? '');
-  const activeCookie = cookieStore.get(ACTIVE_ROLE_COOKIE_NAME)?.value ?? '';
+  const headerCookies = request?.headers.get('cookie') ?? '';
+  const cookieRoles = parseAuthRoles(
+    lastCookieValue(headerCookies, ROLE_COOKIE_NAME) || cookieStore.get(ROLE_COOKIE_NAME)?.value || '',
+  );
+  const activeCookie =
+    lastCookieValue(headerCookies, ACTIVE_ROLE_COOKIE_NAME) ||
+    cookieStore.get(ACTIVE_ROLE_COOKIE_NAME)?.value ||
+    '';
 
   try {
     const supabase = await createClient();

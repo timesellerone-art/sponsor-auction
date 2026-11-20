@@ -1,4 +1,4 @@
-import { clientCookieSuffix } from '@/lib/site-origin';
+import { clientCookieSuffix, PRODUCTION_COOKIE_DOMAIN } from '@/lib/site-origin';
 
 export const NAVER_AUTH_COOKIE_NAMES = [
   'sa_naver_st',
@@ -31,7 +31,8 @@ function expireNamedCookie(name: string) {
   const suffix = clientCookieSuffix();
   document.cookie = `${name}=; Max-Age=0${suffix}`;
   document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
-  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax; Domain=.clinkapp.kr`;
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax; Domain=${PRODUCTION_COOKIE_DOMAIN}`;
+  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax; Secure; Domain=${PRODUCTION_COOKIE_DOMAIN}`;
 }
 
 export function expireBrowserAuthCookies() {
