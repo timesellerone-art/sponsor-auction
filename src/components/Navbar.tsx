@@ -13,11 +13,10 @@ import { RoleSwitcher } from '@/components/RoleSwitcher';
 import { isAdmin, memberRolesLabel } from '@/types/auth';
 
 export function Navbar() {
-  const { user, ready, canPlaceBid, switchableRoles } = useAuth();
+  const { user, ready } = useAuth();
   const { requestAdvertiser } = useRoleIntent();
   const showAdmin = Boolean(ready && isAdmin(user));
   const showDashboard = Boolean(ready && user);
-  const dashboardLabel = switchableRoles.length === 0 ? '마이페이지' : canPlaceBid ? '내 제안' : '내 캠페인';
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const menuId = useId();
@@ -123,7 +122,7 @@ export function Navbar() {
                     href="/my"
                     className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-800 shadow-sm hover:shadow-md lg:h-10 lg:px-4 lg:text-sm"
                   >
-                    {dashboardLabel}
+                    마이페이지
                   </Link>
                 ) : null}
               </>
@@ -213,7 +212,7 @@ export function Navbar() {
               className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
               onClick={() => setOpen(false)}
             >
-              {dashboardLabel}
+              마이페이지
             </Link>
           ) : null}
           {showAdmin ? (

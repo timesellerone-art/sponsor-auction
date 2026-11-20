@@ -1,21 +1,29 @@
+'use client';
+
 import Link from 'next/link';
+import { useAuth } from '@/components/AuthProvider';
 import { cn } from '@/lib/utils';
 
 type MyWorkspaceTab = 'dashboard' | 'credits' | 'settings';
 
-const TABS: Array<{ id: MyWorkspaceTab; href: string; label: string }> = [
-  { id: 'dashboard', href: '/my', label: '마이페이지' },
-  { id: 'credits', href: '/my/credits', label: '크레딧' },
-  { id: 'settings', href: '/my/settings', label: '계정 설정' },
-];
-
 export function MyWorkspaceNav({ current }: { current: MyWorkspaceTab }) {
+  const { activeRole } = useAuth();
+  const tabs: Array<{ id: MyWorkspaceTab; href: string; label: string }> = [
+    {
+      id: 'dashboard',
+      href: '/my',
+      label: activeRole === 'creator' ? '내 제안' : '내 캠페인',
+    },
+    { id: 'credits', href: '/my/credits', label: '크레딧' },
+    { id: 'settings', href: '/my/settings', label: '계정 설정' },
+  ];
+
   return (
     <nav
       aria-label="마이페이지 메뉴"
       className="flex w-full min-w-0 flex-wrap items-center gap-2"
     >
-      {TABS.map((tab) => {
+      {tabs.map((tab) => {
         const active = tab.id === current;
         return (
           <Link
