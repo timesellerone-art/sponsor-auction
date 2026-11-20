@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
 import { authRequestInit } from '@/lib/auth-request';
 import {
   CREDIT_CHARGE_AMOUNTS,
@@ -43,20 +44,17 @@ const TYPE_LABEL: Record<CreditTx['type'], string> = {
   REFUND: '환불',
 };
 
-export function CreditWallet({
-  canCharge,
-  chargePending = false,
-}: {
-  canCharge: boolean;
-  chargePending?: boolean;
-}) {
+export function CreditWallet({ canCharge }: { canCharge: boolean }) {
   const router = useRouter();
   const titleId = useId();
   const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
+  const loadRef = useRef<() => Promise<void>>(async () => {});
   const [balance, setBalance] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<CreditTx[]>([]);
   const [amounts, setAmounts] = useState<number[]>([...CREDIT_CHARGE_AMOUNTS]);
   const [selected, setSelected] = useState<CreditChargeAmount>(CREDIT_CHARGE_AMOUNTS[0]);
+  const { user } = useAuth();
+  const [serverCanCharge, setServerCanCharge] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [checkout, setCheckout] = useState<Checkout | null>(null);
@@ -74,20 +72,35 @@ export function CreditWallet({
       amounts?: number[];
       error?: string;
       errorMessage?: string;
+      canCharge?: boolean;
     } | null;
     if (!response.ok || !body) {
       throw new Error(body?.errorMessage || body?.error || '크레딧을 불러오지 못했습니다.');
     }
     setBalance(typeof body.balance === 'number' ? body.balance : 0);
     setTransactions(Array.isArray(body.transactions) ? body.transactions : []);
+    setServerCanCharge(body.canCharge === true);
     if (Array.isArray(body.amounts) && body.amounts.length > 0) {
-      setAmounts(body.amounts);
+      const nextAmounts = body.amounts;
+      setAmounts(nextAmounts);
+      setSelected((current) =>
+        nextAmounts.includes(current) ? current : (nextAmounts[0] as CreditChargeAmount),
+      );
     }
   };
 
+  const showCharge = serverCanCharge ?? canCharge;
+  loadRef.current = load;
+
   useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
-    void load()
+    setLoading(true);
+    setError(null);
+    void loadRef.current()
       .catch((reason: unknown) => {
         if (!cancelled) {
           setError(reason instanceof Error ? reason.message : '크레딧을 불러오지 못했습니다.');
@@ -101,7 +114,7 @@ export function CreditWallet({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!checkout) {
@@ -224,16 +237,14 @@ export function CreditWallet({
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
         <p className="text-sm font-semibold text-clink-accent">보유 크레딧</p>
         <p className="mt-2 text-3xl font-bold text-zinc-950">
-          {loading || balance === null ? '불러오는 중' : formatWon(balance)}
+          {loading ? '불러오는 중' : error && balance === null ? '—' : formatWon(balance ?? 0)}
         </p>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          {canCharge
+          {showCharge
             ? '충전한 금액은 캠페인 이용 시 차감됩니다. 결제 금액은 서버에 저장한 주문과 같을 때만 잔액에 반영됩니다.'
             : '이용·환불 내역이 이 계정 잔액에 반영됩니다.'}
         </p>
-        {chargePending ? (
-          <p className="mt-5 text-sm text-zinc-500">계정 역할을 확인하고 있습니다.</p>
-        ) : canCharge ? (
+        {showCharge ? (
           <>
             <div className="mt-5 grid grid-cols-2 gap-2">
               {amounts.map((amount) => (
@@ -263,7 +274,7 @@ export function CreditWallet({
           </>
         ) : (
           <p className="mt-5 text-sm leading-6 text-zinc-500">
-            1만·5만·10만·50만·100만 원 선불 충전은 광고주 계정에서 할 수 있습니다.
+            1만·5만·10만·50만·100만·500만 원 선불 충전은 광고주 계정에서 할 수 있습니다.
           </p>
         )}
         {error ? (

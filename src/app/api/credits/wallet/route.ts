@@ -3,7 +3,7 @@ import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { CREDIT_CHARGE_AMOUNTS } from '@/lib/credit-charge';
 import { getCreditBalance, listCreditTransactions, summarizeCreditTransactions } from '@/lib/credits';
-import { getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
+import { canPreparePayment, getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
 import { clientIp, consumeRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -39,7 +39,12 @@ export async function GET(request: Request) {
     const balance = await getCreditBalance(admin, actor.userId);
     const transactions = summarizeCreditTransactions(await listCreditTransactions(admin, actor.userId));
     return NextResponse.json(
-      { balance: balance ?? 0, transactions, amounts: CREDIT_CHARGE_AMOUNTS },
+      {
+        balance: balance ?? 0,
+        transactions,
+        amounts: CREDIT_CHARGE_AMOUNTS,
+        canCharge: canPreparePayment(actor),
+      },
       { headers: NO_STORE },
     );
   } catch (error) {

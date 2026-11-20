@@ -8,7 +8,7 @@ import { PageContainer } from '@/components/PageContainer';
 import { hasAuthRole } from '@/types/auth';
 
 export default function CreditWalletPage() {
-  const { user, profileReady, activeRole } = useAuth();
+  const { user, activeRole } = useAuth();
   const canCharge =
     hasAuthRole(user, 'advertiser') ||
     hasAuthRole(user, 'admin') ||
@@ -27,7 +27,7 @@ export default function CreditWalletPage() {
             ? '보유 크레딧과 충전·이용 내역을 확인하고, 금액을 고른 뒤 토스페이먼츠로 충전합니다.'
             : '보유 크레딧과 이용 내역을 확인합니다. 선불 충전은 광고주 계정에서 진행합니다.'}
         </p>
-        <CreditWallet canCharge={canCharge} chargePending={!profileReady && !canCharge} />
+        <CreditWallet canCharge={canCharge} />
       </PageContainer>
     </AccessGuard>
   );

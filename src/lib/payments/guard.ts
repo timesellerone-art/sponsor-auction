@@ -1,11 +1,12 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { ROLE_COOKIE_NAME } from '@/lib/access';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { parseAuthRoles, primaryAuthRole, type AuthProfileRole } from '@/types/auth';
 
 export type PaymentActor = {
-  role: AuthProfileRole;
+  role: AuthProfileRole | null;
   roles: AuthProfileRole[];
   userId?: string;
 };
@@ -15,41 +16,63 @@ function bearerToken(request?: Request) {
   return match?.[1] ?? '';
 }
 
+function cookieOnlyActor(roles: AuthProfileRole[]): PaymentActor | null {
+  const role = primaryAuthRole(roles);
+  if (!role || process.env.NODE_ENV === 'production') {
+    return null;
+  }
+  return { role, roles };
+}
+
 export async function getPaymentActor(request?: Request): Promise<PaymentActor | null> {
   const cookieStore = await cookies();
   const cookieRoles = parseAuthRoles(cookieStore.get(ROLE_COOKIE_NAME)?.value ?? '');
-  const cookieRole = primaryAuthRole(cookieRoles);
 
   try {
     const supabase = await createClient();
-    if (supabase) {
-      const token = bearerToken(request);
-      const { data, error } = token
-        ? await supabase.auth.getUser(token)
-        : await supabase.auth.getUser();
-      if (!error && data.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role, roles')
-          .eq('id', data.user.id)
-          .maybeSingle();
-        const roles = parseAuthRoles(profile?.roles, profile?.role);
-        const profileRole = primaryAuthRole(roles);
-        if (profileRole) {
-          return { role: profileRole, roles, userId: data.user.id };
-        }
-        return null;
+    if (!supabase) {
+      return cookieOnlyActor(cookieRoles);
+    }
+
+    const token = bearerToken(request);
+    let user: { id: string; user_metadata?: Record<string, unknown> } | null = null;
+    if (token) {
+      const byToken = await supabase.auth.getUser(token);
+      if (!byToken.error && byToken.data.user) {
+        user = byToken.data.user;
       }
     }
+    if (!user) {
+      const byCookie = await supabase.auth.getUser();
+      if (!byCookie.error && byCookie.data.user) {
+        user = byCookie.data.user;
+      }
+    }
+    if (!user) {
+      return cookieOnlyActor(cookieRoles);
+    }
+
+    const reader = createAdminClient() ?? supabase;
+    const { data: profile } = await reader
+      .from('profiles')
+      .select('role, roles')
+      .eq('id', user.id)
+      .maybeSingle();
+    const roles = parseAuthRoles(
+      profile?.roles,
+      profile?.role,
+      user.user_metadata?.roles,
+      user.user_metadata?.role,
+      cookieRoles,
+    );
+    return {
+      role: primaryAuthRole(roles),
+      roles,
+      userId: user.id,
+    };
   } catch {
-    // 데모/로컬은 역할 쿠키만으로 API 가드를 통과시킨다.
+    return cookieOnlyActor(cookieRoles);
   }
-
-  if (cookieRole && process.env.NODE_ENV !== 'production') {
-    return { role: cookieRole, roles: cookieRoles };
-  }
-
-  return null;
 }
 
 export function unauthorizedJson(message = '로그인이 필요합니다.') {
