@@ -8,9 +8,13 @@ function clean(value: string | undefined) {
   return trimmed;
 }
 
+function readRuntimeEnv(name: string) {
+  return Function('name', 'return process.env[name]')(name) as string | undefined;
+}
+
 function firstRuntime(names: readonly string[]) {
   for (const name of names) {
-    const cleaned = clean(process.env[name]);
+    const cleaned = clean(readRuntimeEnv(name));
     if (cleaned) {
       return cleaned;
     }
