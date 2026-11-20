@@ -7,6 +7,7 @@ import { RealtimeNotifications } from '@/components/RealtimeNotifications';
 import { RoleIntentProvider } from '@/components/RoleIntentProvider';
 import { RoleRouteGuard } from '@/components/RoleRouteGuard';
 import { SiteFooter } from '@/components/SiteFooter';
+import { SupabasePublicBootstrap } from '@/components/SupabasePublicBootstrap';
 import { AiSupportWidget } from '@/components/support/AiSupportWidget';
 import { ToastHost } from '@/components/Toast';
 import './globals.css';
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="ko" className={`${geistMono.variable} h-full w-full antialiased`}>
       <head>
+        <SupabasePublicBootstrap />
         <link rel="preconnect" href="https://cdn.jsdelivr.net" />
         <link
           rel="stylesheet"

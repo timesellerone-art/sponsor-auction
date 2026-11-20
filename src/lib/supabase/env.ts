@@ -19,17 +19,52 @@ function clean(value: string | undefined) {
   return trimmed;
 }
 
-/** 브라우저·공용 클라이언트용. NEXT_PUBLIC_ 만 정적 참조합니다. */
+function firstClean(values: Array<string | undefined>) {
+  for (const value of values) {
+    const cleaned = clean(value);
+    if (cleaned) {
+      return cleaned;
+    }
+  }
+  return '';
+}
+
+type BrowserSupabaseConfig = {
+  url?: string;
+  anonKey?: string;
+};
+
+function browserSupabaseConfig(): BrowserSupabaseConfig | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const injected = (window as Window & { __CLINK_SUPABASE__?: BrowserSupabaseConfig }).__CLINK_SUPABASE__;
+  return injected ?? null;
+}
+
+/**
+ * 브라우저·공용 클라이언트용.
+ * 빌드에 공개 키가 인라인되지 않은 배포는 서버가 심은 window.__CLINK_SUPABASE__ 를 사용한다.
+ */
 export function getSupabaseEnv(): SupabaseEnv | null {
-  const url = clean(process.env.NEXT_PUBLIC_SUPABASE_URL);
-  const anonKey = clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const injected = browserSupabaseConfig();
+  const url = firstClean([
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_PROJECT_URL,
+    injected?.url,
+  ]);
+  const anonKey = firstClean([
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    injected?.anonKey,
+  ]);
 
   if (!url || !anonKey) {
     return null;
   }
 
   if (anonKey.length < 20) {
-    console.error('[SponsorAuction] NEXT_PUBLIC_SUPABASE_ANON_KEY 값이 너무 짧습니다.');
+    console.error('[SponsorAuction] Supabase 공개 키 값이 너무 짧습니다.');
     return null;
   }
 

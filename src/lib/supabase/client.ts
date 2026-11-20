@@ -13,14 +13,13 @@ let browserClient: SupabaseClient<Database> | null | undefined;
  * `/auth/callback` 서버 교환과 같은 저장소를 사용합니다.
  */
 export function createClient(): SupabaseClient<Database> | null {
-  if (browserClient !== undefined) {
+  if (browserClient) {
     return browserClient;
   }
 
   const env = getSupabaseEnv();
   if (!env) {
     warnMockFallback();
-    browserClient = null;
     return null;
   }
 

@@ -300,12 +300,7 @@ export default function LoginPage() {
           <p className="mt-3 text-xs text-rose-600" role="alert">
             {error}
           </p>
-        ) : (
-          <p className="mt-3 text-xs text-zinc-400">
-            개발용 계정: brand@demo.com / creator@demo.com / admin@demo.com
-            (비밀번호 demo1234)
-          </p>
-        )}
+        ) : null}
 
         {mode === 'signup' ? (
           <div className="mt-4">
