@@ -43,7 +43,7 @@ const TYPE_LABEL: Record<CreditTx['type'], string> = {
   REFUND: '환불',
 };
 
-export function CreditWallet() {
+export function CreditWallet({ canCharge }: { canCharge: boolean }) {
   const router = useRouter();
   const titleId = useId();
   const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
@@ -221,33 +221,43 @@ export function CreditWallet() {
           {loading || balance === null ? '불러오는 중' : formatWon(balance)}
         </p>
         <p className="mt-2 text-sm leading-6 text-zinc-500">
-          충전한 금액은 캠페인 이용 시 차감됩니다. 결제 금액은 서버에 저장한 주문과 같을 때만 잔액에 반영됩니다.
+          {canCharge
+            ? '충전한 금액은 캠페인 이용 시 차감됩니다. 결제 금액은 서버에 저장한 주문과 같을 때만 잔액에 반영됩니다.'
+            : '이용·환불 내역이 이 계정 잔액에 반영됩니다.'}
         </p>
-        <div className="mt-5 grid grid-cols-2 gap-2">
-          {amounts.map((amount) => (
+        {canCharge ? (
+          <>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              {amounts.map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  className={cn(
+                    'h-11 rounded-xl border text-sm font-semibold',
+                    selected === amount
+                      ? 'border-zinc-950 bg-zinc-950 text-white'
+                      : 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50',
+                  )}
+                  onClick={() => setSelected(amount as CreditChargeAmount)}
+                >
+                  {formatWon(amount)}
+                </button>
+              ))}
+            </div>
             <button
-              key={amount}
               type="button"
-              className={cn(
-                'h-11 rounded-xl border text-sm font-semibold',
-                selected === amount
-                  ? 'border-zinc-950 bg-zinc-950 text-white'
-                  : 'border-zinc-200 bg-white text-zinc-800 hover:bg-zinc-50',
-              )}
-              onClick={() => setSelected(amount as CreditChargeAmount)}
+              className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
+              disabled={preparing || loading}
+              onClick={() => void startCharge()}
             >
-              {formatWon(amount)}
+              {preparing ? '주문 생성 중' : `${formatWon(selected)} 충전하기`}
             </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
-          disabled={preparing || loading}
-          onClick={() => void startCharge()}
-        >
-          {preparing ? '주문 생성 중' : `${formatWon(selected)} 충전하기`}
-        </button>
+          </>
+        ) : (
+          <p className="mt-5 text-sm leading-6 text-zinc-500">
+            1만·5만·10만·50만·100만 원 선불 충전은 광고주 계정에서 할 수 있습니다.
+          </p>
+        )}
         {error ? (
           <p role="alert" className="mt-3 text-sm text-rose-600">
             {error}

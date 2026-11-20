@@ -56,7 +56,7 @@ function CreditChargeFail() {
 
 export default function CreditChargeFailPage() {
   return (
-    <AccessGuard allow={['advertiser', 'admin']}>
+    <AccessGuard allow={['advertiser', 'creator', 'admin']}>
       <Suspense fallback={<PageContainer className="py-16 text-center text-sm text-zinc-500">확인 중입니다.</PageContainer>}>
         <CreditChargeFail />
       </Suspense>

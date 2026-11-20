@@ -23,10 +23,11 @@ function allowedRoles(allow: AccessRole | readonly AccessRole[]) {
 
 export function AccessGuard({ allow, children }: AccessGuardProps) {
   const router = useRouter();
-  const { user, ready } = useAuth();
+  const { user, ready, profileReady } = useAuth();
   const timedOut = useSafetyTimeout();
-  const settled = ready || timedOut;
   const roles = allowedRoles(allow);
+  const roleRestricted = !roles.includes('signed-in');
+  const settled = roleRestricted ? profileReady : ready || timedOut;
   const allowKey = roles.join('|');
   const hasAccess = Boolean(
     settled &&

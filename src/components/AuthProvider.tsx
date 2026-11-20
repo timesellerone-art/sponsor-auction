@@ -31,6 +31,7 @@ import {
 type AuthContextValue = {
   user: SessionUser | null;
   ready: boolean;
+  profileReady: boolean;
   activeRole: MemberRole | null;
   switchableRoles: MemberRole[];
   canCreateAuction: boolean;
@@ -42,6 +43,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   ready: false,
+  profileReady: false,
   activeRole: null,
   switchableRoles: [],
   canCreateAuction: false,
@@ -61,6 +63,7 @@ function persistCurrentMode(role: MemberRole) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [ready, setReady] = useState(false);
+  const [profileReady, setProfileReady] = useState(false);
   const [roleOverride, setRoleOverride] = useState<MemberRole | null>(null);
 
   const latestRequest = useRef(0);
@@ -83,6 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           document.cookie.split(';').some((part) => part.trim() === `${AUTH_PRESENT_COOKIE_NAME}=1`);
         if (result.data || hinted) {
           void refresh('full');
+        } else {
+          setProfileReady(true);
         }
       }
     } catch (error) {
@@ -92,9 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.warn('[SponsorAuction] 인증 상태를 갱신하지 못했습니다.', error);
       setUser(null);
       setRoleOverride(null);
+      setProfileReady(true);
     } finally {
       if (request === latestRequest.current) {
         setReady(true);
+        if (mode === 'full') {
+          setProfileReady(true);
+        }
       }
     }
   }, []);
@@ -103,6 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const failSafe = window.setTimeout(() => {
       setReady(true);
     }, AUTH_BOOT_TIMEOUT_MS);
+    const profileFailSafe = window.setTimeout(() => {
+      setProfileReady(true);
+    }, AUTH_BOOT_TIMEOUT_MS * 3);
     const unsubKnown = onKnownSession((session) => {
       setUser(session);
       setReady(true);
@@ -114,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh('fast');
     return () => {
       window.clearTimeout(failSafe);
+      window.clearTimeout(profileFailSafe);
       unsubKnown();
       unsubscribe();
     };
@@ -125,13 +138,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     : null;
 
   useEffect(() => {
-    if (!ready) {
+    if (!ready || !profileReady) {
       return;
     }
     syncRoleCookie(user?.role ?? null, user?.roles);
     syncAuthPresentCookie(Boolean(user));
     syncActiveRoleCookie(user ? activeRole : null);
-  }, [activeRole, ready, user]);
+  }, [activeRole, profileReady, ready, user]);
 
   const setActiveRole = useCallback(
     (role: MemberRole) => {
@@ -150,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       ready,
+      profileReady,
       activeRole,
       switchableRoles,
       canCreateAuction: activeRole === 'advertiser',
@@ -157,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setActiveRole,
       refresh,
     }),
-    [activeRole, ready, refresh, setActiveRole, switchableRoles, user],
+    [activeRole, profileReady, ready, refresh, setActiveRole, switchableRoles, user],
   );
 
   return (

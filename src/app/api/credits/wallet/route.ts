@@ -3,7 +3,7 @@ import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { CREDIT_CHARGE_AMOUNTS } from '@/lib/credit-charge';
 import { getCreditBalance, listCreditTransactions, summarizeCreditTransactions } from '@/lib/credits';
-import { canPreparePayment, forbiddenJson, getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
+import { getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
 import { clientIp, consumeRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -21,9 +21,6 @@ export async function GET(request: Request) {
     const actor = await getPaymentActor(request);
     if (!actor?.userId) {
       return unauthorizedJson('크레딧을 보려면 로그인해 주세요.');
-    }
-    if (!canPreparePayment(actor)) {
-      return forbiddenJson('크레딧 충전은 광고주 계정만 이용할 수 있습니다.');
     }
 
     const limited = consumeRateLimit(clientIp(request), '/api/credits/wallet');
