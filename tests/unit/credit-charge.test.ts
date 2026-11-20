@@ -1,8 +1,19 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { assessCreditCharge, isCreditChargeOrderId } from '../../src/lib/credit-charge-shared';
+import {
+  CREDIT_CHARGE_AMOUNTS,
+  assessCreditCharge,
+  isCreditChargeAmount,
+  isCreditChargeOrderId,
+} from '../../src/lib/credit-charge-shared';
 
 describe('credit charge assessment', () => {
+  it('충전 금액은 1만, 5만, 10만, 50만, 100만 원이다', () => {
+    assert.deepEqual(CREDIT_CHARGE_AMOUNTS, [10_000, 50_000, 100_000, 500_000, 1_000_000]);
+    assert.equal(isCreditChargeAmount(30_000), false);
+    assert.equal(isCreditChargeAmount(1_000_000), true);
+  });
+
   it('캠페인 주문과 크레딧 주문을 구분한다', () => {
     assert.equal(isCreditChargeOrderId('crd_order_1'), true);
     assert.equal(isCreditChargeOrderId('ord_award'), false);

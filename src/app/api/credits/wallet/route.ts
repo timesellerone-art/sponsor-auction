@@ -18,7 +18,7 @@ export async function GET(request: Request) {
       // 지갑 조회는 동적 렌더 힌트와 무관하게 처리합니다.
     }
 
-    const actor = await getPaymentActor();
+    const actor = await getPaymentActor(request);
     if (!actor?.userId) {
       return unauthorizedJson('크레딧을 보려면 로그인해 주세요.');
     }

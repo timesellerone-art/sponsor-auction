@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       // 충전 실패 기록은 동적 렌더 힌트와 무관하게 처리합니다.
     }
 
-    const actor = await getPaymentActor();
+    const actor = await getPaymentActor(request);
     if (!actor?.userId) {
       return unauthorizedJson('로그인해 주세요.');
     }

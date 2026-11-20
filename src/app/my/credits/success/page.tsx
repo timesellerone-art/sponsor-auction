@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { AccessGuard } from '@/components/AccessGuard';
+import { authRequestInit } from '@/lib/auth-request';
 import { PageContainer } from '@/components/PageContainer';
 import { formatWon } from '@/lib/utils';
 
@@ -28,11 +29,11 @@ function CreditChargeSuccess() {
       return;
     }
 
-    void fetch('/api/credits/charge/confirm', {
+    void authRequestInit({
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderId, paymentKey, amount }),
     })
+      .then((init) => fetch('/api/credits/charge/confirm', init))
       .then(async (response) => {
         const body = (await response.json().catch(() => null)) as {
           error?: string;

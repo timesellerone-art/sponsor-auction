@@ -124,7 +124,7 @@ async function main() {
   };
   log('amount mismatch', { response: mismatch, ...afterMismatch });
 
-  const failedOrder = await createCreditChargeOrder(admin, user.id, 30_000);
+  const failedOrder = await createCreditChargeOrder(admin, user.id, 50_000);
   if (!failedOrder.ok) {
     throw new Error(failedOrder.message);
   }

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { AccessGuard } from '@/components/AccessGuard';
+import { authRequestInit } from '@/lib/auth-request';
 import { PageContainer } from '@/components/PageContainer';
 import { formatWon } from '@/lib/utils';
 
@@ -22,11 +23,11 @@ function CreditChargeFail() {
     if (!orderId) {
       return;
     }
-    void fetch('/api/credits/charge/fail', {
+    void authRequestInit({
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderId }),
     })
+      .then((init) => fetch('/api/credits/charge/fail', init))
       .then(async (response) => {
         const body = (await response.json().catch(() => null)) as { balance?: number | null } | null;
         if (typeof body?.balance === 'number') {

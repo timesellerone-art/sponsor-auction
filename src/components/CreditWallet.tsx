@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { authRequestInit } from '@/lib/auth-request';
 import {
   CREDIT_CHARGE_AMOUNTS,
   CREDIT_CHARGE_ORDER_NAME,
@@ -60,15 +61,16 @@ export function CreditWallet() {
   const [agreed, setAgreed] = useState(false);
 
   const load = async () => {
-    const response = await fetch('/api/credits/wallet', { cache: 'no-store' });
+    const response = await fetch('/api/credits/wallet', await authRequestInit({ cache: 'no-store' }));
     const body = (await response.json().catch(() => null)) as {
       balance?: number;
       transactions?: CreditTx[];
       amounts?: number[];
       error?: string;
+      errorMessage?: string;
     } | null;
     if (!response.ok || !body) {
-      throw new Error(body?.error || '크레딧을 불러오지 못했습니다.');
+      throw new Error(body?.errorMessage || body?.error || '크레딧을 불러오지 못했습니다.');
     }
     setBalance(typeof body.balance === 'number' ? body.balance : 0);
     setTransactions(Array.isArray(body.transactions) ? body.transactions : []);
@@ -145,11 +147,13 @@ export function CreditWallet() {
     setPreparing(true);
     setError(null);
     try {
-      const response = await fetch('/api/credits/charge/prepare', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: selected }),
-      });
+      const response = await fetch(
+        '/api/credits/charge/prepare',
+        await authRequestInit({
+          method: 'POST',
+          body: JSON.stringify({ amount: selected }),
+        }),
+      );
       const body = (await response.json().catch(() => null)) as Checkout & { error?: string };
       if (!response.ok || !body?.orderId) {
         throw new Error(body?.error || '충전 주문을 만들지 못했습니다.');

@@ -10,7 +10,12 @@ export type PaymentActor = {
   userId?: string;
 };
 
-export async function getPaymentActor(): Promise<PaymentActor | null> {
+function bearerToken(request?: Request) {
+  const match = request?.headers.get('authorization')?.trim().match(/^Bearer\s+(\S+)/i);
+  return match?.[1] ?? '';
+}
+
+export async function getPaymentActor(request?: Request): Promise<PaymentActor | null> {
   const cookieStore = await cookies();
   const cookieRoles = parseAuthRoles(cookieStore.get(ROLE_COOKIE_NAME)?.value ?? '');
   const cookieRole = primaryAuthRole(cookieRoles);
@@ -18,7 +23,10 @@ export async function getPaymentActor(): Promise<PaymentActor | null> {
   try {
     const supabase = await createClient();
     if (supabase) {
-      const { data, error } = await supabase.auth.getUser();
+      const token = bearerToken(request);
+      const { data, error } = token
+        ? await supabase.auth.getUser(token)
+        : await supabase.auth.getUser();
       if (!error && data.user) {
         const { data: profile } = await supabase
           .from('profiles')

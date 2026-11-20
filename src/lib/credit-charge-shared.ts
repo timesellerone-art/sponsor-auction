@@ -1,6 +1,6 @@
 export const CREDIT_CHARGE_ORDER_PREFIX = 'crd_';
 export const CREDIT_CHARGE_ORDER_NAME = '클링크 크레딧 충전';
-export const CREDIT_CHARGE_AMOUNTS = [10_000, 30_000, 50_000, 100_000, 300_000] as const;
+export const CREDIT_CHARGE_AMOUNTS = [10_000, 50_000, 100_000, 500_000, 1_000_000] as const;
 
 export type CreditChargeAmount = (typeof CREDIT_CHARGE_AMOUNTS)[number];
 export type CreditChargeOutcome = 'confirmed' | 'failed' | 'cancelled';
