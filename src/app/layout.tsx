@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { Geist_Mono } from 'next/font/google';
 import { AccessReasonToast } from '@/components/AccessReasonToast';
@@ -37,7 +38,9 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         />
       </head>
       <body className="flex min-h-full w-full min-w-0 flex-col overflow-x-clip bg-background font-sans text-foreground">
-        <SupabasePublicBootstrap />
+        <Suspense fallback={null}>
+          <SupabasePublicBootstrap />
+        </Suspense>
         <AuthProvider>
           <RoleIntentProvider>
             <RealtimeNotifications />
