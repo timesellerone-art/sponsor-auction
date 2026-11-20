@@ -22,6 +22,7 @@ declare namespace NodeJS {
     VERCEL_ENV?: 'production' | 'preview' | 'development';
     NAVER_CLIENT_ID?: string;
     NAVER_CLIENT_SECRET?: string;
+    CREDIT_TEST_SECRET?: string;
     GEMINI_API_KEY?: string;
     GOOGLE_GENERATIVE_AI_API_KEY?: string;
     GOOGLE_API_KEY?: string;

@@ -265,6 +265,7 @@ export type Database = {
           role: 'advertiser' | 'creator' | 'admin' | null;
           roles: Array<'advertiser' | 'creator' | 'admin'>;
           status: 'active' | 'suspended';
+          credit_balance: number;
           created_at: string;
         };
         Insert: {
@@ -275,6 +276,7 @@ export type Database = {
           role?: 'advertiser' | 'creator' | 'admin' | null;
           roles?: Array<'advertiser' | 'creator' | 'admin'>;
           status?: 'active' | 'suspended';
+          credit_balance?: number;
           created_at?: string;
         };
         Update: {
@@ -284,6 +286,7 @@ export type Database = {
           role?: 'advertiser' | 'creator' | 'admin' | null;
           roles?: Array<'advertiser' | 'creator' | 'admin'>;
           status?: 'active' | 'suspended';
+          credit_balance?: number;
         };
         Relationships: [];
       };
@@ -510,6 +513,36 @@ export type Database = {
         };
         Relationships: [];
       };
+      credit_transactions: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: 'CHARGE' | 'HOLD' | 'RELEASE' | 'REFUND';
+          amount: number;
+          balance_after: number;
+          reference_id: string | null;
+          description: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: 'CHARGE' | 'HOLD' | 'RELEASE' | 'REFUND';
+          amount: number;
+          balance_after: number;
+          reference_id?: string | null;
+          description?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          type?: 'CHARGE' | 'HOLD' | 'RELEASE' | 'REFUND';
+          amount?: number;
+          balance_after?: number;
+          reference_id?: string | null;
+          description?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -551,6 +584,33 @@ export type Database = {
       delete_own_account: {
         Args: { p_user_id?: string | null };
         Returns: undefined;
+      };
+      charge_user_credit: {
+        Args: {
+          p_user_id: string;
+          p_amount: number;
+          p_reference_id?: string | null;
+          p_description?: string | null;
+        };
+        Returns: {
+          balance_after: number;
+          transaction_id: string;
+          type: 'CHARGE';
+        };
+      };
+      deduct_user_credit: {
+        Args: {
+          p_user_id: string;
+          p_amount: number;
+          p_type?: 'HOLD';
+          p_reference_id?: string | null;
+          p_description?: string | null;
+        };
+        Returns: {
+          balance_after: number;
+          transaction_id: string;
+          type: 'HOLD';
+        };
       };
     };
     Enums: {

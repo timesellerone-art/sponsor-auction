@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { getPaymentSigningSecret } from '@/lib/payments/env';
-import type { PaymentIntent, PaymentIntentStatus } from '@/types/payment';
+import type { PaymentIntent } from '@/types/payment';
 
 export const PAYMENT_INTENT_COOKIE = 'sa-pay-intent';
 export const PAYMENT_INTENT_TTL_MS = 30 * 60 * 1000;
@@ -134,10 +134,6 @@ export function resolveIntent(orderId: string, cookieValue: string | undefined) 
 
   putIntent(fromCookie);
   return fromCookie;
-}
-
-export function isTerminalStatus(status: PaymentIntentStatus) {
-  return status === 'confirmed' || status === 'failed' || status === 'expired';
 }
 
 function pruneExpired() {
