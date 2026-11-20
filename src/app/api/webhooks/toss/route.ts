@@ -1,5 +1,6 @@
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
+import { isCreditChargeOrderId, loadCreditChargeOrder, settleCreditCharge } from '@/lib/credit-charge';
 import { captureException } from '@/lib/monitoring';
 import { productionTossLiveKeyError } from '@/lib/launch-env';
 import { getTossClientKey, getTossSecretKey, isTossSecretConfigured } from '@/lib/payments/env';
@@ -18,6 +19,7 @@ import {
   verifyTossWebhookSignature,
 } from '@/lib/payments/toss-webhook';
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export const preferredRegion = 'icn1';
 
@@ -50,6 +52,95 @@ function storedIntentFromPayment(
     paymentKey: stored.paymentKey,
     createdAt: Date.now(),
   };
+}
+
+async function handleCreditChargeWebhook(event: { kind: 'payment' | 'deposit'; orderId: string; paymentKey?: string }) {
+  const admin = createAdminClient();
+  if (!admin) {
+    return json(503, {
+      error: 'ADMIN_UNAVAILABLE',
+      errorCode: 'ADMIN_UNAVAILABLE',
+      errorMessage: '크레딧 충전 주문을 확인하지 못했습니다.',
+    });
+  }
+
+  const lookedUp = await lookupVerifiedPayment({
+    paymentKey: event.paymentKey,
+    orderId: event.orderId,
+  });
+  if (!lookedUp.ok) {
+    if (lookedUp.httpStatus === 404 || lookedUp.errorCode === 'NOT_FOUND_PAYMENT') {
+      return json(200, { ok: true, ignored: true, reason: 'payment_not_found' });
+    }
+    return json(500, {
+      error: lookedUp.errorCode,
+      errorCode: lookedUp.errorCode,
+      errorMessage: '토스페이먼츠 결제 조회에 실패했습니다. 재전송을 기다립니다.',
+    });
+  }
+
+  const payment = lookedUp.payment;
+  if (payment.orderId !== event.orderId || !isCreditChargeOrderId(payment.orderId)) {
+    return json(400, {
+      error: 'ORDER_ID_MISMATCH',
+      errorCode: 'ORDER_ID_MISMATCH',
+      errorMessage: '웹훅 주문번호가 크레딧 충전 주문과 다릅니다.',
+    });
+  }
+
+  const order = await loadCreditChargeOrder(admin, payment.orderId);
+  if (!order) {
+    return json(200, { ok: true, ignored: true, reason: 'credit_order_not_found' });
+  }
+
+  const mapped = mapTossPaymentStatus(payment.status);
+  if (mapped === 'ignored') {
+    return json(200, { ok: true, ignored: true, orderId: payment.orderId, tossStatus: payment.status });
+  }
+  if (mapped === 'confirmed' && payment.totalAmount !== order.amount) {
+    console.error('[SponsorAuction] 크레딧 충전 웹훅 금액 불일치', {
+      orderId: payment.orderId,
+      storedAmount: order.amount,
+      tossAmount: payment.totalAmount,
+    });
+    return json(400, {
+      error: 'AMOUNT_MISMATCH',
+      errorCode: 'AMOUNT_MISMATCH',
+      errorMessage: '웹훅 금액이 크레딧 충전 주문과 다릅니다.',
+    });
+  }
+
+  const settled = await settleCreditCharge(admin, {
+    userId: order.userId,
+    orderId: order.orderId,
+    paymentKey: payment.paymentKey,
+    paidAmount: mapped === 'confirmed' ? payment.totalAmount : 0,
+    outcome: mapped === 'confirmed' ? 'confirmed' : 'failed',
+  });
+  if (!settled.ok) {
+    return json(400, {
+      error: settled.code,
+      errorCode: settled.code,
+      errorMessage: settled.message,
+      balance: settled.balance,
+    });
+  }
+
+  console.info('[SponsorAuction] 크레딧 충전 웹훅 반영', {
+    orderId: order.orderId,
+    code: settled.code,
+    charged: settled.charged,
+    duplicate: settled.duplicate,
+    balance: settled.balance,
+  });
+  return json(200, {
+    ok: true,
+    orderId: order.orderId,
+    code: settled.code,
+    charged: settled.charged,
+    duplicate: settled.duplicate,
+    balance: settled.balance,
+  });
 }
 
 async function lookupVerifiedPayment(input: {
@@ -130,6 +221,10 @@ export async function POST(request: Request) {
 
     if (event.kind === 'ignored') {
       return json(200, { ok: true, ignored: true, eventType: event.eventType });
+    }
+
+    if (isCreditChargeOrderId(event.orderId)) {
+      return handleCreditChargeWebhook(event);
     }
 
     const lookedUp = await lookupVerifiedPayment({

@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
-type MyWorkspaceTab = 'dashboard' | 'settings';
+type MyWorkspaceTab = 'dashboard' | 'credits' | 'settings';
 
 const TABS: Array<{ id: MyWorkspaceTab; href: string; label: string }> = [
   { id: 'dashboard', href: '/my', label: '마이페이지' },
+  { id: 'credits', href: '/my/credits', label: '크레딧' },
   { id: 'settings', href: '/my/settings', label: '계정 설정' },
 ];
 

@@ -543,6 +543,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      credit_charge_orders: {
+        Row: {
+          order_id: string;
+          user_id: string;
+          amount: number;
+          status: 'pending' | 'confirmed' | 'failed' | 'cancelled';
+          payment_key: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          order_id: string;
+          user_id: string;
+          amount: number;
+          status?: 'pending' | 'confirmed' | 'failed' | 'cancelled';
+          payment_key?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          amount?: number;
+          status?: 'pending' | 'confirmed' | 'failed' | 'cancelled';
+          payment_key?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

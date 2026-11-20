@@ -104,8 +104,18 @@ export function AdvertiserDashboard() {
 
   return (
     <PageContainer className="flex min-w-0 flex-1 flex-col pt-4 pb-6 sm:pt-5 sm:pb-10">
-      <p className="text-sm font-semibold tracking-wide text-clink-accent">광고주</p>
-      <h1 className="mt-1 text-2xl font-bold text-stone-900 sm:text-3xl">내 캠페인</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold tracking-wide text-clink-accent">광고주</p>
+          <h1 className="mt-1 text-2xl font-bold text-stone-900 sm:text-3xl">내 캠페인</h1>
+        </div>
+        <Link
+          href="/my/credits"
+          className="inline-flex h-10 items-center rounded-full border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
+        >
+          크레딧 충전
+        </Link>
+      </div>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
         등록한 캠페인과 결제 완료된 낙찰 내역을 확인하고, 진행 중인 제안은 여기서 바로
         낙찰할 수 있습니다.
