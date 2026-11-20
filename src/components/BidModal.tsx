@@ -9,7 +9,8 @@ import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
-import { DEMO_CREATOR_BANK_ACCOUNT, isDemoAccountEmail } from '@/lib/auth-mock';
+import { isDemoAccountEmail } from '@/lib/auth-mock';
+import { composeBankAccount, settlementAccountFromParts } from '@/lib/settlement-account';
 import { INSERT_FAIL_MESSAGE, createBid, getAuctionById } from '@/lib/auctions';
 import { isUuid } from '@/lib/uuid';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
@@ -55,7 +56,9 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
   const [creatorStyle, setCreatorStyle] = useState('');
   const [proposalBusy, setProposalBusy] = useState(false);
   const [proposalHint, setProposalHint] = useState<string | null>(null);
-  const [bankAccount, setBankAccount] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [accountHolder, setAccountHolder] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -77,7 +80,9 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
     setCreatorStyle('');
     setProposalBusy(false);
     setProposalHint(null);
-    setBankAccount('');
+    setBankName('');
+    setAccountNumber('');
+    setAccountHolder('');
     setErrors({});
     setSubmitError(null);
     setAgreeTerms(false);
@@ -93,13 +98,12 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
       firstFieldRef.current?.focus({ preventScroll: true });
     });
     const fillBank = window.setTimeout(() => {
-      setBankAccount((current) =>
-        current.trim()
-          ? current
-          : isDemoAccountEmail(user?.email)
-            ? DEMO_CREATOR_BANK_ACCOUNT
-            : current,
-      );
+      if (!isDemoAccountEmail(user?.email)) {
+        return;
+      }
+      setBankName((current) => current.trim() || '신한은행');
+      setAccountNumber((current) => current.trim() || '110123456789');
+      setAccountHolder((current) => current.trim() || '데모크리에이터');
     }, 0);
 
     const previousOverflow = document.body.style.overflow;
@@ -213,16 +217,16 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         }
 
         const settlementEmail = user.email?.trim() ?? '';
-        const resolvedBank =
-          bankAccount.trim() ||
-          (isDemoAccountEmail(user.email) ? DEMO_CREATOR_BANK_ACCOUNT : '');
+        const account = settlementAccountFromParts({ bankName, accountNumber, accountHolder });
         const nextErrors = validateBidForm({
           creatorChannelUrl,
           bidAmount,
           proposalText,
           auctionBudget: currentAuction.budget,
           creatorEmail: settlementEmail,
-          bankAccount: resolvedBank,
+          bankName: account.bankName,
+          accountNumber: account.accountNumber,
+          accountHolder: account.accountHolder,
           agreeTerms,
           agreePrivacy,
         });
@@ -243,8 +247,12 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
                   ? 'bid-url'
                   : nextErrors.settlementEmail
                     ? 'bid-settlement-email'
-                    : nextErrors.bankAccount
-                      ? 'bid-bank-account'
+                    : nextErrors.bankName
+                      ? 'bid-bank-name'
+                      : nextErrors.accountNumber
+                        ? 'bid-account-number'
+                        : nextErrors.accountHolder
+                          ? 'bid-account-holder'
                       : 'bid-agreements';
           window.requestAnimationFrame(() => {
             document.getElementById(focusId)?.scrollIntoView({ block: 'nearest' });
@@ -260,7 +268,10 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
           bidAmount: Number(bidAmount),
           proposalText: proposalText.trim(),
           creatorEmail: settlementEmail,
-          bankAccount: resolvedBank,
+          bankName: account.bankName,
+          accountNumber: account.accountNumber,
+          accountHolder: account.accountHolder,
+          bankAccount: composeBankAccount(account),
         };
 
         let result: Awaited<ReturnType<typeof createBid>>;
@@ -486,20 +497,45 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
               />
             </Field>
 
+            <Field label="은행명" htmlFor="bid-bank-name" error={errors.bankName}>
+              <input
+                id="bid-bank-name"
+                type="text"
+                value={bankName}
+                onChange={(event) => setBankName(event.target.value)}
+                className={inputClass(Boolean(errors.bankName))}
+                placeholder="예: 신한은행"
+                autoComplete="off"
+              />
+            </Field>
+
             <Field
-              label="정산 계좌"
-              htmlFor="bid-bank-account"
-              error={errors.bankAccount}
-              hint="은행명 + 계좌번호"
+              label="계좌번호"
+              htmlFor="bid-account-number"
+              error={errors.accountNumber}
+              hint="숫자만 입력하면 됩니다."
             >
               <input
-                id="bid-bank-account"
+                id="bid-account-number"
                 type="text"
-                value={bankAccount}
-                onChange={(event) => setBankAccount(event.target.value)}
-                className={inputClass(Boolean(errors.bankAccount))}
-                placeholder="예: 신한은행 110-123-456789"
+                inputMode="numeric"
+                value={accountNumber}
+                onChange={(event) => setAccountNumber(event.target.value)}
+                className={inputClass(Boolean(errors.accountNumber))}
+                placeholder="예: 110123456789"
                 autoComplete="off"
+              />
+            </Field>
+
+            <Field label="예금주" htmlFor="bid-account-holder" error={errors.accountHolder}>
+              <input
+                id="bid-account-holder"
+                type="text"
+                value={accountHolder}
+                onChange={(event) => setAccountHolder(event.target.value)}
+                className={inputClass(Boolean(errors.accountHolder))}
+                placeholder="계좌 예금주명"
+                autoComplete="name"
               />
             </Field>
 

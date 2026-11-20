@@ -47,6 +47,9 @@ export interface BidItem {
   proposalText: string;
   status: BidStatus;
   createdAt: string;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  accountHolder?: string | null;
   creatorRating?: number;
   creatorCompletionRate?: number;
 }
@@ -74,6 +77,9 @@ export type CreateBidInput = Omit<BidItem, 'id' | 'createdAt' | 'status' | 'crea
   creatorId?: string | null;
   creatorEmail?: string | null;
   bankAccount?: string | null;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  accountHolder?: string | null;
 };
 
 export interface DataResult<T> {

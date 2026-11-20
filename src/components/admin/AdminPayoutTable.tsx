@@ -15,6 +15,8 @@ import {
   filterPayoutsByPeriod,
   summarizePayouts,
 } from '@/lib/payout-stats';
+import { formatSeoulDateLabel } from '@/lib/business-days';
+import { formatSettlementAccount } from '@/lib/settlement-account';
 import { WITHHOLDING_PERCENT } from '@/lib/fee-policy';
 import { applyPaidPayoutLocal } from '@/lib/payouts';
 import { formatAdminTimestamp, formatWon } from '@/lib/utils';
@@ -419,7 +421,15 @@ export function AdminPayoutTable({
                           className="mt-0.5 max-w-[120px]"
                         />
                         <AdminCopyText
-                          value={row.bankAccount || ''}
+                          value={
+                            formatSettlementAccount({
+                              bankName: row.bankName || '',
+                              accountNumber: row.accountNumber || '',
+                              accountHolder: row.accountHolder || '',
+                            }) ||
+                            row.bankAccount ||
+                            ''
+                          }
                           emptyLabel="계좌 미등록"
                           className="mt-0.5 max-w-[120px]"
                         />
@@ -437,6 +447,11 @@ export function AdminPayoutTable({
                       </td>
                       <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
                         {formatAdminTimestamp(row.paidAt || row.requestedAt)}
+                        {row.settlementDueAt ? (
+                          <p className="mt-0.5 text-[11px] text-zinc-500">
+                            정산 예정 {formatSeoulDateLabel(row.settlementDueAt)}
+                          </p>
+                        ) : null}
                       </td>
                       <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top tabular-nums text-ellipsis whitespace-nowrap text-zinc-600">
                         {formatWon(row.supplyAmount ?? 0)}

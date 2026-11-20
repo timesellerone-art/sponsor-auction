@@ -612,6 +612,9 @@ export async function createBid(
       deadline: auction.deadline,
       creatorEmail: data.creatorEmail,
       bankAccount: data.bankAccount,
+      bankName: data.bankName,
+      accountNumber: data.accountNumber,
+      accountHolder: data.accountHolder,
     });
     if (bidError) {
       return fail(null, bidError);
@@ -634,6 +637,9 @@ export async function createBid(
       creatorChannelUrl: data.creatorChannelUrl.trim(),
       bidAmount: data.bidAmount,
       proposalText: sanitizeUserText(data.proposalText, 'reject'),
+      bankName: data.bankName ?? '',
+      accountNumber: data.accountNumber ?? '',
+      accountHolder: data.accountHolder ?? '',
       status: data.status ?? 'pending',
       createdAt: new Date().toISOString(),
     };

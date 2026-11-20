@@ -1,4 +1,5 @@
 import { isDeadlinePassed } from '@/lib/auction-engine';
+import { settlementAccountError, settlementAccountFromParts } from '@/lib/settlement-account';
 import { isAuctionClosed, type AuctionStatus, type PlatformType } from '@/types/auction';
 import { validateBypassContent } from '@/lib/moderation/bypassFilter';
 
@@ -86,9 +87,19 @@ export function isValidBankAccount(value: string) {
 export function validateSettlementContact(input: {
   email?: string | null;
   bankAccount?: string | null;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  accountHolder?: string | null;
 }): string | null {
   if (!isValidSettlementEmail(input.email ?? '')) {
     return VALIDATION.settlementEmailRequired;
+  }
+  const structured = settlementAccountFromParts(input);
+  const hasStructured = Boolean(
+    input.bankName?.trim() || input.accountNumber?.trim() || input.accountHolder?.trim(),
+  );
+  if (hasStructured) {
+    return settlementAccountError(structured);
   }
   if (!isValidBankAccount(input.bankAccount ?? '')) {
     return VALIDATION.settlementAccountRequired;
@@ -128,6 +139,9 @@ export type BidFieldErrors = {
   bidAmount?: string;
   proposalText?: string;
   bankAccount?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolder?: string;
   settlementEmail?: string;
   agreeTerms?: string;
   agreePrivacy?: string;
@@ -217,6 +231,9 @@ export function validateBidForm(values: {
   auctionBudget?: number;
   creatorEmail?: string;
   bankAccount?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolder?: string;
   agreeTerms?: boolean;
   agreePrivacy?: boolean;
 }): BidFieldErrors {
@@ -257,8 +274,26 @@ export function validateBidForm(values: {
   if (!isValidSettlementEmail(values.creatorEmail ?? '')) {
     errors.settlementEmail = VALIDATION.settlementEmailRequired;
   }
-  if (!isValidBankAccount(values.bankAccount ?? '')) {
-    errors.bankAccount = VALIDATION.settlementAccountRequired;
+  const accountError = validateSettlementContact({
+    email: values.creatorEmail,
+    bankAccount: values.bankAccount,
+    bankName: values.bankName,
+    accountNumber: values.accountNumber,
+    accountHolder: values.accountHolder,
+  });
+  if (accountError && accountError !== VALIDATION.settlementEmailRequired) {
+    const structured = Boolean(
+      values.bankName?.trim() || values.accountNumber?.trim() || values.accountHolder?.trim(),
+    );
+    if (!structured) {
+      errors.bankAccount = accountError;
+    } else if (accountError.includes('은행')) {
+      errors.bankName = accountError;
+    } else if (accountError.includes('계좌')) {
+      errors.accountNumber = accountError;
+    } else {
+      errors.accountHolder = accountError;
+    }
   }
 
   if (!values.agreeTerms) {
@@ -435,6 +470,9 @@ export function validateBidPayload(input: {
   deadline?: string;
   creatorEmail?: string | null;
   bankAccount?: string | null;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  accountHolder?: string | null;
 }): string | null {
   const closedReason = getBidBlockReason({
     status: input.auctionStatus,
@@ -480,6 +518,9 @@ export function validateBidPayload(input: {
   const settlementError = validateSettlementContact({
     email: input.creatorEmail,
     bankAccount: input.bankAccount,
+    bankName: input.bankName,
+    accountNumber: input.accountNumber,
+    accountHolder: input.accountHolder,
   });
   if (settlementError) {
     return settlementError;

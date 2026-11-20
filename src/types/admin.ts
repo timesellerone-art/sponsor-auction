@@ -36,6 +36,10 @@ export interface PayoutItem {
   advertiserCharge?: number;
   adminMemo?: string;
   bankAccount?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountHolder?: string;
+  settlementDueAt?: string | null;
   supplyAmount?: number;
   vatAmount?: number;
   withholdingAmount?: number;

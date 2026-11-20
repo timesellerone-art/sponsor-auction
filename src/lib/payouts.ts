@@ -1,4 +1,11 @@
 import { applyAdminPayoutIntegrity } from '@/lib/admin-integrity';
+import { settlementDueAtIso } from '@/lib/business-days';
+import {
+  bankAccountWithHolder,
+  composeBankAccount,
+  settlementAccountFromBankField,
+  settlementAccountFromParts,
+} from '@/lib/settlement-account';
 import {
   advertiserPayableAmount,
   bidAmountFromCreatorPayout,
@@ -13,8 +20,11 @@ import type { PayoutItem, PayoutStatus } from '@/types/admin';
 import type { Database } from '@/types/database';
 import type { SponsorAuctionClient } from '@/lib/supabase';
 
-export const PAYOUT_COLUMNS =
+export const PAYOUT_COLUMNS_BANK =
   'id, creator_id, creator_name, creator_email, amount, status, auction_title, requested_at, paid_at, payment_order_id, auction_id, bid_id, admin_memo, bank_account';
+
+export const PAYOUT_COLUMNS =
+  `${PAYOUT_COLUMNS_BANK}, bank_name, account_number, account_holder, settlement_due_at`;
 
 export const PAYOUT_COLUMNS_CORE =
   'id, creator_id, creator_name, creator_email, amount, status, auction_title, requested_at';
@@ -73,6 +83,7 @@ export function mapPayout(row: Partial<PayoutRow> & Pick<PayoutRow, 'id' | 'stat
   }
 
   const amount = row.amount ?? 0;
+  const decodedAccount = settlementAccountFromBankField(row.bank_account);
   const bidAmount = bidAmountFromCreatorPayout(amount);
   const paymentOrderId = stablePayoutOrderId({
     paymentOrderId: row.payment_order_id,
@@ -98,6 +109,14 @@ export function mapPayout(row: Partial<PayoutRow> & Pick<PayoutRow, 'id' | 'stat
     advertiserCharge: advertiserPayableAmount(bidAmount),
     adminMemo: row.admin_memo ?? '',
     bankAccount: row.bank_account ?? '',
+    bankName: row.bank_name?.trim() || decodedAccount.bankName,
+    accountNumber: row.account_number?.trim() || decodedAccount.accountNumber,
+    accountHolder: row.account_holder?.trim() || decodedAccount.accountHolder,
+    settlementDueAt:
+      row.settlement_due_at ||
+      (row.status === 'pending' && row.requested_at
+        ? settlementDueAtIso(row.requested_at, 4)
+        : null),
   };
 }
 
@@ -213,6 +232,18 @@ async function selectPayouts(client: SponsorAuctionClient): Promise<PayoutItem[]
     .select(PAYOUT_COLUMNS)
     .order('requested_at', { ascending: false });
 
+  if (full.error && isSchemaMismatch(full.error)) {
+    const withBank = await client
+      .from('payouts')
+      .select(PAYOUT_COLUMNS_BANK)
+      .order('requested_at', { ascending: false });
+    if (!withBank.error) {
+      return (withBank.data ?? [])
+        .map((row) => mapPayout(row as PayoutRow))
+        .filter((item): item is PayoutItem => item !== null);
+    }
+  }
+
   if (!full.error) {
     return (full.data ?? [])
       .map((row) => mapPayout(row as PayoutRow))
@@ -289,6 +320,9 @@ type BidLookup = {
   creator_name: string;
   bid_amount: number;
   status: string;
+  bank_name?: string | null;
+  account_number?: string | null;
+  account_holder?: string | null;
 };
 
 type AuctionLookup = {
@@ -322,6 +356,33 @@ async function loadByIds<T extends { id: string }>(
   return (data ?? []) as unknown as T[];
 }
 
+const BID_LOOKUP_COLUMNS =
+  'id, auction_id, creator_id, creator_name, bid_amount, status, bank_name, account_number, account_holder';
+const BID_LOOKUP_CORE = 'id, auction_id, creator_id, creator_name, bid_amount, status';
+
+async function loadBidsForPayout(client: SponsorAuctionClient, ids: string[]) {
+  const full = await loadByIds<BidLookup>(client, 'bids', BID_LOOKUP_COLUMNS, ids);
+  if (full.length > 0) {
+    return full;
+  }
+  return loadByIds<BidLookup>(client, 'bids', BID_LOOKUP_CORE, ids);
+}
+
+function settlementColumns(bid?: BidLookup | null, requestedAt?: string) {
+  const account = settlementAccountFromParts({
+    bankName: bid?.bank_name,
+    accountNumber: bid?.account_number,
+    accountHolder: bid?.account_holder,
+  });
+  return {
+    bank_name: account.bankName,
+    account_number: account.accountNumber,
+    account_holder: account.accountHolder,
+    bank_account: composeBankAccount(account),
+    settlement_due_at: settlementDueAtIso(requestedAt || new Date().toISOString(), 4),
+  };
+}
+
 function buildInsert(input: {
   orderId?: string;
   auctionId: string;
@@ -332,6 +393,7 @@ function buildInsert(input: {
   creatorEmail: string;
   amount: number;
   requestedAt: string;
+  bid?: BidLookup | null;
 }): PayoutInsert | null {
   if (!input.auctionTitle.trim() || input.amount <= 0) {
     return null;
@@ -352,7 +414,52 @@ function buildInsert(input: {
     }) || null,
     auction_id: input.auctionId || null,
     bid_id: input.bidId || null,
+    ...settlementColumns(input.bid, input.requestedAt),
   };
+}
+
+async function savePendingPayout(client: SponsorAuctionClient, insert: PayoutInsert) {
+  const upsert = await client.from('payouts').upsert(insert, {
+    onConflict: 'payment_order_id',
+    ignoreDuplicates: true,
+  });
+  if (upsert.error && isSchemaMismatch(upsert.error)) {
+    const fallback = await client.from('payouts').insert({
+      creator_id: insert.creator_id,
+      creator_name: insert.creator_name,
+      creator_email: insert.creator_email,
+      amount: insert.amount,
+      status: 'pending',
+      auction_title: insert.auction_title,
+      requested_at: insert.requested_at,
+      payment_order_id: insert.payment_order_id,
+      auction_id: insert.auction_id,
+      bid_id: insert.bid_id,
+      bank_account: bankAccountWithHolder(
+        settlementAccountFromParts({
+          bankName: insert.bank_name,
+          accountNumber: insert.account_number,
+          accountHolder: insert.account_holder,
+        }),
+      ),
+    });
+    return fallback.error;
+  }
+  if (!upsert.error && insert.payment_order_id) {
+    await client
+      .from('payouts')
+      .update({
+        bank_name: insert.bank_name,
+        account_number: insert.account_number,
+        account_holder: insert.account_holder,
+        bank_account: insert.bank_account,
+        settlement_due_at: insert.settlement_due_at,
+        amount: insert.amount,
+      })
+      .eq('payment_order_id', insert.payment_order_id)
+      .eq('status', 'pending');
+  }
+  return upsert.error;
 }
 
 function virtualFromInsert(row: PayoutInsert, fallbackId: string): PayoutItem | null {
@@ -369,6 +476,11 @@ function virtualFromInsert(row: PayoutInsert, fallbackId: string): PayoutItem | 
     payment_order_id: row.payment_order_id ?? null,
     auction_id: row.auction_id ?? null,
     bid_id: row.bid_id ?? null,
+    bank_account: row.bank_account ?? '',
+    bank_name: row.bank_name ?? '',
+    account_number: row.account_number ?? '',
+    account_holder: row.account_holder ?? '',
+    settlement_due_at: row.settlement_due_at ?? null,
   });
   return mapped;
 }
@@ -385,12 +497,7 @@ export async function upsertPaidPayout(
 ) {
   try {
     const [bids, auctions] = await Promise.all([
-      loadByIds<BidLookup>(
-        client,
-        'bids',
-        'id, auction_id, creator_id, creator_name, bid_amount, status',
-        [input.bidId],
-      ),
+      loadBidsForPayout(client, [input.bidId]),
       loadByIds<AuctionLookup>(
         client,
         'auctions',
@@ -423,30 +530,15 @@ export async function upsertPaidPayout(
       creatorEmail: profile?.email || '',
       amount,
       requestedAt: auction?.updated_at || auction?.created_at || new Date().toISOString(),
+      bid,
     });
     if (!insert) {
       return;
     }
 
-    const upsert = await client.from('payouts').upsert(insert, {
-      onConflict: 'payment_order_id',
-      ignoreDuplicates: true,
-    });
-    if (upsert.error && !isSchemaMismatch(upsert.error)) {
-      const fallback = await client.from('payouts').insert({
-        creator_id: insert.creator_id,
-        creator_name: insert.creator_name,
-        creator_email: insert.creator_email,
-        amount: insert.amount,
-        status: 'pending',
-        auction_title: insert.auction_title,
-        requested_at: insert.requested_at,
-      });
-      if (fallback.error) {
-        console.error('[SponsorAuction] 결제 후 payouts 생성 실패', fallback.error);
-      }
-    } else if (upsert.error) {
-      console.error('[SponsorAuction] 결제 후 payouts 생성 실패', upsert.error);
+    const saved = await savePendingPayout(client, insert);
+    if (saved) {
+      console.error('[SponsorAuction] 결제 후 payouts 생성 실패', saved);
     } else {
       console.info('[SponsorAuction] 결제 후 payouts 반영', {
         orderId: input.orderId,
@@ -519,24 +611,14 @@ export async function listPayoutsFromDatabase(
   });
 
   const [bids, auctions, extraBids] = await Promise.all([
-    loadByIds<BidLookup>(
-      client,
-      'bids',
-      'id, auction_id, creator_id, creator_name, bid_amount, status',
-      bidIds,
-    ),
+    loadBidsForPayout(client, bidIds),
     loadByIds<AuctionLookup>(
       client,
       'auctions',
       'id, title, status, winner_bid_id, updated_at, created_at',
       auctionIds,
     ),
-    loadByIds<BidLookup>(
-      client,
-      'bids',
-      'id, auction_id, creator_id, creator_name, bid_amount, status',
-      completedAuctions.map((item) => item.winner_bid_id ?? ''),
-    ),
+    loadBidsForPayout(client, completedAuctions.map((item) => item.winner_bid_id ?? '')),
   ]);
 
   const bidMap = new Map([...bids, ...extraBids].map((item) => [item.id, item]));
@@ -609,6 +691,7 @@ export async function listPayoutsFromDatabase(
         creatorEmail: profile?.email || '',
         amount,
         requestedAt: payment.confirmedAt || auction?.updated_at || new Date().toISOString(),
+        bid,
       }),
       payment.orderId,
     );
@@ -634,6 +717,7 @@ export async function listPayoutsFromDatabase(
         creatorEmail: profile?.email || '',
         amount: creatorPayoutAmount(bid.bid_amount),
         requestedAt: auction.updated_at || auction.created_at || new Date().toISOString(),
+        bid,
       }),
       `auction:${auction.id}`,
     );
@@ -643,12 +727,11 @@ export async function listPayoutsFromDatabase(
     const withOrder = pendingInserts.filter((row) => row.payment_order_id);
     const withoutOrder = pendingInserts.filter((row) => !row.payment_order_id);
     if (withOrder.length > 0) {
-      const upserted = await client.from('payouts').upsert(withOrder, {
-        onConflict: 'payment_order_id',
-        ignoreDuplicates: true,
-      });
-      if (upserted.error) {
-        console.warn('[SponsorAuction] 정산 자동 생성(upsert) 실패', upserted.error.message);
+      for (const row of withOrder) {
+        const saved = await savePendingPayout(client, row);
+        if (saved) {
+          console.warn('[SponsorAuction] 정산 자동 생성(upsert) 실패', saved.message);
+        }
       }
     }
     if (withoutOrder.length > 0) {
@@ -764,13 +847,22 @@ async function fetchSelectedBid(
   if (!isUuid(auctionId)) {
     return undefined;
   }
-  const { data } = await client
+  const full = await client
     .from('bids')
-    .select('id, auction_id, creator_id, creator_name, bid_amount, status')
+    .select(BID_LOOKUP_COLUMNS)
     .eq('auction_id', auctionId)
     .eq('status', 'selected')
     .limit(1);
-  return (data?.[0] as BidLookup | undefined) ?? undefined;
+  if (!full.error) {
+    return (full.data?.[0] as BidLookup | undefined) ?? undefined;
+  }
+  const core = await client
+    .from('bids')
+    .select(BID_LOOKUP_CORE)
+    .eq('auction_id', auctionId)
+    .eq('status', 'selected')
+    .limit(1);
+  return (core.data?.[0] as BidLookup | undefined) ?? undefined;
 }
 
 function mapWriteResult(data: unknown) {
@@ -936,14 +1028,7 @@ export async function markPayoutPaid(
           [auctionId],
         )
       : Promise.resolve([]),
-    bidId
-      ? loadByIds<BidLookup>(
-          client,
-          'bids',
-          'id, auction_id, creator_id, creator_name, bid_amount, status',
-          [bidId],
-        )
-      : Promise.resolve([]),
+    bidId ? loadBidsForPayout(client, [bidId]) : Promise.resolve([]),
   ]);
 
   const auction = auctions[0];
@@ -952,12 +1037,7 @@ export async function markPayoutPaid(
   }
   let bid: BidLookup | undefined = bids[0];
   if (!bid && auction?.winner_bid_id) {
-    const winners = await loadByIds<BidLookup>(
-      client,
-      'bids',
-      'id, auction_id, creator_id, creator_name, bid_amount, status',
-      [auction.winner_bid_id],
-    );
+    const winners = await loadBidsForPayout(client, [auction.winner_bid_id]);
     bid = winners[0];
     bidId = bid?.id || bidId;
   }
@@ -1021,6 +1101,17 @@ export async function markPayoutPaid(
     auction_id: auctionId || null,
     bid_id: bidId || null,
   };
+  const settlement = settlementColumns(
+    bid,
+    (typeof payment?.confirmed_at === 'string' && payment.confirmed_at) ||
+      (typeof payment?.created_at === 'string' && payment.created_at) ||
+      paidAt,
+  );
+  if (settlement.account_number) {
+    Object.assign(row, settlement);
+  } else if (settlement.settlement_due_at) {
+    row.settlement_due_at = settlement.settlement_due_at;
+  }
 
   const persisted = await persistPaidPayout(client, row, rawId);
   if (!persisted.ok) {

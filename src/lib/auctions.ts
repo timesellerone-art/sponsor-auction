@@ -109,7 +109,7 @@ async function withAuctionSelect<T>(
 }
 
 const BID_COLUMNS =
-  'id, auction_id, creator_id, creator_name, creator_channel_url, bid_amount, proposal_text, status, created_at';
+  'id, auction_id, creator_id, creator_name, creator_channel_url, bid_amount, proposal_text, status, created_at, bank_name, account_number, account_holder';
 
 const BID_COLUMNS_CORE =
   'id, auction_id, creator_name, creator_channel_url, bid_amount, proposal_text, status, created_at';
@@ -170,6 +170,9 @@ function mapBid(row: Partial<BidRow> & Pick<BidRow, 'id'>): BidItem {
     creatorChannelUrl: row.creator_channel_url ?? '',
     bidAmount: row.bid_amount ?? 0,
     proposalText: maskOffPlatformContact(row.proposal_text ?? ''),
+    bankName: row.bank_name ?? '',
+    accountNumber: row.account_number ?? '',
+    accountHolder: row.account_holder ?? '',
     status: (row.status === 'selected' ? 'selected' : 'pending') as BidStatus,
     createdAt: row.created_at ?? '',
   };
@@ -508,6 +511,9 @@ export async function createBid(
       deadline: auction.deadline,
       creatorEmail: input.creatorEmail,
       bankAccount: input.bankAccount,
+      bankName: input.bankName,
+      accountNumber: input.accountNumber,
+      accountHolder: input.accountHolder,
     });
     if (bidError) {
       return fail(null, bidError);
@@ -568,16 +574,20 @@ export async function createBid(
           bid_amount: input.bidAmount,
           proposal_text: sanitizeUserText(input.proposalText, 'reject'),
           status: 'pending',
+          bank_name: (input.bankName ?? '').trim(),
+          account_number: (input.accountNumber ?? '').replace(/\D/g, ''),
+          account_holder: (input.accountHolder ?? '').trim(),
         })
         .select(BID_COLUMNS)
         .single();
 
       if (error && isSchemaMismatch(error)) {
         logDbError('입찰 등록 컬럼 폴백', error);
-        const retry = await supabase
+        const withoutSettlement = await supabase
           .from('bids')
           .insert({
             auction_id: auctionId,
+            creator_id: creatorId,
             creator_name: input.creatorName.trim(),
             creator_channel_url: input.creatorChannelUrl.trim(),
             bid_amount: input.bidAmount,
@@ -586,8 +596,24 @@ export async function createBid(
           })
           .select(BID_COLUMNS_CORE)
           .single();
-        data = retry.data as typeof data;
-        error = retry.error;
+        data = withoutSettlement.data as typeof data;
+        error = withoutSettlement.error;
+        if (error && isSchemaMismatch(error)) {
+          const retry = await supabase
+            .from('bids')
+            .insert({
+              auction_id: auctionId,
+              creator_name: input.creatorName.trim(),
+              creator_channel_url: input.creatorChannelUrl.trim(),
+              bid_amount: input.bidAmount,
+              proposal_text: sanitizeUserText(input.proposalText, 'reject'),
+              status: 'pending',
+            })
+            .select(BID_COLUMNS_CORE)
+            .single();
+          data = retry.data as typeof data;
+          error = retry.error;
+        }
       }
 
       if (error || !data) {

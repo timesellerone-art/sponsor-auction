@@ -233,6 +233,9 @@ export type Database = {
           proposal_text: string;
           status: 'pending' | 'selected';
           created_at: string;
+          bank_name: string;
+          account_number: string;
+          account_holder: string;
         };
         Insert: {
           id?: string;
@@ -244,6 +247,9 @@ export type Database = {
           proposal_text: string;
           status?: 'pending' | 'selected';
           created_at?: string;
+          bank_name?: string;
+          account_number?: string;
+          account_holder?: string;
         };
         Update: {
           auction_id?: string;
@@ -253,6 +259,9 @@ export type Database = {
           bid_amount?: number;
           proposal_text?: string;
           status?: 'pending' | 'selected';
+          bank_name?: string;
+          account_number?: string;
+          account_holder?: string;
         };
         Relationships: [];
       };
@@ -387,6 +396,10 @@ export type Database = {
           bid_id: string | null;
           admin_memo: string;
           bank_account: string;
+          bank_name: string;
+          account_number: string;
+          account_holder: string;
+          settlement_due_at: string | null;
         };
         Insert: {
           id?: string;
@@ -403,6 +416,10 @@ export type Database = {
           bid_id?: string | null;
           admin_memo?: string;
           bank_account?: string;
+          bank_name?: string;
+          account_number?: string;
+          account_holder?: string;
+          settlement_due_at?: string | null;
         };
         Update: {
           creator_id?: string | null;
@@ -418,6 +435,10 @@ export type Database = {
           bid_id?: string | null;
           admin_memo?: string;
           bank_account?: string;
+          bank_name?: string;
+          account_number?: string;
+          account_holder?: string;
+          settlement_due_at?: string | null;
         };
         Relationships: [];
       };

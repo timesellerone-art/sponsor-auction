@@ -260,8 +260,9 @@ export function parseBankAccountField(raw: string | null | undefined) {
   if (!trimmed) {
     return null;
   }
-  const accountNumber = digitsOnlyAccount(trimmed);
-  const bankRaw = trimmed.replace(/[0-9\-./()\s]+/g, ' ').trim();
+  const body = trimmed.split(' / ')[0]?.trim() ?? '';
+  const accountNumber = digitsOnlyAccount(body);
+  const bankRaw = body.replace(/[0-9\-./()\s]+/g, ' ').trim();
   const bankName = normalizeBankName(bankRaw);
   if (!bankName && accountNumber.length < 6) {
     return null;
@@ -323,7 +324,10 @@ export function collectPayoutTransferRows(payouts: PayoutItem[]) {
       continue;
     }
 
-    const parsed = parseBankAccountField(item.bankAccount);
+    const parsed =
+      item.bankName && item.accountNumber
+        ? { bankName: item.bankName, accountNumber: item.accountNumber }
+        : parseBankAccountField(item.bankAccount);
     if (!parsed?.bankName) {
       skipped.push(skip(item.id, 'missing_bank', '입금은행이 없어 제외합니다.'));
       continue;

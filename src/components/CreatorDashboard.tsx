@@ -9,6 +9,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { getCreatorDashboard } from '@/lib/dashboard';
 import { closeTimeSlot, listTimeSlots } from '@/lib/timeslots';
+import { addBusinessDays, formatSeoulDateLabel } from '@/lib/business-days';
 import { creatorPayoutAmount } from '@/lib/fees';
 import { auctionStatusLabel, bidStatusLabel } from '@/lib/status-labels';
 import { cn, formatDateTime, formatWon } from '@/lib/utils';
@@ -239,7 +240,13 @@ function DealCard({ deal, highlight = false }: { deal: CreatorDeal; highlight?: 
           </Link>
           <p className="mt-1 text-sm text-zinc-500">
             제안 금액 {formatWon(deal.bid.bidAmount)}
-            {paid ? ` · 예상 정산 ${formatWon(creatorPayoutAmount(deal.bid.bidAmount))}` : ''}
+            {paid
+              ? ` · 예상 정산 ${formatWon(creatorPayoutAmount(deal.bid.bidAmount))}${
+                  deal.payment?.confirmedAt
+                    ? ` · 정산 예정 ${formatSeoulDateLabel(addBusinessDays(deal.payment.confirmedAt, 4))}`
+                    : ''
+                }`
+              : ''}
           </p>
         </div>
         <span

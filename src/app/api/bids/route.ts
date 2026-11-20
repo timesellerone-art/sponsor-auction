@@ -103,6 +103,9 @@ export async function POST(request: Request) {
         proposalText,
         creatorEmail: asText(body?.creatorEmail),
         bankAccount: asText(body?.bankAccount),
+        bankName: asText(body?.bankName),
+        accountNumber: asText(body?.accountNumber),
+        accountHolder: asText(body?.accountHolder),
       },
       { client: supabase },
     );
