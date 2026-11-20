@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { randomBytes } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getTossClientKey, isTossClientConfigured } from '@/lib/payments/env';
@@ -15,7 +16,6 @@ import {
   isPaymentVerifyAmount,
 } from '@/lib/payment-verify';
 
-export const preferredRegion = 'icn1';
 
 function jsonError(status: number, errorCode: string, errorMessage: string) {
   return NextResponse.json({ error: errorMessage, errorCode, errorMessage }, { status });
@@ -63,6 +63,7 @@ export async function POST(request: Request) {
     });
     return response;
   } catch (error) {
+    rethrowPrerenderError(error);
     console.error('[SponsorAuction] PG 검수 결제 준비 실패', error);
     return jsonError(500, 'VERIFY_PREPARE_FAILED', '결제를 준비하지 못했습니다. 다시 시도해 주세요.');
   }

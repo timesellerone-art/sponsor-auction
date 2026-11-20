@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { getTossSecretKey, isTossSecretConfigured } from '@/lib/payments/env';
@@ -10,7 +11,6 @@ import {
   isPaymentVerifyOrderId,
 } from '@/lib/payment-verify';
 
-export const preferredRegion = 'icn1';
 
 function jsonError(status: number, errorCode: string, errorMessage: string) {
   return NextResponse.json({ error: `[${errorCode}] ${errorMessage}`, errorCode, errorMessage }, { status });
@@ -75,6 +75,7 @@ export async function POST(request: Request) {
       alreadyConfirmed: Boolean(toss.alreadyConfirmed),
     });
   } catch (error) {
+    rethrowPrerenderError(error);
     captureException(error, { area: 'payment_verify_confirm' });
     return jsonError(500, 'CONFIRM_EXCEPTION', '결제 승인 중 오류가 발생했습니다.');
   }

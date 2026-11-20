@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { listChatMessages, sendChatMessage } from '@/lib/chat';
@@ -50,6 +51,7 @@ export async function GET(request: Request) {
       { headers: NO_STORE },
     );
   } catch (error) {
+    rethrowPrerenderError(error);
     const message =
       error instanceof Error ? error.message : '채팅 메시지를 불러오지 못했습니다.';
     return NextResponse.json(
@@ -83,6 +85,7 @@ export async function POST(request: Request) {
     try {
       assertNoOffPlatformContact(body);
     } catch (error) {
+      rethrowPrerenderError(error);
       const message =
         error instanceof OffPlatformContactError
           ? error.message
@@ -113,6 +116,7 @@ export async function POST(request: Request) {
       { headers: NO_STORE },
     );
   } catch (error) {
+    rethrowPrerenderError(error);
     if (error instanceof OffPlatformContactError) {
       return NextResponse.json(
         {

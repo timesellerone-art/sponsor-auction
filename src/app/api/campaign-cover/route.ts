@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
@@ -103,6 +104,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ url: data.publicUrl }, { headers: NO_STORE });
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 캠페인 대표 사진 업로드 예외', error);
     return NextResponse.json(
       { error: '사진을 올리지 못했습니다. 캠페인은 기본 커버로 등록됩니다.' },

@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   ACCOUNT_LINK_COOKIE,
@@ -31,7 +32,6 @@ import {
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export const preferredRegion = 'icn1';
 
 function expireNaverCookies(response: NextResponse, origin: string) {
   expireNamedCookies(response.cookies, [...NAVER_OAUTH_COOKIE_NAMES], {
@@ -166,6 +166,7 @@ export async function GET(request: NextRequest) {
         }
         return { kind: 'login' as const, tokenHash: linked.tokenHash, next };
       } catch (error) {
+        rethrowPrerenderError(error);
         const message =
           error instanceof Error ? error.message : '네이버 로그인에 실패했습니다.';
         return { kind: 'error' as const, message };
@@ -201,6 +202,7 @@ export async function GET(request: NextRequest) {
       expireNaverCookies(completed.response, origin);
       return completed.response;
     } catch (error) {
+      rethrowPrerenderError(error);
       const resumed = await redirectExistingAuthUser({ request, origin, next: once.next });
       if (resumed) {
         expireNaverCookies(resumed, origin);
@@ -218,6 +220,7 @@ export async function GET(request: NextRequest) {
       return response;
     }
   } catch (error) {
+    rethrowPrerenderError(error);
     const detail = error instanceof Error ? error.message : '네이버 로그인에 실패했습니다.';
     console.warn('[SponsorAuction] 네이버 콜백 처리 예외', error);
     const origin = requestOrigin(request);

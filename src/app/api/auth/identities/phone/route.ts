@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { linkPhoneToAccount } from '@/lib/account-delete';
@@ -6,7 +7,6 @@ import { listLinkedAccountStatuses } from '@/lib/auth-identities';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export const preferredRegion = 'icn1';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE },
     );
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 휴대전화 연동 예외', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : '휴대전화를 연동하지 못했습니다.' },

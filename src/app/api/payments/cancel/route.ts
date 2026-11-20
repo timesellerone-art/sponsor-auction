@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { PAYMENT_INTENT_COOKIE, resolveIntent, updateIntent } from '@/lib/payments/intent';
@@ -5,7 +6,6 @@ import { canPreparePayment, forbiddenJson, getPaymentActor, unauthorizedJson } f
 import { persistPayment } from '@/lib/payments/persist';
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
 
-export const preferredRegion = 'icn1';
 
 export async function POST(request: Request) {
   try {
@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     console.info('[SponsorAuction] 결제 intent 취소 처리', { orderId });
     return NextResponse.json({ ok: true });
   } catch (error) {
+    rethrowPrerenderError(error);
     console.error('[SponsorAuction] 결제 취소 처리 중 예외가 발생했습니다.', error);
     return NextResponse.json({ ok: true });
   }

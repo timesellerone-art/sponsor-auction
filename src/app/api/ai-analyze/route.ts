@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { NextResponse } from 'next/server';
 import {
   buildFallbackReport,
@@ -171,6 +172,7 @@ export async function POST(request: Request) {
       report,
     } satisfies AiAnalyzeResponse);
   } catch (error) {
+    rethrowPrerenderError(error);
     const timedOut =
       error instanceof Error &&
       (error.name === 'AbortError' || error.message.toLowerCase().includes('abort'));

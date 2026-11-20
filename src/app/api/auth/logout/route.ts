@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import {
@@ -20,7 +21,6 @@ import { requestAppOrigin } from '@/lib/site-origin';
 import { createClient } from '@/lib/supabase/server';
 import { NAVER_NEXT_COOKIE, NAVER_STATE_COOKIE } from '@/lib/naver-oauth';
 
-export const preferredRegion = 'icn1';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
     expireAuthDebrisCookies(request, response, { secure, hostname });
     return response;
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 로그아웃 쿠키 정리 예외', error);
     return NextResponse.json({ ok: true }, { headers: NO_STORE });
   }

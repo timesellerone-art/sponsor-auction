@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { timingSafeEqual } from 'crypto';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -9,7 +10,6 @@ import {
 import { clientIp, consumeRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export const preferredRegion = 'icn1';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -88,6 +88,7 @@ export async function POST(request: Request) {
       { headers: NO_STORE },
     );
   } catch (error) {
+    rethrowPrerenderError(error);
     const message = error instanceof Error ? error.message : '크레딧 검증에 실패했습니다.';
     console.error('[SponsorAuction] 크레딧 원장 검증 실패', error);
     return NextResponse.json({ error: message }, { status: 500, headers: NO_STORE });

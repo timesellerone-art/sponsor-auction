@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { applyAuthCookies } from '@/lib/access';
@@ -164,6 +165,7 @@ export async function POST(request: Request) {
     });
     return response;
   } catch (error) {
+    rethrowPrerenderError(error);
     if (error instanceof AccountMergeUnavailableError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }

@@ -1,5 +1,6 @@
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { listBidsFromDatabase } from '@/lib/auctions';
 import {
   forbiddenJson,
@@ -38,6 +39,7 @@ export async function GET() {
     const bids = await listBidsFromDatabase(client);
     return NextResponse.json({ data: bids }, { headers: NO_STORE });
   } catch (error) {
+    rethrowPrerenderError(error);
     const message =
       error instanceof Error
         ? error.message

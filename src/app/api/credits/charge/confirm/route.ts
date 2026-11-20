@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
@@ -14,7 +15,6 @@ import { productionTossLiveKeyError } from '@/lib/launch-env';
 import { clientIp, consumeRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export const preferredRegion = 'icn1';
 
 const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate' } as const;
 
@@ -149,6 +149,7 @@ export async function POST(request: Request) {
 
     return jsonError(503, 'TOSS_SECRET_KEY_MISSING', '토스페이먼츠 비밀키가 없어 충전을 승인하지 못했습니다.');
   } catch (error) {
+    rethrowPrerenderError(error);
     const message = error instanceof Error ? error.message : '크레딧 충전에 실패했습니다.';
     console.error('[SponsorAuction] 크레딧 충전 승인 실패', error);
     return jsonError(500, 'CONFIRM_FAILED', message);

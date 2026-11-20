@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { notifyUpcomingDeadlines } from '@/lib/notification-deadline';
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
     const result = await notifyUpcomingDeadlines();
     return NextResponse.json({ data: result });
   } catch (error) {
+    rethrowPrerenderError(error);
     console.info('[Notification Mock] 마감 임박 알림 예외 수용', error);
     return NextResponse.json({ data: { scanned: 0, sent: 0, mocked: true } });
   }

@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
@@ -33,6 +34,7 @@ export async function GET(
     }
     return NextResponse.json({ data: result.data }, { headers: NO_STORE });
   } catch (error) {
+    rethrowPrerenderError(error);
     const message =
       error instanceof Error ? error.message : '타임슬롯을 불러오지 못했습니다.';
     return NextResponse.json(
@@ -82,6 +84,7 @@ export async function PATCH(
     }
     return NextResponse.json({ data: result.data }, { headers: NO_STORE });
   } catch (error) {
+    rethrowPrerenderError(error);
     const message =
       error instanceof Error ? error.message : '타임슬롯을 마감하지 못했습니다.';
     return NextResponse.json(

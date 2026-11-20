@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { isProductionRuntime } from '@/lib/launch-env';
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
       { headers: NO_STORE },
     );
   } catch (error) {
+    rethrowPrerenderError(error);
     const message = error instanceof Error ? error.message : '웹훅을 처리하지 못했습니다.';
     console.warn('[SponsorAuction] Realtime 웹훅 예외', error);
     if (isProductionRuntime()) {

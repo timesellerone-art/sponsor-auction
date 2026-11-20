@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
     const result = await deliverLifecycleNotification(input);
     return NextResponse.json({ data: result });
   } catch (error) {
+    rethrowPrerenderError(error);
     console.info('[Notification Mock] send API 예외 수용', error);
     return NextResponse.json({
       data: { ok: true, mocked: true, event: 'bid_received', text: '' },

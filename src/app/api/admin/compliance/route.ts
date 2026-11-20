@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { listComplianceLogs } from '@/lib/compliance';
@@ -29,6 +30,7 @@ export async function GET() {
     const data = await listComplianceLogs();
     return NextResponse.json({ data }, { headers: NO_STORE });
   } catch (error) {
+    rethrowPrerenderError(error);
     const message =
       error instanceof Error ? error.message : '모니터링 로그를 불러오지 못했습니다.';
     return NextResponse.json(

@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { NextResponse } from 'next/server';
 import {
   forbiddenJson,
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
+    rethrowPrerenderError(error);
     console.error('[SponsorAuction] 관리자 회원 상태 API 예외', error);
     return NextResponse.json({ error: '회원 상태를 저장하지 못했습니다.' }, { status: 500 });
   }

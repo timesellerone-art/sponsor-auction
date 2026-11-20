@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { NextResponse, type NextRequest } from 'next/server';
 import { readAuthUserIdFromCookies, writeAccountLinkCookie } from '@/lib/account-link';
 import { POST_AUTH_HOME, oauthFailedLoginPath, sanitizeNextPath } from '@/lib/auth-guard';
@@ -15,7 +16,6 @@ import {
 } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 
-export const preferredRegion = 'icn1';
 
 export async function GET(request: NextRequest) {
   try {
@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
     }
     return response;
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 네이버 로그인 시작에 실패했습니다.', error);
     return NextResponse.redirect(
       new URL(oauthFailedLoginPath('네이버 로그인을 시작하지 못했습니다.'), request.url),

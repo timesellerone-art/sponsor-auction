@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { extractJsonPayload, geminiGenerateUrl, getGeminiApiKey } from '@/lib/ai-guide';
@@ -168,6 +169,7 @@ export async function POST(request: Request) {
       const reply = sanitizeSupportReply(result.reply, quoteContext);
       return jsonOk(result.escalate ? `${reply}\n\n${SUPPORT_ESCALATION_MESSAGE}` : reply, result.escalate);
     } catch (error) {
+      rethrowPrerenderError(error);
       lastError = error instanceof Error ? error : new Error('request failed');
     }
   }

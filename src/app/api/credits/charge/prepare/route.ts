@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { createCreditChargeOrder, CREDIT_CHARGE_ORDER_NAME, isCreditChargeAmount } from '@/lib/credit-charge';
@@ -8,7 +9,6 @@ import { sanitizeCustomerKey } from '@/lib/payments/intent';
 import { clientIp, consumeRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export const preferredRegion = 'icn1';
 
 const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate' } as const;
 
@@ -87,6 +87,7 @@ export async function POST(request: Request) {
       { headers: NO_STORE },
     );
   } catch (error) {
+    rethrowPrerenderError(error);
     const message = error instanceof Error ? error.message : '충전 주문을 만들지 못했습니다.';
     console.error('[SponsorAuction] 크레딧 충전 준비 실패', error);
     return NextResponse.json({ error: message, errorCode: 'PREPARE_FAILED' }, { status: 500, headers: NO_STORE });

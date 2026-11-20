@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
@@ -10,7 +11,6 @@ import { getApiAuthUser } from '@/lib/auth-api-user';
 import { reconcileSocialIdentities } from '@/lib/auth-identity';
 import { expireAuthDebrisCookies } from '@/lib/auth-paths';
 
-export const preferredRegion = 'icn1';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
     writeAccountLinkCookie(response.cookies, mergedId, secure);
     return response;
   } catch (error) {
+    rethrowPrerenderError(error);
     console.error('[SponsorAuction] 소셜 계정 통합 중 예외가 발생했습니다.', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : '소셜 계정을 연결하지 못했습니다.' },

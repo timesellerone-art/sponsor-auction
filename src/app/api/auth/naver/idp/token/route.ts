@@ -1,8 +1,8 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { readNaverIdpTicket } from '@/lib/naver-idp';
 
-export const preferredRegion = 'icn1';
 
 function json(status: number, body: Record<string, unknown>) {
   return NextResponse.json(body, {
@@ -35,6 +35,7 @@ export async function POST(request: Request) {
       expires_in: Math.max(1, Math.floor((ticket.exp - Date.now()) / 1000)),
     });
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 네이버 IdP token 실패', error);
     return json(500, { error: 'server_error' });
   }

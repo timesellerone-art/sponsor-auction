@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { type NextRequest } from 'next/server';
 import {
@@ -8,7 +9,6 @@ import {
 import { requestOrigin } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 
-export const preferredRegion = 'icn1';
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       next,
     });
   } catch (error) {
+    rethrowPrerenderError(error);
     const detail = error instanceof Error ? error.message : '로그인 세션을 만들지 못했습니다.';
     console.warn('[SponsorAuction] 세션 완료 처리 예외', error);
     const origin = requestOrigin(request);

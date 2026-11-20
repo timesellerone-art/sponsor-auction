@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { createBid, getAuctionById } from '@/lib/auctions';
@@ -116,6 +117,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ data: result.data }, { headers: NO_STORE });
   } catch (error) {
+    rethrowPrerenderError(error);
     if (error instanceof OffPlatformContactError) {
       return NextResponse.json(
         {

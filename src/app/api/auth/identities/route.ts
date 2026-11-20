@@ -1,10 +1,10 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getApiAuthUser } from '@/lib/auth-api-user';
 import { listLinkedAccountStatuses } from '@/lib/auth-identities';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 
-export const preferredRegion = 'icn1';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -47,6 +47,7 @@ export async function GET(request: Request) {
       { headers: NO_STORE },
     );
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 연동 계정 조회 예외', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : '연동 계정을 불러오지 못했습니다.' },

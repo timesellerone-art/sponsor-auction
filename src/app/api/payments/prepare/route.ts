@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { NextResponse } from 'next/server';
 import { advertiserChargeMatchesBid, advertiserPayableAmount } from '@/lib/fees';
 import { productionTossLiveKeyError } from '@/lib/launch-env';
@@ -21,7 +22,6 @@ import { persistPayment } from '@/lib/payments/persist';
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
 import type { PreparePaymentInput, PreparePaymentResult } from '@/types/payment';
 
-export const preferredRegion = 'icn1';
 
 function parseBody(value: unknown): PreparePaymentInput | null {
   if (!value || typeof value !== 'object') {
@@ -159,6 +159,7 @@ export async function POST(request: Request) {
     });
     return response;
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 결제 준비 중 예외가 발생했습니다.', error);
     return NextResponse.json(
       { error: '결제를 준비하지 못했습니다. 다시 시도해 주세요.' },

@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -76,6 +77,7 @@ export async function GET() {
       { headers: NO_STORE },
     );
   } catch (error) {
+    rethrowPrerenderError(error);
     const message =
       error instanceof Error
         ? error.message
@@ -164,6 +166,7 @@ export async function POST(request: Request) {
       });
       console.info('[SponsorAuction] 정산 세금계산서 처리', tax);
     } catch (error) {
+      rethrowPrerenderError(error);
       console.warn('[SponsorAuction] 세금계산서 연동 우회', error);
     }
 
@@ -178,6 +181,7 @@ export async function POST(request: Request) {
         extra: `${result.data.amount}원`,
       });
     } catch (error) {
+      rethrowPrerenderError(error);
       console.info('[Notification Mock] 정산 알림 우회', error);
     }
 
@@ -189,6 +193,7 @@ export async function POST(request: Request) {
       { headers: NO_STORE },
     );
   } catch (error) {
+    rethrowPrerenderError(error);
     const message =
       error instanceof Error
         ? error.message

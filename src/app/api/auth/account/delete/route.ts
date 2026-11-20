@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { applyAuthCookies } from '@/lib/access';
@@ -7,7 +8,6 @@ import { expireAuthDebrisCookies } from '@/lib/auth-paths';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export const preferredRegion = 'icn1';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
     });
     return response;
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 회원 탈퇴 예외', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : '회원 탈퇴를 완료하지 못했습니다.' },

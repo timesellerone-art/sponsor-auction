@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { applyAuthCookies } from '@/lib/access';
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
     });
     return response;
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 가입 프로필 저장 예외', error);
     return NextResponse.json({ error: '프로필을 저장하지 못했습니다.' }, { status: 500 });
   }

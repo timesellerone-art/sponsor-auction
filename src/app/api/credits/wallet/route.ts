@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { CREDIT_CHARGE_AMOUNTS } from '@/lib/credit-charge';
@@ -6,7 +7,6 @@ import { canPreparePayment, forbiddenJson, getPaymentActor, unauthorizedJson } f
 import { clientIp, consumeRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export const preferredRegion = 'icn1';
 
 const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate' } as const;
 
@@ -46,6 +46,7 @@ export async function GET(request: Request) {
       { headers: NO_STORE },
     );
   } catch (error) {
+    rethrowPrerenderError(error);
     const message = error instanceof Error ? error.message : '크레딧을 조회하지 못했습니다.';
     console.error('[SponsorAuction] 크레딧 지갑 조회 실패', error);
     return NextResponse.json({ error: message, errorCode: 'WALLET_FAILED' }, { status: 500, headers: NO_STORE });

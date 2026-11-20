@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -75,6 +76,7 @@ export async function POST(request: Request) {
     revalidateTag('payouts', { expire: 0 });
     return NextResponse.json({ data: result.data }, { headers: NO_STORE });
   } catch (error) {
+    rethrowPrerenderError(error);
     const message =
       error instanceof Error
         ? error.message

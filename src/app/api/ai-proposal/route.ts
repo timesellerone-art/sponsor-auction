@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
@@ -87,6 +88,7 @@ async function generateWithGemini(input: ReturnType<typeof parseProposalBody>, a
       }
       return parsed;
     } catch (error) {
+      rethrowPrerenderError(error);
       lastError = error instanceof Error ? error : new Error('AI request failed');
     }
   }

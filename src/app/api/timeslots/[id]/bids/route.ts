@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
@@ -50,6 +51,7 @@ export async function GET(
     }
     return NextResponse.json({ data: result.data }, { headers: NO_STORE });
   } catch (error) {
+    rethrowPrerenderError(error);
     const message =
       error instanceof Error ? error.message : '제안 목록을 불러오지 못했습니다.';
     return NextResponse.json(
@@ -88,6 +90,7 @@ export async function POST(
     try {
       assertNoOffPlatformContact(message);
     } catch (error) {
+      rethrowPrerenderError(error);
       const text =
         error instanceof OffPlatformContactError
           ? error.message
@@ -114,6 +117,7 @@ export async function POST(
     }
     return NextResponse.json({ data: result.data }, { headers: NO_STORE });
   } catch (error) {
+    rethrowPrerenderError(error);
     const message =
       error instanceof Error ? error.message : '제안을 등록하지 못했습니다.';
     return NextResponse.json(

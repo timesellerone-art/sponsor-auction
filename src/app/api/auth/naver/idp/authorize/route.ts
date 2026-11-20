@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { NextResponse } from 'next/server';
 import { oauthFailedLoginPath } from '@/lib/auth-guard';
 import { appOriginFromIdpRequest, signNaverIdpState } from '@/lib/naver-idp';
@@ -8,7 +9,6 @@ import {
 } from '@/lib/naver-oauth';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 
-export const preferredRegion = 'icn1';
 
 export async function GET(request: Request) {
   try {
@@ -45,6 +45,7 @@ export async function GET(request: Request) {
       }),
     );
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 네이버 IdP authorize 실패', error);
     return NextResponse.redirect(
       new URL(oauthFailedLoginPath('네이버 로그인을 시작하지 못했습니다.'), request.url),

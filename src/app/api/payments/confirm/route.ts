@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { describeTossSecret, getTossClientKey, getTossSecretKey, isTossSecretConfigured } from '@/lib/payments/env';
@@ -19,7 +20,6 @@ import { captureException } from '@/lib/monitoring';
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
 import type { ConfirmPaymentInput, ConfirmPaymentResult } from '@/types/payment';
 
-export const preferredRegion = 'icn1';
 
 function jsonError(
   status: number,
@@ -50,6 +50,7 @@ async function resolveAwardBidAmount(auctionId: string, bidId: string): Promise<
       return Math.round(bid.bidAmount);
     }
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 낙찰가 조회에 실패했습니다.', error);
   }
 
@@ -380,6 +381,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(result, { status: 200 });
   } catch (error) {
+    rethrowPrerenderError(error);
     console.error('[SponsorAuction] 결제 승인 중 예외가 발생했습니다.', error);
     captureException(error, { area: 'payment_confirm' });
     const errorMessage =

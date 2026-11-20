@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { isCreditChargeOrderId, loadCreditChargeOrder, settleCreditCharge } from '@/lib/credit-charge';
@@ -21,7 +22,6 @@ import {
 import { paymentDbConfigForRequest } from '@/lib/supabase/payment-config';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-export const preferredRegion = 'icn1';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -391,6 +391,7 @@ export async function POST(request: Request) {
 
     return json(200, { ok: true, ignored: true, orderId: payment.orderId });
   } catch (error) {
+    rethrowPrerenderError(error);
     captureException(error, { area: 'toss_webhook' });
     const message = error instanceof Error ? error.message : '웹훅을 처리하지 못했습니다.';
     console.error('[SponsorAuction] Toss 웹훅 예외', error);

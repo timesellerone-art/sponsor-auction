@@ -1,3 +1,4 @@
+import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
@@ -49,6 +50,7 @@ export async function GET() {
 
     return NextResponse.json({ data: profiles }, { headers: NO_STORE });
   } catch (error) {
+    rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 관리자 회원 목록 API 예외', error);
     return NextResponse.json(
       { error: '회원 목록을 불러오지 못했습니다.' },

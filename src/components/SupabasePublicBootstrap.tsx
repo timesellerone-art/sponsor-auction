@@ -1,9 +1,7 @@
-import { connection } from 'next/server';
-import { readRuntimeSupabasePublicConfig } from '@/lib/supabase/public-config';
+import { readSupabasePublicConfig } from '@/lib/supabase/public-config';
 
-export async function SupabasePublicBootstrap() {
-  await connection();
-  const config = readRuntimeSupabasePublicConfig();
+export function SupabasePublicBootstrap() {
+  const config = readSupabasePublicConfig();
   if (!config) {
     return null;
   }
