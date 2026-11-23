@@ -20,6 +20,7 @@ export const TRANSFER_XLSX_MIME =
 export type TransferSkipReason =
   | 'paid'
   | 'cancelled'
+  | 'hold'
   | 'missing_bank'
   | 'missing_account'
   | 'orphan'
@@ -312,6 +313,10 @@ export function collectPayoutTransferRows(payouts: PayoutItem[]) {
     }
     if (status === 'cancelled' || status === 'canceled' || status === 'refunded') {
       skipped.push(skip(item.id, 'cancelled', '취소 건은 대량이체 대상이 아닙니다.'));
+      continue;
+    }
+    if (status === 'hold') {
+      skipped.push(skip(item.id, 'hold', '보류 중인 정산은 대량이체 대상이 아닙니다.'));
       continue;
     }
     if (!isTransferPendingStatus(status)) {

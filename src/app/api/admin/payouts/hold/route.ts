@@ -10,7 +10,7 @@ const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate' } as c
 export async function POST(request: Request) {
   try {
     await connection();
-    const actor = await getPaymentActor(request);
+    const actor = await getPaymentActor();
     if (!actor) {
       return unauthorizedJson('정산 보류를 하려면 로그인해 주세요.');
     }

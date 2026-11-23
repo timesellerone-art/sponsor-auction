@@ -96,6 +96,7 @@ describe('대량이체 대상 필터', () => {
       } as unknown as PayoutItem,
       payout({ id: 'paid', status: 'paid', bidAmount: 10_000 }),
       payout({ id: 'cancelled', status: 'cancelled', bidAmount: 10_000 }),
+      payout({ id: 'held', status: 'hold', bidAmount: 10_000 }),
       {
         ...payout({ id: 'canceled', status: 'pending', bidAmount: 10_000 }),
         status: 'canceled',
@@ -140,6 +141,7 @@ describe('대량이체 대상 필터', () => {
       [
         'cancelled',
         'cancelled',
+        'hold',
         'missing_account',
         'missing_bank',
         'orphan',

@@ -425,6 +425,12 @@ export function AdminDashboard({
       }
       return null;
     }
+    if (latest.status === 'hold') {
+      if (!options?.silent) {
+        showToast('보류 중인 정산은 지급할 수 없습니다. 보류를 해제한 뒤 지급해 주세요.');
+      }
+      return null;
+    }
     if (!latest.creatorEmail?.trim() || !latest.bankAccount?.trim()) {
       if (!options?.silent) {
         showToast(VALIDATION.payoutMissingContact);
@@ -491,13 +497,19 @@ export function AdminDashboard({
   const handleHoldPayout = async (payout: PayoutItem, hold: boolean) => {
     await run(payout.id, async () => {
       try {
-        const response = await fetch(
-          '/api/admin/payouts/hold',
-          await authRequestInit({
-            method: 'POST',
-            body: JSON.stringify({ id: payout.id, hold }),
+        const response = await fetch('/api/admin/payouts/hold', {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          },
+          body: JSON.stringify({
+            id: payout.paymentOrderId || payout.id,
+            hold,
           }),
-        );
+        });
         const body = (await response.json().catch(() => null)) as {
           data?: PayoutItem;
           error?: string;
@@ -507,8 +519,19 @@ export function AdminDashboard({
           showToast(body?.error || '정산 보류를 저장하지 못했습니다.');
           return;
         }
+        const saved = body.data;
         setPayouts((prev) =>
-          prev.map((item) => (item.id === payout.id ? { ...item, ...body.data, id: item.id } : item)),
+          prev.map((item) =>
+            item.id === payout.id
+              ? {
+                  ...item,
+                  ...saved,
+                  id: item.id,
+                  paymentOrderId: saved.paymentOrderId || item.paymentOrderId || null,
+                  status: saved.status,
+                }
+              : item,
+          ),
         );
         showToast(hold ? '정산을 보류했습니다.' : '정산 보류를 해제했습니다.', 'success');
       } catch {

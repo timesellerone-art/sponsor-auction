@@ -100,6 +100,9 @@ export function AdminPayoutTable({
           };
         });
       });
+      setSelectedIds((prev) =>
+        prev.filter((id) => incoming.some((item) => item.id === id && item.status === 'pending')),
+      );
     }, 0);
     return () => {
       window.clearTimeout(timer);

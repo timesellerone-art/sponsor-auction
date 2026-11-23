@@ -114,7 +114,7 @@ export function mapPayout(row: Partial<PayoutRow> & Pick<PayoutRow, 'id' | 'stat
     accountHolder: row.account_holder?.trim() || decodedAccount.accountHolder,
     settlementDueAt:
       row.settlement_due_at ||
-      (row.status === 'pending' && row.requested_at
+      ((row.status === 'pending' || row.status === 'hold') && row.requested_at
         ? settlementDueAtIso(row.requested_at, 4)
         : null),
   };
@@ -995,6 +995,69 @@ async function persistPaidPayout(
   };
 }
 
+async function findPayoutHoldTarget(
+  client: SponsorAuctionClient,
+  rawId: string,
+): Promise<{ ok: true; id: string; status: string } | { ok: false; message: string }> {
+  const attempts: Array<{ column: 'id' | 'payment_order_id'; value: string }> = [];
+  if (isUuid(rawId)) {
+    attempts.push({ column: 'id', value: rawId });
+  }
+  attempts.push({ column: 'payment_order_id', value: rawId });
+  if (rawId.startsWith('auction:')) {
+    const auctionId = rawId.slice('auction:'.length).trim();
+    if (auctionId) {
+      const byAuction = await client
+        .from('payouts')
+        .select('id, status')
+        .eq('auction_id', auctionId)
+        .neq('status', 'paid')
+        .order('requested_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (byAuction.error) {
+        if (
+          isSchemaMismatch(byAuction.error) ||
+          /payout_status|invalid input value/i.test(byAuction.error.message)
+        ) {
+          return {
+            ok: false,
+            message: '정산 보류 상태가 데이터베이스에 없습니다. 마이그레이션을 적용해 주세요.',
+          };
+        }
+        return { ok: false, message: '정산 상태를 확인하지 못했습니다.' };
+      }
+      if (byAuction.data?.id) {
+        return { ok: true, id: byAuction.data.id, status: String(byAuction.data.status) };
+      }
+    }
+  }
+
+  for (const attempt of attempts) {
+    const current = await client
+      .from('payouts')
+      .select('id, status')
+      .eq(attempt.column, attempt.value)
+      .maybeSingle();
+    if (current.error) {
+      if (
+        isSchemaMismatch(current.error) ||
+        /payout_status|invalid input value/i.test(current.error.message)
+      ) {
+        return {
+          ok: false,
+          message: '정산 보류 상태가 데이터베이스에 없습니다. 마이그레이션을 적용해 주세요.',
+        };
+      }
+      return { ok: false, message: '정산 상태를 확인하지 못했습니다.' };
+    }
+    if (current.data?.id) {
+      return { ok: true, id: current.data.id, status: String(current.data.status) };
+    }
+  }
+  return { ok: false, message: '정산 행을 찾지 못했습니다.' };
+}
+
 export async function setPayoutHold(
   client: SponsorAuctionClient,
   input: { id: string; hold: boolean },
@@ -1003,17 +1066,11 @@ export async function setPayoutHold(
   if (!id) {
     return { ok: false, message: '정산 ID가 필요합니다.' };
   }
-  const current = await client.from('payouts').select('id, status').eq('id', id).maybeSingle();
-  if (current.error) {
-    if (isSchemaMismatch(current.error) || /payout_status|invalid input value/i.test(current.error.message)) {
-      return { ok: false, message: '정산 보류 상태가 데이터베이스에 없습니다. 마이그레이션을 적용해 주세요.' };
-    }
-    return { ok: false, message: '정산 상태를 확인하지 못했습니다.' };
+  const current = await findPayoutHoldTarget(client, id);
+  if (!current.ok) {
+    return current;
   }
-  if (!current.data) {
-    return { ok: false, message: '정산 행을 찾지 못했습니다.' };
-  }
-  const status = String(current.data.status);
+  const status = current.status;
   if (status === 'paid' || status === 'cancelled') {
     return { ok: false, message: '지급 완료이거나 취소된 정산은 보류할 수 없습니다.' };
   }
@@ -1027,7 +1084,7 @@ export async function setPayoutHold(
   const updated = await client
     .from('payouts')
     .update({ status: next })
-    .eq('id', id)
+    .eq('id', current.id)
     .select(PAYOUT_COLUMNS_BANK)
     .maybeSingle();
   if (updated.error) {
@@ -1036,7 +1093,19 @@ export async function setPayoutHold(
     }
     return { ok: false, message: '정산 보류를 저장하지 못했습니다.' };
   }
-  const mapped = updated.data ? mapPayout(updated.data) : null;
+  if (!updated.data) {
+    const fallback = await client
+      .from('payouts')
+      .select(PAYOUT_COLUMNS_CORE)
+      .eq('id', current.id)
+      .maybeSingle();
+    const mappedFallback = fallback.data ? mapPayout(fallback.data) : null;
+    if (mappedFallback) {
+      return { ok: true, data: { ...mappedFallback, status: next } };
+    }
+    return { ok: false, message: '정산 보류 결과를 읽지 못했습니다.' };
+  }
+  const mapped = mapPayout(updated.data);
   if (!mapped) {
     return { ok: false, message: '정산 보류 결과를 읽지 못했습니다.' };
   }
@@ -1049,12 +1118,6 @@ export async function markPayoutPaid(
 ): Promise<{ ok: true; data: PayoutItem } | { ok: false; message: string }> {
   const paidAt = new Date().toISOString();
   const rawId = (input.id || '').trim();
-  if (isUuid(rawId)) {
-    const existing = await client.from('payouts').select('status').eq('id', rawId).maybeSingle();
-    if (existing.data?.status === 'hold') {
-      return { ok: false, message: '보류 중인 정산은 지급할 수 없습니다. 보류를 해제한 뒤 지급해 주세요.' };
-    }
-  }
   let orderId = (input.paymentOrderId || '').trim();
   let auctionId = (input.auctionId || '').trim();
   let bidId = (input.bidId || '').trim();
@@ -1064,6 +1127,11 @@ export async function markPayoutPaid(
   }
   if (rawId && !orderId && !isUuid(rawId) && !rawId.startsWith('auction:')) {
     orderId = rawId;
+  }
+
+  const holdLookup = await findPayoutHoldTarget(client, orderId || rawId);
+  if (holdLookup.ok && holdLookup.status === 'hold') {
+    return { ok: false, message: '보류 중인 정산은 지급할 수 없습니다. 보류를 해제한 뒤 지급해 주세요.' };
   }
 
   const payment = await fetchConfirmedPayment(client, orderId, auctionId);
