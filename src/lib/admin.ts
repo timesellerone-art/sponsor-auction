@@ -243,6 +243,7 @@ export async function getAdminBids(seedFromServer: BidItem[] = []): Promise<Data
 
 export async function getPayouts(seedFromServer: PayoutItem[] = []): Promise<DataResult<PayoutItem[]>> {
   let fromDb: PayoutItem[] = asPayoutItems(seedFromServer);
+  let apiOk = false;
 
   try {
     const response = await fetch('/api/admin/payouts', {
@@ -252,12 +253,18 @@ export async function getPayouts(seedFromServer: PayoutItem[] = []): Promise<Dat
     });
     const payload = await parseAdminJson(response, 'GET');
     if (response.ok && Array.isArray(payload?.data)) {
+      // 운영 DB 응답이 있으면 데모 세션보다 우선한다. 빈 배열도 실제 조회 결과로 본다.
       fromDb = asPayoutItems(payload.data);
+      apiOk = true;
     } else if (!payload?.fallbackMock && response.status !== 409 && !response.ok && fromDb.length === 0) {
       return fail([], payload?.error || payload?.errorMessage || '정산 목록을 불러오지 못했습니다.');
     }
   } catch (error) {
     console.warn('[SponsorAuction] 정산 API 목록 조회 실패', error);
+  }
+
+  if (apiOk || fromDb.length > 0) {
+    return ok(fromDb);
   }
 
   const mock = await mockGetSession();
@@ -268,10 +275,6 @@ export async function getPayouts(seedFromServer: PayoutItem[] = []): Promise<Dat
       return fail([], '정산 요청이 없습니다.');
     }
     return ok(mockItems);
-  }
-
-  if (fromDb.length > 0) {
-    return ok(fromDb);
   }
 
   return getMockPayouts();
