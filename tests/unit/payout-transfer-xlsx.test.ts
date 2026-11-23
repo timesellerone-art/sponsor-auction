@@ -10,6 +10,7 @@ import {
   digitsOnlyAccount,
   parseBankAccountField,
   parsePayoutTransferXlsx,
+  resolveTransferAccount,
   transferPayoutAmount,
 } from '../../src/lib/payout-transfer-xlsx';
 import { describeSettlementAmounts } from '../../src/lib/settlement-amounts';
@@ -52,6 +53,19 @@ describe('계좌번호 정규화', () => {
     const parsed = parseBankAccountField('010-1234-5678');
     assert.equal(parsed?.bankName, '');
     assert.equal(parsed?.accountNumber, '01012345678');
+  });
+
+  it('은행 / 계좌 / 예금주 형식을 파싱한다', () => {
+    const parsed = parseBankAccountField('국민은행 / 123456789012 / 정산보류검증');
+    assert.equal(parsed?.bankName, '국민은행');
+    assert.equal(parsed?.accountNumber, '123456789012');
+    const resolved = resolveTransferAccount({
+      bankName: '국민은행',
+      accountNumber: '123456789012',
+      bankAccount: '',
+    });
+    assert.equal(resolved?.bankName, '국민은행');
+    assert.equal(resolved?.accountNumber, '123456789012');
   });
 });
 
@@ -110,10 +124,15 @@ describe('대량이체 대상 필터', () => {
         bidAmount: 10_000,
       }),
       payout({
-        id: 'orphan-no-campaign',
+        id: 'pending-no-auction-id',
         status: 'pending',
         auctionId: '',
-        bidAmount: 10_000,
+        auctionTitle: '[검증] 정산 보류 테스트 캠페인',
+        bankName: '국민은행',
+        accountNumber: '123456789012',
+        bankAccount: '국민은행 / 123456789012 / 정산보류검증',
+        bidAmount: 100_000,
+        amount: 88_000,
       }),
       payout({
         id: 'no-bank',
@@ -131,15 +150,19 @@ describe('대량이체 대상 필터', () => {
 
     assert.deepEqual(
       rows.map((item) => item.sourceId).sort(),
-      ['pending-ok', 'pending-payout-ok'],
+      ['pending-no-auction-id', 'pending-ok', 'pending-payout-ok'],
     );
-    assert.equal(rows[0]?.bankName === '신한은행' || rows[1]?.bankName === '신한은행', true);
+    const kb = rows.find((item) => item.sourceId === 'pending-no-auction-id');
+    assert.equal(kb?.bankName, '국민은행');
+    assert.equal(kb?.accountNumber, '123456789012');
     assert.equal(
-      rows.every(
-        (item) =>
-          item.accountNumber === '110123456789' &&
-          item.amount === describeSettlementAmounts(10_000, 'individual').transferAmount,
-      ),
+      rows
+        .filter((item) => item.sourceId !== 'pending-no-auction-id')
+        .every(
+          (item) =>
+            item.accountNumber === '110123456789' &&
+            item.amount === describeSettlementAmounts(10_000, 'individual').transferAmount,
+        ),
       true,
     );
     assert.deepEqual(
@@ -150,7 +173,6 @@ describe('대량이체 대상 필터', () => {
         'hold',
         'missing_account',
         'missing_bank',
-        'orphan',
         'orphan',
         'paid',
       ],

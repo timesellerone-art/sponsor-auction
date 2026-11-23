@@ -190,12 +190,17 @@ export function AdminPayoutTable({
   };
 
   const handleExport = () => {
-    const result = downloadPayoutTransferXlsx(rows);
+    const selected =
+      selectedIds.length > 0 ? rows.filter((item) => selectedIds.includes(item.id)) : [];
+    const targets = selected.length > 0 ? selected : rows;
+    const result = downloadPayoutTransferXlsx(targets);
     if (result.rowCount === 0) {
       showToast(
         result.skipped.length > 0
-          ? '내려받을 지급 대기 정산이 없습니다. 계좌 누락·지급 완료·취소 건은 제외했습니다.'
-          : '지급 대기 중인 정산이 없습니다.',
+          ? '내려받을 지급 대기 정산이 없습니다. 계좌 누락·보류·지급 완료·취소 건은 제외했습니다.'
+          : selectedIds.length > 0
+            ? '선택한 항목 중 지급 대기·계좌 등록 건이 없습니다.'
+            : '지급 대기 중인 정산이 없습니다.',
       );
       return;
     }

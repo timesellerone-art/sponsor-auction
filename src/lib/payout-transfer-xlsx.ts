@@ -261,10 +261,40 @@ export function parseBankAccountField(raw: string | null | undefined) {
   if (!trimmed) {
     return null;
   }
-  const body = trimmed.split(' / ')[0]?.trim() ?? '';
+  // "은행 / 계좌 / 예금주" 또는 "은행 계좌" 모두 허용
+  const parts = trimmed.split(/\s*\/\s*/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const bankName = normalizeBankName(parts[0] ?? '');
+    const accountNumber = digitsOnlyAccount(parts[1] ?? '');
+    if (!bankName && accountNumber.length < 6) {
+      return null;
+    }
+    return { bankName, accountNumber };
+  }
+  const body = parts[0] ?? trimmed;
   const accountNumber = digitsOnlyAccount(body);
   const bankRaw = body.replace(/[0-9\-./()\s]+/g, ' ').trim();
   const bankName = normalizeBankName(bankRaw);
+  if (!bankName && accountNumber.length < 6) {
+    return null;
+  }
+  return { bankName, accountNumber };
+}
+
+export function resolveTransferAccount(item: Pick<PayoutItem, 'bankName' | 'accountNumber' | 'bankAccount'>) {
+  const fromPartsBank = normalizeBankName((item.bankName ?? '').trim());
+  const fromPartsAccount = digitsOnlyAccount(item.accountNumber ?? '');
+  if (fromPartsBank && fromPartsAccount.length >= 6) {
+    return { bankName: fromPartsBank, accountNumber: fromPartsAccount };
+  }
+  const parsed = parseBankAccountField(item.bankAccount);
+  if (parsed?.bankName && parsed.accountNumber.length >= 6) {
+    return parsed;
+  }
+  // 은행·계좌가 필드에 나뉘어 일부만 채워진 경우 병합
+  const bankName = fromPartsBank || parsed?.bankName || '';
+  const accountNumber =
+    fromPartsAccount.length >= 6 ? fromPartsAccount : parsed?.accountNumber || '';
   if (!bankName && accountNumber.length < 6) {
     return null;
   }
@@ -326,16 +356,13 @@ export function collectPayoutTransferRows(payouts: PayoutItem[]) {
       skipped.push(skip(item.id, 'cancelled', '지급 대기가 아닌 건은 제외합니다.'));
       continue;
     }
-    const campaignId = (item.auctionId ?? '').trim();
-    if (!campaignId || (item.auctionTitle || '').trim() === DELETED_CAMPAIGN_LABEL) {
-      skipped.push(skip(item.id, 'orphan', '캠페인 식별자가 없는 고아 정산은 제외합니다.'));
+    // 삭제된 캠페인만 고아로 제외. auction_id 없는 수동/검증 지급 대기 건은 계좌만 있으면 포함.
+    if ((item.auctionTitle || '').trim() === DELETED_CAMPAIGN_LABEL) {
+      skipped.push(skip(item.id, 'orphan', '삭제된 캠페인 정산은 대량이체 대상이 아닙니다.'));
       continue;
     }
 
-    const parsed =
-      item.bankName && item.accountNumber
-        ? { bankName: item.bankName, accountNumber: item.accountNumber }
-        : parseBankAccountField(item.bankAccount);
+    const parsed = resolveTransferAccount(item);
     if (!parsed?.bankName) {
       skipped.push(skip(item.id, 'missing_bank', '입금은행이 없어 제외합니다.'));
       continue;
