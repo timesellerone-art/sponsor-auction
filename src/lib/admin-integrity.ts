@@ -48,9 +48,7 @@ function bidAmountForPayout(payout: PayoutItem, bids: BidRef[]) {
 }
 
 function taxKindForPayout(item: PayoutItem, profile?: ProfileTaxRef | null): CreatorTaxKind {
-  if (item.taxKind === 'individual' || item.taxKind === 'business') {
-    return item.taxKind;
-  }
+  // 검증 상태 기준으로 매번 재산정한다. (번호만 있는 무증빙을 사업자로 굳히지 않음)
   return creatorTaxKind({
     businessVerificationStatus:
       profile?.businessVerificationStatus ?? item.businessVerificationStatus,

@@ -27,10 +27,12 @@ const payout = (overrides: Partial<PayoutItem> = {}): PayoutItem => ({
 });
 
 describe('settlement amounts', () => {
-  it('개인은 3.3% 원천징수 후 10원 절사 실지급, 사업자는 원천징수 0이다', () => {
+  it('개인은 3.3% 원천징수·부가세 0, 검증 사업자는 원천징수 0·부가세 10%(별도)', () => {
     const individual = describeSettlementAmounts(100_000, 'individual');
     assert.equal(individual.creatorFee, 12_000);
     assert.equal(individual.finalSettlement, 88_000);
+    assert.equal(individual.supplyAmount, 100_000);
+    assert.equal(individual.taxInvoiceSupply, 88_000);
     assert.equal(individual.withholdingAmount, 2_904);
     assert.equal(individual.vatAmount, 0);
     assert.equal(individual.transferAmount, floorToTenWon(88_000 - 2_904));
@@ -40,12 +42,13 @@ describe('settlement amounts', () => {
     const business = describeSettlementAmounts(100_000, 'business');
     assert.equal(business.withholdingAmount, 0);
     assert.equal(business.vatAmount, 8_800);
+    assert.equal(business.taxInvoiceSupply, 88_000);
     assert.equal(business.transferAmount, 88_000);
     assert.equal(business.finalSettlement, creatorPayoutAmount(100_000));
     assert.equal(business.advertiserCharge, advertiserPayableAmount(100_000));
   });
 
-  it('사업자등록번호 보유/검증이면 사업자 세무다', () => {
+  it('검증완료만 사업자 세무이고 번호만 있으면 개인이다', () => {
     assert.equal(
       creatorTaxKind({
         businessVerificationStatus: 'verified',
@@ -58,7 +61,14 @@ describe('settlement amounts', () => {
         businessVerificationStatus: 'unregistered',
         businessRegistrationNumber: '1208800001',
       }),
-      'business',
+      'individual',
+    );
+    assert.equal(
+      creatorTaxKind({
+        businessVerificationStatus: 'review_required',
+        businessRegistrationNumber: '1208800001',
+      }),
+      'individual',
     );
     assert.equal(
       creatorTaxKind({
@@ -69,13 +79,24 @@ describe('settlement amounts', () => {
     );
   });
 
-  it('목록 enrichment이 개인/사업자 세무를 구분한다', () => {
+  it('목록 enrichment이 검증 여부로 개인/사업자 세무를 구분한다', () => {
     const personal = enrichPayoutAmounts(payout(), [], []);
     assert.equal(personal.taxKind, 'individual');
     assert.ok((personal.withholdingAmount ?? 0) > 0);
     assert.equal(personal.vatAmount, 0);
     assert.equal(personal.netPayoutAmount, 88_000);
     assert.equal(personal.transferAmount, floorToTenWon(88_000 - (personal.withholdingAmount ?? 0)));
+
+    const numberOnly = enrichPayoutAmounts(payout(), [], [
+      {
+        id: 'creator-1',
+        businessRegistrationNumber: '1208800001',
+        businessVerificationStatus: 'unregistered',
+      },
+    ]);
+    assert.equal(numberOnly.taxKind, 'individual');
+    assert.ok((numberOnly.withholdingAmount ?? 0) > 0);
+    assert.equal(numberOnly.vatAmount, 0);
 
     const company = enrichPayoutAmounts(payout(), [], [
       {

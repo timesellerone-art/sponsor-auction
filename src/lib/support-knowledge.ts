@@ -69,7 +69,7 @@ export function buildSupportSystemPrompt(quoteContext?: string) {
 - 광고주: 낙찰 금액의 ${ADVERTISER_FEE_PERCENT}%를 결제 시 합산합니다.
 ${CREATOR_BRACKET_COPY}
 - 개인 크리에이터: 수수료 공제 후 금액에 사업소득 ${WITHHOLDING_PERCENT}% 원천징수를 안내합니다.
-- 사업자 크리에이터: 수수료 공제 후 공급가에 VAT ${VAT_PERCENT}%를 세금계산서로 별도 발행합니다.
+- 사업자등록번호 검증 크리에이터: 수수료 공제 후 최종 정산액(공급가)에 VAT ${VAT_PERCENT}%를 세금계산서로 별도 발행하고 원천징수는 0원입니다. 미검증은 개인과 동일하게 원천징수합니다.
 
 행동 규칙:
 - 친절하고 명확한 한국어 존댓말로 2~8문장 이내로 답합니다.

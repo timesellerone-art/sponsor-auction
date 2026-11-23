@@ -17,31 +17,34 @@ type AdminPayoutTaxModalProps = {
 type TaxRow = { label: string; display: string };
 
 export function AdminPayoutTaxModal({ payout, onClose }: AdminPayoutTaxModalProps) {
-  const taxKind = payout.taxKind === 'business' ? '사업자' : '개인';
+  const isBusiness = payout.taxKind === 'business';
+  const taxKind = isBusiness ? '사업자(검증완료)' : '개인(미검증·원천징수)';
+  const finalSettlement = payout.netPayoutAmount ?? payout.amount;
   const transfer =
     payout.transferAmount ??
-    Math.max(0, (payout.netPayoutAmount ?? payout.amount) - (payout.withholdingAmount ?? 0));
+    Math.max(0, finalSettlement - (payout.withholdingAmount ?? 0));
   const rows: TaxRow[] = [
     { label: '세무 구분', display: taxKind },
-    { label: '낙찰 금액(공급가액)', display: formatWon(payout.bidAmount ?? payout.supplyAmount ?? 0) },
     {
-      label: `광고주 결제 합계(${ADVERTISER_FEE_PERCENT}% 합산)`,
+      label: '낙찰 금액(공급가액)',
+      display: formatWon(payout.bidAmount ?? payout.supplyAmount ?? 0),
+    },
+    {
+      label: `광고주 결제 합계(수수료 ${ADVERTISER_FEE_PERCENT}% 합산)`,
       display: formatWon(payout.advertiserCharge ?? 0),
     },
     { label: '크리에이터 수수료(공제액)', display: formatWon(payout.platformFee ?? 0) },
-    { label: '최종 정산액', display: formatWon(payout.netPayoutAmount ?? payout.amount) },
+    { label: '최종 정산액', display: formatWon(finalSettlement) },
     {
-      label:
-        payout.taxKind === 'business'
-          ? `원천징수(${WITHHOLDING_PERCENT}%, 사업자 0원)`
-          : `개인 원천징수(${WITHHOLDING_PERCENT}%)`,
+      label: isBusiness
+        ? `원천징수(${WITHHOLDING_PERCENT}%, 검증 사업자 0원)`
+        : `개인 원천징수(${WITHHOLDING_PERCENT}%)`,
       display: formatWon(payout.withholdingAmount ?? 0),
     },
     {
-      label:
-        payout.taxKind === 'business'
-          ? `사업자 부가세(${VAT_PERCENT}%, 별도)`
-          : `사업자 부가세(${VAT_PERCENT}%, 개인 0원)`,
+      label: isBusiness
+        ? `부가세(${VAT_PERCENT}%, 최종 정산액 기준 별도)`
+        : `부가세(${VAT_PERCENT}%, 개인 0원)`,
       display: formatWon(payout.vatAmount ?? 0),
     },
     { label: '실지급액(10원 절사)', display: formatWon(transfer) },

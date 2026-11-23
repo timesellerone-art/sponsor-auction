@@ -9,9 +9,9 @@ import {
 import {
   advertiserPayableAmount,
   bidAmountFromCreatorPayout,
+  creatorPlatformFeeAmount,
   creatorPayoutAmount,
   creatorPayoutFromCharge,
-  platformFeeFromAmount,
 } from '@/lib/fees';
 import { VALIDATION } from '@/lib/validation';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
@@ -105,7 +105,7 @@ export function mapPayout(row: Partial<PayoutRow> & Pick<PayoutRow, 'id' | 'stat
     auctionId: row.auction_id ?? null,
     bidId: row.bid_id ?? null,
     bidAmount,
-    platformFee: platformFeeFromAmount(bidAmount),
+    platformFee: creatorPlatformFeeAmount(bidAmount),
     advertiserCharge: advertiserPayableAmount(bidAmount),
     adminMemo: row.admin_memo ?? '',
     bankAccount: row.bank_account ?? '',

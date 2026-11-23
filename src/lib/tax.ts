@@ -39,7 +39,7 @@ export function splitAdvertiserInvoice(bidAmount: number): AdvertiserTaxSplit {
   const amounts = describeSettlementAmounts(bidAmount);
   return {
     supplyAmount: amounts.supplyAmount,
-    // 광고주 청구서의 가산분은 수수료 15%(VAT 항목명으로 쓰이던 자리)
+    // 광고주 합산 수수료 15%. 크리에이터 부가세(10%)와 별개 — 필드명 vatAmount는 레거시 호환.
     vatAmount: amounts.advertiserFee,
     totalAmount: amounts.advertiserCharge,
   };

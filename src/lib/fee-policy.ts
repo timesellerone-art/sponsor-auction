@@ -206,7 +206,7 @@ export function formatFeeQuoteKorean(quote: FeeQuote) {
     `제안 금액 ${formatWonAmount(quote.amount)}은 ${quote.bracketLabel}이라 크리에이터 수수료 ${quote.creatorRatePercent}%가 단일 구간으로 적용됩니다.`,
     `플랫폼 수수료 ${formatWonAmount(quote.creatorFee)}를 공제하면 ${formatWonAmount(quote.creatorPayout)}입니다.`,
     `개인 크리에이터는 사업소득 ${WITHHOLDING_PERCENT}% 원천징수 ${formatWonAmount(quote.individualWithholding)}를 추가로 떼면 실수령 ${formatWonAmount(quote.individualNet)}입니다.`,
-    `사업자 크리에이터는 공급가 ${formatWonAmount(quote.businessSupply)}에 VAT ${VAT_PERCENT}% ${formatWonAmount(quote.businessVat)}를 별도 세금계산서로 발행합니다.`,
+    `사업자등록번호 검증 크리에이터는 최종 정산액(공급가) ${formatWonAmount(quote.businessSupply)}에 VAT ${VAT_PERCENT}% ${formatWonAmount(quote.businessVat)}를 별도 세금계산서로 발행하고 원천징수는 없습니다.`,
     `광고주는 같은 낙찰액에 수수료 ${quote.advertiserRatePercent}% ${formatWonAmount(quote.advertiserFee)}를 합산해 ${formatWonAmount(quote.advertiserPayable)}를 결제합니다.`,
   ].join(' ');
 }
