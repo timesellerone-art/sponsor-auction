@@ -77,31 +77,38 @@ describe('fees: 가드 및 기본 금액', () => {
 
 describe('tax: 공급가액·부가세·원천징수·최종 정산금', () => {
   it('10,000원 제안 세금 분해가 정확하다', () => {
-    const tax = describeSettlementTax(10_000);
-    assert.deepEqual(tax.advertiser, {
+    const individual = describeSettlementTax(10_000, 'individual');
+    assert.deepEqual(individual.advertiser, {
       supplyAmount: 10_000,
       vatAmount: 1_500,
       totalAmount: 11_500,
     });
-    assert.deepEqual(tax.creator, {
+    assert.deepEqual(individual.creator, {
       awardAmount: 10_000,
       platformFee: 1_200,
       withholdingAmount: 290,
-      businessVatAmount: 880,
+      businessVatAmount: 0,
       netPayout: 8_800,
       individualNetPayout: 8_510,
     });
+    const business = describeSettlementTax(10_000, 'business');
+    assert.equal(business.creator.withholdingAmount, 0);
+    assert.equal(business.creator.businessVatAmount, 880);
+    assert.equal(business.creator.individualNetPayout, 8_800);
   });
 
   it('1,500,000원 제안 세금 분해가 정확하다', () => {
-    const tax = describeSettlementTax(1_500_000);
+    const tax = describeSettlementTax(1_500_000, 'individual');
     assert.equal(tax.advertiser.supplyAmount, 1_500_000);
     assert.equal(tax.advertiser.totalAmount, 1_725_000);
     assert.equal(tax.creator.platformFee, 150_000);
     assert.equal(tax.creator.withholdingAmount, 44_550);
-    assert.equal(tax.creator.businessVatAmount, 135_000);
+    assert.equal(tax.creator.businessVatAmount, 0);
     assert.equal(tax.creator.netPayout, 1_350_000);
     assert.equal(tax.creator.individualNetPayout, 1_305_450);
+    const business = describeSettlementTax(1_500_000, 'business');
+    assert.equal(business.creator.withholdingAmount, 0);
+    assert.equal(business.creator.businessVatAmount, 135_000);
   });
 
   it('0원 제안은 세금 분해가 모두 0이다', () => {
@@ -135,7 +142,10 @@ describe('정산 항등식: 입찰가 스위프', () => {
 
       assert.equal(creator.platformFee, roundWon(creator.awardAmount * rate));
       assert.equal(creator.withholdingAmount, roundWon(creator.netPayout * WITHHOLDING_RATE));
-      assert.equal(creator.businessVatAmount, roundWon(creator.netPayout * VAT_RATE));
+      assert.equal(creator.businessVatAmount, 0);
+      const business = splitCreatorSettlement(bid, 'business');
+      assert.equal(business.withholdingAmount, 0);
+      assert.equal(business.businessVatAmount, roundWon(business.netPayout * VAT_RATE));
       assert.equal(creator.netPayout, Math.max(0, creator.awardAmount - creator.platformFee));
       assert.equal(creatorGross, creator.netPayout);
       assert.equal(platform, advertiserFeeFromBid(invoice.supplyAmount) + creator.platformFee);

@@ -625,16 +625,32 @@ export async function listPayoutsFromDatabase(
   const auctionMap = new Map(
     [...auctions, ...completedAuctions].map((item) => [item.id, item]),
   );
-  const creatorIds = [...bidMap.values()]
-    .map((item) => item.creator_id)
-    .filter((id): id is string => Boolean(id));
-  const profiles = await loadByIds<{ id: string; name: string; email: string }>(
+  const creatorIds = [
+    ...[...bidMap.values()].map((item) => item.creator_id),
+    ...existing.map((item) => item.creatorId),
+  ].filter((id): id is string => Boolean(id));
+  type ProfileLookup = {
+    id: string;
+    name: string;
+    email: string;
+    business_registration_number?: string | null;
+    business_verification_status?: string | null;
+  };
+  let profiles = await loadByIds<ProfileLookup>(
     client,
     'profiles',
-    'id, name, email',
+    'id, name, email, business_registration_number, business_verification_status',
     creatorIds,
   );
+  if (profiles.length === 0) {
+    profiles = await loadByIds<ProfileLookup>(client, 'profiles', 'id, name, email', creatorIds);
+  }
   const profileMap = new Map(profiles.map((item) => [item.id, item]));
+  const profileTaxRefs = profiles.map((item) => ({
+    id: item.id,
+    businessRegistrationNumber: item.business_registration_number ?? '',
+    businessVerificationStatus: item.business_verification_status ?? undefined,
+  }));
 
   const pendingInserts: PayoutInsert[] = [];
   const virtual: PayoutItem[] = [];
@@ -752,6 +768,7 @@ export async function listPayoutsFromDatabase(
           bidAmount: item.bid_amount,
           status: item.status === 'selected' ? 'selected' : 'pending',
         })),
+        profileTaxRefs,
       );
     } catch {
       return applyAdminPayoutIntegrity(
@@ -763,6 +780,7 @@ export async function listPayoutsFromDatabase(
           bidAmount: item.bid_amount,
           status: item.status === 'selected' ? 'selected' : 'pending',
         })),
+        profileTaxRefs,
       );
     }
   }
@@ -776,6 +794,7 @@ export async function listPayoutsFromDatabase(
       bidAmount: item.bid_amount,
       status: item.status === 'selected' ? 'selected' : 'pending',
     })),
+    profileTaxRefs,
   );
 }
 

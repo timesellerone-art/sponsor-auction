@@ -273,9 +273,12 @@ export function parseBankAccountField(raw: string | null | undefined) {
 
 export function transferPayoutAmount(item: PayoutItem) {
   const enriched = enrichPayoutAmounts(item);
+  if (typeof enriched.transferAmount === 'number' && Number.isFinite(enriched.transferAmount)) {
+    return enriched.transferAmount;
+  }
   const fromNet = enriched.netPayoutAmount;
   if (typeof fromNet === 'number' && Number.isFinite(fromNet) && fromNet > 0) {
-    return floorToTenWon(fromNet);
+    return floorToTenWon(Math.max(0, fromNet - (enriched.withholdingAmount ?? 0)));
   }
   const bidAmount =
     enriched.bidAmount && enriched.bidAmount > 0

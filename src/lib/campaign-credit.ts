@@ -1,4 +1,5 @@
 import { advertiserFeeFromBid, advertiserPayableAmount } from '@/lib/fee-policy';
+import { assertAdvertiserHoldMatchesSettlement } from '@/lib/settlement-amounts';
 import {
   deductUserCredit,
   restoreUserCredit,
@@ -51,6 +52,9 @@ export function campaignHoldQuote(bidAmount: number) {
   const bid = Math.round(bidAmount);
   const fee = advertiserFeeFromBid(bid);
   const amount = advertiserPayableAmount(bid);
+  if (!assertAdvertiserHoldMatchesSettlement(bid, amount)) {
+    throw new Error('광고주 15% 수수료 합산액이 정산 기준과 맞지 않습니다.');
+  }
   return { bid, fee, amount };
 }
 

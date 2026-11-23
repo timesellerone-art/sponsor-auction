@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { DELETED_CAMPAIGN_LABEL } from '../../src/lib/admin-integrity';
-import { floorToTenWon } from '../../src/lib/fees';
 import { calculateCreatorPayout } from '../../src/lib/payments/payout';
 import {
   TRANSFER_RECIPIENT_LABEL,
@@ -13,6 +12,7 @@ import {
   parsePayoutTransferXlsx,
   transferPayoutAmount,
 } from '../../src/lib/payout-transfer-xlsx';
+import { describeSettlementAmounts } from '../../src/lib/settlement-amounts';
 import type { PayoutItem } from '../../src/types/admin';
 
 function payout(partial: Partial<PayoutItem> & Pick<PayoutItem, 'id' | 'status'>): PayoutItem {
@@ -56,7 +56,7 @@ describe('계좌번호 정규화', () => {
 });
 
 describe('실정산액 10원 절사', () => {
-  it('구간 수수료 공제 후 10원 단위 절사가 payout.ts와 일치한다', () => {
+  it('개인 원천징수 반영 후 10원 단위 절사가 정산 유틸과 일치한다', () => {
     for (const bid of [10_000, 12_345, 33_333, 980_000, 1_234_567]) {
       const item = payout({
         id: `payout-${bid}`,
@@ -64,7 +64,8 @@ describe('실정산액 10원 절사', () => {
         bidAmount: bid,
         amount: calculateCreatorPayout(bid),
       });
-      assert.equal(transferPayoutAmount(item), floorToTenWon(calculateCreatorPayout(bid)));
+      const expected = describeSettlementAmounts(bid, 'individual').transferAmount;
+      assert.equal(transferPayoutAmount(item), expected);
       assert.equal(transferPayoutAmount(item) % 10, 0);
     }
   });
@@ -77,7 +78,8 @@ describe('실정산액 10원 절사', () => {
       amount: calculateCreatorPayout(333),
     });
     assert.equal(calculateCreatorPayout(333), 293);
-    assert.equal(transferPayoutAmount(item), 290);
+    assert.equal(transferPayoutAmount(item), describeSettlementAmounts(333, 'individual').transferAmount);
+    assert.equal(transferPayoutAmount(item) % 10, 0);
   });
 });
 
@@ -133,7 +135,11 @@ describe('대량이체 대상 필터', () => {
     );
     assert.equal(rows[0]?.bankName === '신한은행' || rows[1]?.bankName === '신한은행', true);
     assert.equal(
-      rows.every((item) => item.accountNumber === '110123456789' && item.amount === 8_800),
+      rows.every(
+        (item) =>
+          item.accountNumber === '110123456789' &&
+          item.amount === describeSettlementAmounts(10_000, 'individual').transferAmount,
+      ),
       true,
     );
     assert.deepEqual(
@@ -183,9 +189,9 @@ describe('xlsx 라운드트립', () => {
     const area = parsed.rows.find((row) => row.accountNumber.startsWith('02'));
     assert.equal(phone?.accountNumber, '01012345678');
     assert.equal(phone?.bankName, '우리은행');
-    assert.equal(phone?.amount, floorToTenWon(calculateCreatorPayout(12_345)));
+    assert.equal(phone?.amount, describeSettlementAmounts(12_345, 'individual').transferAmount);
     assert.equal(area?.accountNumber, '02123456789');
-    assert.equal(area?.amount, floorToTenWon(calculateCreatorPayout(33_333)));
+    assert.equal(area?.amount, describeSettlementAmounts(33_333, 'individual').transferAmount);
     assert.equal(/<f[ >]/.test(parsed.xml), false);
     assert.equal(/=SUM/i.test(parsed.xml), false);
     assert.equal(parsed.xml.includes('t="inlineStr"'), false);

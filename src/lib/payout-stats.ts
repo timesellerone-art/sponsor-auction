@@ -12,6 +12,7 @@ function payoutTime(item: PayoutItem) {
 }
 
 export function enrichPayout(item: PayoutItem): PayoutItem {
+  // 이미 세무 종류가 붙은 행은 재계산해도 taxKind를 유지한다.
   return enrichPayoutAmounts(item);
 }
 

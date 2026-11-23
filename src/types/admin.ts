@@ -55,6 +55,11 @@ export interface PayoutItem {
   vatAmount?: number;
   withholdingAmount?: number;
   netPayoutAmount?: number;
+  /** 원천징수 반영 후 이체액(10원 절사) */
+  transferAmount?: number;
+  taxKind?: 'individual' | 'business';
+  businessRegistrationNumber?: string;
+  businessVerificationStatus?: BusinessVerificationStatus;
   platformNetFee?: number;
 }
 

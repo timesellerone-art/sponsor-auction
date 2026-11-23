@@ -1,12 +1,10 @@
 import {
-  advertiserPayableAmount,
-  bidAmountFromCreatorPayout,
-  creatorCombinedFeeAmount,
-  floorToTenWon,
-  platformNetFeeFromBid,
-} from '@/lib/fees';
-import { calculateCreatorPayout } from '@/lib/payments/payout';
-import { describeSettlementTax } from '@/lib/tax';
+  creatorTaxKind,
+  isBusinessVerificationStatus,
+  type CreatorTaxKind,
+} from '@/lib/business-registration';
+import { bidAmountFromCreatorPayout } from '@/lib/fees';
+import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import type { PayoutItem } from '@/types/admin';
 import type { AuctionItem, BidItem } from '@/types/auction';
 
@@ -14,9 +12,18 @@ export const DELETED_CAMPAIGN_LABEL = '(삭제된 캠페인)';
 
 type AuctionRef = Pick<AuctionItem, 'id' | 'title'> & { status?: string | null };
 type BidRef = Pick<BidItem, 'id' | 'auctionId' | 'bidAmount' | 'status'>;
+type ProfileTaxRef = {
+  id: string;
+  businessRegistrationNumber?: string | null;
+  businessVerificationStatus?: string | null;
+};
 
 function auctionById(auctions: AuctionRef[]) {
   return new Map(auctions.map((item) => [item.id, item]));
+}
+
+function profileById(profiles: ProfileTaxRef[]) {
+  return new Map(profiles.map((item) => [item.id, item]));
 }
 
 function bidAmountForPayout(payout: PayoutItem, bids: BidRef[]) {
@@ -40,6 +47,18 @@ function bidAmountForPayout(payout: PayoutItem, bids: BidRef[]) {
   return bidAmountFromCreatorPayout(payout.amount);
 }
 
+function taxKindForPayout(item: PayoutItem, profile?: ProfileTaxRef | null): CreatorTaxKind {
+  if (item.taxKind === 'individual' || item.taxKind === 'business') {
+    return item.taxKind;
+  }
+  return creatorTaxKind({
+    businessVerificationStatus:
+      profile?.businessVerificationStatus ?? item.businessVerificationStatus,
+    businessRegistrationNumber:
+      profile?.businessRegistrationNumber ?? item.businessRegistrationNumber,
+  });
+}
+
 export function campaignTitleForAdmin(
   auction: AuctionRef | null | undefined,
   campaignId?: string | null,
@@ -55,24 +74,38 @@ export function campaignTitleForAdmin(
   return fallback || DELETED_CAMPAIGN_LABEL;
 }
 
-export function enrichPayoutAmounts(item: PayoutItem, bids: BidRef[] = []): PayoutItem {
+export function enrichPayoutAmounts(
+  item: PayoutItem,
+  bids: BidRef[] = [],
+  profiles: ProfileTaxRef[] = [],
+): PayoutItem {
   const bidAmount = bidAmountForPayout(item, bids);
-  const tax = describeSettlementTax(bidAmount);
-  const netPayoutAmount = floorToTenWon(calculateCreatorPayout(bidAmount));
+  const profile = item.creatorId ? profileById(profiles).get(item.creatorId) : undefined;
+  const taxKind = taxKindForPayout(item, profile);
+  const amounts = describeSettlementAmounts(bidAmount, taxKind);
+  const statusRaw =
+    profile?.businessVerificationStatus ?? item.businessVerificationStatus ?? '';
   return {
     ...item,
-    bidAmount,
-    platformFee: floorToTenWon(creatorCombinedFeeAmount(bidAmount)),
-    platformNetFee: platformNetFeeFromBid(bidAmount),
-    advertiserCharge: floorToTenWon(advertiserPayableAmount(bidAmount)),
-    supplyAmount: floorToTenWon(tax.advertiser.supplyAmount),
-    vatAmount: floorToTenWon(tax.creator.businessVatAmount),
-    withholdingAmount: floorToTenWon(tax.creator.withholdingAmount),
-    netPayoutAmount,
+    bidAmount: amounts.bidAmount,
+    taxKind: amounts.taxKind,
+    businessRegistrationNumber:
+      profile?.businessRegistrationNumber ?? item.businessRegistrationNumber,
+    businessVerificationStatus: isBusinessVerificationStatus(statusRaw)
+      ? statusRaw
+      : item.businessVerificationStatus,
+    platformFee: amounts.creatorFee,
+    platformNetFee: amounts.platformNetFee,
+    advertiserCharge: amounts.advertiserCharge,
+    supplyAmount: amounts.supplyAmount,
+    vatAmount: amounts.vatAmount,
+    withholdingAmount: amounts.withholdingAmount,
+    netPayoutAmount: amounts.finalSettlement,
+    transferAmount: amounts.transferAmount,
     amount:
       item.status === 'paid' || item.status === 'cancelled'
         ? item.amount
-        : netPayoutAmount || item.amount,
+        : amounts.finalSettlement || item.amount,
   };
 }
 
@@ -80,10 +113,11 @@ export function applyAdminPayoutIntegrity(
   payouts: PayoutItem[],
   auctions: AuctionRef[] = [],
   bids: BidRef[] = [],
+  profiles: ProfileTaxRef[] = [],
 ): PayoutItem[] {
   const auctionsMap = auctionById(auctions);
   return payouts.map((item) => {
-    const enriched = enrichPayoutAmounts(item, bids);
+    const enriched = enrichPayoutAmounts(item, bids, profiles);
     const auction = item.auctionId ? auctionsMap.get(item.auctionId) : undefined;
     const cancelled = auction?.status === 'cancelled';
     const missingCampaign = Boolean(item.auctionId) && !auction;

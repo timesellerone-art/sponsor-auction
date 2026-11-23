@@ -64,6 +64,23 @@ export function businessNumberError(value: string | null | undefined) {
   return null;
 }
 
+export type CreatorTaxKind = 'individual' | 'business';
+
+/** 사업자등록번호 보유 또는 검증완료면 사업자 세무(원천징수 없음), 그 외는 개인. */
+export function creatorTaxKind(input: {
+  businessVerificationStatus?: string | null;
+  businessRegistrationNumber?: string | null;
+}): CreatorTaxKind {
+  const raw = input.businessVerificationStatus ?? '';
+  if (isBusinessVerificationStatus(raw) && raw === 'verified') {
+    return 'business';
+  }
+  if (isValidBusinessRegistrationNumber(input.businessRegistrationNumber)) {
+    return 'business';
+  }
+  return 'individual';
+}
+
 export function businessActionBlock(
   status: string | null | undefined,
   action: 'charge' | 'campaign',

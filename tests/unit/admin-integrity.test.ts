@@ -59,11 +59,17 @@ describe('관리자 정산 정합성', () => {
     assert.equal(platformNetFeeFromBid(980_000), floorToTenWon(platformFeeFromAmount(980_000)));
   });
 
-  it('최종 정산액은 크리에이터 구간 수수료 공제와 같다', () => {
+  it('최종 정산액은 크리에이터 구간 수수료 공제와 같고 실지급은 원천징수 후 10원 절사다', () => {
     const [row] = applyAdminPayoutIntegrity([basePayout], [auction('active')]);
     assert.equal(row.netPayoutAmount, creatorPayoutAmount(980_000));
     assert.equal(row.platformFee, creatorCombinedFeeAmount(980_000));
     assert.equal(row.amount, creatorPayoutAmount(980_000));
+    assert.equal(row.taxKind, 'individual');
+    assert.ok((row.withholdingAmount ?? 0) > 0);
+    assert.equal(
+      row.transferAmount,
+      floorToTenWon(creatorPayoutAmount(980_000) - (row.withholdingAmount ?? 0)),
+    );
   });
 
   it('취소된 캠페인의 정산은 취소/무효가 된다', () => {

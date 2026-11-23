@@ -182,8 +182,9 @@ export function AdminDashboard({
         asPayoutList(payouts),
         asAuctionList(auctions),
         asBidList(bids),
+        asProfileList(profiles),
       ),
-    [auctions, bids, payouts],
+    [auctions, bids, payouts, profiles],
   );
 
   const stats = useMemo(() => {

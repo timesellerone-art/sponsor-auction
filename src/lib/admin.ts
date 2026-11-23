@@ -119,23 +119,33 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
     });
     const payload = await parseAdminJson(response, 'GET');
     if (response.ok && Array.isArray(payload?.data)) {
-      fromDb = payload.data
-        .map((row) => {
-          const item = row as Partial<ProfileItem> & { created_at?: string };
-          if (!item.id || !item.email || !item.status) {
-            return null;
-          }
-          return mapProfile({
-            id: item.id,
-            name: item.name || item.email,
-            email: item.email,
-            role: item.role ?? null,
-            roles: item.roles,
-            status: item.status,
-            created_at: item.createdAt || item.created_at || '',
-          });
-        })
-        .filter((item): item is ProfileItem => item !== null);
+      const next: ProfileItem[] = [];
+      for (const row of payload.data) {
+        const item = row as Partial<ProfileItem> & { created_at?: string };
+        if (!item.id || !item.email || !item.status) {
+          continue;
+        }
+        const mapped = mapProfile({
+          id: item.id,
+          name: item.name || item.email,
+          email: item.email,
+          role: item.role ?? null,
+          roles: item.roles,
+          status: item.status,
+          created_at: item.createdAt || item.created_at || '',
+        });
+        if (!mapped) {
+          continue;
+        }
+        next.push({
+          ...mapped,
+          businessRegistrationNumber: item.businessRegistrationNumber,
+          businessVerificationStatus: item.businessVerificationStatus,
+          businessStatusDetail: item.businessStatusDetail,
+          businessReviewNote: item.businessReviewNote,
+        });
+      }
+      fromDb = next;
     } else if (!payload?.fallbackMock && response.status !== 409 && !response.ok) {
       console.warn('[SponsorAuction] 회원 목록 API 조회 실패', payload?.error);
     }

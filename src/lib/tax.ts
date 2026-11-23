@@ -1,13 +1,10 @@
+import type { CreatorTaxKind } from '@/lib/business-registration';
 import {
   VAT_RATE,
   WITHHOLDING_RATE,
   advertiserPayableAmount,
-  creatorBusinessVatAmount,
-  creatorIndividualNetAmount,
-  creatorPlatformFeeAmount,
-  creatorPayoutAmount,
-  creatorWithholdingAmount,
 } from '@/lib/fee-policy';
+import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 
 export { VAT_RATE, WITHHOLDING_RATE };
 
@@ -39,12 +36,12 @@ export type SettlementTaxBreakdown = {
 };
 
 export function splitAdvertiserInvoice(bidAmount: number): AdvertiserTaxSplit {
-  const supplyAmount = asWon(bidAmount);
-  const totalAmount = advertiserPayableAmount(supplyAmount);
+  const amounts = describeSettlementAmounts(bidAmount);
   return {
-    supplyAmount,
-    vatAmount: Math.max(0, totalAmount - supplyAmount),
-    totalAmount,
+    supplyAmount: amounts.supplyAmount,
+    // 광고주 청구서의 가산분은 수수료 15%(VAT 항목명으로 쓰이던 자리)
+    vatAmount: amounts.advertiserFee,
+    totalAmount: amounts.advertiserCharge,
   };
 }
 
@@ -61,23 +58,31 @@ export function splitAdvertiserInvoiceFromTotal(totalAmount: number): Advertiser
   };
 }
 
-export function splitCreatorSettlement(bidAmount: number): CreatorTaxSplit {
-  const awardAmount = asWon(bidAmount);
-  const platformFee = creatorPlatformFeeAmount(awardAmount);
-  const netPayout = creatorPayoutAmount(awardAmount);
+export function splitCreatorSettlement(
+  bidAmount: number,
+  taxKind: CreatorTaxKind = 'individual',
+): CreatorTaxSplit {
+  const amounts = describeSettlementAmounts(bidAmount, taxKind);
   return {
-    awardAmount,
-    platformFee,
-    withholdingAmount: creatorWithholdingAmount(awardAmount),
-    businessVatAmount: creatorBusinessVatAmount(awardAmount),
-    netPayout,
-    individualNetPayout: creatorIndividualNetAmount(awardAmount),
+    awardAmount: amounts.bidAmount,
+    platformFee: amounts.creatorFee,
+    withholdingAmount: amounts.withholdingAmount,
+    businessVatAmount: amounts.vatAmount,
+    netPayout: amounts.finalSettlement,
+    individualNetPayout: Math.max(0, amounts.finalSettlement - amounts.withholdingAmount),
   };
 }
 
-export function describeSettlementTax(bidAmount: number): SettlementTaxBreakdown {
+export function describeSettlementTax(
+  bidAmount: number,
+  taxKind: CreatorTaxKind = 'individual',
+): SettlementTaxBreakdown {
   return {
     advertiser: splitAdvertiserInvoice(bidAmount),
-    creator: splitCreatorSettlement(bidAmount),
+    creator: splitCreatorSettlement(bidAmount, taxKind),
   };
+}
+
+export function advertiserPayableMatchesHold(bidAmount: number, heldAmount: number) {
+  return advertiserPayableAmount(bidAmount) === heldAmount;
 }

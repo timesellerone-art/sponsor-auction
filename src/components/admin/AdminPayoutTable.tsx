@@ -393,7 +393,9 @@ export function AdminPayoutTable({
                   const cancelled = row.status === 'cancelled';
                   const busy = busyId === payout.id || busyId === 'bulk';
                   const anyBusy = Boolean(busyId);
-                  const payoutAmount = row.netPayoutAmount ?? row.amount;
+                  const payoutAmount =
+                    row.transferAmount ??
+                    Math.max(0, (row.netPayoutAmount ?? row.amount) - (row.withholdingAmount ?? 0));
 
                   return (
                     <tr
