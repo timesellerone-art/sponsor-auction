@@ -20,7 +20,7 @@ function asText(value: unknown) {
 export async function GET(request: Request) {
   try {
     await connection();
-    const actor = await getPaymentActor();
+    const actor = await getPaymentActor(request);
     if (!actor) {
       return unauthorizedJson('크레딧 원장을 보려면 로그인해 주세요.');
     }
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     await connection();
-    const actor = await getPaymentActor();
+    const actor = await getPaymentActor(request);
     if (!actor) {
       return unauthorizedJson('크레딧을 조정하려면 로그인해 주세요.');
     }

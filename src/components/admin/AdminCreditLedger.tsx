@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CreditLedgerEntry } from '@/components/CreditLedgerEntry';
+import { authRequestInit } from '@/lib/auth-request';
 import { formatWon } from '@/lib/utils';
 
 type LedgerRow = {
@@ -14,20 +15,6 @@ type LedgerRow = {
   description: string | null;
   created_at: string;
 };
-
-function adminCreditRequest(input: string, init: RequestInit = {}) {
-  const headers = new Headers(init.headers);
-  if (init.body && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json');
-  }
-  headers.set('Cache-Control', 'no-store');
-  return fetch(input, {
-    ...init,
-    credentials: 'include',
-    cache: 'no-store',
-    headers,
-  });
-}
 
 export function AdminCreditLedger() {
   const [query, setQuery] = useState('');
@@ -43,8 +30,9 @@ export function AdminCreditLedger() {
     setBusy(true);
     setError(null);
     try {
-      const response = await adminCreditRequest(
+      const response = await fetch(
         `/api/admin/credits?q=${encodeURIComponent(target.trim())}`,
+        await authRequestInit({ cache: 'no-store' }),
       );
       const body = (await response.json().catch(() => null)) as {
         data?: LedgerRow[];
@@ -73,15 +61,18 @@ export function AdminCreditLedger() {
     setBusy(true);
     setError(null);
     try {
-      const response = await adminCreditRequest('/api/admin/credits', {
-        method: 'POST',
-        body: JSON.stringify({
-          userId,
-          amount: Number(amount),
-          action,
-          description: note,
+      const response = await fetch(
+        '/api/admin/credits',
+        await authRequestInit({
+          method: 'POST',
+          body: JSON.stringify({
+            userId,
+            amount: Number(amount),
+            action,
+            description: note,
+          }),
         }),
-      });
+      );
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
       if (!response.ok) {
         throw new Error(body?.error || '원장을 조정하지 못했습니다.');
