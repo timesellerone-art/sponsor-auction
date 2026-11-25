@@ -1,19 +1,29 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AuctionCardSkeleton } from '@/components/AuctionCard';
 import { CreateTimeslotModal } from '@/components/CreateTimeslotModal';
 import { PageContainer } from '@/components/PageContainer';
 import { useAuth } from '@/components/AuthProvider';
+import { SettlementAccountForm } from '@/components/SettlementAccountForm';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
+import { authRequestInit } from '@/lib/auth-request';
 import { getCreatorDashboard } from '@/lib/dashboard';
 import { closeTimeSlot, listTimeSlots } from '@/lib/timeslots';
 import { addBusinessDays, formatSeoulDateLabel } from '@/lib/business-days';
-import { creatorPayoutAmount } from '@/lib/fees';
-import { auctionStatusLabel, bidStatusLabel } from '@/lib/status-labels';
+import { describeSettlementAmounts } from '@/lib/settlement-amounts';
+import {
+  MISSING_SETTLEMENT_ACCOUNT_MESSAGE,
+  parseSettlementType,
+  settlementAccountError,
+  settlementAccountFromParts,
+  type SettlementType,
+} from '@/lib/settlement-account';
+import { auctionStatusLabel, creatorPayoutStatusLabel } from '@/lib/status-labels';
 import { cn, formatDateTime, formatWon } from '@/lib/utils';
 import type { TimeSlotItem } from '@/types/timeslot';
+import { isBidSelected } from '@/types/auction';
 import type { CreatorDeal } from '@/types/dashboard';
 
 export function CreatorDashboard() {
@@ -25,6 +35,8 @@ export function CreatorDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createSlotOpen, setCreateSlotOpen] = useState(false);
+  const [settlementType, setSettlementType] = useState<SettlementType>('individual');
+  const [accountMissing, setAccountMissing] = useState(false);
 
   useEffect(() => {
     userRef.current = user;
@@ -46,13 +58,36 @@ export function CreatorDashboard() {
         setLoading(true);
       }
       try {
-        const [result, slotResult] = await Promise.all([
+        const [result, slotResult, settlementResponse] = await Promise.all([
           getCreatorDashboard(actor),
           listTimeSlots({ creatorId: actor.id }),
+          fetch('/api/account/settlement', await authRequestInit({ cache: 'no-store' })).catch(
+            () => null,
+          ),
         ]);
+        const settlementBody = settlementResponse
+          ? ((await settlementResponse.json().catch(() => null)) as {
+              settlementType?: string;
+              bankName?: string;
+              accountNumber?: string;
+              accountHolder?: string;
+            } | null)
+          : null;
         if (cancelled) {
           return;
         }
+        setSettlementType(parseSettlementType(settlementBody?.settlementType));
+        setAccountMissing(
+          Boolean(
+            settlementAccountError(
+              settlementAccountFromParts({
+                bankName: settlementBody?.bankName,
+                accountNumber: settlementBody?.accountNumber,
+                accountHolder: settlementBody?.accountHolder,
+              }),
+            ),
+          ),
+        );
         const list = Array.isArray(result.data) ? result.data : [];
         setDeals(list);
         setSlots(slotResult.data);
@@ -78,23 +113,37 @@ export function CreatorDashboard() {
       void load(true);
     };
     window.addEventListener('auctions:changed', onChanged);
+    window.addEventListener('payouts:changed', onChanged);
     window.addEventListener('timeslots:changed', onChanged);
+    window.addEventListener('settlement:changed', onChanged);
     return () => {
       cancelled = true;
       window.removeEventListener('auctions:changed', onChanged);
+      window.removeEventListener('payouts:changed', onChanged);
       window.removeEventListener('timeslots:changed', onChanged);
+      window.removeEventListener('settlement:changed', onChanged);
     };
   }, [userId]);
 
-  const wonDeals = deals.filter((deal) => deal.bid.status === 'selected');
-  const pendingDeals = deals.filter((deal) => deal.bid.status !== 'selected');
+  const awardedDeals = deals.filter(
+    (deal) =>
+      deal.bid.status === 'selected' ||
+      Boolean(deal.auction && isBidSelected(deal.bid, deal.auction.winnerBidId)),
+  );
+  const paidDeals = awardedDeals.filter((deal) => deal.payoutStatus === 'paid');
+  const holdDeals = awardedDeals.filter((deal) => deal.payoutStatus === 'hold');
+  const settlingDeals = awardedDeals.filter(
+    (deal) => deal.payoutStatus !== 'paid' && deal.payoutStatus !== 'hold',
+  );
+  const pendingDeals = deals.filter((deal) => !awardedDeals.includes(deal));
 
   return (
     <PageContainer className="flex min-w-0 flex-1 flex-col pt-4 pb-6 sm:pt-5 sm:pb-10">
       <p className="text-sm font-semibold tracking-wide text-clink-accent">크리에이터</p>
       <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">내 제안</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
-        타임슬롯 인벤토리와 제출한 제안, 선정·결제 완료된 캠페인을 한곳에서 확인할 수 있습니다.
+        제출한 제안과 낙찰 건의 정산 예정·지급 완료 상태, 정산 금액과 계좌·세무 정보를 확인할 수
+        있습니다.
       </p>
       <div className="mt-4">
         <button
@@ -105,6 +154,15 @@ export function CreatorDashboard() {
           타임슬롯 등록
         </button>
       </div>
+      {accountMissing && awardedDeals.length > 0 ? (
+        <div
+          role="alert"
+          className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          {MISSING_SETTLEMENT_ACCOUNT_MESSAGE}
+        </div>
+      ) : null}
+      <SettlementAccountForm />
 
       {slots.length > 0 ? (
         <section className="mt-8">
@@ -165,56 +223,50 @@ export function CreatorDashboard() {
           </Link>
         </div>
       ) : (
-        <div className="mt-8 flex flex-col gap-8">
-          <section>
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h2 className="text-lg font-bold text-zinc-950">낙찰/결제 완료</h2>
-                <p className="mt-1 text-sm text-zinc-500">
-                  선정되고 결제가 승인된 항목입니다.
-                </p>
-              </div>
-              <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
-                {wonDeals.length}건
-              </span>
-            </div>
-            {wonDeals.length === 0 ? (
-              <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-10 text-center text-sm text-zinc-500">
-                아직 낙찰·결제 완료된 제안이 없습니다.
-              </div>
-            ) : (
-              <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
-                {wonDeals.map((deal) => (
-                  <DealCard key={deal.bid.id} deal={deal} highlight />
-                ))}
-              </ul>
-            )}
-          </section>
+        <div className="mt-8 flex flex-col gap-5">
+          <DealSection
+            title="지급 완료"
+            count={paidDeals.length}
+            emptyText="지급 완료 0건"
+            countClassName="bg-clink-peach text-clink-accent"
+          >
+            {paidDeals.map((deal) => (
+              <DealCard key={`paid-${deal.bid.id}`} deal={deal} highlight taxKind={settlementType} />
+            ))}
+          </DealSection>
 
-          <section>
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <h2 className="text-lg font-bold text-stone-900">진행 중인 제안</h2>
-                <p className="mt-1 text-sm text-zinc-500">
-                  아직 선정되지 않아 광고주 확인을 기다리는 제안입니다.
-                </p>
-              </div>
-              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
-                {pendingDeals.length}건
-              </span>
-            </div>
-            {pendingDeals.length === 0 ? (
-              <div className="mt-4 rounded-2xl border border-dashed border-zinc-200 bg-white px-4 py-10 text-center text-sm text-zinc-500">
-                진행 중인 제안이 없습니다.
-              </div>
-            ) : (
-              <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
-                {pendingDeals.map((deal) => (
-                  <DealCard key={`pending-${deal.bid.id}`} deal={deal} />
-                ))}
-              </ul>
-            )}
-          </section>
+          <DealSection
+            title="정산 보류"
+            count={holdDeals.length}
+            emptyText="정산 보류 0건"
+            countClassName="bg-rose-50 text-rose-700"
+          >
+            {holdDeals.map((deal) => (
+              <DealCard key={`hold-${deal.bid.id}`} deal={deal} highlight taxKind={settlementType} />
+            ))}
+          </DealSection>
+
+          <DealSection
+            title="낙찰·정산 예정"
+            count={settlingDeals.length}
+            emptyText="낙찰·정산 예정 0건"
+            countClassName="bg-amber-50 text-amber-800"
+          >
+            {settlingDeals.map((deal) => (
+              <DealCard key={`settling-${deal.bid.id}`} deal={deal} highlight taxKind={settlementType} />
+            ))}
+          </DealSection>
+
+          <DealSection
+            title="진행 중인 제안"
+            count={pendingDeals.length}
+            emptyText="진행 중인 제안 0건"
+            countClassName="bg-stone-100 text-stone-600"
+          >
+            {pendingDeals.map((deal) => (
+              <DealCard key={`pending-${deal.bid.id}`} deal={deal} taxKind={settlementType} />
+            ))}
+          </DealSection>
         </div>
       )}
       <CreateTimeslotModal open={createSlotOpen} onClose={() => setCreateSlotOpen(false)} />
@@ -222,57 +274,122 @@ export function CreatorDashboard() {
   );
 }
 
-function DealCard({ deal, highlight = false }: { deal: CreatorDeal; highlight?: boolean }) {
-  const paid = deal.bid.status === 'selected';
+function DealSection({
+  title,
+  count,
+  emptyText,
+  countClassName,
+  children,
+}: {
+  title: string;
+  count: number;
+  emptyText: string;
+  countClassName: string;
+  children: ReactNode;
+}) {
+  return (
+    <section>
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="text-base font-bold text-zinc-950">{title}</h2>
+        <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', countClassName)}>
+          {count}건
+        </span>
+      </div>
+      {count === 0 ? (
+        <p className="mt-1.5 text-sm text-zinc-400">{emptyText}</p>
+      ) : (
+        <ul className="mt-2 flex max-h-80 flex-col gap-2 overflow-y-auto pr-1">{children}</ul>
+      )}
+    </section>
+  );
+}
+
+function DealCard({
+  deal,
+  highlight = false,
+  taxKind = 'individual',
+}: {
+  deal: CreatorDeal;
+  highlight?: boolean;
+  taxKind?: SettlementType;
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const awarded = deal.bid.status === 'selected';
+  const payoutPaid = deal.payoutStatus === 'paid';
+  const payoutHold = deal.payoutStatus === 'hold';
+  const resolvedTaxKind =
+    deal.payout?.taxKind === 'business' || taxKind === 'business' ? 'business' : taxKind;
   const href = deal.auction?.id ? `/auctions/${deal.auction.id}` : '/';
+  const amounts = describeSettlementAmounts(deal.bid.bidAmount, resolvedTaxKind);
+  const dueAt =
+    deal.payout?.settlementDueAt ||
+    (deal.payout?.requestedAt ? addBusinessDays(deal.payout.requestedAt, 4) : null) ||
+    (deal.payment?.confirmedAt ? addBusinessDays(deal.payment.confirmedAt, 4) : null);
+  const dateLabel =
+    payoutPaid && deal.payout?.paidAt
+      ? `지급 ${formatDateTime(deal.payout.paidAt)}`
+      : dueAt
+        ? `정산 예정 ${formatSeoulDateLabel(dueAt)}`
+        : null;
 
   return (
     <li
       className={cn(
-        'rounded-2xl border bg-white p-4 sm:p-5',
-        highlight || paid ? 'border-clink-peach-strong' : 'border-amber-100',
+        'rounded-xl border bg-white px-3.5 py-3',
+        highlight || awarded ? 'border-clink-peach-strong' : 'border-zinc-200',
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <Link href={href} className="font-semibold text-zinc-950 hover:underline">
-            {deal.auction?.title || '연결된 캠페인 없음'}
-          </Link>
-          <p className="mt-1 text-sm text-zinc-500">
-            제안 금액 {formatWon(deal.bid.bidAmount)}
-            {paid
-              ? ` · 예상 정산 ${formatWon(creatorPayoutAmount(deal.bid.bidAmount))}${
-                  deal.payment?.confirmedAt
-                    ? ` · 정산 예정 ${formatSeoulDateLabel(addBusinessDays(deal.payment.confirmedAt, 4))}`
-                    : ''
-                }`
-              : ''}
-          </p>
-        </div>
+      <div className="flex items-start justify-between gap-2">
+        <Link
+          href={href}
+          title={deal.auction?.title || '연결된 캠페인 없음'}
+          className="min-w-0 truncate font-semibold text-zinc-950 hover:underline"
+        >
+          {deal.auction?.title || '연결된 캠페인 없음'}
+        </Link>
         <span
           className={cn(
-            'rounded-full px-2.5 py-1 text-xs font-semibold',
-            paid ? 'bg-clink-peach text-clink' : 'bg-amber-50 text-amber-800',
+            'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
+            payoutPaid
+              ? 'bg-clink-peach text-clink'
+              : payoutHold
+                ? 'bg-rose-50 text-rose-700'
+                : awarded
+                  ? 'bg-amber-50 text-amber-800'
+                  : 'bg-stone-100 text-stone-600',
           )}
         >
-          {bidStatusLabel(deal.bid.status, paid)}
+          {creatorPayoutStatusLabel(deal.payoutStatus, awarded)}
         </span>
       </div>
-      {paid ? (
-        <div className="mt-3">
-          <FeeBreakdownCard role="creator" amount={deal.bid.bidAmount} />
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-zinc-600">
+        <span>제안 {formatWon(deal.bid.bidAmount)}</span>
+        {awarded ? <span>실지급액 {formatWon(amounts.transferAmount)}</span> : null}
+        {dateLabel ? <span>{dateLabel}</span> : null}
+        <button
+          type="button"
+          className="text-xs font-medium text-zinc-400 hover:text-zinc-700"
+          aria-expanded={detailsOpen}
+          onClick={() => setDetailsOpen((open) => !open)}
+        >
+          {detailsOpen ? '상세 접기' : '상세 보기'}
+        </button>
+      </div>
+      {detailsOpen ? (
+        <div className="mt-2 space-y-2 border-t border-zinc-100 pt-2">
+          {awarded ? (
+            <FeeBreakdownCard role="creator" amount={deal.bid.bidAmount} taxKind={resolvedTaxKind} />
+          ) : null}
+          {deal.bid.proposalText ? (
+            <p className="text-sm leading-6 text-zinc-600">{deal.bid.proposalText}</p>
+          ) : null}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">
+            {deal.auction?.status ? <span>캠페인 {auctionStatusLabel(deal.auction.status)}</span> : null}
+            <span>제출 {formatDateTime(deal.bid.createdAt)}</span>
+            {deal.payment?.orderId ? <span>주문 {deal.payment.orderId}</span> : null}
+          </div>
         </div>
       ) : null}
-      {deal.bid.proposalText ? (
-        <p className="mt-3 line-clamp-3 text-sm leading-6 text-zinc-600">
-          {deal.bid.proposalText}
-        </p>
-      ) : null}
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">
-        {deal.auction?.status ? <span>캠페인 {auctionStatusLabel(deal.auction.status)}</span> : null}
-        <span>제출 {formatDateTime(deal.bid.createdAt)}</span>
-        {deal.payment?.orderId ? <span>주문 {deal.payment.orderId}</span> : null}
-      </div>
     </li>
   );
 }

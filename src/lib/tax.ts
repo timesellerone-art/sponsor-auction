@@ -1,9 +1,5 @@
 import type { CreatorTaxKind } from '@/lib/business-registration';
-import {
-  VAT_RATE,
-  WITHHOLDING_RATE,
-  advertiserPayableAmount,
-} from '@/lib/fee-policy';
+import { VAT_RATE, WITHHOLDING_RATE } from '@/lib/fee-policy';
 import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 
 export { VAT_RATE, WITHHOLDING_RATE };
@@ -38,9 +34,8 @@ export type SettlementTaxBreakdown = {
 export function splitAdvertiserInvoice(bidAmount: number): AdvertiserTaxSplit {
   const amounts = describeSettlementAmounts(bidAmount);
   return {
-    supplyAmount: amounts.supplyAmount,
-    // 광고주 합산 수수료 15%. 크리에이터 부가세(10%)와 별개 — 필드명 vatAmount는 레거시 호환.
-    vatAmount: amounts.advertiserFee,
+    supplyAmount: amounts.advertiserSupply,
+    vatAmount: amounts.advertiserVat,
     totalAmount: amounts.advertiserCharge,
   };
 }
@@ -84,5 +79,5 @@ export function describeSettlementTax(
 }
 
 export function advertiserPayableMatchesHold(bidAmount: number, heldAmount: number) {
-  return advertiserPayableAmount(bidAmount) === heldAmount;
+  return describeSettlementAmounts(bidAmount).advertiserCharge === heldAmount;
 }

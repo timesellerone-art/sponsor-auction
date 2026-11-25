@@ -7,7 +7,6 @@ import { CreatorDashboard } from '@/components/CreatorDashboard';
 import { MyWorkspaceNav } from '@/components/MyWorkspaceNav';
 import { PageContainer } from '@/components/PageContainer';
 import { useAuth } from '@/components/AuthProvider';
-import { cn } from '@/lib/utils';
 
 export default function MyPage() {
   const { activeRole } = useAuth();
@@ -20,22 +19,11 @@ export default function MyPage() {
         <MyWorkspaceNav current="dashboard" />
       </PageContainer>
       {hasWorkspace ? (
-        <>
-          <div
-            className={cn('flex min-h-0 w-full min-w-0 flex-1 flex-col', showCreator && 'hidden')}
-            aria-hidden={showCreator}
-            inert={showCreator}
-          >
-            <AdvertiserDashboard />
-          </div>
-          <div
-            className={cn('flex min-h-0 w-full min-w-0 flex-1 flex-col', !showCreator && 'hidden')}
-            aria-hidden={!showCreator}
-            inert={!showCreator}
-          >
-            <CreatorDashboard />
-          </div>
-        </>
+        showCreator ? (
+          <CreatorDashboard />
+        ) : (
+          <AdvertiserDashboard />
+        )
       ) : (
         <PageContainer className="w-full min-w-0 pb-10">
           <div className="mt-6 rounded-2xl border border-zinc-200 bg-white px-5 py-8 sm:px-6">

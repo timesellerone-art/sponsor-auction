@@ -5,8 +5,12 @@ import { BusinessRegistrationForm } from '@/components/BusinessRegistrationForm'
 import { LinkedAccountsPanel } from '@/components/LinkedAccountsPanel';
 import { MyWorkspaceNav } from '@/components/MyWorkspaceNav';
 import { PageContainer } from '@/components/PageContainer';
+import { SettlementAccountForm } from '@/components/SettlementAccountForm';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function AccountSettingsPage() {
+  const { activeRole } = useAuth();
+
   return (
     <AccessGuard allow="signed-in">
       <PageContainer className="flex min-w-0 flex-1 flex-col py-6 sm:py-10">
@@ -17,7 +21,10 @@ export default function AccountSettingsPage() {
           연동된 소셜 계정과 휴대전화를 관리할 수 있습니다.
         </p>
         <LinkedAccountsPanel />
-        <BusinessRegistrationForm />
+        {activeRole === 'creator' ? <SettlementAccountForm /> : null}
+        {activeRole === 'advertiser' || activeRole === 'creator' ? (
+          <BusinessRegistrationForm />
+        ) : null}
       </PageContainer>
     </AccessGuard>
   );

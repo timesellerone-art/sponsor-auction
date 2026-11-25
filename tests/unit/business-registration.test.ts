@@ -27,13 +27,15 @@ describe('business registration number', () => {
     assert.equal(formatBusinessNumber(`533-06-0373${valid.slice(-1)}`), formatBusinessNumber(valid));
     assert.equal(normalizeBusinessNumber('533-06-03737'), '5330603737');
     assert.equal(businessNumberError('123'), '사업자등록번호 10자리를 확인해 주세요.');
+    assert.equal(businessNumberError('1234567890'), '유효하지 않은 사업자등록번호입니다. 번호를 다시 확인해 주세요.');
     assert.equal(businessNumberError(valid), null);
   });
 
-  it('계속사업자는 검수필요, 휴업과 폐업은 휴폐업이다', () => {
+  it('계속사업자는 검수필요, 휴업과 폐업은 휴폐업, 미등록은 미등록이다', () => {
     assert.equal(profileStatusFromNts('01', '계속사업자').status, 'review_required');
     assert.equal(profileStatusFromNts('02', '휴업자').status, 'closed');
     assert.equal(profileStatusFromNts('03', '폐업자').status, 'closed');
+    assert.equal(profileStatusFromNts('UNREGISTERED', '미등록').status, 'unregistered');
   });
 
   it('휴폐업과 반려만 충전과 캠페인 등록을 막는다', () => {

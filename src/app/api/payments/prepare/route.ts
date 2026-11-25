@@ -6,7 +6,7 @@ import {
   releaseCampaignCredit,
   releaseCampaignPaymentIfOpen,
 } from '@/lib/campaign-credit';
-import { advertiserChargeMatchesBid, advertiserPayableAmount } from '@/lib/fees';
+import { advertiserChargeMatchesBid, advertiserTotalCharge } from '@/lib/fees';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isUuid } from '@/lib/uuid';
 import { productionTossLiveKeyError } from '@/lib/launch-env';
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (parsed.amount < 100 || parsed.amount > MAX_BID_AMOUNT + advertiserPayableAmount(MAX_BID_AMOUNT)) {
+    if (parsed.amount < 100 || parsed.amount > advertiserTotalCharge(MAX_BID_AMOUNT)) {
       return NextResponse.json(
         { error: '결제 금액이 허용 범위를 벗어났습니다.' },
         { status: 400 },

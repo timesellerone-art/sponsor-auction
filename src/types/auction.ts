@@ -91,6 +91,12 @@ export function isAuctionClosed(status: AuctionStatus | undefined) {
   return status === 'closed' || status === 'matched' || status === 'completed';
 }
 
+export function isAwardedAuction(
+  auction: Pick<AuctionItem, 'status'> & { winnerBidId?: string | null },
+) {
+  return Boolean(auction.winnerBidId) || isAuctionClosed(auction.status);
+}
+
 export function isBidSelected(bid: Pick<BidItem, 'id' | 'status'>, winnerBidId?: string | null) {
   return bid.status === 'selected' || Boolean(winnerBidId && winnerBidId === bid.id);
 }

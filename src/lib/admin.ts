@@ -1,6 +1,7 @@
 import { showToast } from '@/components/Toast';
 import {
   approvePayout as approveMockPayout,
+  getAuctions as getMockAuctions,
   getBids as getMockBids,
   getPayouts as getMockPayouts,
   getProfiles as getMockProfiles,
@@ -9,9 +10,11 @@ import {
 } from '@/lib/mock-data';
 import { withExclusiveAction } from '@/lib/action-lock';
 import { mockGetSession } from '@/lib/auth-mock';
+import { authRequestInit } from '@/lib/auth-request';
 import { markPayoutPaid, updatePayoutMemo as persistPayoutMemo } from '@/lib/payouts';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { RATE_LIMIT_MESSAGE } from '@/lib/rate-limit';
+import { isUuid } from '@/lib/uuid';
 import { VALIDATION } from '@/lib/validation';
 import type {
   PayoutItem,
@@ -20,7 +23,7 @@ import type {
   ProfileStatus,
 } from '@/types/admin';
 import { isAuthProfileRole, parseAuthRoles, primaryAuthRole } from '@/types/auth';
-import type { BidItem, DataResult } from '@/types/auction';
+import type { AuctionItem, BidItem, DataResult } from '@/types/auction';
 
 export const ADMIN_UPDATE_FAIL_MESSAGE =
   '변경에 실패했습니다. 다시 시도해 주세요.';
@@ -41,6 +44,15 @@ function fail<T>(data: T, error: string): DataResult<T> {
 
 function ok<T>(data: T): DataResult<T> {
   return { data, error: null };
+}
+
+function asAuctionItems(value: unknown): AuctionItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is AuctionItem => {
+    return Boolean(item && typeof item === 'object' && 'id' in item);
+  });
 }
 
 function asBidItems(value: unknown): BidItem[] {
@@ -143,6 +155,10 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
           businessVerificationStatus: item.businessVerificationStatus,
           businessStatusDetail: item.businessStatusDetail,
           businessReviewNote: item.businessReviewNote,
+          settlementType:
+            item.settlementType === 'business' || item.settlementType === 'individual'
+              ? item.settlementType
+              : undefined,
         });
       }
       fromDb = next;
@@ -206,6 +222,46 @@ export async function updateProfileStatus(
 
   return updateMockProfileStatus(id, status);
   });
+}
+
+export async function getAdminAuctions(
+  seedFromServer: AuctionItem[] = [],
+): Promise<DataResult<AuctionItem[]>> {
+  let fromDb: AuctionItem[] = asAuctionItems(seedFromServer);
+  let apiOk = false;
+
+  try {
+    const response = await fetch('/api/admin/auctions', {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-store' },
+    });
+    const payload = await parseAdminJson(response, 'GET');
+    if (response.ok && Array.isArray(payload?.data)) {
+      fromDb = asAuctionItems(payload.data);
+      apiOk = true;
+    } else if (!payload?.fallbackMock && response.status !== 409 && !response.ok && fromDb.length === 0) {
+      return fail([], payload?.error || payload?.errorMessage || '캠페인 목록을 불러오지 못했습니다.');
+    }
+  } catch (error) {
+    console.warn('[SponsorAuction] 캠페인 API 목록 조회 실패', error);
+  }
+
+  if (apiOk || fromDb.length > 0) {
+    return ok(fromDb);
+  }
+
+  const mock = await mockGetSession();
+  if (mock.data) {
+    const mockResult = await getMockAuctions();
+    const mockItems = asAuctionItems(mockResult.data);
+    if (mockItems.length === 0) {
+      return fail([], '등록된 캠페인이 없습니다.');
+    }
+    return ok(mockItems);
+  }
+
+  return fail([], '등록된 캠페인이 없습니다.');
 }
 
 export async function getAdminBids(seedFromServer: BidItem[] = []): Promise<DataResult<BidItem[]>> {
@@ -295,14 +351,45 @@ async function useDemoAdminStore() {
   return Boolean(mock.data);
 }
 
+function isLivePayoutTarget(payout: PayoutItem | null, id: string) {
+  if (isUuid(id) || id.startsWith('ord_')) {
+    return true;
+  }
+  if (!payout) {
+    return false;
+  }
+  if (isUuid(payout.id) || isUuid(payout.auctionId) || isUuid(payout.bidId)) {
+    return true;
+  }
+  const order = (payout.paymentOrderId || '').trim();
+  return order.startsWith('ord_');
+}
+
+function payoutApprovePayload(payout: PayoutItem | null, fallbackId: string) {
+  const rowId = (payout?.id || fallbackId).trim();
+  const paymentOrderId = (payout?.paymentOrderId || '').trim();
+  return {
+    id: rowId,
+    paymentOrderId: paymentOrderId || (!isUuid(rowId) ? rowId : null),
+    auctionId: payout?.auctionId ?? null,
+    bidId: payout?.bidId ?? null,
+    amount: payout?.amount,
+    auctionTitle: payout?.auctionTitle,
+    creatorName: payout?.creatorName,
+    creatorEmail: payout?.creatorEmail,
+    creatorId: payout?.creatorId,
+  };
+}
+
 export async function approvePayout(
   target: string | PayoutItem,
 ): Promise<DataResult<PayoutItem | null>> {
   const payout = typeof target === 'string' ? null : target;
-  const id =
-    typeof target === 'string'
-      ? target.trim()
-      : (target.paymentOrderId || target.id).trim();
+  const rowId = (payout?.id || (typeof target === 'string' ? target : '')).trim();
+  const paymentOrderId = (payout?.paymentOrderId || '').trim();
+  const id = paymentOrderId || rowId;
+  const live = isLivePayoutTarget(payout, id);
+  const payloadBody = payoutApprovePayload(payout, id);
 
   return withExclusiveAction(`payout:${id}`, fail(null, VALIDATION.actionInFlight), async () => {
   if (payout?.status === 'cancelled') {
@@ -311,31 +398,23 @@ export async function approvePayout(
   if (payout && (!payout.creatorEmail?.trim() || !payout.bankAccount?.trim())) {
     return fail(null, VALIDATION.payoutMissingContact);
   }
-  if (await useDemoAdminStore()) {
-    return approveMockPayout(typeof target === 'string' ? id : target.id);
+  if (!live && (await useDemoAdminStore())) {
+    return approveMockPayout(payout ?? id);
   }
 
   try {
-    const response = await fetch('/api/admin/payouts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id,
-        paymentOrderId: payout?.paymentOrderId ?? id,
-        auctionId: payout?.auctionId ?? null,
-        bidId: payout?.bidId ?? null,
-        amount: payout?.amount,
-        auctionTitle: payout?.auctionTitle,
-        creatorName: payout?.creatorName,
-        creatorEmail: payout?.creatorEmail,
-        creatorId: payout?.creatorId,
+    const response = await fetch(
+      '/api/admin/payouts',
+      await authRequestInit({
+        method: 'POST',
+        body: JSON.stringify(payloadBody),
       }),
-    });
+    );
     const payload = await parseAdminJson(response, 'POST');
     if (response.ok && payload?.data && typeof payload.data === 'object') {
       const mapped = payload.data as PayoutItem;
       if (mapped.id) {
-        return ok(mapped);
+        return ok({ ...mapped, status: 'paid' });
       }
     }
     const apiError = payload?.error || payload?.errorMessage || `HTTP ${response.status}`;
@@ -348,25 +427,18 @@ export async function approvePayout(
 
   const supabase = await getDataClient();
   if (!supabase) {
-    return approveMockPayout(id);
+    if (!live) {
+      return approveMockPayout(payout ?? id);
+    }
+    return fail(null, '해당 정산 요청을 저장할 수 없습니다.');
   }
 
   try {
-    const result = await markPayoutPaid(supabase, {
-      id,
-      paymentOrderId: payout?.paymentOrderId ?? id,
-      auctionId: payout?.auctionId ?? null,
-      bidId: payout?.bidId ?? null,
-      amount: payout?.amount,
-      auctionTitle: payout?.auctionTitle,
-      creatorName: payout?.creatorName,
-      creatorEmail: payout?.creatorEmail,
-      creatorId: payout?.creatorId,
-    });
+    const result = await markPayoutPaid(supabase, payloadBody);
     if (!result.ok) {
       return fail(null, result.message);
     }
-    return ok(result.data);
+    return ok({ ...result.data, status: 'paid' });
   } catch (error) {
     const message = error instanceof Error ? error.message : ADMIN_UPDATE_FAIL_MESSAGE;
     console.error('[SponsorAuction] 정산 승인 예외:', error);
@@ -380,23 +452,26 @@ export async function savePayoutMemo(
   adminMemo: string,
 ): Promise<DataResult<PayoutItem | null>> {
   const id = (payout.paymentOrderId || payout.id).trim();
+  const live = isLivePayoutTarget(payout, id);
   return withExclusiveAction(`payout-memo:${id}`, fail(null, VALIDATION.actionInFlight), async () => {
-    if (await useDemoAdminStore()) {
+    if (!live && (await useDemoAdminStore())) {
       return updateMockPayoutMemo(payout.id, adminMemo);
     }
 
     try {
-      const response = await fetch('/api/admin/payouts/memo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id,
-          paymentOrderId: payout.paymentOrderId ?? id,
-          auctionId: payout.auctionId ?? null,
-          bidId: payout.bidId ?? null,
-          adminMemo,
+      const response = await fetch(
+        '/api/admin/payouts/memo',
+        await authRequestInit({
+          method: 'POST',
+          body: JSON.stringify({
+            id: payout.id || id,
+            paymentOrderId: payout.paymentOrderId ?? id,
+            auctionId: payout.auctionId ?? null,
+            bidId: payout.bidId ?? null,
+            adminMemo,
+          }),
         }),
-      });
+      );
       const payload = await parseAdminJson(response, 'POST');
       if (response.ok && payload?.data && typeof payload.data === 'object') {
         const mapped = payload.data as PayoutItem;
@@ -414,21 +489,26 @@ export async function savePayoutMemo(
 
     const supabase = await getDataClient();
     if (!supabase) {
-      return updateMockPayoutMemo(payout.id, adminMemo);
+      if (!live) {
+        return updateMockPayoutMemo(payout.id, adminMemo);
+      }
+      return fail(null, '정산 메모를 저장할 수 없습니다.');
     }
 
     try {
       const result = await persistPayoutMemo(supabase, {
-        id,
+        id: payout.id || id,
         paymentOrderId: payout.paymentOrderId ?? id,
         auctionId: payout.auctionId ?? null,
         bidId: payout.bidId ?? null,
         adminMemo,
       });
       if (!result.ok) {
-        const mock = await updateMockPayoutMemo(payout.id, adminMemo);
-        if (mock.data) {
-          return ok(mock.data);
+        if (!live) {
+          const mock = await updateMockPayoutMemo(payout.id, adminMemo);
+          if (mock.data) {
+            return ok(mock.data);
+          }
         }
         return fail(null, result.message);
       }

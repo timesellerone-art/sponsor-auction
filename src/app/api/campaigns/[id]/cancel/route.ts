@@ -77,6 +77,29 @@ export async function POST(
       );
     }
 
+    const reopened = await admin
+      .from('auctions')
+      .update({ status: 'active', winner_bid_id: null })
+      .eq('id', auctionId)
+      .in('status', ['closed', 'matched', 'completed']);
+    if (reopened.error) {
+      return NextResponse.json(
+        { error: reopened.error.message, errorCode: 'REOPEN_FAILED' },
+        { status: 500, headers: NO_STORE },
+      );
+    }
+    const bidsReset = await admin
+      .from('bids')
+      .update({ status: 'pending' })
+      .eq('auction_id', auctionId)
+      .eq('status', 'selected');
+    if (bidsReset.error) {
+      return NextResponse.json(
+        { error: bidsReset.error.message, errorCode: 'BID_RESET_FAILED' },
+        { status: 500, headers: NO_STORE },
+      );
+    }
+
     console.info('[SponsorAuction] 캠페인 취소 크레딧 복구', {
       auctionId,
       restoredCount: released.restoredCount,
@@ -87,6 +110,7 @@ export async function POST(
         ok: true,
         restoredCount: released.restoredCount,
         restoredAmount: released.restoredAmount,
+        reopened: true,
       },
       { headers: NO_STORE },
     );

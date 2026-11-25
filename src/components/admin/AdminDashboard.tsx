@@ -18,6 +18,7 @@ import { useActionLock } from '@/hooks/useActionLock';
 import {
   ADMIN_UPDATE_FAIL_MESSAGE,
   approvePayout,
+  getAdminAuctions,
   getAdminBids,
   getPayouts,
   getProfiles,
@@ -25,12 +26,11 @@ import {
   updateProfileStatus,
 } from '@/lib/admin';
 import { applyAdminPayoutIntegrity } from '@/lib/admin-integrity';
-import { applyPaidPayoutLocal } from '@/lib/payouts';
+import { applyHoldPayoutLocal, applyPaidPayoutLocal, payoutsMatch } from '@/lib/payouts';
 import { VALIDATION } from '@/lib/validation';
 import {
   UPDATE_FAIL_MESSAGE,
   deleteAuction,
-  getAuctions,
   updateAuctionBlind,
 } from '@/lib/auctions';
 import { cn } from '@/lib/utils';
@@ -85,14 +85,16 @@ export function AdminDashboard({
   initialPayouts = [],
   initialBids = [],
   initialProfiles = [],
+  initialAuctions = [],
 }: {
   initialPayouts?: PayoutItem[];
   initialBids?: BidItem[];
   initialProfiles?: ProfileItem[];
+  initialAuctions?: AuctionItem[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabId>('auctions');
-  const [auctions, setAuctions] = useState<AuctionItem[]>([]);
+  const [auctions, setAuctions] = useState<AuctionItem[]>(() => asAuctionList(initialAuctions));
   const [bids, setBids] = useState<BidItem[]>(() => asBidList(initialBids));
   const [profiles, setProfiles] = useState<ProfileItem[]>(() =>
     asProfileList(initialProfiles),
@@ -113,7 +115,19 @@ export function AdminDashboard({
           ...asPayoutList(initialPayouts).filter((item) => item.status === 'paid'),
           ...prev.filter((item) => item.status === 'paid'),
         ];
-        return paid.reduce((list, item) => applyPaidPayoutLocal(list, item), fresh);
+        const held = [
+          ...asPayoutList(initialPayouts).filter((item) => item.status === 'hold'),
+          ...prev.filter((item) => item.status === 'hold'),
+          ...fresh.filter((item) => item.status === 'hold'),
+        ];
+        const withPaid = paid.reduce((list, item) => applyPaidPayoutLocal(list, item), fresh);
+        return held.reduce((list, item) => {
+          const current = list.find((row) => payoutsMatch(row, item) || row.id === item.id);
+          if (current?.status === 'paid') {
+            return list;
+          }
+          return applyHoldPayoutLocal(list, item, true);
+        }, withPaid);
       });
       if (payoutResult.data.length === 0 && payoutResult.error) {
         setLoadError(payoutResult.error);
@@ -128,14 +142,18 @@ export function AdminDashboard({
     try {
       const [auctionResult, bidResult, profileResult, payoutResult, complianceResponse] =
         await Promise.all([
-          getAuctions(),
+          getAdminAuctions(asAuctionList(initialAuctions)),
           getAdminBids(asBidList(initialBids)),
           getProfiles(),
           getPayouts(asPayoutList(initialPayouts)),
           fetch('/api/admin/compliance', { cache: 'no-store' }),
         ]);
 
-      setAuctions(asAuctionList(auctionResult.data));
+      setAuctions(
+        asAuctionList(auctionResult.data).length > 0
+          ? asAuctionList(auctionResult.data)
+          : asAuctionList(initialAuctions),
+      );
       setBids(asBidList(bidResult.data));
       const nextProfiles = asProfileList(profileResult.data);
       setProfiles(
@@ -155,7 +173,7 @@ export function AdminDashboard({
       setLoadError(firstError);
     } catch (error) {
       console.warn('[SponsorAuction] 관리자 데이터를 불러오지 못했습니다.', error);
-      setAuctions([]);
+      setAuctions(asAuctionList(initialAuctions));
       setBids(asBidList(initialBids));
       setProfiles(asProfileList(initialProfiles));
       setPayouts(asPayoutList(initialPayouts));
@@ -165,16 +183,29 @@ export function AdminDashboard({
     } finally {
       setLoading(false);
     }
-  }, [initialBids, initialPayouts, initialProfiles]);
+  }, [initialAuctions, initialBids, initialPayouts, initialProfiles]);
+
+  const refreshAuctions = useCallback(async () => {
+    const result = await getAdminAuctions(asAuctionList(initialAuctions));
+    const next = asAuctionList(result.data);
+    if (next.length > 0 || !result.error) {
+      setAuctions(next);
+    }
+  }, [initialAuctions]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void load();
     }, 0);
+    const onChanged = () => {
+      void refreshAuctions();
+    };
+    window.addEventListener('auctions:changed', onChanged);
     return () => {
       window.clearTimeout(timer);
+      window.removeEventListener('auctions:changed', onChanged);
     };
-  }, [load]);
+  }, [load, refreshAuctions]);
 
   const reconciledPayouts = useMemo(
     () =>
@@ -483,7 +514,11 @@ export function AdminDashboard({
         if (!options?.silent) {
           showToast('지급 처리했습니다.', 'success');
         }
+        window.dispatchEvent(new Event('payouts:changed'));
+        window.dispatchEvent(new Event('auctions:changed'));
         router.refresh();
+        const bidResult = await getAdminBids(asBidList(initialBids));
+        setBids(asBidList(bidResult.data));
         await fetchPayouts([paid]);
       } catch (error) {
         const detail =
@@ -498,19 +533,23 @@ export function AdminDashboard({
   const handleHoldPayout = async (payout: PayoutItem, hold: boolean) => {
     await run(payout.id, async () => {
       try {
-        const response = await fetch('/api/admin/payouts/hold', {
-          method: 'POST',
-          credentials: 'include',
-          cache: 'no-store',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-store',
-          },
-          body: JSON.stringify({
-            id: payout.paymentOrderId || payout.id,
-            hold,
+        const response = await fetch(
+          '/api/admin/payouts/hold',
+          await authRequestInit({
+            method: 'POST',
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-store',
+            },
+            body: JSON.stringify({
+              id: payout.id,
+              paymentOrderId: payout.paymentOrderId || payout.id,
+              auctionId: payout.auctionId ?? null,
+              bidId: payout.bidId ?? null,
+              hold,
+            }),
           }),
-        });
+        );
         const body = (await response.json().catch(() => null)) as {
           data?: PayoutItem;
           error?: string;
@@ -522,19 +561,21 @@ export function AdminDashboard({
         }
         const saved = body.data;
         setPayouts((prev) =>
-          prev.map((item) =>
-            item.id === payout.id
-              ? {
-                  ...item,
-                  ...saved,
-                  id: item.id,
-                  paymentOrderId: saved.paymentOrderId || item.paymentOrderId || null,
-                  status: saved.status,
-                }
-              : item,
+          applyHoldPayoutLocal(
+            prev,
+            {
+              ...payout,
+              ...saved,
+              id: payout.id,
+              paymentOrderId: saved.paymentOrderId || payout.paymentOrderId || null,
+              status: hold ? 'hold' : 'pending',
+            },
+            hold,
           ),
         );
         showToast(hold ? '정산을 보류했습니다.' : '정산 보류를 해제했습니다.', 'success');
+        window.dispatchEvent(new Event('payouts:changed'));
+        await fetchPayouts();
       } catch {
         showToast('정산 보류를 저장하지 못했습니다.');
       }

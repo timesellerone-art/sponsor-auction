@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { COMPANY } from '@/lib/company';
-import { describeSettlementTax, splitAdvertiserInvoiceFromTotal } from '@/lib/tax';
+import { describeSettlementTax } from '@/lib/tax';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export type TaxInvoiceIssueInput = {
@@ -113,7 +113,7 @@ export async function issueTaxInvoice(
   input: TaxInvoiceIssueInput,
 ): Promise<TaxInvoiceIssueResult> {
   const tax = describeSettlementTax(input.bidAmount);
-  const advertiserInvoice = splitAdvertiserInvoiceFromTotal(tax.advertiser.totalAmount);
+  const advertiserInvoice = tax.advertiser;
   const mgtKey = makeMgtKey(input);
   const secret = popbillSecret();
   const linkId = popbillLinkId();
@@ -224,5 +224,68 @@ export async function issueTaxInvoice(
     };
     await persistFallbackLog({ ...baseLog, ...result });
     return result;
+  }
+}
+
+export type TaxInvoiceLookup = {
+  issued: boolean;
+  status: 'issued' | 'fallback' | 'error' | 'none';
+  label: string;
+  mgtKey: string | null;
+};
+
+export async function lookupTaxInvoiceForAuction(
+  auctionId: string,
+): Promise<TaxInvoiceLookup> {
+  const empty: TaxInvoiceLookup = {
+    issued: false,
+    status: 'none',
+    label: '미발행',
+    mgtKey: null,
+  };
+  const id = auctionId.trim();
+  if (!id) {
+    return empty;
+  }
+  const client = createAdminClient();
+  if (!client) {
+    return empty;
+  }
+  try {
+    const { data, error } = await client
+      .from('tax_invoice_logs')
+      .select('status, mgt_key, created_at')
+      .eq('auction_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (error || !data?.[0]) {
+      return empty;
+    }
+    const row = data[0];
+    const raw = String(row.status || '');
+    if (raw === 'issued') {
+      return {
+        issued: true,
+        status: 'issued',
+        label: '발행 완료',
+        mgtKey: row.mgt_key ?? null,
+      };
+    }
+    if (raw === 'error') {
+      return {
+        issued: false,
+        status: 'error',
+        label: '발행 실패',
+        mgtKey: row.mgt_key ?? null,
+      };
+    }
+    return {
+      issued: false,
+      status: 'fallback',
+      label: '발행 신청',
+      mgtKey: row.mgt_key ?? null,
+    };
+  } catch {
+    return empty;
   }
 }

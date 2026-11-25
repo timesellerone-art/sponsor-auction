@@ -4,17 +4,20 @@ import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type React
 import { createPortal } from 'react-dom';
 import { Loader2, Sparkles, X } from 'lucide-react';
 import { AgreementFields } from '@/components/AgreementFields';
+import { BankSelect } from '@/components/BankSelect';
 import { EscrowNotice } from '@/components/EscrowNotice';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { isDemoAccountEmail } from '@/lib/auth-mock';
+import { authRequestInit } from '@/lib/auth-request';
+import { canonicalBankName } from '@/lib/banks';
 import { composeBankAccount, settlementAccountFromParts } from '@/lib/settlement-account';
-import { INSERT_FAIL_MESSAGE, createBid, getAuctionById } from '@/lib/auctions';
+import { INSERT_FAIL_MESSAGE, createBid, getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
 import { isUuid } from '@/lib/uuid';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
-import { rememberMyBid } from '@/lib/my-bids';
+import { hasActiveCreatorBid, rememberMyBid } from '@/lib/my-bids';
 import { creatorFeeShortRatesCopy } from '@/lib/fee-policy';
 import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { getAuctionOwnerId, pushNotification } from '@/lib/notifications';
@@ -59,6 +62,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
   const [bankName, setBankName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [accountHolder, setAccountHolder] = useState('');
+  const [settlementType, setSettlementType] = useState<'individual' | 'business'>('individual');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -98,13 +102,41 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
       firstFieldRef.current?.focus({ preventScroll: true });
     });
     const fillBank = window.setTimeout(() => {
-      if (!isDemoAccountEmail(user?.email)) {
+      if (isDemoAccountEmail(user?.email)) {
+        setBankName((current) => canonicalBankName(current) || '신한은행');
+        setAccountNumber((current) => current.trim() || '110123456789');
+        setAccountHolder((current) => current.trim() || '데모크리에이터');
+      }
+    }, 0);
+    let cancelled = false;
+    const loadSavedAccount = async () => {
+      if (isDemoAccountEmail(user?.email)) {
         return;
       }
-      setBankName((current) => current.trim() || '신한은행');
-      setAccountNumber((current) => current.trim() || '110123456789');
-      setAccountHolder((current) => current.trim() || '데모크리에이터');
-    }, 0);
+      const response = await fetch('/api/account/settlement', await authRequestInit({ cache: 'no-store' }));
+      const body = (await response.json().catch(() => null)) as {
+        bankName?: string;
+        accountNumber?: string;
+        accountHolder?: string;
+        settlementType?: string;
+      } | null;
+      if (cancelled || !body) {
+        return;
+      }
+      if (body.bankName) {
+        setBankName(canonicalBankName(body.bankName));
+      }
+      if (body.accountNumber) {
+        setAccountNumber(body.accountNumber);
+      }
+      if (body.accountHolder) {
+        setAccountHolder(body.accountHolder);
+      }
+      if (body.settlementType === 'business' || body.settlementType === 'individual') {
+        setSettlementType(body.settlementType);
+      }
+    };
+    void loadSavedAccount();
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -117,6 +149,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
 
     document.addEventListener('keydown', onKeyDown);
     return () => {
+      cancelled = true;
       window.cancelAnimationFrame(frame);
       window.clearTimeout(fillBank);
       document.body.style.overflow = previousOverflow;
@@ -213,6 +246,12 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         if (isCampaignAuthor(currentAuction, user.id)) {
           setSubmitError(VALIDATION.selfCampaignBid);
           showToast(VALIDATION.selfCampaignBid);
+          return;
+        }
+        const existingBids = await getBidsByAuctionId(auctionId);
+        if (hasActiveCreatorBid(existingBids.data ?? [], user.id, auctionId)) {
+          setSubmitError(VALIDATION.duplicateBid);
+          showToast(VALIDATION.duplicateBid);
           return;
         }
 
@@ -394,7 +433,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
             </Field>
 
             {bidValue > 0 ? (
-              <FeeBreakdownCard role="creator" amount={bidValue} />
+              <FeeBreakdownCard role="creator" amount={bidValue} taxKind={settlementType} />
             ) : (
               <div className="rounded-xl border border-clink-peach-strong bg-clink-peach px-3 py-3 text-sm text-clink">
                 <p className="text-xs text-clink-accent">
@@ -498,14 +537,11 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
             </Field>
 
             <Field label="은행명" htmlFor="bid-bank-name" error={errors.bankName}>
-              <input
+              <BankSelect
                 id="bid-bank-name"
-                type="text"
                 value={bankName}
-                onChange={(event) => setBankName(event.target.value)}
-                className={inputClass(Boolean(errors.bankName))}
-                placeholder="예: 신한은행"
-                autoComplete="off"
+                onChange={setBankName}
+                invalid={Boolean(errors.bankName)}
               />
             </Field>
 

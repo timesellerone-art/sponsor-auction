@@ -4,6 +4,7 @@ import {
   advertiserChargeMatchesBid,
   advertiserFeeFromBid,
   advertiserPayableAmount,
+  advertiserTotalCharge,
   bidAmountFromCreatorPayout,
   creatorFeeRate,
   creatorPayoutAmount,
@@ -65,12 +66,14 @@ describe('fees: 가드 및 기본 금액', () => {
     assert.equal(creatorPlatformFeeAmount(5_000_000), 400_000);
   });
 
-  it('광고주 결제액은 낙찰가 + Math.round(낙찰가 * 0.15)이다', () => {
+  it('광고주 공급가액은 낙찰가 + 15%이고 결제는 부가세 10%를 별도 가산한다', () => {
     for (const bid of [1, 10_000, 120_000, 1_500_000]) {
-      const expected = bid + Math.round(bid * 0.15);
-      assert.equal(advertiserPayableAmount(bid), expected);
-      assert.equal(advertiserChargeMatchesBid(bid, expected), true);
-      assert.equal(advertiserChargeMatchesBid(bid, expected + 1), false);
+      const supply = bid + Math.round(bid * 0.15);
+      const total = supply + Math.round(supply * VAT_RATE);
+      assert.equal(advertiserPayableAmount(bid), supply);
+      assert.equal(advertiserTotalCharge(bid), total);
+      assert.equal(advertiserChargeMatchesBid(bid, total), true);
+      assert.equal(advertiserChargeMatchesBid(bid, supply), false);
     }
   });
 });
@@ -79,9 +82,9 @@ describe('tax: 공급가액·부가세·원천징수·최종 정산금', () => {
   it('10,000원 제안 세금 분해가 정확하다', () => {
     const individual = describeSettlementTax(10_000, 'individual');
     assert.deepEqual(individual.advertiser, {
-      supplyAmount: 10_000,
-      vatAmount: 1_500,
-      totalAmount: 11_500,
+      supplyAmount: 11_500,
+      vatAmount: 1_150,
+      totalAmount: 12_650,
     });
     assert.deepEqual(individual.creator, {
       awardAmount: 10_000,
@@ -99,8 +102,9 @@ describe('tax: 공급가액·부가세·원천징수·최종 정산금', () => {
 
   it('1,500,000원 제안 세금 분해가 정확하다', () => {
     const tax = describeSettlementTax(1_500_000, 'individual');
-    assert.equal(tax.advertiser.supplyAmount, 1_500_000);
-    assert.equal(tax.advertiser.totalAmount, 1_725_000);
+    assert.equal(tax.advertiser.supplyAmount, 1_725_000);
+    assert.equal(tax.advertiser.vatAmount, 172_500);
+    assert.equal(tax.advertiser.totalAmount, 1_897_500);
     assert.equal(tax.creator.platformFee, 150_000);
     assert.equal(tax.creator.withholdingAmount, 44_550);
     assert.equal(tax.creator.businessVatAmount, 0);
@@ -130,13 +134,13 @@ describe('정산 항등식: 입찰가 스위프', () => {
     it(`${bid.toLocaleString('ko-KR')}원에서 공급가+합산수수료+정산금이 맞는다`, () => {
       const invoice = splitAdvertiserInvoice(bid);
       const creator = splitCreatorSettlement(bid);
-      const payable = advertiserPayableAmount(bid);
+      const payable = advertiserTotalCharge(bid);
       const creatorGross = creatorPayoutAmount(bid);
       const platform = platformFeeFromAmount(bid);
       const rate = creatorFeeRate(bid);
 
-      assert.equal(invoice.supplyAmount, bid <= 0 ? 0 : roundWon(bid));
-      assert.equal(invoice.vatAmount, advertiserFeeFromBid(bid));
+      assert.equal(invoice.supplyAmount, advertiserPayableAmount(bid));
+      assert.equal(invoice.vatAmount, bid <= 0 ? 0 : roundWon(invoice.supplyAmount * VAT_RATE));
       assert.equal(invoice.totalAmount, invoice.supplyAmount + invoice.vatAmount);
       assert.equal(payable, invoice.totalAmount);
 
@@ -148,7 +152,7 @@ describe('정산 항등식: 입찰가 스위프', () => {
       assert.equal(business.businessVatAmount, roundWon(business.netPayout * VAT_RATE));
       assert.equal(creator.netPayout, Math.max(0, creator.awardAmount - creator.platformFee));
       assert.equal(creatorGross, creator.netPayout);
-      assert.equal(platform, advertiserFeeFromBid(invoice.supplyAmount) + creator.platformFee);
+      assert.equal(platform, advertiserFeeFromBid(bid) + creator.platformFee);
       assert.equal(creator.netPayout + creator.platformFee, creator.awardAmount);
     });
   }
@@ -180,11 +184,11 @@ describe('부동소수점·반올림 예외', () => {
     for (let bid = 1; bid <= 20_000; bid += 1) {
       const invoice = splitAdvertiserInvoice(bid);
       const creator = splitCreatorSettlement(bid);
-      assert.equal(advertiserPayableAmount(bid), invoice.totalAmount, `advertiser ${bid}`);
+      assert.equal(advertiserTotalCharge(bid), invoice.totalAmount, `advertiser ${bid}`);
       assert.equal(creatorPayoutAmount(bid), bid - creator.platformFee, `creator gross ${bid}`);
       assert.equal(
         platformFeeFromAmount(bid),
-        invoice.vatAmount + creator.platformFee,
+        advertiserFeeFromBid(bid) + creator.platformFee,
         `platform ${bid}`,
       );
       assert.equal(creator.netPayout + creator.platformFee, bid, `creator identity ${bid}`);
@@ -210,8 +214,8 @@ describe('역산 왕복', () => {
   });
 
   it('광고주 결제액에서 크리에이터 지급을 역산하면 수수료 차감과 맞는다', () => {
-    const charge = advertiserPayableAmount(10_000);
-    assert.equal(charge, 11_500);
+    const charge = advertiserTotalCharge(10_000);
+    assert.equal(charge, 12_650);
     assert.equal(creatorPayoutFromCharge(charge), creatorPayoutAmount(10_000));
   });
 });
@@ -228,5 +232,7 @@ describe('상담용 금액 파싱', () => {
     assert.equal(quote.individualNet, 2_175_750);
     assert.equal(quote.businessVat, 225_000);
     assert.equal(quote.advertiserPayable, 2_875_000);
+    assert.equal(quote.advertiserVat, 287_500);
+    assert.equal(quote.advertiserTotal, 3_162_500);
   });
 });

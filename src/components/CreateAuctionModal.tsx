@@ -305,30 +305,43 @@ export function CreateAuctionModal({
               htmlFor="auction-cover"
               hint="JPG, PNG, WEBP · 5MB 이하"
             >
-              <input
-                id="auction-cover"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="block w-full min-w-0 text-sm text-zinc-700 file:mr-3 file:rounded-full file:border-0 file:bg-[#FFF7ED] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[#1C1917] hover:file:bg-[#FFEDD5]"
-                onChange={(event) => {
-                  const file = event.target.files?.[0] ?? null;
-                  if (!file) {
-                    setCoverFile(null);
-                    setCoverPreview(null);
-                    return;
-                  }
-                  const invalid = validateCampaignCoverFile(file);
-                  if (invalid) {
-                    setSubmitError(invalid);
-                    showToast(invalid);
-                    event.target.value = '';
-                    return;
-                  }
-                  setSubmitError(null);
-                  setCoverFile(file);
-                  setCoverPreview(URL.createObjectURL(file));
-                }}
-              />
+              <div className="flex min-w-0 items-center gap-3">
+                <input
+                  id="auction-cover"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    if (!file) {
+                      setCoverFile(null);
+                      setCoverPreview(null);
+                      return;
+                    }
+                    const invalid = validateCampaignCoverFile(file);
+                    if (invalid) {
+                      setSubmitError(invalid);
+                      showToast(invalid);
+                      event.target.value = '';
+                      return;
+                    }
+                    setSubmitError(null);
+                    setCoverFile(file);
+                    setCoverPreview(URL.createObjectURL(file));
+                  }}
+                />
+                <label
+                  htmlFor="auction-cover"
+                  className="inline-flex h-9 shrink-0 cursor-pointer items-center rounded-full bg-[#FFF7ED] px-3 text-xs font-semibold text-[#1C1917] hover:bg-[#FFEDD5]"
+                >
+                  파일 선택
+                </label>
+                {coverFile?.name ? (
+                  <span className="min-w-0 flex-1 truncate text-sm text-zinc-500">
+                    {coverFile.name}
+                  </span>
+                ) : null}
+              </div>
               {coverPreview ? (
                 <img
                   src={coverPreview}

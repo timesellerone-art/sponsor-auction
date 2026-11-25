@@ -34,13 +34,15 @@ export async function POST(request: Request) {
 
     const lookup = await lookupNtsBusinessStatus(businessNumber);
     if (!lookup.ok) {
+      const status =
+        lookup.code === 'INVALID_NUMBER' ? 400 : lookup.code === 'UNCONFIGURED' ? 503 : 502;
       return NextResponse.json(
         {
           error: lookup.message,
           errorCode: lookup.code,
           businessNumber: formatBusinessNumber(businessNumber),
         },
-        { status: lookup.code === 'UNCONFIGURED' ? 503 : 502, headers: NO_STORE },
+        { status, headers: NO_STORE },
       );
     }
 
@@ -49,9 +51,10 @@ export async function POST(request: Request) {
       {
         businessNumber: formatBusinessNumber(lookup.businessNumber),
         ntsCode: lookup.code,
-        ntsLabel: lookup.label,
+        ntsLabel: saved.ntsLabel || lookup.label,
         suggestedStatus: saved.status,
         detail: saved.detail,
+        status: saved.status,
       },
       { headers: NO_STORE },
     );

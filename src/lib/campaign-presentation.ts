@@ -248,8 +248,8 @@ export function closedCampaignBadge(status?: AuctionStatus) {
   if (status === 'cancelled') {
     return '취소';
   }
-  if (status === 'completed') {
-    return '결제 완료';
+  if (status === 'completed' || status === 'closed' || status === 'matched') {
+    return '낙찰 완료';
   }
   return '최종 매칭 완료';
 }

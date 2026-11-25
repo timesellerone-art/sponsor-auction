@@ -2,21 +2,20 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { BusinessStatusNotice } from '@/components/BusinessStatusNotice';
+import { CreditLedgerEntry } from '@/components/CreditLedgerEntry';
 import { authRequestInit } from '@/lib/auth-request';
 import {
   CREDIT_CHARGE_AMOUNTS,
   CREDIT_CHARGE_ORDER_NAME,
-  demoCreditPaymentKey,
   type CreditChargeAmount,
 } from '@/lib/credit-charge-shared';
-import { describeTossKeyKind } from '@/lib/payments/env';
+import { describeTossKeyKind, getTossClientKey } from '@/lib/payments/env';
 import { REFUND_REQUIRED } from '@/lib/legal';
 import { isProductionClinkHost } from '@/lib/site-origin';
-import { cn, formatDateTime, formatWon } from '@/lib/utils';
+import { cn, formatWon } from '@/lib/utils';
 import type { TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
 
 type CreditTx = {
@@ -38,15 +37,7 @@ type Checkout = {
   demo: boolean;
 };
 
-const TYPE_LABEL: Record<CreditTx['type'], string> = {
-  CHARGE: '충전',
-  HOLD: '이용',
-  RELEASE: '예치 해제',
-  REFUND: '환불',
-};
-
 export function CreditWallet({ canCharge }: { canCharge: boolean }) {
-  const router = useRouter();
   const titleId = useId();
   const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
   const loadRef = useRef<() => Promise<void>>(async () => {});
@@ -133,7 +124,7 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
     const boot = async () => {
       setReady(false);
       setPayError(null);
-      const clientKey = checkout.clientKey?.trim() || '';
+      const clientKey = checkout.clientKey?.trim() || getTossClientKey();
       const liveHost = isProductionClinkHost(window.location.hostname);
       if (liveHost && (!clientKey || describeTossKeyKind(clientKey).kind === 'test')) {
         setPayError('운영 환경에서는 토스페이먼츠 라이브 키가 필요합니다.');
@@ -141,6 +132,7 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
         return;
       }
       if (!clientKey) {
+        setPayError('토스페이먼츠 클라이언트 키가 없어 결제창을 열 수 없습니다.');
         setReady(true);
         return;
       }
@@ -206,6 +198,14 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
     }
   };
 
+  const closeCheckout = () => {
+    widgetsRef.current = null;
+    setPaying(false);
+    setReady(false);
+    setPayError(null);
+    setCheckout(null);
+  };
+
   const pay = async () => {
     if (!checkout || paying) {
       return;
@@ -216,31 +216,23 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
     }
     setPaying(true);
     setPayError(null);
-    const successUrl = `${window.location.origin}/my/credits/success`;
-    const failUrl = `${window.location.origin}/my/credits/fail?orderId=${encodeURIComponent(checkout.orderId)}`;
+    const origin = window.location.origin;
+    const successUrl = `${origin}/my/credits/success`;
+    const failUrl = `${origin}/my/credits/fail?orderId=${encodeURIComponent(checkout.orderId)}`;
     try {
-      if (widgetsRef.current) {
-        await widgetsRef.current.requestPayment({
-          orderId: checkout.orderId,
-          orderName: checkout.orderName,
-          successUrl,
-          failUrl,
-        });
+      if (!widgetsRef.current) {
+        setPayError('토스페이먼츠 결제창을 열 수 없습니다. 클라이언트 키를 확인해 주세요.');
         return;
       }
-      if (isProductionClinkHost(window.location.hostname) || !checkout.demo) {
-        setPayError('토스페이먼츠 결제창을 열 수 없습니다.');
-        setPaying(false);
-        return;
-      }
-      const params = new URLSearchParams({
-        paymentKey: demoCreditPaymentKey(checkout.orderId),
+      await widgetsRef.current.requestPayment({
         orderId: checkout.orderId,
-        amount: String(checkout.amount),
+        orderName: checkout.orderName,
+        successUrl,
+        failUrl,
       });
-      router.push(`/my/credits/success?${params.toString()}`);
     } catch (reason) {
       setPayError(reason instanceof Error ? reason.message : '결제를 시작하지 못했습니다.');
+    } finally {
       setPaying(false);
     }
   };
@@ -301,30 +293,20 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
       </section>
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
-        <h2 className="text-lg font-bold text-zinc-950">충전·이용 내역</h2>
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-lg font-bold text-zinc-950">충전·이용 내역</h2>
+          {transactions.length > 0 ? (
+            <span className="text-xs font-semibold text-zinc-400">{transactions.length}건</span>
+          ) : null}
+        </div>
         {loading ? (
-          <p className="mt-4 text-sm text-zinc-500">내역을 불러오는 중입니다.</p>
+          <p className="mt-3 text-sm text-zinc-500">내역을 불러오는 중입니다.</p>
         ) : transactions.length === 0 ? (
-          <p className="mt-4 text-sm text-zinc-500">아직 크레딧 내역이 없습니다.</p>
+          <p className="mt-3 text-sm text-zinc-400">크레딧 내역 0건</p>
         ) : (
-          <ul className="mt-4 divide-y divide-zinc-100">
+          <ul className="mt-1.5 max-h-96 divide-y divide-zinc-100 overflow-y-auto pr-1">
             {transactions.map((row) => (
-              <li key={row.id} className="flex items-start justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-zinc-950">{TYPE_LABEL[row.type]}</p>
-                  <p className="mt-1 truncate text-xs text-zinc-500">
-                    {formatDateTime(row.created_at)}
-                    {row.reference_id ? ` · ${row.reference_id}` : ''}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-zinc-950">
-                    {row.type === 'HOLD' ? '-' : '+'}
-                    {formatWon(row.amount)}
-                  </p>
-                  <p className="mt-1 text-xs text-zinc-500">잔액 {formatWon(row.balance_after)}</p>
-                </div>
-              </li>
+              <CreditLedgerEntry key={row.id} row={row} />
             ))}
           </ul>
         )}
@@ -336,8 +318,12 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
           aria-modal="true"
           aria-labelledby={titleId}
           className="fixed inset-0 z-[75] flex items-center justify-center bg-zinc-950/50 p-4"
+          onClick={closeCheckout}
         >
-          <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+          <div
+            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
             <h2 id={titleId} className="text-base font-semibold text-zinc-950">
               크레딧 충전
             </h2>
@@ -370,8 +356,7 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
               <button
                 type="button"
                 className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-zinc-200 text-sm font-semibold"
-                disabled={paying}
-                onClick={() => setCheckout(null)}
+                onClick={closeCheckout}
               >
                 닫기
               </button>

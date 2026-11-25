@@ -11,7 +11,8 @@ import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
 import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { BidProposalList } from '@/components/BidProposalList';
-import { PaymentCheckoutModal } from '@/components/PaymentCheckoutModal';
+import { CreditChargeModal } from '@/components/CreditChargeModal';
+import { TaxInvoiceStatus } from '@/components/TaxInvoiceStatus';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useAwardCheckout } from '@/hooks/useAwardCheckout';
@@ -26,7 +27,9 @@ import {
   writeCachedAiGuide,
 } from '@/lib/ai-guide';
 import { buildFallbackReport } from '@/lib/ai-report';
+import { isOpenForBid } from '@/lib/auction-browse';
 import { getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
+import { hasActiveCreatorBid, loadMyProposedAuctionIds } from '@/lib/my-bids';
 import { isCampaignAuthor, isOwnedAuction } from '@/lib/my-campaigns';
 import { VALIDATION } from '@/lib/validation';
 import {
@@ -52,8 +55,9 @@ export function AuctionDetail({ id }: { id: string }) {
   const [bidsError, setBidsError] = useState<string | null>(null);
   const [awardBusyId, setAwardBusyId] = useState<string | null>(null);
   const { run: runAward } = useActionLock();
-  const { checkout, startCheckout, closeCheckout } = useAwardCheckout();
+  const { awardWithCredit, chargeNeeded, closeCharge } = useAwardCheckout();
   const [bidOpen, setBidOpen] = useState(false);
+  const [alreadyBidRemote, setAlreadyBidRemote] = useState(false);
   const [report, setReport] = useState<AiReport | null>(null);
   const [reportSource, setReportSource] = useState<AiAnalyzeResponse['source'] | null>(
     null,
@@ -194,11 +198,31 @@ export function AuctionDetail({ id }: { id: string }) {
 
   const title = auction?.title || '제목 없음';
   const detailCategory = auction ? resolveCampaignCategory(auction) : null;
-  const auctionOpen = auction?.status === 'active' && !auction.isBlind;
+  const auctionOpen = Boolean(auction && isOpenForBid(auction));
   const ownCampaign = Boolean(auction && isCampaignAuthor(auction, user?.id));
-  const canAttemptBid = Boolean(auctionOpen && ready && user && !ownCampaign);
+  const alreadyBid = Boolean(
+    (auction && user && hasActiveCreatorBid(bids, user.id, auction.id)) || alreadyBidRemote,
+  );
+  const canAttemptBid = Boolean(auctionOpen && ready && user && !ownCampaign && !alreadyBid);
+
+  useEffect(() => {
+    if (!user?.id || !auction?.id || ownCampaign) {
+      setAlreadyBidRemote(false);
+      return;
+    }
+    let cancelled = false;
+    void loadMyProposedAuctionIds(user.id).then((ids) => {
+      if (!cancelled) {
+        setAlreadyBidRemote(ids.has(auction.id));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [auction?.id, ownCampaign, user?.id]);
 
   const handleBidCreated = () => {
+    setAlreadyBidRemote(true);
     setAuction((current) =>
       current
         ? { ...current, bidsCount: (current.bidsCount ?? 0) + 1 }
@@ -231,14 +255,25 @@ export function AuctionDetail({ id }: { id: string }) {
       return;
     }
 
+    if (awardBusyId) {
+      return;
+    }
+    setAwardBusyId(bid.id);
     await runAward(bid.id, async () => {
-      setAwardBusyId(bid.id);
-      try {
-        await startCheckout(auction, bid);
-      } finally {
-        setAwardBusyId(null);
+      const awarded = await awardWithCredit(auction, bid);
+      if (!awarded) {
+        return;
       }
+      setAuction(awarded);
+      setBids((current) =>
+        current.map((item) =>
+          item.id === awarded.winnerBidId || item.id === bid.id
+            ? { ...item, status: 'selected' as const }
+            : item,
+        ),
+      );
     });
+    setAwardBusyId(null);
   };
 
   return (
@@ -280,8 +315,8 @@ export function AuctionDetail({ id }: { id: string }) {
               </p>
               {matched ? (
                 <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
-                  {auction.status === 'completed'
-                    ? '결제 완료된 캠페인입니다'
+                  {isAuctionClosed(auction.status) || auction.winnerBidId
+                    ? '낙찰된 캠페인입니다'
                     : '매칭 완료된 캠페인입니다'}
                 </span>
               ) : null}
@@ -341,6 +376,14 @@ export function AuctionDetail({ id }: { id: string }) {
                 </button>
                 <p className="mt-2 text-center text-xs text-zinc-500">{VALIDATION.selfCampaignHint}</p>
               </div>
+            ) : alreadyBid && auctionOpen ? (
+              <button
+                type="button"
+                disabled
+                className="mt-6 inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-full bg-zinc-300 text-sm font-semibold text-zinc-500"
+              >
+                제안 완료
+              </button>
             ) : canAttemptBid ? (
               <button
                 type="button"
@@ -381,13 +424,19 @@ export function AuctionDetail({ id }: { id: string }) {
           />
 
           <AuctionChat auctionId={auction.id} />
+          {user &&
+          (isOwner ||
+            ownCampaign ||
+            (selectedBid?.creatorId && selectedBid.creatorId === user.id)) ? (
+            <TaxInvoiceStatus auctionId={auction.id} />
+          ) : null}
         </div>
       )}
 
-      <PaymentCheckoutModal
-        open={Boolean(checkout)}
-        checkout={checkout}
-        onClose={closeCheckout}
+      <CreditChargeModal
+        open={chargeNeeded != null}
+        neededAmount={chargeNeeded ?? 0}
+        onClose={closeCharge}
       />
 
       {auction ? (

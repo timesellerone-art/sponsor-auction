@@ -7,11 +7,13 @@ import {
   formatBusinessNumber,
   isBusinessVerificationStatus,
   normalizeBusinessNumber,
+  ntsBusinessLabelFromText,
   profileStatusFromNts,
   type BusinessVerificationStatus,
 } from '@/lib/business-registration';
 import { lookupNtsBusinessStatus } from '@/lib/nts-business-status';
-import { getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
+import { forbiddenJson, getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
+import { hasAuthRole } from '@/types/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 
@@ -36,6 +38,7 @@ function present(row: {
     detail,
     reviewNote: row.business_review_note ?? '',
     notice: businessStatusNotice(status, detail),
+    ntsLabel: ntsBusinessLabelFromText(detail),
   };
 }
 
@@ -45,6 +48,13 @@ export async function GET(request: Request) {
     const actor = await getPaymentActor(request);
     if (!actor?.userId) {
       return unauthorizedJson('사업자 정보를 보려면 로그인해 주세요.');
+    }
+    if (
+      !hasAuthRole(actor, 'advertiser') &&
+      !hasAuthRole(actor, 'creator') &&
+      !hasAuthRole(actor, 'admin')
+    ) {
+      return forbiddenJson('사업자등록번호는 광고주 또는 크리에이터 계정에서 관리합니다.');
     }
     const admin = createAdminClient();
     if (!admin) {
@@ -87,6 +97,13 @@ export async function POST(request: Request) {
     if (!actor?.userId) {
       return unauthorizedJson('사업자등록번호를 저장하려면 로그인해 주세요.');
     }
+    if (
+      !hasAuthRole(actor, 'advertiser') &&
+      !hasAuthRole(actor, 'creator') &&
+      !hasAuthRole(actor, 'admin')
+    ) {
+      return forbiddenJson('사업자등록번호는 광고주 또는 크리에이터 계정에서 관리합니다.');
+    }
     const body = (await request.json().catch(() => null)) as { businessNumber?: unknown } | null;
     const businessNumber = normalizeBusinessNumber(
       typeof body?.businessNumber === 'string' ? body.businessNumber : '',
@@ -111,16 +128,18 @@ export async function POST(request: Request) {
       ? '국세청 상태를 확인하기 전에 번호를 저장했습니다.'
       : '';
     let lookupError: { code: string; message: string } | null = null;
+    let ntsLabel = '';
     if (businessNumber) {
       const lookup = await lookupNtsBusinessStatus(businessNumber);
       if (lookup.ok) {
         const saved = profileStatusFromNts(lookup.code, lookup.label);
         status = saved.status;
         detail = saved.detail;
+        ntsLabel = saved.ntsLabel;
       } else {
         lookupError = { code: lookup.code, message: lookup.message };
         detail = lookup.message;
-        status = 'review_required';
+        status = lookup.code === 'INVALID_NUMBER' ? 'unregistered' : 'review_required';
       }
     }
 
@@ -155,6 +174,10 @@ export async function POST(request: Request) {
       {
         ...present(updated.data),
         lookupError,
+        ntsLabel:
+          ntsLabel ||
+          ntsBusinessLabelFromText(updated.data.business_status_detail) ||
+          ntsBusinessLabelFromText(detail),
       },
       { headers: NO_STORE },
     );

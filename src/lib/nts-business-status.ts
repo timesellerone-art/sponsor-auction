@@ -1,28 +1,53 @@
-import { normalizeBusinessNumber } from '@/lib/business-registration';
+import {
+  isValidBusinessRegistrationNumber,
+  normalizeBusinessNumber,
+} from '@/lib/business-registration';
 
 const DEFAULT_ENDPOINT = 'https://api.odcloud.kr/api/nts-businessman/v1/status';
 
 export type NtsBusinessCode = '01' | '02' | '03';
+export type NtsBusinessKind = NtsBusinessCode | 'UNREGISTERED';
 
 export type NtsBusinessLookup =
   | {
       ok: true;
-      code: NtsBusinessCode;
+      code: NtsBusinessKind;
       label: string;
       businessNumber: string;
     }
   | {
       ok: false;
-      code: 'UNCONFIGURED' | 'INVALID_NUMBER' | 'NOT_FOUND' | 'LOOKUP_FAILED';
+      code: 'UNCONFIGURED' | 'INVALID_NUMBER' | 'LOOKUP_FAILED';
       message: string;
     };
 
 export function ntsBusinessApiKey() {
-  return (process.env.NTS_BUSINESS_API_KEY || process.env.DATA_GO_KR_SERVICE_KEY || '').trim();
+  return decodedServiceKey(
+    process.env.NTS_BUSINESS_API_KEY || process.env.DATA_GO_KR_SERVICE_KEY || '',
+  );
 }
 
 export function ntsBusinessApiEndpoint() {
   return (process.env.NTS_BUSINESS_API_URL || DEFAULT_ENDPOINT).trim() || DEFAULT_ENDPOINT;
+}
+
+function decodedServiceKey(raw: string) {
+  let key = raw.trim();
+  for (let index = 0; index < 2; index += 1) {
+    if (!/%[0-9A-Fa-f]{2}/.test(key)) {
+      break;
+    }
+    try {
+      const next = decodeURIComponent(key);
+      if (next === key) {
+        break;
+      }
+      key = next;
+    } catch {
+      break;
+    }
+  }
+  return key;
 }
 
 function asRecord(value: unknown) {
@@ -51,12 +76,56 @@ function labelOf(code: NtsBusinessCode, raw: unknown) {
   return '폐업자';
 }
 
+function classifyRow(row: Record<string, unknown> | null): {
+  code: NtsBusinessKind;
+  label: string;
+} | null {
+  if (!row) {
+    return null;
+  }
+  const statusText = String(row.b_stt ?? '').trim();
+  const taxType = String(row.tax_type ?? '').trim();
+  const combined = `${statusText} ${taxType}`;
+  if (/등록되지 않은|미등록/.test(combined)) {
+    return { code: 'UNREGISTERED', label: '미등록' };
+  }
+  const code = codeOf(row.b_stt_cd);
+  if (code) {
+    return { code, label: labelOf(code, statusText) };
+  }
+  if (/계속사업/.test(statusText)) {
+    return { code: '01', label: '계속사업자' };
+  }
+  if (/휴업/.test(statusText)) {
+    return { code: '02', label: '휴업자' };
+  }
+  if (/폐업/.test(statusText)) {
+    return { code: '03', label: '폐업자' };
+  }
+  return null;
+}
+
+function parseJsonBody(text: string) {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 export async function lookupNtsBusinessStatus(
   businessNumber: string,
 ): Promise<NtsBusinessLookup> {
   const digits = normalizeBusinessNumber(businessNumber);
-  if (digits.length !== 10) {
-    return { ok: false, code: 'INVALID_NUMBER', message: '사업자등록번호 10자리가 필요합니다.' };
+  if (!isValidBusinessRegistrationNumber(digits)) {
+    return {
+      ok: false,
+      code: 'INVALID_NUMBER',
+      message:
+        digits.length === 10
+          ? '유효하지 않은 사업자등록번호입니다. 번호를 다시 확인해 주세요.'
+          : '사업자등록번호 10자리가 필요합니다.',
+    };
   }
   const key = ntsBusinessApiKey();
   if (!key) {
@@ -70,6 +139,7 @@ export async function lookupNtsBusinessStatus(
 
   const url = new URL(ntsBusinessApiEndpoint());
   url.searchParams.set('serviceKey', key);
+  url.searchParams.set('returnType', 'JSON');
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -78,29 +148,42 @@ export async function lookupNtsBusinessStatus(
       signal: AbortSignal.timeout(8000),
       cache: 'no-store',
     });
-    const body = (await response.json().catch(() => null)) as unknown;
+    const text = await response.text();
+    const body = parseJsonBody(text);
+    const record = asRecord(body);
+    const statusCode = String(record?.status_code ?? '').trim().toUpperCase();
     if (!response.ok) {
+      const hint = String(record?.status_msg ?? record?.msg ?? '').trim();
       return {
         ok: false,
         code: 'LOOKUP_FAILED',
-        message: `국세청 사업자 상태 조회에 실패했습니다. (${response.status})`,
+        message: hint
+          ? `국세청 사업자 상태 조회에 실패했습니다. ${hint}`
+          : `국세청 사업자 상태 조회에 실패했습니다. (${response.status})`,
       };
     }
-    const record = asRecord(body);
-    const rows = Array.isArray(record?.data) ? record.data : [];
-    const row = asRecord(rows[0]);
-    const code = codeOf(row?.b_stt_cd);
-    if (!row || !code) {
+    if (statusCode && statusCode !== 'OK') {
+      const hint = String(record?.status_msg ?? record?.msg ?? statusCode).trim();
       return {
         ok: false,
-        code: 'NOT_FOUND',
-        message: '국세청에서 해당 사업자등록번호의 상태를 찾지 못했습니다.',
+        code: 'LOOKUP_FAILED',
+        message: `국세청 사업자 상태 조회에 실패했습니다. ${hint}`,
+      };
+    }
+    const rows = Array.isArray(record?.data) ? record.data : [];
+    const classified = classifyRow(asRecord(rows[0]));
+    if (!classified) {
+      return {
+        ok: true,
+        code: 'UNREGISTERED',
+        label: '미등록',
+        businessNumber: digits,
       };
     }
     return {
       ok: true,
-      code,
-      label: labelOf(code, row.b_stt),
+      code: classified.code,
+      label: classified.label,
       businessNumber: digits,
     };
   } catch {

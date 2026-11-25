@@ -3,6 +3,8 @@ export {
   advertiserChargeMatchesBid,
   advertiserFeeFromBid,
   advertiserPayableAmount,
+  advertiserTotalCharge,
+  advertiserVatFromBid,
   bidAmountFromAdvertiserCharge,
   bidAmountFromCreatorPayout,
   creatorFeeRate,

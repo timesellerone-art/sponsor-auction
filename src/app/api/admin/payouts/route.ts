@@ -12,7 +12,6 @@ import { deliverLifecycleNotification } from '@/lib/notification';
 import { issueTaxInvoice } from '@/lib/popbill';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { captureException } from '@/lib/monitoring';
-import { bidAmountFromCreatorPayout } from '@/lib/fees';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -151,9 +150,7 @@ export async function POST(request: Request) {
 
     try {
       const bidAmount =
-        result.data.bidAmount && result.data.bidAmount > 0
-          ? result.data.bidAmount
-          : bidAmountFromCreatorPayout(result.data.amount);
+        result.data.bidAmount && result.data.bidAmount > 0 ? result.data.bidAmount : 0;
       const tax = await issueTaxInvoice({
         payoutId: result.data.id,
         paymentOrderId: result.data.paymentOrderId,

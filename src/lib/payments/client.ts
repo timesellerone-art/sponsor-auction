@@ -1,4 +1,4 @@
-import { advertiserPayableAmount } from '@/lib/fees';
+import { advertiserTotalCharge } from '@/lib/fees';
 import { getTossClientKey } from '@/lib/payments/env';
 import { publicSupabasePayload } from '@/lib/supabase/env';
 import type { PreparePaymentResult } from '@/types/payment';
@@ -72,7 +72,7 @@ export async function prepareAwardPayment(input: {
   customerKey?: string;
 }): Promise<{ data: PreparePaymentResult | null; error: string | null }> {
   try {
-    const amount = advertiserPayableAmount(input.bid.bidAmount);
+    const amount = advertiserTotalCharge(input.bid.bidAmount);
     if (amount < 100) {
       return { data: null, error: '결제 금액이 올바르지 않습니다.' };
     }

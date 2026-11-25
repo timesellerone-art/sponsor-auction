@@ -19,7 +19,6 @@ import {
   serializePaymentError,
   type PaymentErrorInfo,
 } from '@/lib/payments/errors';
-import { bidAmountFromAdvertiserCharge } from '@/lib/fees';
 import { cn } from '@/lib/utils';
 import type { TossPaymentsWidgets } from '@tosspayments/tosspayments-sdk';
 import type { PaymentMethod, PreparePaymentResult } from '@/types/payment';
@@ -160,10 +159,7 @@ export function PaymentCheckoutModal({
   const isDemoCheckout = !clientKey && !liveHost;
   const blockTestOnLive = liveHost && describeTossKeyKind(clientKey).kind === 'test';
   const useToss = ready && Boolean(clientKey) && !loadError && !blockTestOnLive;
-  const bidAmount =
-    checkout.bidAmount && checkout.bidAmount > 0
-      ? checkout.bidAmount
-      : bidAmountFromAdvertiserCharge(checkout.amount);
+  const bidAmount = checkout.bidAmount && checkout.bidAmount > 0 ? checkout.bidAmount : 0;
 
   const handlePay = async () => {
     if (busy || !ready) {

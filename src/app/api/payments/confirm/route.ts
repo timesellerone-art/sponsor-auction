@@ -12,7 +12,7 @@ import {
 } from '@/lib/payments/intent';
 import { getBidsByAuctionId } from '@/lib/auctions';
 import { holdCampaignPayment, releaseCampaignPaymentIfOpen } from '@/lib/campaign-credit';
-import { advertiserPayableAmount } from '@/lib/fees';
+import { advertiserTotalCharge } from '@/lib/fees';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isUuid } from '@/lib/uuid';
 import { canPreparePayment, getPaymentActor } from '@/lib/payments/guard';
@@ -309,7 +309,7 @@ export async function POST(request: Request) {
     const bidAmount = lookedUpBidAmount ?? storedBidAmount;
 
     if (typeof bidAmount === 'number' && bidAmount > 0) {
-      const expectedAmount = advertiserPayableAmount(bidAmount);
+      const expectedAmount = advertiserTotalCharge(bidAmount);
       if (parsed.amount !== expectedAmount || intent.amount !== expectedAmount) {
         console.error('[SponsorAuction] 결제 승인 실패: 낙찰가 수수료 금액 불일치', {
           orderId: parsed.orderId,

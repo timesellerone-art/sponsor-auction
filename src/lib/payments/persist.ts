@@ -5,6 +5,7 @@ import {
   type PaymentSupabaseConfig,
 } from '@/lib/supabase/payment-config';
 import { isUuid } from '@/lib/uuid';
+import type { SponsorAuctionClient } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 import type { PaymentIntent, PaymentIntentStatus } from '@/types/payment';
 
@@ -140,6 +141,7 @@ export async function persistPayment(
   status: PaymentIntentStatus,
   paymentKey: string | null,
   configOverride?: Partial<PaymentSupabaseConfig>,
+  writeClient?: SponsorAuctionClient | null,
 ): Promise<PersistPaymentResult> {
   const config = readPaymentSupabaseConfig(configOverride);
   const writeKey = config.serviceKey || config.anonKey;
@@ -149,7 +151,7 @@ export async function persistPayment(
     : config.anonKey
       ? 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
       : null;
-  const client = paymentWriteClient(config);
+  const client = writeClient ?? paymentWriteClient(config);
 
   if (!config.url || !writeKey || !client) {
     const described = describePaymentSupabaseConfig(config);

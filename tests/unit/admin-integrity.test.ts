@@ -63,7 +63,7 @@ describe('관리자 정산 정합성', () => {
     const [row] = applyAdminPayoutIntegrity([basePayout], [auction('active')]);
     assert.equal(row.netPayoutAmount, creatorPayoutAmount(980_000));
     assert.equal(row.platformFee, creatorCombinedFeeAmount(980_000));
-    assert.equal(row.amount, creatorPayoutAmount(980_000));
+    assert.equal(row.amount, row.transferAmount);
     assert.equal(row.taxKind, 'individual');
     assert.ok((row.withholdingAmount ?? 0) > 0);
     assert.equal(

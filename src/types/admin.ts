@@ -27,6 +27,7 @@ export interface ProfileItem {
   businessVerificationStatus?: BusinessVerificationStatus;
   businessStatusDetail?: string;
   businessReviewNote?: string;
+  settlementType?: 'individual' | 'business';
 }
 
 export interface PayoutItem {
@@ -44,6 +45,7 @@ export interface PayoutItem {
   bidId?: string | null;
   bidAmount?: number;
   platformFee?: number;
+  /** 광고주 결제 합계 = (낙찰 + 15%) + 부가세 10% */
   advertiserCharge?: number;
   adminMemo?: string;
   bankAccount?: string;

@@ -379,7 +379,7 @@ export function AdminPayoutTable({
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">크리에이터</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">캠페인</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">처리 일시</th>
-                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">공급가액</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">낙찰 금액</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">부가세</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">{WITHHOLDING_PERCENT}% 공제액</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">최종 정산액</th>
@@ -398,9 +398,7 @@ export function AdminPayoutTable({
                   const cancelled = row.status === 'cancelled';
                   const busy = busyId === payout.id || busyId === 'bulk';
                   const anyBusy = Boolean(busyId);
-                  const payoutAmount =
-                    row.transferAmount ??
-                    Math.max(0, (row.netPayoutAmount ?? row.amount) - (row.withholdingAmount ?? 0));
+                  const payoutAmount = row.transferAmount ?? 0;
 
                   return (
                     <tr

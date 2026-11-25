@@ -11,7 +11,7 @@ import { authRequestInit } from '@/lib/auth-request';
 import { notifyLifecycleEvent } from '@/lib/notification';
 import { pushNotification } from '@/lib/notifications';
 import { UPDATE_FAIL_MESSAGE, awardBid, getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
-import { advertiserPayableAmount } from '@/lib/fees';
+import { advertiserTotalCharge } from '@/lib/fees';
 import { readCheckoutContext, recoverAuctionHref } from '@/lib/payments/client';
 import { formatPaymentToast, parsePaymentError } from '@/lib/payments/errors';
 import { RATE_LIMIT_MESSAGE } from '@/lib/rate-limit';
@@ -175,7 +175,7 @@ function PaymentSuccessContent() {
           return;
         }
 
-        if (advertiserPayableAmount(bid.bidAmount) !== confirmPayload.amount) {
+        if (advertiserTotalCharge(bid.bidAmount) !== confirmPayload.amount) {
           const info = parsePaymentError({
             code: 'AMOUNT_MISMATCH',
             message: '결제 금액이 제안 금액과 일치하지 않아 낙찰을 중단했습니다.',

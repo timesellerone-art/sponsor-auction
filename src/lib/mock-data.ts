@@ -620,11 +620,22 @@ export async function createBid(
       return fail(null, bidError);
     }
 
-    const alreadyBid = bidsStore.some(
-      (item) =>
-        item.auctionId === data.auctionId &&
-        item.creatorName.trim().toLowerCase() === data.creatorName.trim().toLowerCase(),
-    );
+    const alreadyBid = bidsStore.some((item) => {
+      const sameCampaign = item.auctionId === data.auctionId;
+      if (!sameCampaign) {
+        return false;
+      }
+      const status = String(item.status ?? 'pending');
+      if (status === 'cancelled' || status === 'rejected' || status === 'withdrawn') {
+        return false;
+      }
+      if (data.creatorId && item.creatorId === data.creatorId) {
+        return true;
+      }
+      return (
+        item.creatorName.trim().toLowerCase() === data.creatorName.trim().toLowerCase()
+      );
+    });
     if (alreadyBid) {
       return fail(null, VALIDATION.duplicateBid);
     }
@@ -735,6 +746,23 @@ export async function getBids(): Promise<DataResult<BidItem[]>> {
       return fail([], '등록된 제안이 없습니다.');
     }
 
+    return ok(bids);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : '제안 목록을 불러오지 못했습니다.';
+    return fail([], message);
+  }
+}
+
+export async function getBidsByAuctionIds(
+  auctionIds: string[],
+): Promise<DataResult<BidItem[]>> {
+  try {
+    const ids = new Set(auctionIds.map((id) => id.trim()).filter(Boolean));
+    if (ids.size === 0) {
+      return ok([]);
+    }
+    const bids = guardBidList(bidsStore).filter((item) => ids.has(item.auctionId));
     return ok(bids);
   } catch (error) {
     const message =
@@ -1043,7 +1071,7 @@ function payoutsFromClosedCampaigns(): PayoutItem[] {
       creatorName: bid.creatorName,
       creatorEmail: `${bid.creatorName.replace(/\s+/g, '').toLowerCase()}@creator.local`,
       amount,
-      status: auction.status === 'completed' ? 'paid' : 'pending',
+      status: isAuctionClosed(auction.status) ? 'paid' : 'pending',
       auctionTitle: auction.title,
       requestedAt: auction.createdAt,
       paymentOrderId: payoutId,
@@ -1077,17 +1105,43 @@ export async function getPayouts(): Promise<DataResult<PayoutItem[]>> {
   }
 }
 
+function mockPayoutMatches(item: PayoutItem, target: string | PayoutItem) {
+  if (typeof target === 'string') {
+    return item.id === target || item.paymentOrderId === target;
+  }
+  if (target.id && (item.id === target.id || item.paymentOrderId === target.id)) {
+    return true;
+  }
+  if (
+    target.paymentOrderId &&
+    (item.paymentOrderId === target.paymentOrderId || item.id === target.paymentOrderId)
+  ) {
+    return true;
+  }
+  if (target.auctionId && target.bidId && item.auctionId === target.auctionId && item.bidId === target.bidId) {
+    return true;
+  }
+  return Boolean(target.auctionId && item.auctionId === target.auctionId);
+}
+
+function findMockPayout(target: string | PayoutItem) {
+  const fromStore = payoutsStore.find((item) => mockPayoutMatches(item, target));
+  if (fromStore) {
+    return fromStore;
+  }
+  return payoutsFromClosedCampaigns().find((item) => mockPayoutMatches(item, target));
+}
+
 export async function approvePayout(
-  id: string,
+  target: string | PayoutItem,
 ): Promise<DataResult<PayoutItem | null>> {
   try {
-    if (!isNonEmptyString(id)) {
+    const id = typeof target === 'string' ? target.trim() : (target.id || target.paymentOrderId || '').trim();
+    if (!isNonEmptyString(id) && typeof target === 'string') {
       return fail(null, '유효한 정산 ID가 필요합니다.');
     }
 
-    const current =
-      payoutsStore.find((item) => item.id === id) ??
-      payoutsFromClosedCampaigns().find((item) => item.id === id);
+    const current = findMockPayout(target);
     if (!current) {
       return fail(null, '해당 정산 요청을 찾을 수 없습니다.');
     }
@@ -1109,9 +1163,9 @@ export async function approvePayout(
       status: 'paid',
       paidAt: new Date().toISOString(),
     };
-    if (payoutsStore.some((item) => item.id === id)) {
+    if (payoutsStore.some((item) => item.id === current.id)) {
       payoutsStore = payoutsStore.map((item) =>
-        item.id === id ? updated : item,
+        item.id === current.id ? updated : item,
       );
     } else {
       payoutsStore = [...payoutsStore, updated];
@@ -1133,9 +1187,7 @@ export async function updatePayoutMemo(
     if (!isNonEmptyString(id)) {
       return fail(null, '유효한 정산 ID가 필요합니다.');
     }
-    const current =
-      payoutsStore.find((item) => item.id === id) ??
-      payoutsFromClosedCampaigns().find((item) => item.id === id);
+    const current = findMockPayout(id);
     if (!current) {
       return fail(null, '해당 정산 요청을 찾을 수 없습니다.');
     }
@@ -1143,8 +1195,8 @@ export async function updatePayoutMemo(
       ...current,
       adminMemo,
     };
-    if (payoutsStore.some((item) => item.id === id)) {
-      payoutsStore = payoutsStore.map((item) => (item.id === id ? updated : item));
+    if (payoutsStore.some((item) => item.id === current.id)) {
+      payoutsStore = payoutsStore.map((item) => (item.id === current.id ? updated : item));
     } else {
       payoutsStore = [...payoutsStore, updated];
     }

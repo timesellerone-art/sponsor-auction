@@ -1,5 +1,4 @@
-import { advertiserFeeFromBid, advertiserPayableAmount } from '@/lib/fee-policy';
-import { assertAdvertiserHoldMatchesSettlement } from '@/lib/settlement-amounts';
+import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import {
   deductUserCredit,
   restoreUserCredit,
@@ -12,6 +11,7 @@ export type CreditLedgerSnap = {
   type: 'CHARGE' | 'HOLD' | 'RELEASE' | 'REFUND';
   amount: number;
   reference_id: string | null;
+  description?: string | null;
 };
 
 export type CampaignHoldResult =
@@ -44,24 +44,71 @@ export function campaignPayReference(orderId: string) {
   return `campaign-pay:${id}`;
 }
 
+export function campaignAwardOrderId(auctionId: string, bidId: string) {
+  return `ord_awd_${auctionId.replace(/-/g, '')}_${bidId.replace(/-/g, '')}`;
+}
+
 export function timeslotAwardReference(slotId: string, bidId: string, attemptId: string) {
   return `timeslot-award:${slotId.trim()}:${bidId.trim()}:${attemptId.trim()}`;
 }
 
 export function campaignHoldQuote(bidAmount: number) {
-  const bid = Math.round(bidAmount);
-  const fee = advertiserFeeFromBid(bid);
-  const amount = advertiserPayableAmount(bid);
-  if (!assertAdvertiserHoldMatchesSettlement(bid, amount)) {
-    throw new Error('광고주 15% 수수료 합산액이 정산 기준과 맞지 않습니다.');
-  }
-  return { bid, fee, amount };
+  const amounts = describeSettlementAmounts(bidAmount);
+  return {
+    bid: amounts.bidAmount,
+    fee: amounts.advertiserFee,
+    supply: amounts.advertiserSupply,
+    vat: amounts.advertiserVat,
+    amount: amounts.advertiserCharge,
+  };
+}
+
+function formatHoldBreakdown(
+  quote: ReturnType<typeof campaignHoldQuote>,
+  options?: { locale?: boolean },
+) {
+  const won = (value: number) =>
+    options?.locale ? value.toLocaleString('ko-KR') : String(value);
+  return `공급가액 ${won(quote.supply)}원(낙찰 ${won(quote.bid)}+수수료 ${won(quote.fee)}) · 부가세 ${won(quote.vat)}원 · 총 ${won(quote.amount)}원`;
 }
 
 export function campaignHoldDescription(input: { title?: string | null; bidAmount: number }) {
   const quote = campaignHoldQuote(input.bidAmount);
   const title = input.title?.trim() || '캠페인';
-  return `${title} 채택: 제안 ${quote.bid}원 + 수수료 ${quote.fee}원`;
+  return `${title} 채택: ${formatHoldBreakdown(quote)}`;
+}
+
+export function parseCampaignHoldBidAmount(description?: string | null) {
+  const fromText = description ?? '';
+  const bidMatch = fromText.match(/낙찰\s*([0-9,]+)/);
+  const proposalMatch = fromText.match(/제안\s*([0-9,]+)원/);
+  const raw = bidMatch?.[1] ?? proposalMatch?.[1];
+  if (!raw) {
+    return null;
+  }
+  const bid = Number(raw.replace(/,/g, ''));
+  return Number.isFinite(bid) && bid > 0 ? bid : null;
+}
+
+export function campaignHoldLedgerLabel(input: {
+  type: 'HOLD' | 'RELEASE' | 'CHARGE' | 'REFUND';
+  amount: number;
+  description?: string | null;
+}) {
+  if (input.type !== 'HOLD' && input.type !== 'RELEASE') {
+    return input.description?.trim() || '';
+  }
+  const prefix = input.type === 'HOLD' ? '예치' : '예치 해제';
+  const bid = parseCampaignHoldBidAmount(input.description);
+  if (bid != null) {
+    const quote = campaignHoldQuote(bid);
+    return `${prefix}: ${formatHoldBreakdown(quote, { locale: true })}`;
+  }
+  const fromText = input.description?.trim() || '';
+  if (fromText && !/부가세\s*(?:10%\s*)?0원/.test(fromText)) {
+    return fromText;
+  }
+  return `${prefix}: 총 ${Math.round(input.amount).toLocaleString('ko-KR')}원`;
 }
 
 export function holdRestorePlan(rows: CreditLedgerSnap[], referenceId: string) {
@@ -84,7 +131,7 @@ export function holdRestorePlan(rows: CreditLedgerSnap[], referenceId: string) {
 async function loadReferenceRows(client: CreditLedgerClient, referenceId: string) {
   const { data, error } = await client
     .from('credit_transactions')
-    .select('user_id, type, amount, reference_id')
+    .select('user_id, type, amount, reference_id, description')
     .eq('reference_id', referenceId);
   if (error) {
     return { rows: [] as CreditLedgerSnap[], error: error.message };
@@ -151,6 +198,7 @@ export async function holdCampaignCredit(
       referenceId,
       amount: quote.amount,
       fee: quote.fee,
+      vat: quote.vat,
       balanceAfter: held.data.balance_after,
     });
     return {
@@ -168,7 +216,7 @@ export async function holdCampaignCredit(
     return {
       ok: false,
       code: held.error.code,
-      message: '크레딧이 부족해 채택할 수 없습니다. 제안 금액과 수수료를 합친 금액이 필요합니다.',
+      message: `크레딧이 부족해 채택할 수 없습니다. 총액 ${quote.amount.toLocaleString('ko-KR')}원(공급가액 ${quote.supply.toLocaleString('ko-KR')}원 + 부가세 ${quote.vat.toLocaleString('ko-KR')}원)이 필요합니다.`,
     };
   }
   if (held.error.code === 'DUPLICATE_REFERENCE') {
@@ -212,12 +260,17 @@ export async function releaseCampaignCredit(
     return { ok: true, restored: false, amount: 0, balanceAfter: null, reason: plan.reason };
   }
 
+  const holdRow = existing.rows.find((row) => row.type === 'HOLD');
   const restored = await restoreUserCredit(client, {
     userId: plan.userId,
     amount: plan.amount,
     type: 'RELEASE',
     referenceId,
-    description: input.reason,
+    description: `${input.reason} · ${campaignHoldLedgerLabel({
+      type: 'RELEASE',
+      amount: plan.amount,
+      description: holdRow?.description,
+    })}`,
   });
   if (!restored.ok) {
     if (restored.error.code === 'DUPLICATE_REFERENCE') {
@@ -344,6 +397,17 @@ export async function releaseCampaignPaymentIfOpen(
 ): Promise<CampaignReleaseResult> {
   const auctionId = input.auctionId.trim();
   const bidId = input.bidId.trim();
+  const orderId = input.orderId.trim();
+  if (orderId) {
+    const payment = await client
+      .from('payments')
+      .select('status')
+      .eq('order_id', orderId)
+      .maybeSingle();
+    if (payment.data?.status === 'confirmed') {
+      return { ok: true, restored: false, amount: 0, balanceAfter: null, reason: 'awarded' };
+    }
+  }
   if (isUuid(auctionId)) {
     const auction = await client
       .from('auctions')
@@ -364,7 +428,7 @@ export async function releaseCampaignPaymentIfOpen(
   }
 
   return releaseCampaignCredit(client, {
-    referenceId: campaignPayReference(input.orderId),
+    referenceId: campaignPayReference(orderId),
     reason: input.reason,
   });
 }

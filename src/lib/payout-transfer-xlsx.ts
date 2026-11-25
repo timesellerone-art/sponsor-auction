@@ -1,8 +1,7 @@
 import { downloadBytes } from '@/lib/admin-csv';
 import { COMPANY } from '@/lib/company';
 import { DELETED_CAMPAIGN_LABEL, enrichPayoutAmounts } from '@/lib/admin-integrity';
-import { floorToTenWon } from '@/lib/fees';
-import { calculateCreatorPayout } from '@/lib/payments/payout';
+import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import type { PayoutItem } from '@/types/admin';
 
 export const TRANSFER_XLSX_HEADERS = [
@@ -306,15 +305,8 @@ export function transferPayoutAmount(item: PayoutItem) {
   if (typeof enriched.transferAmount === 'number' && Number.isFinite(enriched.transferAmount)) {
     return enriched.transferAmount;
   }
-  const fromNet = enriched.netPayoutAmount;
-  if (typeof fromNet === 'number' && Number.isFinite(fromNet) && fromNet > 0) {
-    return floorToTenWon(Math.max(0, fromNet - (enriched.withholdingAmount ?? 0)));
-  }
-  const bidAmount =
-    enriched.bidAmount && enriched.bidAmount > 0
-      ? enriched.bidAmount
-      : 0;
-  return floorToTenWon(calculateCreatorPayout(bidAmount || item.amount));
+  const bidAmount = enriched.bidAmount && enriched.bidAmount > 0 ? enriched.bidAmount : 0;
+  return describeSettlementAmounts(bidAmount, enriched.taxKind).transferAmount;
 }
 
 function skip(id: string, reason: TransferSkipReason, message: string): TransferSkip {

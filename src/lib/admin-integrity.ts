@@ -3,7 +3,6 @@ import {
   isBusinessVerificationStatus,
   type CreatorTaxKind,
 } from '@/lib/business-registration';
-import { bidAmountFromCreatorPayout } from '@/lib/fees';
 import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import type { PayoutItem } from '@/types/admin';
 import type { AuctionItem, BidItem } from '@/types/auction';
@@ -14,6 +13,7 @@ type AuctionRef = Pick<AuctionItem, 'id' | 'title'> & { status?: string | null }
 type BidRef = Pick<BidItem, 'id' | 'auctionId' | 'bidAmount' | 'status'>;
 type ProfileTaxRef = {
   id: string;
+  settlementType?: string | null;
   businessRegistrationNumber?: string | null;
   businessVerificationStatus?: string | null;
 };
@@ -27,9 +27,6 @@ function profileById(profiles: ProfileTaxRef[]) {
 }
 
 function bidAmountForPayout(payout: PayoutItem, bids: BidRef[]) {
-  if (payout.bidAmount && payout.bidAmount > 0) {
-    return payout.bidAmount;
-  }
   if (payout.bidId) {
     const matched = bids.find((item) => item.id === payout.bidId);
     if (matched && matched.bidAmount > 0) {
@@ -44,12 +41,15 @@ function bidAmountForPayout(payout: PayoutItem, bids: BidRef[]) {
       return selected.bidAmount;
     }
   }
-  return bidAmountFromCreatorPayout(payout.amount);
+  if (payout.bidAmount && payout.bidAmount > 0) {
+    return payout.bidAmount;
+  }
+  return 0;
 }
 
 function taxKindForPayout(item: PayoutItem, profile?: ProfileTaxRef | null): CreatorTaxKind {
-  // 검증 상태 기준으로 매번 재산정한다. (번호만 있는 무증빙을 사업자로 굳히지 않음)
   return creatorTaxKind({
+    settlementType: profile?.settlementType ?? item.taxKind,
     businessVerificationStatus:
       profile?.businessVerificationStatus ?? item.businessVerificationStatus,
     businessRegistrationNumber:
@@ -103,7 +103,7 @@ export function enrichPayoutAmounts(
     amount:
       item.status === 'paid' || item.status === 'cancelled'
         ? item.amount
-        : amounts.finalSettlement || item.amount,
+        : amounts.transferAmount || item.amount,
   };
 }
 

@@ -66,7 +66,7 @@ export function buildSupportSystemPrompt(quoteContext?: string) {
 4) 콘텐츠 제작·검수 후 정산합니다. 매칭은 1:1입니다.
 
 확정 수수료(양면, 단일 구간, 누진 아님):
-- 광고주: 낙찰 금액의 ${ADVERTISER_FEE_PERCENT}%를 결제 시 합산합니다.
+- 광고주: 낙찰 금액의 ${ADVERTISER_FEE_PERCENT}%를 더한 공급가액에 부가세 ${VAT_PERCENT}%를 별도 가산해 결제합니다.
 ${CREATOR_BRACKET_COPY}
 - 개인 크리에이터: 수수료 공제 후 금액에 사업소득 ${WITHHOLDING_PERCENT}% 원천징수를 안내합니다.
 - 사업자등록번호 검증 크리에이터: 수수료 공제 후 최종 정산액(공급가)에 VAT ${VAT_PERCENT}%를 세금계산서로 별도 발행하고 원천징수는 0원입니다. 미검증은 개인과 동일하게 원천징수합니다.

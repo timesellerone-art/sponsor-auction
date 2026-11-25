@@ -5,6 +5,8 @@ import { ExternalLink, Loader2 } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { showToast } from '@/components/Toast';
 import { CreatorRatingBadge } from '@/components/CreatorRatingBadge';
+import { ADVERTISER_FEE_PERCENT, VAT_PERCENT } from '@/lib/fee-policy';
+import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import { formatDateTime, formatWon } from '@/lib/utils';
 import { ACCESS_REASON } from '@/lib/access';
 import { getAwardBlockReason } from '@/lib/validation';
@@ -54,7 +56,7 @@ export function BidProposalList({
   const selectedBid =
     safeBids.find((bid) => isBidSelected(bid, auction.winnerBidId)) ?? null;
 
-  const confirmBid = closed ? null : pendingBid;
+  const holdQuote = pendingBid ? describeSettlementAmounts(pendingBid.bidAmount) : null;
 
   return (
     <section
@@ -80,10 +82,10 @@ export function BidProposalList({
             </p>
           ) : null}
         </div>
-        {closed ? (
+        {closed || Boolean(selectedBid) ? (
           <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
-            {auction.status === 'completed'
-              ? '결제 완료된 캠페인입니다'
+            {isAuctionClosed(auction.status) || selectedBid
+              ? '낙찰된 캠페인입니다'
               : '매칭 완료된 캠페인입니다'}
           </span>
         ) : null}
@@ -174,9 +176,11 @@ export function BidProposalList({
                     </button>
                   ) : winner ? (
                     <span className="shrink-0 rounded-full bg-clink-peach px-3 py-1 text-xs font-semibold text-clink-accent">
-                      {auction.status === 'completed'
-                        ? BID_STATUS_LABEL.selected
-                        : '낙찰됨'}
+                      {BID_STATUS_LABEL.selected}
+                    </span>
+                  ) : closed ? (
+                    <span className="shrink-0 rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">
+                      미선정
                     </span>
                   ) : null}
                 </div>
@@ -203,13 +207,13 @@ export function BidProposalList({
       )}
 
       <ConfirmModal
-        open={Boolean(confirmBid)}
+        open={Boolean(pendingBid) && !closed}
         title="이 제안을 낙찰할까요?"
-        description={`"${confirmBid?.creatorName || '크리에이터'}"의 제안을 선택하면 토스페이먼츠 간편 결제를 진행합니다. 외부 계좌·카톡 직거래는 보호되지 않으며, 결제 완료 후에만 계약이 확정되고 세금계산서가 신청됩니다.`}
-        confirmLabel="결제하고 낙찰하기"
-        busyLabel="결제 준비 중..."
+        description={`"${pendingBid?.creatorName || '크리에이터'}"의 제안을 선택하면 보유 크레딧에서 공급가액과 부가세가 즉시 예치 차감됩니다. 잔액이 부족하면 충전 후 다시 낙찰할 수 있습니다.`}
+        confirmLabel="크레딧으로 낙찰하기"
+        busyLabel="낙찰 중..."
         cancelLabel="취소"
-        busy={Boolean(confirmBid && busyId === confirmBid.id)}
+        busy={Boolean(pendingBid && busyId === pendingBid.id)}
         onClose={() => {
           if (!busyId) {
             setPendingBid(null);
@@ -224,17 +228,39 @@ export function BidProposalList({
             setPendingBid(null);
             return;
           }
-          const blocked = getAwardBlockReason(auction);
-          if (blocked) {
-            showToast(blocked);
-            setPendingBid(null);
-            return;
-          }
           const selected = pendingBid;
-          setPendingBid(null);
-          void onAward(selected);
+          void Promise.resolve(onAward(selected)).finally(() => {
+            setPendingBid(null);
+          });
         }}
-      />
+      >
+        {holdQuote ? (
+          <dl className="mt-3 space-y-1.5 rounded-xl bg-zinc-50 px-3 py-3 text-sm text-zinc-700">
+            <div className="flex items-center justify-between gap-3">
+              <dt>낙찰 금액</dt>
+              <dd className="font-medium tabular-nums text-zinc-950">
+                {formatWon(holdQuote.bidAmount)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt>공급가액 (낙찰 + 수수료 {ADVERTISER_FEE_PERCENT}%)</dt>
+              <dd className="font-medium tabular-nums text-zinc-950">
+                {formatWon(holdQuote.advertiserSupply)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <dt>부가세 ({VAT_PERCENT}% 별도)</dt>
+              <dd className="font-medium tabular-nums text-zinc-950">
+                {formatWon(holdQuote.advertiserVat)}
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-3 font-semibold text-zinc-950">
+              <dt>총 차감액</dt>
+              <dd className="tabular-nums">{formatWon(holdQuote.advertiserCharge)}</dd>
+            </div>
+          </dl>
+        ) : null}
+      </ConfirmModal>
     </section>
   );
 }

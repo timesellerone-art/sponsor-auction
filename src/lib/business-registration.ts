@@ -58,8 +58,11 @@ export function businessNumberError(value: string | null | undefined) {
   if (!digits) {
     return '사업자등록번호를 입력해 주세요.';
   }
-  if (digits.length !== 10 || !isValidBusinessRegistrationNumber(digits)) {
+  if (digits.length !== 10) {
     return '사업자등록번호 10자리를 확인해 주세요.';
+  }
+  if (!isValidBusinessRegistrationNumber(digits)) {
+    return '유효하지 않은 사업자등록번호입니다. 번호를 다시 확인해 주세요.';
   }
   return null;
 }
@@ -67,13 +70,17 @@ export function businessNumberError(value: string | null | undefined) {
 export type CreatorTaxKind = 'individual' | 'business';
 
 /**
- * 세무 분기: 사업자등록번호 **검증완료(verified)** 만 사업자.
- * 번호만 있고 미검증·검수중·반려·휴폐업은 개인(원천징수)으로 본다. (무증빙·세금계산서 혼선 방지)
+ * 세무 분기: 저장한 정산 유형이 있으면 그대로 쓴다.
+ * 유형이 없으면 사업자등록번호 **검증완료(verified)** 만 사업자.
  */
 export function creatorTaxKind(input: {
+  settlementType?: string | null;
   businessVerificationStatus?: string | null;
   businessRegistrationNumber?: string | null;
 }): CreatorTaxKind {
+  if (input.settlementType === 'business' || input.settlementType === 'individual') {
+    return input.settlementType;
+  }
   const raw = input.businessVerificationStatus ?? '';
   if (isBusinessVerificationStatus(raw) && raw === 'verified') {
     return 'business';
@@ -99,16 +106,45 @@ export function businessActionBlock(
   return `사업자 상태가 ${label}이라 캠페인을 등록할 수 없습니다. 계정 설정에서 번호를 확인해 주세요.`;
 }
 
-export function profileStatusFromNts(code: '01' | '02' | '03', label: string) {
+export function ntsBusinessLabelFromText(value: string | null | undefined) {
+  const text = value ?? '';
+  if (/계속사업/.test(text)) {
+    return '계속사업자';
+  }
+  if (/휴업/.test(text)) {
+    return '휴업자';
+  }
+  if (/폐업/.test(text)) {
+    return '폐업자';
+  }
+  if (/미등록|등록되지 않은/.test(text)) {
+    return '미등록';
+  }
+  return '';
+}
+
+export function profileStatusFromNts(
+  code: '01' | '02' | '03' | 'UNREGISTERED',
+  label: string,
+) {
+  if (code === 'UNREGISTERED') {
+    return {
+      status: 'unregistered' as const,
+      detail: '미등록. 국세청에 등록되지 않은 사업자등록번호입니다.',
+      ntsLabel: '미등록',
+    };
+  }
   if (code === '01') {
     return {
       status: 'review_required' as const,
       detail: `${label}. 관리자 검수가 필요합니다.`,
+      ntsLabel: label || '계속사업자',
     };
   }
   return {
     status: 'closed' as const,
     detail: `${label}로 확인되었습니다.`,
+    ntsLabel: label || (code === '02' ? '휴업자' : '폐업자'),
   };
 }
 

@@ -1,3 +1,4 @@
+import type { PayoutItem } from '@/types/admin';
 import type { AuctionItem, BidItem } from '@/types/auction';
 
 export type PaymentRecord = {
@@ -17,8 +18,12 @@ export type AdvertiserDeal = {
   payment: PaymentRecord | null;
 };
 
+export type CreatorPayoutStatus = 'none' | 'pending' | 'hold' | 'paid';
+
 export type CreatorDeal = {
   bid: BidItem;
   auction: AuctionItem | null;
   payment: PaymentRecord | null;
+  payout: PayoutItem | null;
+  payoutStatus: CreatorPayoutStatus;
 };

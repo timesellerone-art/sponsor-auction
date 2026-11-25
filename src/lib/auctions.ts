@@ -7,6 +7,7 @@ import {
   getAuctions as getMockAuctions,
   getBids as getMockBids,
   getBidsByAuctionId as getMockBidsByAuctionId,
+  getBidsByAuctionIds as getMockBidsByAuctionIds,
   getBidsByCreator as getMockBidsByCreator,
   updateAuctionBlind as updateMockAuctionBlind,
   updateAuctionStatus as updateMockAuctionStatus,
@@ -26,14 +27,15 @@ import {
   validateAuctionPayload,
   validateBidPayload,
 } from '@/lib/validation';
-import type {
-  AuctionItem,
-  AuctionStatus,
-  BidItem,
-  BidStatus,
-  CreateAuctionInput,
-  CreateBidInput,
-  DataResult,
+import {
+  isAuctionClosed,
+  type AuctionItem,
+  type AuctionStatus,
+  type BidItem,
+  type BidStatus,
+  type CreateAuctionInput,
+  type CreateBidInput,
+  type DataResult,
 } from '@/types/auction';
 import {
   computeBidEngineStats,
@@ -132,24 +134,42 @@ function rowImageUrl(row: Partial<AuctionRow>) {
   return image || thumb || parseImageFromDescription(row.description) || null;
 }
 
+function asAuctionStatus(
+  status: string | undefined,
+  deadline: string | undefined,
+  winnerBidId: string | null,
+): AuctionStatus {
+  const next = expiredAuctionStatus(status ?? 'active', deadline ?? '', winnerBidId);
+  if (
+    next === 'active' ||
+    next === 'matched' ||
+    next === 'completed' ||
+    next === 'cancelled' ||
+    next === 'closed'
+  ) {
+    if (next === 'active' && winnerBidId) {
+      return 'closed';
+    }
+    return next;
+  }
+  return winnerBidId ? 'closed' : 'active';
+}
+
 function mapAuction(row: unknown): AuctionItem {
   const record = row as Partial<AuctionRow> & Pick<AuctionRow, 'id'>;
   const platformRaw = String(record.platform ?? '');
+  const winnerBidId = record.winner_bid_id ?? null;
   return {
     id: record.id,
     title: record.title ?? '제목 없음',
     platform: isPlatformType(platformRaw) ? platformRaw : 'other',
     budget: record.budget ?? 0,
     description: record.description ?? '',
-    status: expiredAuctionStatus(
-      record.status ?? 'active',
-      record.deadline ?? '',
-      record.winner_bid_id ?? null,
-    ) as AuctionStatus,
+    status: asAuctionStatus(record.status ?? 'active', record.deadline ?? '', winnerBidId),
     isBlind: Boolean(record.is_blind),
     authorId: record.author_id ?? null,
     authorName: record.author_name?.trim() || '미상',
-    winnerBidId: record.winner_bid_id ?? null,
+    winnerBidId,
     deadline: record.deadline ?? '',
     createdAt: record.created_at ?? '',
     bidsCount: record.bids_count ?? 0,
@@ -160,6 +180,48 @@ function mapAuction(row: unknown): AuctionItem {
       ? record.category
       : parseCategoryFromDescription(record.description),
   };
+}
+
+async function overlayPaidAuctions(
+  client: SponsorAuctionClient,
+  auctions: AuctionItem[],
+): Promise<AuctionItem[]> {
+  if (auctions.length === 0) {
+    return auctions;
+  }
+  const paidByAuction = new Map<string, string>();
+  const { data, error } = await client
+    .from('payments')
+    .select('auction_id, bid_id')
+    .eq('status', 'confirmed')
+    .in(
+      'auction_id',
+      auctions.map((auction) => auction.id),
+    );
+  if (!error && data) {
+    for (const row of data) {
+      const auctionId = row.auction_id?.trim();
+      const bidId = row.bid_id?.trim();
+      if (auctionId && bidId && !paidByAuction.has(auctionId)) {
+        paidByAuction.set(auctionId, bidId);
+      }
+    }
+  }
+  return auctions.map((auction) => {
+    if (auction.status === 'cancelled') {
+      return auction;
+    }
+    const paidBidId = paidByAuction.get(auction.id);
+    const winnerBidId = auction.winnerBidId || paidBidId || null;
+    if (!winnerBidId) {
+      return auction;
+    }
+    return {
+      ...auction,
+      status: isAuctionClosed(auction.status) ? auction.status : 'closed',
+      winnerBidId,
+    };
+  });
 }
 
 function mapBid(row: Partial<BidRow> & Pick<BidRow, 'id'>): BidItem {
@@ -247,7 +309,7 @@ export async function getAuctions(): Promise<DataResult<AuctionItem[]>> {
       return getMockAuctions();
     }
 
-    const auctions = (data ?? []).map((row) => mapAuction(row));
+    const auctions = await overlayPaidAuctions(supabase, (data ?? []).map((row) => mapAuction(row)));
     if (auctions.length === 0) {
       return getMockAuctions();
     }
@@ -273,43 +335,107 @@ async function getMockAuctionsByAuthor(userId: string): Promise<DataResult<Aucti
   return ok([]);
 }
 
+async function fetchAuctionsForAuthor(
+  client: SponsorAuctionClient,
+  authorId: string,
+  extraIds: string[] = [],
+): Promise<AuctionItem[]> {
+  const ownedExtraIds = uuidIds(extraIds);
+  const pageSize = 1000;
+  const rows: unknown[] = [];
+  for (let from = 0; from < 10_000; from += pageSize) {
+    const to = from + pageSize - 1;
+    const { data, error } = await withAuctionSelect((columns) => {
+      const query = client
+        .from('auctions')
+        .select(columns)
+        .order('created_at', { ascending: false })
+        .range(from, to);
+      if (ownedExtraIds.length > 0) {
+        return query.or(`author_id.eq.${authorId},id.in.(${ownedExtraIds.join(',')})`);
+      }
+      return query.eq('author_id', authorId);
+    });
+    if (error) {
+      if (from === 0) {
+        logDbError('광고주 경매 목록 조회', error);
+        throw error;
+      }
+      break;
+    }
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < pageSize) {
+      break;
+    }
+  }
+
+  const auctions = await overlayPaidAuctions(
+    client,
+    rows.map((row) => mapAuction(row)),
+  );
+  return auctions.filter((auction) => !auction.authorId || auction.authorId === authorId);
+}
+
 /** 로그인한 광고주가 등록한 캠페인만 조회합니다. 샘플/타 계정 데이터는 포함하지 않습니다. */
 export async function getAuctionsByAuthor(
   userId: string,
+  options?: AuctionQueryOptions,
 ): Promise<DataResult<AuctionItem[]>> {
   const authorId = userId.trim();
   if (!authorId) {
     return fail([], '유효한 광고주 ID가 필요합니다.');
   }
 
-  const supabase = await getDataClient();
-  if (!supabase || !isUuid(authorId)) {
+  if (!isUuid(authorId)) {
+    return getMockAuctionsByAuthor(authorId);
+  }
+
+  const supabase = await resolveAuctionClient(options);
+  if (!supabase) {
     return getMockAuctionsByAuthor(authorId);
   }
 
   try {
-    const { data, error } = await withAuctionSelect((columns) =>
-      supabase
-        .from('auctions')
-        .select(columns)
-        .eq('author_id', authorId)
-        .order('created_at', { ascending: false }),
-    );
-
-    if (error) {
-      logDbError('광고주 경매 목록 조회', error);
-      return fail([], '캠페인 목록을 불러오지 못했습니다.');
-    }
-
-    return ok((data ?? []).map((row) => mapAuction(row)));
+    return ok(await fetchAuctionsForAuthor(supabase, authorId, options?.extraIds));
   } catch (error) {
     logDbError('광고주 경매 목록 조회 예외', error);
     return fail([], '캠페인 목록을 불러오지 못했습니다.');
   }
 }
 
+/** 지정한 캠페인만 조회합니다. 공개 오픈 목록·관리자 전체 목록과 분리합니다. */
+export async function getAuctionsByIds(ids: string[]): Promise<DataResult<AuctionItem[]>> {
+  const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+  if (unique.length === 0) {
+    return ok([]);
+  }
+
+  const supabase = await getDataClient();
+  const uuids = uuidIds(unique);
+  if (!supabase || uuids.length === 0) {
+    const mock = await getMockAuctions();
+    return ok((mock.data ?? []).filter((item) => unique.includes(item.id)));
+  }
+
+  try {
+    const { data, error } = await withAuctionSelect((columns) =>
+      supabase.from('auctions').select(columns).in('id', uuids).order('created_at', { ascending: false }),
+    );
+    if (error) {
+      logDbError('캠페인 지정 조회', error);
+      return fail([], '캠페인 정보를 불러오지 못했습니다.');
+    }
+    return ok(await overlayPaidAuctions(supabase, (data ?? []).map((row) => mapAuction(row))));
+  } catch (error) {
+    logDbError('캠페인 지정 조회 예외', error);
+    return fail([], '캠페인 정보를 불러오지 못했습니다.');
+  }
+}
+
 type AuctionQueryOptions = {
   client?: SponsorAuctionClient | null;
+  extraIds?: string[];
 };
 
 async function resolveAuctionClient(options?: AuctionQueryOptions) {
@@ -455,6 +581,9 @@ export async function createAuction(
           budget: payload.budget,
           description: imageUrl ? withImageMarker(markedDescription, imageUrl) : markedDescription,
           status: payload.status,
+          is_blind: payload.is_blind,
+          author_id: payload.author_id,
+          author_name: payload.author_name,
           deadline: payload.deadline,
         },
         columns: AUCTION_COLUMNS_CORE,
@@ -498,7 +627,7 @@ export async function createBid(
   options?: AuctionQueryOptions,
 ): Promise<DataResult<BidItem | null>> {
   const auctionId = input.auctionId.trim();
-  const lockKey = `bid:${auctionId}:${input.creatorName.trim().toLowerCase()}`;
+  const lockKey = `bid:${auctionId}:${(input.creatorId ?? '').trim() || input.creatorName.trim().toLowerCase()}`;
   return withExclusiveAction(lockKey, fail(null, VALIDATION.actionInFlight), async () => {
     const supabase = await resolveAuctionClient(options);
     const auctionResult = await getAuctionById(auctionId, {
@@ -549,29 +678,31 @@ export async function createBid(
 
     try {
       const creatorId = await resolveAuthUserId(supabase, input.creatorId);
+      if (!creatorId) {
+        return fail(null, '제안을 등록하려면 로그인해 주세요.');
+      }
 
       let existing = await supabase
         .from('bids')
-        .select('id, creator_id, creator_name')
-        .eq('auction_id', auctionId);
+        .select('id, creator_id, creator_name, status')
+        .eq('auction_id', auctionId)
+        .eq('creator_id', creatorId);
       if (existing.error && isSchemaMismatch(existing.error)) {
         existing = (await supabase
           .from('bids')
-          .select('id, creator_name')
-          .eq('auction_id', auctionId)) as typeof existing;
+          .select('id, creator_id, creator_name')
+          .eq('auction_id', auctionId)
+          .eq('creator_id', creatorId)) as typeof existing;
       }
       if (existing.error) {
         logDbError('중복 제안 조회', existing.error);
       } else {
         const duplicated = (existing.data ?? []).some((row) => {
-          if (creatorId && row.creator_id === creatorId) {
-            return true;
+          if (row.creator_id !== creatorId) {
+            return false;
           }
-          return (
-            typeof row.creator_name === 'string' &&
-            row.creator_name.trim().toLowerCase() ===
-              input.creatorName.trim().toLowerCase()
-          );
+          const status = String(typeof row.status === 'string' ? row.status : 'pending');
+          return status !== 'cancelled' && status !== 'rejected' && status !== 'withdrawn';
         });
         if (duplicated) {
           return fail(null, VALIDATION.duplicateBid);
@@ -741,6 +872,36 @@ export async function getBidsByCreator(
     logDbError('크리에이터 입찰 조회 예외', error);
     return fail([], '제안 목록을 불러오지 못했습니다.');
   }
+}
+
+export async function listAuctionsFromDatabase(
+  client: SponsorAuctionClient,
+): Promise<AuctionItem[]> {
+  const pageSize = 1000;
+  const rows: unknown[] = [];
+  for (let from = 0; from < 10_000; from += pageSize) {
+    const to = from + pageSize - 1;
+    const { data, error } = await withAuctionSelect((columns) =>
+      client
+        .from('auctions')
+        .select(columns)
+        .order('created_at', { ascending: false })
+        .range(from, to),
+    );
+    if (error) {
+      if (from === 0) {
+        logDbError('관리자 캠페인 목록 조회', error);
+        return [];
+      }
+      break;
+    }
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < pageSize) {
+      break;
+    }
+  }
+  return overlayPaidAuctions(client, rows.map((row) => mapAuction(row)));
 }
 
 export async function listBidsFromDatabase(
@@ -926,6 +1087,51 @@ export async function updateAuctionBlind(
       return fail(null, UPDATE_FAIL_MESSAGE);
     }
   });
+}
+
+/** 광고주 본인 캠페인에 달린 제안만 조회합니다. 전체 제안 목록과 분리합니다. */
+export async function getBidsByAuctionIds(
+  auctionIds: string[],
+  options?: AuctionQueryOptions,
+): Promise<DataResult<BidItem[]>> {
+  const unique = [...new Set(auctionIds.map((id) => id.trim()).filter(Boolean))];
+  if (unique.length === 0) {
+    return ok([]);
+  }
+
+  const supabase = await resolveAuctionClient(options);
+  const uuids = uuidIds(unique);
+  if (!supabase || uuids.length === 0) {
+    return getMockBidsByAuctionIds(unique);
+  }
+
+  try {
+    let { data, error } = await supabase
+      .from('bids')
+      .select(BID_COLUMNS)
+      .in('auction_id', uuids)
+      .order('created_at', { ascending: false });
+
+    if (error && isSchemaMismatch(error)) {
+      const fallback = await supabase
+        .from('bids')
+        .select(BID_COLUMNS_CORE)
+        .in('auction_id', uuids)
+        .order('created_at', { ascending: false });
+      data = fallback.data as typeof data;
+      error = fallback.error;
+    }
+
+    if (error) {
+      logDbError('캠페인 제안 조회', error);
+      return fail([], '제안 목록을 불러오지 못했습니다.');
+    }
+
+    return ok(await withBidScores((data ?? []).map((row) => mapBid(row))));
+  } catch (error) {
+    logDbError('캠페인 제안 조회 예외', error);
+    return fail([], '제안 목록을 불러오지 못했습니다.');
+  }
 }
 
 export async function getBidsByAuctionId(

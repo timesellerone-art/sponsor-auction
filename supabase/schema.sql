@@ -443,7 +443,7 @@ begin
     raise exception '블라인드된 역경매는 낙찰할 수 없습니다.';
   end if;
 
-  if v_auction.status <> 'active' or v_auction.winner_bid_id is not null then
+  if v_auction.winner_bid_id is not null and v_auction.winner_bid_id is distinct from p_bid_id then
     raise exception '이미 낙찰 완료된 역경매입니다.';
   end if;
 
@@ -456,29 +456,28 @@ begin
     raise exception '해당 제안을 찾을 수 없습니다.';
   end if;
 
-  if v_bid.status = 'selected' then
-    raise exception '이미 낙찰 완료된 역경매입니다.';
-  end if;
-
   update public.bids
   set status = 'selected'
   where id = p_bid_id
     and auction_id = p_auction_id
-    and status = 'pending';
-
-  if not found then
-    raise exception '이미 낙찰 완료된 역경매입니다.';
-  end if;
+    and status in ('pending', 'selected');
 
   update public.auctions
   set status = 'closed',
       winner_bid_id = p_bid_id
   where id = p_auction_id
-    and status = 'active'
     and winner_bid_id is null
+    and status = 'active'
   returning * into v_auction;
 
   if not found then
+    select * into v_auction
+    from public.auctions
+    where id = p_auction_id
+      and winner_bid_id = p_bid_id;
+  end if;
+
+  if v_auction.winner_bid_id is distinct from p_bid_id then
     raise exception '이미 낙찰 완료된 역경매입니다.';
   end if;
 
@@ -1249,5 +1248,18 @@ alter table if exists public.profiles
   add column if not exists business_review_note text not null default '';
 alter table if exists public.profiles
   add column if not exists business_checked_at timestamptz;
+alter table if exists public.profiles
+  add column if not exists bank_name text not null default '';
+alter table if exists public.profiles
+  add column if not exists account_number text not null default '';
+alter table if exists public.profiles
+  add column if not exists account_holder text not null default '';
+alter table if exists public.profiles
+  add column if not exists settlement_type text not null default 'individual';
+alter table public.profiles
+  drop constraint if exists profiles_settlement_type_check;
+alter table public.profiles
+  add constraint profiles_settlement_type_check
+  check (settlement_type in ('individual', 'business'));
 
 alter type public.payout_status add value if not exists 'hold';

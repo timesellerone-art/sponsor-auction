@@ -73,7 +73,7 @@ export function resolveAdminBidStatus(
 export const ADMIN_BID_STATUS_LABEL: Record<AdminBidLifecycle, string> = {
   pending: '제안/대기',
   awarded: '낙찰/결제완료',
-  paid: '낙찰 / 지급 완료',
+  paid: '지급 완료',
   rejected: '탈락/취소',
 };
 

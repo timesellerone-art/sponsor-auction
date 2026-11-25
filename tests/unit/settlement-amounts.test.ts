@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { creatorTaxKind } from '../../src/lib/business-registration';
-import {
-  advertiserPayableAmount,
-  creatorPayoutAmount,
-  floorToTenWon,
-} from '../../src/lib/fees';
+import { advertiserTotalCharge, creatorPayoutAmount, floorToTenWon } from '../../src/lib/fees';
 import {
   assertAdvertiserHoldMatchesSettlement,
   describeSettlementAmounts,
@@ -36,16 +32,19 @@ describe('settlement amounts', () => {
     assert.equal(individual.withholdingAmount, 2_904);
     assert.equal(individual.vatAmount, 0);
     assert.equal(individual.transferAmount, floorToTenWon(88_000 - 2_904));
-    assert.equal(individual.advertiserCharge, 115_000);
-    assert.equal(assertAdvertiserHoldMatchesSettlement(100_000, 115_000), true);
+    assert.equal(individual.advertiserSupply, 115_000);
+    assert.equal(individual.advertiserVat, 11_500);
+    assert.equal(individual.advertiserCharge, 126_500);
+    assert.equal(assertAdvertiserHoldMatchesSettlement(100_000, 126_500), true);
+    assert.equal(assertAdvertiserHoldMatchesSettlement(100_000, 115_000), false);
 
     const business = describeSettlementAmounts(100_000, 'business');
     assert.equal(business.withholdingAmount, 0);
     assert.equal(business.vatAmount, 8_800);
     assert.equal(business.taxInvoiceSupply, 88_000);
-    assert.equal(business.transferAmount, 88_000);
+    assert.equal(business.transferAmount, floorToTenWon(88_000 + 8_800));
     assert.equal(business.finalSettlement, creatorPayoutAmount(100_000));
-    assert.equal(business.advertiserCharge, advertiserPayableAmount(100_000));
+    assert.equal(business.advertiserCharge, advertiserTotalCharge(100_000));
   });
 
   it('검증완료만 사업자 세무이고 번호만 있으면 개인이다', () => {
@@ -108,6 +107,6 @@ describe('settlement amounts', () => {
     assert.equal(company.taxKind, 'business');
     assert.equal(company.withholdingAmount, 0);
     assert.equal(company.vatAmount, 8_800);
-    assert.equal(company.transferAmount, 88_000);
+    assert.equal(company.transferAmount, floorToTenWon(88_000 + 8_800));
   });
 });

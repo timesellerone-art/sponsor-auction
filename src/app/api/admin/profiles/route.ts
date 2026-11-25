@@ -41,11 +41,18 @@ export async function GET() {
     }
 
     const { profiles, error } = await listAndBackfillProfiles(client);
-    const business = await client
+    let business = await client
       .from('profiles')
       .select(
-        'id, business_registration_number, business_verification_status, business_status_detail, business_review_note',
+        'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type',
       );
+    if (business.error) {
+      business = await client
+        .from('profiles')
+        .select(
+          'id, business_registration_number, business_verification_status, business_status_detail, business_review_note',
+        );
+    }
     const businessById = new Map(
       (business.error ? [] : business.data ?? []).map((row) => [row.id, row]),
     );
@@ -54,12 +61,19 @@ export async function GET() {
       const status = isBusinessVerificationStatus(extra?.business_verification_status ?? '')
         ? extra?.business_verification_status
         : 'unregistered';
+      const settlementType =
+        extra && 'settlement_type' in extra && extra.settlement_type === 'business'
+          ? 'business'
+          : extra && 'settlement_type' in extra && extra.settlement_type === 'individual'
+            ? 'individual'
+            : undefined;
       return {
         ...profile,
         businessRegistrationNumber: formatBusinessNumber(extra?.business_registration_number ?? ''),
         businessVerificationStatus: status,
         businessStatusDetail: extra?.business_status_detail ?? '',
         businessReviewNote: extra?.business_review_note ?? '',
+        settlementType,
       };
     });
     if (error && isSchemaMismatch({ message: error })) {

@@ -286,6 +286,10 @@ export type Database = {
           business_status_detail: string;
           business_review_note: string;
           business_checked_at: string | null;
+          bank_name: string;
+          account_number: string;
+          account_holder: string;
+          settlement_type: 'individual' | 'business';
         };
         Insert: {
           id?: string;
@@ -307,6 +311,10 @@ export type Database = {
           business_status_detail?: string;
           business_review_note?: string;
           business_checked_at?: string | null;
+          bank_name?: string;
+          account_number?: string;
+          account_holder?: string;
+          settlement_type?: 'individual' | 'business';
         };
         Update: {
           name?: string;
@@ -326,6 +334,10 @@ export type Database = {
           business_status_detail?: string;
           business_review_note?: string;
           business_checked_at?: string | null;
+          bank_name?: string;
+          account_number?: string;
+          account_holder?: string;
+          settlement_type?: 'individual' | 'business';
         };
         Relationships: [];
       };

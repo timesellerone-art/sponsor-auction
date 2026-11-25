@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { formatDateTime, formatWon } from '@/lib/utils';
+import { CreditLedgerEntry } from '@/components/CreditLedgerEntry';
+import { formatWon } from '@/lib/utils';
 
 type LedgerRow = {
   id: string;
@@ -12,13 +13,6 @@ type LedgerRow = {
   reference_id: string | null;
   description: string | null;
   created_at: string;
-};
-
-const TYPE_LABEL: Record<LedgerRow['type'], string> = {
-  CHARGE: '충전',
-  HOLD: '이용',
-  RELEASE: '예치 해제',
-  REFUND: '환불',
 };
 
 function adminCreditRequest(input: string, init: RequestInit = {}) {
@@ -151,18 +145,9 @@ export function AdminCreditLedger() {
         </button>
       </div>
       {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
-      <ul className="mt-4 divide-y divide-zinc-100">
+      <ul className="mt-3 max-h-96 divide-y divide-zinc-100 overflow-y-auto pr-1">
         {rows.map((row) => (
-          <li key={row.id} className="py-2 text-sm">
-            <p className="font-semibold text-zinc-950">
-              {TYPE_LABEL[row.type]} {formatWon(row.amount)} · 잔액 {formatWon(row.balance_after)}
-            </p>
-            <p className="text-xs text-zinc-500">
-              {formatDateTime(row.created_at)}
-              {row.description ? ` · ${row.description}` : ''}
-              {row.reference_id ? ` · ${row.reference_id}` : ''}
-            </p>
-          </li>
+          <CreditLedgerEntry key={row.id} row={row} />
         ))}
       </ul>
     </div>

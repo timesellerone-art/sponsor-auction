@@ -17,9 +17,18 @@ export async function POST(request: Request) {
     if (actor.role !== 'admin') {
       return forbiddenJson('정산 보류는 관리자만 할 수 있습니다.');
     }
-    const body = (await request.json().catch(() => null)) as { id?: unknown; hold?: unknown } | null;
+    const body = (await request.json().catch(() => null)) as {
+      id?: unknown;
+      paymentOrderId?: unknown;
+      auctionId?: unknown;
+      bidId?: unknown;
+      hold?: unknown;
+    } | null;
     const id = typeof body?.id === 'string' ? body.id.trim() : '';
-    if (!id || typeof body?.hold !== 'boolean') {
+    const paymentOrderId = typeof body?.paymentOrderId === 'string' ? body.paymentOrderId.trim() : '';
+    const auctionId = typeof body?.auctionId === 'string' ? body.auctionId.trim() : '';
+    const bidId = typeof body?.bidId === 'string' ? body.bidId.trim() : '';
+    if ((!id && !paymentOrderId && !auctionId) || typeof body?.hold !== 'boolean') {
       return NextResponse.json(
         { error: '정산 ID와 보류 여부를 지정해 주세요.' },
         { status: 400, headers: NO_STORE },
@@ -32,7 +41,13 @@ export async function POST(request: Request) {
         { status: 409, headers: NO_STORE },
       );
     }
-    const saved = await setPayoutHold(admin, { id, hold: body.hold });
+    const saved = await setPayoutHold(admin, {
+      id: id || paymentOrderId,
+      paymentOrderId: paymentOrderId || null,
+      auctionId: auctionId || null,
+      bidId: bidId || null,
+      hold: body.hold,
+    });
     if (!saved.ok) {
       return NextResponse.json({ error: saved.message }, { status: 409, headers: NO_STORE });
     }

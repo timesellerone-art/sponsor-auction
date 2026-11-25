@@ -1,63 +1,97 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useAuth } from '@/components/AuthProvider';
+import { authRequestInit } from '@/lib/auth-request';
 import { showToast } from '@/components/Toast';
-import { getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
-import { prepareAwardPayment } from '@/lib/payments/client';
-import { getAwardBlockReason, VALIDATION } from '@/lib/validation';
-import type { PreparePaymentResult } from '@/types/payment';
+import { awardBid, getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
+import { campaignHoldQuote } from '@/lib/campaign-credit';
+import { isUuid } from '@/lib/uuid';
+import { VALIDATION } from '@/lib/validation';
 import type { AuctionItem, BidItem } from '@/types/auction';
 
+function asAwarded(auction: AuctionItem, bidId: string): AuctionItem {
+  return {
+    ...auction,
+    winnerBidId: auction.winnerBidId || bidId,
+    status: auction.status === 'cancelled' ? auction.status : 'closed',
+  };
+}
+
 export function useAwardCheckout() {
-  const { user } = useAuth();
-  const [checkout, setCheckout] = useState<PreparePaymentResult | null>(null);
+  const [chargeNeeded, setChargeNeeded] = useState<number | null>(null);
 
-  const startCheckout = useCallback(
-    async (auction: AuctionItem, bid: BidItem) => {
-      try {
-        const latest = await getAuctionById(auction.id);
-        const blocked = getAwardBlockReason(latest.data ?? auction);
-        if (blocked) {
-          showToast(blocked);
-          return false;
-        }
-
-        const bidsResult = await getBidsByAuctionId(auction.id);
-        const target = (bidsResult.data ?? []).find((item) => item.id === bid.id);
-        if (!target) {
-          showToast('해당 제안을 찾을 수 없습니다.');
-          return false;
-        }
-        if (target.status === 'selected') {
-          showToast(VALIDATION.alreadyAwarded);
-          return false;
-        }
-
-        const prepared = await prepareAwardPayment({
-          auction: latest.data ?? auction,
-          bid: target,
-          customerKey: user?.id,
-        });
-        if (prepared.error || !prepared.data) {
-          showToast(prepared.error ?? '결제를 준비하지 못했습니다.');
-          return false;
-        }
-
-        setCheckout(prepared.data);
-        return true;
-      } catch (error) {
-        console.warn('[SponsorAuction] 낙찰 결제 준비 중 예외가 발생했습니다.', error);
-        showToast('결제를 시작하지 못했습니다. 낙찰은 진행되지 않았습니다.');
-        return false;
+  const awardWithCredit = useCallback(async (auction: AuctionItem, bid: BidItem) => {
+    try {
+      const latest = await getAuctionById(auction.id);
+      const current = latest.data ?? auction;
+      if (current.winnerBidId && current.winnerBidId !== bid.id) {
+        showToast(VALIDATION.alreadyAwarded);
+        return null;
       }
-    },
-    [user],
-  );
 
-  const closeCheckout = useCallback(() => {
-    setCheckout(null);
+      const bidsResult = await getBidsByAuctionId(auction.id);
+      const target = (bidsResult.data ?? []).find((item) => item.id === bid.id) ?? bid;
+
+      if (!isUuid(auction.id) || !isUuid(bid.id)) {
+        const mocked = await awardBid(auction.id, bid.id);
+        if (mocked.error || !mocked.data) {
+          showToast(mocked.error ?? '낙찰하지 못했습니다.');
+          return null;
+        }
+        showToast('크레딧에서 예치하고 낙찰했습니다.', 'success');
+        window.dispatchEvent(new Event('auctions:changed'));
+        return asAwarded(mocked.data, bid.id);
+      }
+
+      const response = await fetch(
+        `/api/campaigns/${auction.id}/award`,
+        await authRequestInit({
+          method: 'POST',
+          body: JSON.stringify({ bidId: bid.id }),
+        }),
+      );
+      const body = (await response.json().catch(() => null)) as {
+        data?: AuctionItem;
+        error?: string;
+        errorCode?: string;
+        neededAmount?: number;
+      } | null;
+
+      if (response.status === 402 || body?.errorCode === 'INSUFFICIENT_CREDIT') {
+        const needed =
+          typeof body?.neededAmount === 'number' && body.neededAmount > 0
+            ? body.neededAmount
+            : campaignHoldQuote(target.bidAmount).amount;
+        setChargeNeeded(needed);
+        showToast(body?.error || '크레딧이 부족합니다. 충전 후 다시 낙찰해 주세요.');
+        return null;
+      }
+
+      if (body?.data?.winnerBidId === bid.id || body?.data?.status === 'closed' || body?.data?.status === 'completed') {
+        const awarded = asAwarded(body.data ?? current, bid.id);
+        showToast('크레딧에서 예치하고 낙찰했습니다.', 'success');
+        window.dispatchEvent(new Event('auctions:changed'));
+        return awarded;
+      }
+
+      if (!response.ok || !body?.data) {
+        showToast(body?.error ?? '낙찰하지 못했습니다.');
+        return null;
+      }
+
+      showToast('크레딧에서 예치하고 낙찰했습니다.', 'success');
+      window.dispatchEvent(new Event('auctions:changed'));
+      return asAwarded(body.data, bid.id);
+    } catch (error) {
+      console.warn('[SponsorAuction] 크레딧 낙찰 중 예외가 발생했습니다.', error);
+      showToast('낙찰을 시작하지 못했습니다. 캠페인 상태는 그대로입니다.');
+      return null;
+    }
   }, []);
 
-  return { checkout, startCheckout, closeCheckout };
+  const closeCharge = useCallback(() => {
+    setChargeNeeded(null);
+  }, []);
+
+  return { awardWithCredit, chargeNeeded, closeCharge };
 }

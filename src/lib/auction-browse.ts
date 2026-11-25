@@ -11,8 +11,16 @@ export type BrowsePlatformFilter = 'all' | Exclude<PlatformType, 'other'>;
 
 export type BrowseSort = 'newest' | 'budget_desc' | 'deadline_asc';
 
-export function isOpenForBid(auction: Pick<AuctionItem, 'status' | 'isBlind'>) {
-  return auction.status === 'active' && !auction.isBlind;
+export function isOpenForBid(
+  auction: Pick<AuctionItem, 'status' | 'isBlind'> & { winnerBidId?: string | null },
+) {
+  return (
+    auction.status === 'active' &&
+    !auction.isBlind &&
+    !auction.winnerBidId &&
+    !isAuctionClosed(auction.status) &&
+    String(auction.status) !== 'completed'
+  );
 }
 
 export function matchesAuctionQuery(
@@ -83,7 +91,14 @@ export function browseAuctions(
   return {
     open: sortAuctions(filtered.filter((auction) => isOpenForBid(auction)), options.sort),
     closed: sortAuctions(
-      filtered.filter((auction) => isAuctionClosed(auction.status) || auction.status === 'cancelled'),
+      filtered.filter(
+        (auction) =>
+          !isOpenForBid(auction) &&
+          (isAuctionClosed(auction.status) ||
+            auction.status === 'cancelled' ||
+            String(auction.status) === 'completed' ||
+            Boolean(auction.winnerBidId)),
+      ),
       options.sort,
     ),
   };

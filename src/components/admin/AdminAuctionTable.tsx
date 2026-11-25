@@ -9,7 +9,7 @@ import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-cs
 import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
 import { formatAdminTimestamp, formatWon } from '@/lib/utils';
 import type { AuctionAdminFilter, ProfileItem } from '@/types/admin';
-import type { AuctionItem } from '@/types/auction';
+import { isAwardedAuction, type AuctionItem } from '@/types/auction';
 
 const STATUS_LABEL = AUCTION_STATUS_LABEL;
 
@@ -33,16 +33,16 @@ function isBlinded(auction: AuctionItem) {
   return Boolean(auction.isBlind);
 }
 
+function isAwardedCampaign(auction: AuctionItem) {
+  return isAwardedAuction(auction);
+}
+
 function matchesFilter(auction: AuctionItem, filter: AuctionAdminFilter) {
   if (filter === 'active') {
-    return auction.status === 'active';
+    return auction.status === 'active' && !isAwardedCampaign(auction);
   }
   if (filter === 'awarded') {
-    return (
-      auction.status === 'closed' ||
-      auction.status === 'matched' ||
-      auction.status === 'completed'
-    );
+    return isAwardedCampaign(auction) && auction.status !== 'cancelled';
   }
   if (filter === 'ended') {
     return auction.status === 'cancelled';

@@ -6,6 +6,7 @@ import {
   VAT_PERCENT,
   WITHHOLDING_PERCENT,
 } from '@/lib/fee-policy';
+import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import { formatWon } from '@/lib/utils';
 import type { PayoutItem } from '@/types/admin';
 
@@ -17,37 +18,39 @@ type AdminPayoutTaxModalProps = {
 type TaxRow = { label: string; display: string };
 
 export function AdminPayoutTaxModal({ payout, onClose }: AdminPayoutTaxModalProps) {
-  const isBusiness = payout.taxKind === 'business';
-  const taxKind = isBusiness ? '사업자(검증완료)' : '개인(미검증·원천징수)';
-  const finalSettlement = payout.netPayoutAmount ?? payout.amount;
-  const transfer =
-    payout.transferAmount ??
-    Math.max(0, finalSettlement - (payout.withholdingAmount ?? 0));
+  const amounts = describeSettlementAmounts(
+    payout.bidAmount ?? 0,
+    payout.taxKind ?? 'individual',
+  );
+  const isBusiness = amounts.taxKind === 'business';
+  const taxKind = isBusiness ? '사업자' : '개인 프리랜서';
   const rows: TaxRow[] = [
     { label: '세무 구분', display: taxKind },
+    { label: '낙찰 금액', display: formatWon(amounts.bidAmount) },
     {
-      label: '낙찰 금액(공급가액)',
-      display: formatWon(payout.bidAmount ?? payout.supplyAmount ?? 0),
+      label: `광고주 공급가액(낙찰 + 수수료 ${ADVERTISER_FEE_PERCENT}%)`,
+      display: formatWon(amounts.advertiserSupply),
     },
     {
-      label: `광고주 결제 합계(수수료 ${ADVERTISER_FEE_PERCENT}% 합산)`,
-      display: formatWon(payout.advertiserCharge ?? 0),
+      label: `광고주 부가세(${VAT_PERCENT}% 별도)`,
+      display: formatWon(amounts.advertiserVat),
     },
-    { label: '크리에이터 수수료(공제액)', display: formatWon(payout.platformFee ?? 0) },
-    { label: '최종 정산액', display: formatWon(finalSettlement) },
+    { label: '광고주 결제 합계', display: formatWon(amounts.advertiserCharge) },
+    { label: '크리에이터 수수료(공제액)', display: formatWon(amounts.creatorFee) },
+    { label: '최종 정산액', display: formatWon(amounts.finalSettlement) },
     {
       label: isBusiness
-        ? `원천징수(${WITHHOLDING_PERCENT}%, 검증 사업자 0원)`
+        ? `원천징수(${WITHHOLDING_PERCENT}%, 사업자 0원)`
         : `개인 원천징수(${WITHHOLDING_PERCENT}%)`,
-      display: formatWon(payout.withholdingAmount ?? 0),
+      display: formatWon(amounts.withholdingAmount),
     },
     {
       label: isBusiness
         ? `부가세(${VAT_PERCENT}%, 최종 정산액 기준 별도)`
         : `부가세(${VAT_PERCENT}%, 개인 0원)`,
-      display: formatWon(payout.vatAmount ?? 0),
+      display: formatWon(amounts.vatAmount),
     },
-    { label: '실지급액(10원 절사)', display: formatWon(transfer) },
+    { label: '실지급액(10원 절사)', display: formatWon(amounts.transferAmount) },
   ];
 
   return (

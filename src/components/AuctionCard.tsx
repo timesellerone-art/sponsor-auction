@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
@@ -18,6 +18,7 @@ import {
   platformBadgeLabel,
   resolveCampaignCategory,
 } from '@/lib/campaign-presentation';
+import { loadMyProposedAuctionIds } from '@/lib/my-bids';
 import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { VALIDATION } from '@/lib/validation';
 import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
@@ -66,14 +67,17 @@ function formatBudget(budget: number | null | undefined) {
 export function AuctionCard({
   auction,
   hideBidAction = false,
+  footerAction = null,
 }: {
   auction: AuctionCardData;
   hideBidAction?: boolean;
+  footerAction?: ReactNode;
 }) {
   const router = useRouter();
   const { user, ready } = useAuth();
   const { requestCreator } = useRoleIntent();
   const [bidOpen, setBidOpen] = useState(false);
+  const [alreadyBid, setAlreadyBid] = useState(false);
   const title = auction.title || '제목 없음';
   const platform = auction.platform ?? 'other';
   const status = auction.status ?? 'active';
@@ -95,6 +99,7 @@ export function AuctionCard({
   const auctionOpen = Boolean(auction.id) && isOpenForBid({
     status,
     isBlind: Boolean(auction.isBlind),
+    winnerBidId: auction.winnerBidId ?? null,
   });
   const owned = Boolean(
     user &&
@@ -107,14 +112,33 @@ export function AuctionCard({
         user.id,
       ),
   );
-  const canAttemptBid = auctionOpen && !owned && Boolean(ready && user);
+  const canAttemptBid = auctionOpen && !owned && !alreadyBid && Boolean(ready && user);
   const openBid = () => {
+    if (alreadyBid) {
+      return;
+    }
     requestCreator(() => setBidOpen(true));
   };
 
+  useEffect(() => {
+    if (!user?.id || !auction.id || owned) {
+      setAlreadyBid(false);
+      return;
+    }
+    let cancelled = false;
+    void loadMyProposedAuctionIds(user.id).then((ids) => {
+      if (!cancelled) {
+        setAlreadyBid(ids.has(auction.id as string));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [auction.id, owned, user?.id]);
+
   return (
-    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-stone-900/5 transition-shadow hover:shadow-md">
-      <div className="relative h-44 overflow-hidden bg-stone-200">
+    <article className="relative z-0 flex h-full min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-stone-900/5 transition-shadow hover:shadow-md">
+      <div className="relative isolate z-0 h-44 shrink-0 overflow-hidden bg-stone-200">
         <img
           src={cover}
           alt=""
@@ -123,22 +147,24 @@ export function AuctionCard({
           className="absolute inset-0 size-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
-        <span className="absolute top-3 left-3 max-w-[70%] truncate rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
-          {categoryId
-            ? `${campaignCategoryLabel(categoryId)} · ${platformBadgeLabel(platform)}`
-            : platformBadgeLabel(platform)}
-        </span>
-        <span className="absolute top-3 right-3 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
-          {auctionOpen ? deadlineBadge : statusInfo.label}
-        </span>
-        {owned ? (
-          <span className="absolute bottom-3 right-3 rounded-full bg-[#1C1917] px-2 py-0.5 text-[10px] font-semibold text-white">
-            내 캠페인
+        <div className="absolute inset-x-3 top-3 z-10 flex flex-wrap content-start gap-1.5">
+          <span className="max-w-full truncate rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+            {categoryId
+              ? `${campaignCategoryLabel(categoryId)} · ${platformBadgeLabel(platform)}`
+              : platformBadgeLabel(platform)}
           </span>
-        ) : null}
+          {owned ? (
+            <span className="shrink-0 rounded-full bg-[#1C1917] px-2.5 py-1 text-[11px] font-semibold text-white">
+              내 캠페인
+            </span>
+          ) : null}
+          <span className="shrink-0 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+            {auctionOpen ? deadlineBadge : statusInfo.label}
+          </span>
+        </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 p-4 sm:p-5">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-3 bg-white p-4 sm:p-5">
       <h3 className="line-clamp-2 min-w-0 break-words text-base font-bold tracking-[-0.03em] leading-[1.15] text-clink">
         <Link href={href} className="hover:underline">
           {title}
@@ -179,6 +205,14 @@ export function AuctionCard({
           </button>
           <p className="mt-1.5 text-center text-xs text-zinc-500">{VALIDATION.selfCampaignHint}</p>
         </div>
+      ) : alreadyBid && auctionOpen ? (
+        <button
+          type="button"
+          disabled
+          className="mt-auto inline-flex h-10 min-h-10 w-full min-w-0 cursor-not-allowed items-center justify-center rounded-full bg-stone-100 px-3 text-sm font-semibold text-stone-400"
+        >
+          제안 완료
+        </button>
       ) : canAttemptBid ? (
         <button type="button" onClick={openBid} className={CARD_CTA}>
           콘텐츠 제안하기
@@ -203,6 +237,9 @@ export function AuctionCard({
           {!auctionOpen ? '모집 마감' : '로그인 후 콘텐츠를 제안할 수 있습니다.'}
         </p>
       )}
+      {footerAction ? (
+        <div className="relative z-10 mt-auto shrink-0 pt-1">{footerAction}</div>
+      ) : null}
       </div>
 
       {auction.id ? (
@@ -221,6 +258,7 @@ export function AuctionCard({
           }}
           onClose={() => setBidOpen(false)}
           onCreated={() => {
+            setAlreadyBid(true);
             window.dispatchEvent(new Event('auctions:changed'));
           }}
         />

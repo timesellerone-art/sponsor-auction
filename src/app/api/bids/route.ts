@@ -112,8 +112,13 @@ export async function POST(request: Request) {
 
     if (result.error || !result.data) {
       const message = result.error ?? '제안을 등록하지 못했습니다.';
+      const duplicate = message === VALIDATION.duplicateBid;
       return NextResponse.json(
-        { error: message, errorMessage: message },
+        {
+          error: message,
+          errorMessage: message,
+          ...(duplicate ? { errorCode: 'DUPLICATE_BID' } : {}),
+        },
         { status: 400, headers: NO_STORE },
       );
     }

@@ -6,7 +6,11 @@ import { mapPayout } from '../../src/lib/payouts';
 import {
   bankAccountWithHolder,
   composeBankAccount,
+  creatorSettlementError,
+  creatorSettlementFromRow,
   formatSettlementAccount,
+  parseSettlementType,
+  SETTLEMENT_TYPE_LABEL,
   settlementAccountError,
   settlementAccountFromParts,
 } from '../../src/lib/settlement-account';
@@ -74,6 +78,34 @@ describe('settlement account', () => {
         accountHolder: account.accountHolder,
       }),
       null,
+    );
+  });
+
+  it('정산 유형은 개인 프리랜서와 사업자로 저장한다', () => {
+    assert.equal(parseSettlementType('business'), 'business');
+    assert.equal(parseSettlementType('individual'), 'individual');
+    assert.equal(parseSettlementType('unknown'), 'individual');
+    assert.equal(SETTLEMENT_TYPE_LABEL.individual, '개인 프리랜서');
+    assert.equal(SETTLEMENT_TYPE_LABEL.business, '사업자');
+    const saved = creatorSettlementFromRow({
+      bank_name: '국민은행',
+      account_number: '123-45-678901',
+      account_holder: '김정산',
+      settlement_type: 'business',
+    });
+    assert.equal(saved.bankName, '국민은행');
+    assert.equal(saved.accountNumber, '12345678901');
+    assert.equal(saved.accountHolder, '김정산');
+    assert.equal(saved.settlementType, 'business');
+    assert.equal(creatorSettlementError(saved), null);
+    assert.equal(
+      creatorSettlementError({
+        bankName: '',
+        accountNumber: '',
+        accountHolder: '',
+        settlementType: 'individual',
+      }),
+      '은행명을 입력해 주세요.',
     );
   });
 });

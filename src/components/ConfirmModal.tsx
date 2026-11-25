@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId } from 'react';
+import { useCallback, useEffect, useId, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, X } from 'lucide-react';
 
@@ -13,6 +13,7 @@ type ConfirmModalProps = {
   cancelLabel?: string;
   busy?: boolean;
   danger?: boolean;
+  children?: ReactNode;
   onConfirm: () => void;
   onClose: () => void;
 };
@@ -26,6 +27,7 @@ export function ConfirmModal({
   cancelLabel = '취소',
   busy = false,
   danger = false,
+  children,
   onConfirm,
   onClose,
 }: ConfirmModalProps) {
@@ -91,6 +93,7 @@ export function ConfirmModal({
           </button>
         </div>
         <p className="mt-3 text-sm leading-6 text-zinc-600">{description}</p>
+        {children}
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button
             type="button"
