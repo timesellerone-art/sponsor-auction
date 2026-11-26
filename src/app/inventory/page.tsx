@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PageContainer } from '@/components/PageContainer';
 import { TimeslotCard, TimeslotCardSkeleton } from '@/components/TimeslotCard';
-import { listTimeSlots } from '@/lib/timeslots';
+import { partitionTimeSlots } from '@/lib/timeslots';
 import type { TimeSlotItem } from '@/types/timeslot';
 
 export default function InventoryPage() {
@@ -13,15 +13,27 @@ export default function InventoryPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
-      setLoading(true);
+    const load = async (silent = false) => {
+      if (!silent) {
+        setLoading(true);
+      }
       try {
-        const result = await listTimeSlots();
+        const response = await fetch('/api/timeslots', { cache: 'no-store' });
+        const payload = (await response.json().catch(() => null)) as {
+          data?: TimeSlotItem[];
+          error?: string;
+          errorMessage?: string;
+        } | null;
         if (cancelled) {
           return;
         }
-        setSlots(result.data);
-        setError(result.error);
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        setSlots(rows);
+        setError(
+          response.ok
+            ? null
+            : payload?.errorMessage || payload?.error || '인벤토리를 불러오지 못했습니다.',
+        );
       } catch {
         if (!cancelled) {
           setSlots([]);
@@ -37,7 +49,7 @@ export default function InventoryPage() {
       void load();
     }, 0);
     const onChanged = () => {
-      void load();
+      void load(true);
     };
     window.addEventListener('timeslots:changed', onChanged);
     return () => {
@@ -47,12 +59,7 @@ export default function InventoryPage() {
     };
   }, []);
 
-  const { open, closed } = useMemo(() => {
-    return {
-      open: slots.filter((item) => item.status === 'open' && !item.winnerBidId),
-      closed: slots.filter((item) => item.status !== 'open' || Boolean(item.winnerBidId)),
-    };
-  }, [slots]);
+  const { open, closed } = useMemo(() => partitionTimeSlots(slots), [slots]);
 
   return (
     <PageContainer className="flex min-w-0 flex-1 flex-col py-8 sm:py-12">

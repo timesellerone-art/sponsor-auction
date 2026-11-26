@@ -7,9 +7,15 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { isPlatformType } from '@/lib/platforms';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createTimeSlot, listTimeSlots } from '@/lib/timeslots';
 import { hasAuthRole } from '@/types/auth';
 import type { PlatformType } from '@/types/auction';
+
+async function timeslotWriter() {
+  return createAdminClient() ?? (await createServerClient());
+}
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -44,6 +50,7 @@ export async function GET(request: Request) {
     }
     const result = await listTimeSlots({
       creatorId: mine ? actor?.userId : undefined,
+      client: await timeslotWriter(),
     });
     if (result.error) {
       return NextResponse.json(
@@ -81,18 +88,21 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const platformRaw = asText(body?.platform);
     const platform: PlatformType = isPlatformType(platformRaw) ? platformRaw : 'other';
-    const result = await createTimeSlot({
-      creatorId: (actor.userId ?? asText(body?.creatorId)) || null,
-      creatorName: asText(body?.creatorName) || '크리에이터',
-      title: asText(body?.title),
-      platform,
-      description: asText(body?.description),
-      expectedViews: asNumber(body?.expectedViews),
-      startingPrice: asNumber(body?.startingPrice),
-      slotStart: asText(body?.slotStart),
-      slotEnd: asText(body?.slotEnd),
-      deadline: asText(body?.deadline),
-    });
+    const result = await createTimeSlot(
+      {
+        creatorId: (actor.userId ?? asText(body?.creatorId)) || null,
+        creatorName: asText(body?.creatorName) || '크리에이터',
+        title: asText(body?.title),
+        platform,
+        description: asText(body?.description),
+        expectedViews: asNumber(body?.expectedViews),
+        startingPrice: asNumber(body?.startingPrice),
+        slotStart: asText(body?.slotStart),
+        slotEnd: asText(body?.slotEnd),
+        deadline: asText(body?.deadline),
+      },
+      await timeslotWriter(),
+    );
     if (result.error || !result.data) {
       const message = result.error ?? '타임슬롯을 등록하지 못했습니다.';
       return NextResponse.json(

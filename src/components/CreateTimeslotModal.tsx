@@ -7,6 +7,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { authRequestInit } from '@/lib/auth-request';
 import { SELECTABLE_PLATFORMS } from '@/lib/platforms';
 import { createTimeSlot } from '@/lib/timeslots';
 import { cn } from '@/lib/utils';
@@ -27,7 +28,7 @@ function localDateTime(daysFromNow: number, hour: number) {
 function defaultDeadline() {
   const date = new Date();
   date.setDate(date.getDate() + 5);
-  return date.toISOString().slice(0, 10);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 function toIso(value: string) {
@@ -57,6 +58,25 @@ export function CreateTimeslotModal({
   const [errors, setErrors] = useState<TimeSlotFieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { isBusy: isSubmitting, run } = useActionLock();
+
+  const resetForm = () => {
+    setTitle('');
+    setPlatform('youtube_shorts');
+    setExpectedViews('100000');
+    setStartingPrice('300000');
+    setDescription('');
+    setSlotStart(localDateTime(3, 14));
+    setSlotEnd(localDateTime(3, 16));
+    setDeadline(defaultDeadline());
+    setErrors({});
+    setSubmitError(null);
+  };
+
+  useEffect(() => {
+    if (open) {
+      resetForm();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -120,11 +140,13 @@ export function CreateTimeslotModal({
 
       let result: { error: string | null };
       try {
-        const response = await fetch('/api/timeslots', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+        const response = await fetch(
+          '/api/timeslots',
+          await authRequestInit({
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }),
+        );
         const json = (await response.json().catch(() => null)) as {
           data?: unknown;
           error?: string;
@@ -145,6 +167,7 @@ export function CreateTimeslotModal({
         return;
       }
       showToast('타임슬롯을 등록했습니다.', 'success');
+      resetForm();
       window.dispatchEvent(new Event('timeslots:changed'));
       onClose();
     });

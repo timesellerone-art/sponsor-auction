@@ -4,8 +4,10 @@ import {
   isDeadlinePassed,
   nextInventoryMinBid,
 } from '@/lib/auction-engine';
+import { mockGetSession } from '@/lib/auth-mock';
 import { attachScore, getCreatorScoresByIds } from '@/lib/creator-metrics';
 import { isPlatformType } from '@/lib/platforms';
+import { getSupabaseClient, type SponsorAuctionClient } from '@/lib/supabase';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
 import { isUuid } from '@/lib/uuid';
@@ -13,12 +15,13 @@ import { VALIDATION, validateTimeSlotPayload } from '@/lib/validation';
 import { maskOffPlatformContact, sanitizeUserText } from '@/utils/filter';
 import type { DataResult } from '@/types/auction';
 import type { Database } from '@/types/database';
-import type {
-  CreateTimeSlotInput,
-  PlaceTimeSlotBidInput,
-  TimeSlotBidItem,
-  TimeSlotItem,
-  TimeSlotStatus,
+import {
+  isTimeSlotOpen,
+  type CreateTimeSlotInput,
+  type PlaceTimeSlotBidInput,
+  type TimeSlotBidItem,
+  type TimeSlotItem,
+  type TimeSlotStatus,
 } from '@/types/timeslot';
 
 const SLOT_COLUMNS =
@@ -33,8 +36,15 @@ const UPDATE_FAIL_MESSAGE = '변경에 실패했습니다. 다시 시도해 주�
 type SlotRow = Database['public']['Tables']['time_slots']['Row'];
 type SlotBidRow = Database['public']['Tables']['time_slot_bids']['Row'];
 
-const STORAGE_SLOTS = 'sponsor-auction-timeslots';
+const STORAGE_SLOTS = 'sponsor-auction-timeslots-v2';
 const STORAGE_BIDS = 'sponsor-auction-timeslot-bids';
+
+function offsetIso(daysFromNow: number, hour: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromNow);
+  date.setHours(hour, 0, 0, 0);
+  return date.toISOString();
+}
 
 function fail<T>(data: T, error: string): DataResult<T> {
   return { data, error };
@@ -116,9 +126,9 @@ const seedSlots: TimeSlotItem[] = [
     startingPrice: 800_000,
     currentHighestBid: 920_000,
     bidsCount: 2,
-    slotStart: '2026-10-25T14:00:00+09:00',
-    slotEnd: '2026-10-25T16:00:00+09:00',
-    deadline: '2026-10-24T18:00:00+09:00',
+    slotStart: offsetIso(7, 14),
+    slotEnd: offsetIso(7, 16),
+    deadline: offsetIso(6, 18),
     status: 'open',
     winnerBidId: null,
     createdAt: '2026-10-18T10:00:00+09:00',
@@ -134,9 +144,9 @@ const seedSlots: TimeSlotItem[] = [
     startingPrice: 350_000,
     currentHighestBid: 0,
     bidsCount: 0,
-    slotStart: '2026-10-28T20:00:00+09:00',
-    slotEnd: '2026-10-28T22:00:00+09:00',
-    deadline: '2026-10-27T23:59:59+09:00',
+    slotStart: offsetIso(10, 20),
+    slotEnd: offsetIso(10, 22),
+    deadline: offsetIso(9, 23),
     status: 'open',
     winnerBidId: null,
     createdAt: '2026-10-19T09:30:00+09:00',
@@ -208,6 +218,25 @@ function persistSlots() {
   }
 }
 
+async function getTimeslotReadClient(preferred?: SponsorAuctionClient | null) {
+  if (preferred) {
+    return preferred;
+  }
+  const live = await getDataClient();
+  if (live) {
+    return live;
+  }
+  try {
+    const mock = await mockGetSession();
+    if (mock.data) {
+      return null;
+    }
+  } catch {
+    // 데모 세션이 없으면 공개 조회 클라이언트를 이어갑니다.
+  }
+  return getSupabaseClient();
+}
+
 function refreshMockSlotEngine(slotId: string) {
   const amounts = slotBidsStore
     .filter((item) => item.timeSlotId === slotId)
@@ -229,39 +258,55 @@ async function withScores(slots: TimeSlotItem[]): Promise<TimeSlotItem[]> {
   return slots.map((item) => attachScore(item, scores));
 }
 
+function mockSlotList(creatorId?: string) {
+  return slotsStore
+    .map((item) => applySlotExpiry(item))
+    .filter((item) => (creatorId ? item.creatorId === creatorId : true));
+}
+
+export function partitionTimeSlots(slots: TimeSlotItem[]) {
+  const open: TimeSlotItem[] = [];
+  const closed: TimeSlotItem[] = [];
+  for (const slot of slots) {
+    if (isTimeSlotOpen(slot)) {
+      open.push(slot);
+    } else {
+      closed.push(slot);
+    }
+  }
+  return { open, closed };
+}
+
 export async function listTimeSlots(options?: {
   creatorId?: string;
+  client?: SponsorAuctionClient | null;
 }): Promise<DataResult<TimeSlotItem[]>> {
-  const supabase = await getDataClient();
-  if (!supabase || (options?.creatorId && !isUuid(options.creatorId))) {
-    const filtered = slotsStore
-      .map((item) => applySlotExpiry(item))
-      .filter((item) => (options?.creatorId ? item.creatorId === options.creatorId : true));
-    return ok(await withScores(filtered));
+  const creatorId = options?.creatorId?.trim() || undefined;
+  if (creatorId && !isUuid(creatorId)) {
+    return ok(await withScores(mockSlotList(creatorId)));
+  }
+
+  const supabase = await getTimeslotReadClient(options?.client);
+  if (!supabase) {
+    return ok(await withScores(mockSlotList(creatorId)));
   }
 
   try {
     let query = supabase.from('time_slots').select(SLOT_COLUMNS).order('created_at', {
       ascending: false,
     });
-    if (options?.creatorId && isUuid(options.creatorId)) {
-      query = query.eq('creator_id', options.creatorId);
+    if (creatorId) {
+      query = query.eq('creator_id', creatorId);
     }
     const { data, error } = await query;
     if (error) {
       if (isSchemaMismatch(error)) {
-        const filtered = slotsStore
-          .map((item) => applySlotExpiry(item))
-          .filter((item) => (options?.creatorId ? item.creatorId === options.creatorId : true));
-        return ok(await withScores(filtered));
+        return ok(await withScores(mockSlotList(creatorId)));
       }
+      console.warn('[SponsorAuction] 타임슬롯 목록 조회 실패', error.message);
       return fail([], '타임슬롯 목록을 불러오지 못했습니다.');
     }
-    const rows = (data ?? []).map((row) => mapSlot(row));
-    if (rows.length === 0 && !options?.creatorId) {
-      return ok(await withScores(slotsStore.map((item) => applySlotExpiry(item))));
-    }
-    return ok(await withScores(rows));
+    return ok(await withScores((data ?? []).map((row) => mapSlot(row))));
   } catch {
     return fail([], '타임슬롯 목록을 불러오지 못했습니다.');
   }
@@ -339,15 +384,20 @@ export async function listTimeSlotBids(slotId: string): Promise<DataResult<TimeS
   }
 }
 
+function rememberMockSlot(slot: TimeSlotItem) {
+  slotsStore = [slot, ...slotsStore.filter((item) => item.id !== slot.id)];
+  persistSlots();
+}
+
 export async function createTimeSlot(
   input: CreateTimeSlotInput,
+  client?: SponsorAuctionClient | null,
 ): Promise<DataResult<TimeSlotItem | null>> {
   const invalid = validateTimeSlotPayload(input);
   if (invalid) {
     return fail(null, invalid);
   }
 
-  const supabase = await getDataClient();
   const payload = {
     creator_id: input.creatorId && isUuid(input.creatorId) ? input.creatorId : null,
     creator_name: (input.creatorName ?? '').trim() || '크리에이터',
@@ -362,7 +412,11 @@ export async function createTimeSlot(
     status: 'open' as const,
   };
 
+  const supabase = client ?? (await getDataClient());
   if (!supabase || !payload.creator_id) {
+    if (supabase && !payload.creator_id) {
+      return fail(null, '타임슬롯을 등록할 크리에이터 정보가 없습니다.');
+    }
     const created: TimeSlotItem = {
       id: `slot-${Date.now()}`,
       creatorId: input.creatorId ?? null,
@@ -381,8 +435,7 @@ export async function createTimeSlot(
       winnerBidId: null,
       createdAt: new Date().toISOString(),
     };
-    slotsStore = [created, ...slotsStore];
-    persistSlots();
+    rememberMockSlot(created);
     const [withScore] = await withScores([created]);
     return ok(withScore ?? created);
   }
@@ -394,31 +447,13 @@ export async function createTimeSlot(
       .select(SLOT_COLUMNS)
       .single();
     if (error || !data) {
-      const created: TimeSlotItem = {
-        id: `slot-${Date.now()}`,
-        creatorId: input.creatorId ?? null,
-        creatorName: payload.creator_name,
-        title: payload.title,
-        platform: payload.platform,
-        description: payload.description,
-        expectedViews: payload.expected_views,
-        startingPrice: payload.starting_price,
-        currentHighestBid: 0,
-        bidsCount: 0,
-        slotStart: payload.slot_start,
-        slotEnd: payload.slot_end,
-        deadline: payload.deadline,
-        status: 'open',
-        winnerBidId: null,
-        createdAt: new Date().toISOString(),
-      };
-      slotsStore = [created, ...slotsStore];
-      persistSlots();
-      const [withScore] = await withScores([created]);
-      return ok(withScore ?? created);
+      console.warn('[SponsorAuction] 타임슬롯 등록 실패', error?.message);
+      return fail(null, INSERT_FAIL_MESSAGE);
     }
-    const [withScore] = await withScores([mapSlot(data)]);
-    return ok(withScore ?? mapSlot(data));
+    const mapped = mapSlot(data);
+    rememberMockSlot(mapped);
+    const [withScore] = await withScores([mapped]);
+    return ok(withScore ?? mapped);
   } catch {
     return fail(null, INSERT_FAIL_MESSAGE);
   }

@@ -10,7 +10,7 @@ import { SettlementAccountSummary } from '@/components/SettlementAccountSummary'
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { authRequestInit } from '@/lib/auth-request';
 import { getCreatorDashboard } from '@/lib/dashboard';
-import { closeTimeSlot, listTimeSlots } from '@/lib/timeslots';
+import { closeTimeSlot } from '@/lib/timeslots';
 import { addBusinessDays, formatSeoulDateLabel } from '@/lib/business-days';
 import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import {
@@ -59,13 +59,22 @@ export function CreatorDashboard() {
         setLoading(true);
       }
       try {
-        const [result, slotResult, settlementResponse] = await Promise.all([
+        const [result, slotResponse, settlementResponse] = await Promise.all([
           getCreatorDashboard(actor),
-          listTimeSlots({ creatorId: actor.id }),
+          fetch('/api/timeslots?mine=1', await authRequestInit({ cache: 'no-store' })).catch(
+            () => null,
+          ),
           fetch('/api/account/settlement', await authRequestInit({ cache: 'no-store' })).catch(
             () => null,
           ),
         ]);
+        const slotBody = slotResponse
+          ? ((await slotResponse.json().catch(() => null)) as {
+              data?: TimeSlotItem[];
+              error?: string;
+            } | null)
+          : null;
+        const slotRows = Array.isArray(slotBody?.data) ? slotBody.data : [];
         const settlementBody = settlementResponse
           ? ((await settlementResponse.json().catch(() => null)) as {
               settlementType?: string;
@@ -88,9 +97,9 @@ export function CreatorDashboard() {
         setAccountMissing(Boolean(settlementAccountError(account)));
         const list = Array.isArray(result.data) ? result.data : [];
         setDeals(list);
-        setSlots(slotResult.data);
+        setSlots(slotRows);
         setError(
-          list.length === 0 && slotResult.data.length === 0
+          list.length === 0 && slotRows.length === 0
             ? '제출한 제안이 없습니다.'
             : result.error,
         );
@@ -159,9 +168,11 @@ export function CreatorDashboard() {
         missing={accountMissing}
       />
 
-      {slots.length > 0 ? (
-        <section className="mt-8">
-          <h2 className="text-lg font-bold text-zinc-950">내 타임슬롯</h2>
+      <section className="mt-8">
+        <h2 className="text-lg font-bold text-zinc-950">내 타임슬롯</h2>
+        {slots.length === 0 ? (
+          <p className="mt-4 text-sm text-zinc-500">등록한 타임슬롯이 없습니다.</p>
+        ) : (
           <ul className="mt-4 flex max-h-[50vh] flex-col gap-3 overflow-y-auto pr-1">
             {slots.map((slot) => (
               <li key={slot.id} className="rounded-2xl border border-zinc-200 bg-white p-4">
@@ -196,8 +207,8 @@ export function CreatorDashboard() {
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        )}
+      </section>
 
       {loading ? (
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
