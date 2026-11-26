@@ -9,6 +9,7 @@ import {
   SUPPORT_MESSAGE_MAX_LENGTH,
   SUPPORT_QUICK_PROMPTS,
   SUPPORT_TICKET_CATEGORIES,
+  SUPPORT_TICKET_QUICK_LABEL,
   SUPPORT_WELCOME_MESSAGE,
   sanitizeSupportReply,
   type SupportTicketCategory,
@@ -91,6 +92,10 @@ export function AiSupportWidget() {
         { role: 'assistant', content: sanitizeSupportReply(payload.reply ?? '') },
       ]);
       if (payload.escalate) {
+        setTicket((current) => ({
+          ...current,
+          message: current.message || message,
+        }));
         setTicketMode(true);
       }
     } catch (error) {
@@ -101,10 +106,9 @@ export function AiSupportWidget() {
         ...current,
         {
           role: 'assistant',
-          content: `${fallback} 아래 [1:1 문의 남기기]로 남겨 주세요.`,
+          content: `${fallback} 이용 방법은 이 창에서 계속 질문할 수 있고, 운영 확인이 필요하면 아래 [1:1 문의 남기기]를 눌러 주세요.`,
         },
       ]);
-      setTicketMode(true);
     } finally {
       setBusy(false);
     }
@@ -154,7 +158,7 @@ export function AiSupportWidget() {
                 <Headset className="size-4" aria-hidden />
                 클링크 상담
               </p>
-              <p className="text-[11px] text-white/80">수수료·캠페인 안내 · 24시간</p>
+              <p className="text-[11px] text-white/80">이용방법·정책 안내 · 24시간</p>
             </div>
             <button
               type="button"
@@ -262,15 +266,6 @@ export function AiSupportWidget() {
                       type="button"
                       disabled={busy}
                       onClick={() => {
-                        if (prompt === SUPPORT_QUICK_PROMPTS[3]) {
-                          setTicket((current) => ({
-                            ...current,
-                            category: 'payment',
-                            message: current.message || prompt,
-                          }));
-                          setTicketMode(true);
-                          return;
-                        }
                         void sendMessage(prompt);
                       }}
                       className="rounded-full border border-orange-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:border-[#EA580C] hover:text-[#EA580C] disabled:opacity-60"
@@ -278,6 +273,14 @@ export function AiSupportWidget() {
                       {prompt}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setTicketMode(true)}
+                    className="rounded-full border border-orange-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:border-[#EA580C] hover:text-[#EA580C] disabled:opacity-60"
+                  >
+                    {SUPPORT_TICKET_QUICK_LABEL}
+                  </button>
                 </div>
               </div>
               <form

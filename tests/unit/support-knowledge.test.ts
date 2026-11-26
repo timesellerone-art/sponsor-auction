@@ -2,23 +2,57 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   SUPPORT_QUICK_PROMPTS,
+  answerSupportLocally,
   buildSupportSystemPrompt,
+  isOperatorSupportCase,
+  matchSupportKnowledge,
   parseSupportModelPayload,
   quoteContextFromUserText,
   sanitizeSupportReply,
 } from '../../src/lib/support-knowledge';
 
 describe('클링크 상담 지식', () => {
-  it('퀵 질문 4개와 확정 수수료 정책을 포함한다', () => {
+  it('퀵 질문 4개와 확정 수수료·화면 경로를 포함한다', () => {
     assert.equal(SUPPORT_QUICK_PROMPTS.length, 4);
+    assert.match(SUPPORT_QUICK_PROMPTS[0], /광고 등록/);
     const prompt = buildSupportSystemPrompt();
-    assert.match(prompt, /광고주: 낙찰 금액의 15%/);
+    assert.match(prompt, /광고주: 낙찰 금액의 15%|광고주 15%/);
     assert.match(prompt, /12%/);
     assert.match(prompt, /10%/);
     assert.match(prompt, /8%/);
-    assert.match(prompt, /단일 구간/);
+    assert.match(prompt, /단일 구간|누진 아님/);
     assert.match(prompt, /원천징수/);
+    assert.match(prompt, /\+ 캠페인 등록/);
+    assert.match(prompt, /마이페이지/);
+    assert.match(prompt, /계정 설정/);
+    assert.match(prompt, /콘텐츠 제안하기/);
     assert.equal(prompt.includes('타임 경매'), true);
+    assert.match(prompt, /escalate=false/);
+  });
+
+  it('광고 등록 같은 기본 질문은 로컬 안내로 답하고 1:1로 넘기지 않는다', () => {
+    const answer = matchSupportKnowledge('광고등록방법은?');
+    assert.match(answer, /\+ 캠페인 등록/);
+    assert.match(answer, /광고주/);
+    assert.equal(isOperatorSupportCase('광고등록방법은?'), false);
+    assert.equal(answerSupportLocally('광고등록방법은?')?.escalate, false);
+
+    const bid = matchSupportKnowledge('콘텐츠 제안하는 방법');
+    assert.match(bid, /콘텐츠 제안하기/);
+
+    const fee = matchSupportKnowledge('수수료가 궁금해요');
+    assert.match(fee, /15%/);
+    assert.match(fee, /12%/);
+
+    const biz = matchSupportKnowledge('사업자등록은 어디서 하나요');
+    assert.match(biz, /계정 설정/);
+    assert.match(biz, /상태 조회/);
+
+    assert.equal(isOperatorSupportCase('환불 규정이 궁금해요'), false);
+    assert.equal(isOperatorSupportCase('정산이 누락됐어요'), true);
+    assert.equal(isOperatorSupportCase('결제 오류로 돈이 빠졌어요'), true);
+    assert.equal(isOperatorSupportCase('상담원 연결해줘'), true);
+    assert.equal(isOperatorSupportCase('분쟁 신고합니다'), true);
   });
 
   it('금액 질문에는 확정 계산 문장을 붙인다', () => {
@@ -27,6 +61,9 @@ describe('클링크 상담 지식', () => {
     assert.match(context, /10%/);
     assert.match(context, /250,000원/);
     assert.match(context, /2,175,750원/);
+    const local = answerSupportLocally('250만 원 제안하면 얼마 받나요?');
+    assert.equal(local?.escalate, false);
+    assert.match(local?.reply ?? '', /2,175,750원/);
   });
 
   it('모델 JSON만 통과시킨다', () => {

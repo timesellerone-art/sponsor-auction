@@ -19,11 +19,13 @@ export const SUPPORT_CHAT_MODELS = [
 ] as const;
 
 export const SUPPORT_QUICK_PROMPTS = [
-  '역경매 진행 방식이 궁금해요',
-  `광고주 캠페인 등록 및 수수료(${ADVERTISER_FEE_PERCENT}%)`,
-  `크리에이터 제안하기 및 구간별 수수료(${creatorFeeShortRatesCopy()})`,
-  '결제/계정 오류 · 1:1 문의 접수',
+  '광고 등록 방법은?',
+  '콘텐츠 제안하는 방법',
+  `수수료·원천징수(${ADVERTISER_FEE_PERCENT}% / ${creatorFeeShortRatesCopy()} / ${WITHHOLDING_PERCENT}%)`,
+  '사업자등록·정산 계좌 안내',
 ] as const;
+
+export const SUPPORT_TICKET_QUICK_LABEL = '상담원 연결 (1:1 문의)';
 
 export const SUPPORT_TICKET_CATEGORIES = [
   { id: 'payment', label: '결제/정산' },
@@ -35,13 +37,13 @@ export const SUPPORT_TICKET_CATEGORIES = [
 export type SupportTicketCategory = (typeof SUPPORT_TICKET_CATEGORIES)[number]['id'];
 
 export const SUPPORT_WELCOME_MESSAGE =
-  '안녕하세요. 클링크(Clink) AI 상담입니다. 캠페인 등록, 콘텐츠 제안, 수수료·정산 안내를 도와드릴게요. 금액이 있으면 알려주시면 구간 요율로 계산해 드립니다.';
+  '안녕하세요. 클링크(Clink) AI 상담입니다. 캠페인 등록, 콘텐츠 제안, 수수료·정산, 사업자등록까지 화면 경로와 함께 안내해 드릴게요. 운영팀 확인이 필요한 결제 오류·정산 누락·분쟁만 1:1 문의로 연결됩니다.';
 
 export const SUPPORT_FALLBACK_MESSAGE =
-  '지금은 실시간 상담 연결이 원활하지 않습니다. 화면의 [1:1 문의 남기기]로 남겨 주시면 운영팀이 확인 후 답변드립니다.';
+  '지금은 실시간 AI 응답이 지연됩니다. 상단 [+ 캠페인 등록], 오픈 캠페인의 [콘텐츠 제안하기], 마이페이지 > 계정 설정에서 대부분의 이용 방법을 바로 진행할 수 있습니다. 필요하면 아래 [1:1 문의 남기기]를 이용해 주세요.';
 
 export const SUPPORT_ESCALATION_MESSAGE =
-  '이 내용은 제가 임의로 확정할 수 없습니다. 환불·분쟁·결제 오류는 [1:1 문의 남기기]로 접수해 주세요.';
+  '이 건은 운영팀이 원장·결제·정산 기록을 확인해야 합니다. 아래 [1:1 문의 남기기]로 접수해 주세요.';
 
 const CREATOR_BRACKET_COPY = CREATOR_FEE_BRACKETS.map((bracket) => {
   const maxLabel =
@@ -51,30 +53,295 @@ const CREATOR_BRACKET_COPY = CREATOR_FEE_BRACKETS.map((bracket) => {
   return `- ${bracket.label}: ${Math.round(bracket.rate * 100)}% (적용 구간 ${bracket.min.toLocaleString('ko-KR')}원 이상 ~ ${maxLabel})`;
 }).join('\n');
 
+const HOW_TO_HINT =
+  /방법|어떻게|안내|궁금|절차|규정|무엇|무슨|뭔가요|이란|인가요|알려|설명|어디|경로/;
+
+type KnowledgeArticle = {
+  id: string;
+  keywords: string[];
+  answer: string;
+};
+
+export const SUPPORT_KNOWLEDGE_ARTICLES: KnowledgeArticle[] = [
+  {
+    id: 'campaign-register',
+    keywords: [
+      '광고등록',
+      '캠페인등록',
+      '캠페인올리',
+      '광고올리',
+      '등록방법',
+      '캠페인만드는',
+      '광고하는법',
+      '캠페인어떻게',
+      '광고올리는',
+      '캠페인생성',
+    ],
+    answer: `광고(캠페인) 등록은 광고주 모드에서 합니다.
+
+1) 화면 상단 오른쪽의 [+ 캠페인 등록]을 누릅니다. 로그인이 없으면 /login 에서 Google·카카오·네이버로 로그인한 뒤, 상단 역할 전환에서 광고주를 선택합니다.
+2) 모달에 캠페인 제목, 플랫폼, 카테고리, 예산, 설명, 마감일, 표지 이미지를 입력하고 등록합니다.
+3) 등록 후 홈의 [오픈 캠페인](/#auctions)에 공개되고, 마이페이지(/my)의 [진행 중 캠페인]에서 확인할 수 있습니다.
+
+광고주 충전·캠페인 등록 전에 마이페이지 > 계정 설정(/my/settings)에서 사업자등록번호를 넣는 것을 권장합니다. 휴폐업·반려 상태면 등록이 막힙니다. 캠페인 1건은 크리에이터 1명과만 매칭됩니다.`,
+  },
+  {
+    id: 'how-it-works',
+    keywords: ['역경매', '진행방식', '이용방법', '클링크란', '플랫폼이용', '매칭방식', '타임경매'],
+    answer: `클링크는 타임 경매가 아니라, 광고주가 캠페인을 올리면 크리에이터가 제안 금액을 내는 역경매 스폰서십입니다.
+
+1) 광고주: 상단 [+ 캠페인 등록]
+2) 크리에이터: [오픈 캠페인]에서 [콘텐츠 제안하기]
+3) 광고주: 마이페이지 > 내 캠페인 > [캠페인별 제안 현황]에서 1명을 [낙찰하기 (선택)] 후 크레딧으로 결제
+4) 제작·검수 후 정산. 결제는 토스페이먼츠, 매칭은 항상 1:1입니다.
+
+상단 메뉴는 오픈 캠페인, 크리에이터(/inventory), 이용안내(/#guide), 마이페이지입니다.`,
+  },
+  {
+    id: 'creator-bid',
+    keywords: [
+      '콘텐츠제안',
+      '제안하기',
+      '제안방법',
+      '입찰방법',
+      '크리에이터제안',
+      '지원방법',
+      '제안하는법',
+    ],
+    answer: `콘텐츠 제안은 크리에이터 모드에서 합니다.
+
+1) 상단 [오픈 캠페인] 또는 홈 /#auctions 에서 원하는 캠페인을 엽니다.
+2) [콘텐츠 제안하기]를 누릅니다. 로그인이 없으면 /login 후 역할을 크리에이터로 바꿉니다.
+3) 채널 URL, 제안 금액, 제안 내용, 스타일, 정산 계좌(은행·계좌번호·예금주, 개인/사업자)를 입력하고 약관에 동의한 뒤 제출합니다.
+4) 제출한 제안은 마이페이지(/my)의 [내 제안]에서 확인합니다.
+
+캠페인당 선정은 1명입니다. 연락처·카카오톡·직거래 유도 문구는 차단됩니다.`,
+  },
+  {
+    id: 'award-pay',
+    keywords: ['낙찰', '선정방법', '크레딧결제', '낙찰하기', '제안현황', '선정하는'],
+    answer: `낙찰·결제는 광고주가 마이페이지에서 진행합니다.
+
+1) 마이페이지(/my) > [캠페인별 제안 현황]에서 캠페인을 고릅니다.
+2) 제안 목록의 [낙찰하기 (선택)]을 누른 뒤 [크레딧으로 낙찰하기]로 확정합니다. 잔액이 부족하면 충전 창이 열립니다.
+3) 낙찰은 캠페인당 1명입니다. 확정되면 모집이 마감되고 상태가 종료(closed)로 바뀝니다.
+4) 결제·충전 내역은 마이페이지 > 크레딧(/my/credits), 캠페인 목록은 [결제 완료 목록]·[종료된 캠페인] 탭에서 봅니다.`,
+  },
+  {
+    id: 'fees',
+    keywords: ['수수료', '요율', '몇퍼', '몇%', '플랫폼수수료', '수수료율'],
+    answer: `수수료는 양면·단일 구간이며 누진이 아닙니다.
+
+- 광고주: 낙찰 금액의 ${ADVERTISER_FEE_PERCENT}%를 더한 공급가액에 부가세 ${VAT_PERCENT}%를 별도 가산해 결제합니다.
+${CREATOR_BRACKET_COPY}
+- 개인 크리에이터: 수수료 공제 후 금액에 사업소득 ${WITHHOLDING_PERCENT}% 원천징수를 안내합니다.
+- 사업자등록이 검증된 크리에이터: 수수료 공제 후 공급가에 VAT ${VAT_PERCENT}% 세금계산서를 발행하고 원천징수는 0원입니다.
+
+금액이 있으면 알려 주시면 같은 공식으로 계산해 드립니다. 마이페이지 제안/결제 화면의 수수료 카드와 동일합니다.`,
+  },
+  {
+    id: 'withholding',
+    keywords: ['원천징수', '3.3', '사업소득', '세금떼'],
+    answer: `개인 크리에이터는 수수료를 뺀 금액에 사업소득 ${WITHHOLDING_PERCENT}% 원천징수를 안내합니다. 사업자등록번호가 국세청 진위확인·상태조회를 통과하고 관리자 검증이 끝난 크리에이터는 원천징수 0원이며, 공급가에 VAT ${VAT_PERCENT}% 세금계산서를 발행합니다.
+
+정산 유형(개인/사업자)과 계좌는 마이페이지 > 계정 설정(/my/settings)의 정산 계좌, 또는 제안 모달에서 등록합니다.`,
+  },
+  {
+    id: 'business',
+    keywords: [
+      '사업자등록',
+      '사업자번호',
+      '국세청',
+      '진위확인',
+      '상태조회',
+      '휴폐업',
+      '검수필요',
+    ],
+    answer: `사업자등록은 마이페이지 > 계정 설정(/my/settings)에서 합니다.
+
+1) 사업자등록번호(10자리), 국세청 대표자 성명, 개업일자를 입력합니다.
+2) [상태 조회]로 국세청 휴폐업 상태와 진위확인(valid=01만 일치)을 동시에 확인합니다. 상호명이 아니라 대표자 성명입니다.
+3) 저장하면 상태가 미등록·검증완료·휴폐업·검수필요·반려 중 하나로 표시됩니다. 불일치는 미등록이며 검수필요로 남겨 두지 않습니다.
+4) 관리자가 추가로 검수할 수 있습니다. 휴폐업·반려면 크레딧 충전과 캠페인 등록이 막힙니다.
+
+광고주·크리에이터 모두 같은 화면에서 등록합니다.`,
+  },
+  {
+    id: 'settlement-account',
+    keywords: ['정산계좌', '계좌등록', '입금계좌', '은행계좌', '예금주'],
+    answer: `크리에이터 정산 계좌는 마이페이지 > 계정 설정(/my/settings)의 정산 계좌 폼에서 등록합니다. 은행, 계좌번호, 예금주, 정산 유형(개인/사업자)을 저장하세요.
+
+콘텐츠 제안 모달에서도 같은 계좌를 입력할 수 있습니다. 사업자등록번호는 계정 설정의 사업자 폼에 따로 저장하고, 관리자 검증이 끝나면 세금계산서로 정산됩니다.`,
+  },
+  {
+    id: 'credits',
+    keywords: ['크레딧충전', '크레딧', '토스페이', '충전방법', '잔액'],
+    answer: `광고주 크레딧은 마이페이지 > 크레딧(/my/credits)에서 충전합니다. 내 캠페인 화면의 [크레딧 충전]도 같은 흐름입니다.
+
+1) 충전 금액을 고르고 토스페이먼츠 결제창에서 결제합니다.
+2) 낙찰 시 필요 금액(낙찰가 + 광고주 ${ADVERTISER_FEE_PERCENT}% + 부가세 ${VAT_PERCENT}%)이 크레딧에서 예치·차감됩니다.
+3) 내역은 같은 화면의 크레딧 원장에서 확인합니다.
+
+휴폐업·반려 사업자는 충전이 제한됩니다. 충전 실패는 /my/credits/fail, 성공은 /my/credits/success 로 안내됩니다.`,
+  },
+  {
+    id: 'refund-policy',
+    keywords: ['환불규정', '환불방법', '취소규정', '환불은어떻게', '환불안내'],
+    answer: `환불·취소 기준은 /refund 페이지에 있습니다. 용역 개시 전(매칭·작업 시작 전) 취소는 전액 환불, 개시 후는 진행률·합의에 따른 부분 환불 또는 환불 불가일 수 있습니다. 최종 검수 승인 건은 원칙적으로 환불 대상이 아닙니다. 광고 미이행이 확인되면 광고주 100% 환불을 요청할 수 있습니다.
+
+실제 환불 처리·이중결제·승인만 되고 잔액이 안 보이는 문제는 운영팀이 원장을 확인해야 하므로 [1:1 문의 남기기]를 이용해 주세요.`,
+  },
+  {
+    id: 'tax-invoice',
+    keywords: ['세금계산서', '세금계산', '계산서발행', '팝빌'],
+    answer: `검증된 사업자 크리에이터는 수수료 공제 후 공급가에 VAT ${VAT_PERCENT}% 세금계산서를 발행하고 원천징수는 없습니다. 광고주 결제의 부가세는 낙찰가+${ADVERTISER_FEE_PERCENT}% 공급가액에 ${VAT_PERCENT}%입니다.
+
+세금계산서 상태는 해당 캠페인 당사자가 캠페인 상세에서 확인할 수 있습니다. 미발행·오기 정정은 운영 확인이 필요하면 1:1 문의를 이용해 주세요.`,
+  },
+  {
+    id: 'bypass',
+    keywords: ['우회거래', '직거래', '외부거래', '카카오톡번호', '연락처금지'],
+    answer: `클링크는 플랫폼 밖 직거래·우회 거래를 금지합니다. 캠페인 설명·제안 문구에 전화번호, 계좌번호, 카카오톡, 외부거래 유도 표현을 넣으면 입력이 거절되거나 우회 모니터링에 기록됩니다.
+
+연락·결제·정산은 클링크와 토스페이먼츠·크레딧 원장으로만 진행하세요. 우회 시도가 확인되면 이용 제한이 있을 수 있습니다.`,
+  },
+  {
+    id: 'login-role',
+    keywords: ['로그인', '회원가입', '역할전환', '광고주모드', '크리에이터모드', '마이페이지'],
+    answer: `로그인은 /login 에서 Google, 카카오, 네이버로 합니다. 로그인 후 상단 [마이페이지](/my)로 이동합니다.
+
+역할은 상단 역할 전환에서 광고주/크리에이터를 바꿉니다. 광고주면 마이페이지 탭이 내 캠페인·크레딧·계정 설정, 크리에이터면 내 제안·계정 설정입니다. 소셜 계정·휴대전화 연결은 마이페이지 > 계정 설정입니다.`,
+  },
+  {
+    id: 'inventory',
+    keywords: ['크리에이터목록', '인벤토리', '타임슬롯', '크리에이터찾기'],
+    answer: `상단 [크리에이터](/inventory)에서 크리에이터·타임슬롯을 둘러볼 수 있습니다. 일반 캠페인 매칭은 [오픈 캠페인]에서 역경매로 진행하는 것이 기본입니다.`,
+  },
+  {
+    id: 'contact',
+    keywords: ['고객센터', '문의처', '운영팀', '1:1문의어떻게'],
+    answer: `이용 방법·수수료·화면 경로는 이 AI 상담에서 안내합니다. 결제 오류, 정산 누락, 분쟁 신고처럼 운영자가 원장을 확인해야 하는 건만 상담창 하단 [1:1 문의 남기기] 또는 [상담원 연결]로 접수해 주세요.`,
+  },
+];
+
+const PLATFORM_GUIDE = `화면·경로(실제 UI):
+- 상단: 로고(홈), 오픈 캠페인(/#auctions), 크리에이터(/inventory), 이용안내(/#guide), 로그인(/login) 또는 마이페이지(/my), [+ 캠페인 등록]
+- 마이페이지 탭: 광고주=내 캠페인·크레딧(/my/credits)·계정 설정(/my/settings). 크리에이터=내 제안·계정 설정
+- 광고주 캠페인 탭: 진행 중 캠페인, 결제 완료 목록, 캠페인별 제안 현황, 종료된 캠페인
+- 계정 설정: 소셜/휴대전화, 크리에이터 정산 계좌, 광고주·크리에이터 사업자등록(번호·대표자 성명·개업일자, [상태 조회]·저장)
+- 환불 규정: /refund
+- 로그인은 Google·카카오·네이버
+
+등록·제안·낙찰:
+- 광고 등록 = 상단 [+ 캠페인 등록] (광고주). 제목/플랫폼/카테고리/예산/설명/마감/표지
+- 제안 = 오픈 캠페인 카드 [콘텐츠 제안하기]. 채널 URL, 금액, 제안 내용, 정산 계좌
+- 낙찰 = 마이페이지 > 캠페인별 제안 현황 > [낙찰하기 (선택)] > [크레딧으로 낙찰하기]. 캠페인당 1명, 상태 closed + winner_bid_id
+- 휴폐업·반려 사업자는 충전·캠페인 등록 불가. 미등록은 설정에서 번호 등록 권장
+
+수수료(확정, 누진 아님):
+- 광고주 ${ADVERTISER_FEE_PERCENT}% + 공급가 부가세 ${VAT_PERCENT}%
+${CREATOR_BRACKET_COPY}
+- 개인 크리에이터 원천징수 ${WITHHOLDING_PERCENT}%
+- 검증 사업자 크리에이터는 원천징수 0, 공급가 VAT ${VAT_PERCENT}% 세금계산서
+
+사업자: 국세청 진위확인은 valid=01만 일치. 상태조회와 함께 대표자명·개업일자 필요. 불일치는 미등록. 관리자 검수 가능.
+우회거래 금지: 연락처·카카오톡·직거래·외부거래 문구 차단, 우회 모니터링.
+결제는 토스페이먼츠 크레딧. 환불 규정은 /refund. 실제 환불 실행·결제오류·정산누락·분쟁은 운영자 확인.`;
+
 export function isSupportTicketCategory(value: string): value is SupportTicketCategory {
   return SUPPORT_TICKET_CATEGORIES.some((item) => item.id === value);
+}
+
+export function compactSupportText(text: string) {
+  return text.toLowerCase().replace(/[\s?!.,·~'"“”‘’\-_/()[\]{}]+/g, '');
+}
+
+export function isOperatorSupportCase(text: string) {
+  const compact = compactSupportText(text);
+  if (!compact) {
+    return false;
+  }
+  if (
+    /상담원연결|상담원불러|상담원요청|상담원해줘|사람상담|직원연결|운영자연결|운영팀연결/.test(
+      compact,
+    )
+  ) {
+    return true;
+  }
+  if (/(?:1:1|일대일)문의(?:남기|접수|연결|원해|부탁)/.test(compact)) {
+    return true;
+  }
+  if (/(?:1:1|일대일)(?:상담|연결)/.test(compact) && !HOW_TO_HINT.test(text)) {
+    return true;
+  }
+  if (/결제오류|결제가안|결제안됨|이중결제|중복결제|중복출금|돈이빠|출금오류/.test(compact)) {
+    return true;
+  }
+  if (/정산(?:이)?누락|입금(?:이)?누락|입금이안|정산이안|미입금됐|미정산|누락됐/.test(compact)) {
+    return true;
+  }
+  if (/분쟁신고|사기신고|해킹당|계정탈취|계정도와|도용당/.test(compact)) {
+    return true;
+  }
+  if (/환불(?:해줘|해주세요|요청|신청|부탁)/.test(compact) && !HOW_TO_HINT.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+export function matchSupportKnowledge(text: string) {
+  const compact = compactSupportText(text);
+  if (!compact) {
+    return '';
+  }
+  let bestScore = 0;
+  let bestHits = 0;
+  let bestAnswer = '';
+  for (const article of SUPPORT_KNOWLEDGE_ARTICLES) {
+    let score = 0;
+    let hits = 0;
+    for (const keyword of article.keywords) {
+      const needle = compactSupportText(keyword);
+      if (needle && compact.includes(needle)) {
+        score += needle.length;
+        hits += 1;
+      }
+    }
+    if (score > bestScore || (score === bestScore && hits > bestHits)) {
+      bestScore = score;
+      bestHits = hits;
+      bestAnswer = article.answer;
+    }
+  }
+  return bestScore >= 3 ? bestAnswer : '';
+}
+
+export function composeSupportReply(knowledge: string, quoteContext = '') {
+  if (knowledge && quoteContext) {
+    return `${knowledge}\n\n${quoteContext}`;
+  }
+  return knowledge || quoteContext;
+}
+
+export function answerSupportLocally(message: string): { reply: string; escalate: boolean } | null {
+  const escalate = isOperatorSupportCase(message);
+  const reply = composeSupportReply(matchSupportKnowledge(message), quoteContextFromUserText(message));
+  if (!reply) {
+    return escalate ? { reply: '', escalate: true } : null;
+  }
+  return { reply, escalate };
 }
 
 export function buildSupportSystemPrompt(quoteContext?: string) {
   return `당신은 클링크(Clink, https://www.clinkapp.kr)의 한국어 고객 상담원입니다.
 클링크는 타임 경매가 아니라, 광고주가 캠페인을 올리면 크리에이터가 제안 금액을 내는 역경매 기반 스폰서십 매칭 플랫폼입니다. 화면에서는 오픈 캠페인·콘텐츠 제안으로 안내합니다.
 
-진행 절차:
-1) 광고주가 캠페인을 등록합니다.
-2) 크리에이터가 역경매 방식으로 제안합니다.
-3) 광고주가 1명을 낙찰하고 토스페이먼츠로 결제합니다.
-4) 콘텐츠 제작·검수 후 정산합니다. 매칭은 1:1입니다.
-
-확정 수수료(양면, 단일 구간, 누진 아님):
-- 광고주: 낙찰 금액의 ${ADVERTISER_FEE_PERCENT}%를 더한 공급가액에 부가세 ${VAT_PERCENT}%를 별도 가산해 결제합니다.
-${CREATOR_BRACKET_COPY}
-- 개인 크리에이터: 수수료 공제 후 금액에 사업소득 ${WITHHOLDING_PERCENT}% 원천징수를 안내합니다.
-- 사업자등록번호 검증 크리에이터: 수수료 공제 후 최종 정산액(공급가)에 VAT ${VAT_PERCENT}%를 세금계산서로 별도 발행하고 원천징수는 0원입니다. 미검증은 개인과 동일하게 원천징수합니다.
+${PLATFORM_GUIDE}
 
 행동 규칙:
-- 친절하고 명확한 한국어 존댓말로 2~8문장 이내로 답합니다.
-- 제공된 정책·절차만 말합니다. 예외 환불 확정, 분쟁 판정, 결제 오류 원인, 미공개 일정은 지어내지 않습니다.
-- 그런 요청이면 escalate=true 로 두고 1:1 문의 접수를 안내합니다.
+- 어떤 이용방법·정책 질문이든 먼저 위 지식으로 구체적으로 답합니다. 추상적으로 말하지 말고 실제 메뉴명과 경로, 단계 순서를 친절한 존댓말로 4~12문장 이내로 안내합니다.
+- 제공된 정책·절차만 말합니다. 예외 환불 확정 금액, 분쟁 판정, 결제 오류 원인, 미공개 일정은 지어내지 않습니다.
+- escalate=true 는 사용자가 상담원/1:1 연결을 요청했거나, 실제 결제오류·이중결제·정산누락·분쟁신고처럼 운영자가 DB를 봐야 하는 경우에만 사용합니다. 등록 방법, 수수료, 사업자등록, 계좌, 환불 규정 안내에는 escalate=false 입니다.
 - UI에 Gemini/모델명을 말하지 않습니다.
 - 답변은 JSON만 출력합니다. 형식: {"reply":"한국어 답변","escalate":false}
 
@@ -104,7 +371,7 @@ export function parseSupportModelPayload(value: unknown): { reply: string; escal
     return null;
   }
   return {
-    reply: reply.slice(0, 2000),
+    reply: reply.slice(0, 2500),
     escalate: record.escalate === true,
   };
 }

@@ -9,7 +9,9 @@ import {
   SUPPORT_ESCALATION_MESSAGE,
   SUPPORT_FALLBACK_MESSAGE,
   SUPPORT_MESSAGE_MAX_LENGTH,
+  answerSupportLocally,
   buildSupportSystemPrompt,
+  isOperatorSupportCase,
   parseSupportModelPayload,
   quoteContextFromUserText,
   sanitizeSupportReply,
@@ -25,6 +27,17 @@ type ChatTurn = {
 
 function jsonOk(reply: string, escalate = false) {
   return NextResponse.json({ reply, escalate });
+}
+
+function withEscalation(reply: string, escalate: boolean) {
+  const text = reply.trim() || SUPPORT_FALLBACK_MESSAGE;
+  if (!escalate) {
+    return jsonOk(text, false);
+  }
+  if (text.includes('1:1 문의')) {
+    return jsonOk(text, true);
+  }
+  return jsonOk(`${text}\n\n${SUPPORT_ESCALATION_MESSAGE}`, true);
 }
 
 function readTurns(value: unknown): Array<{ role: 'user' | 'assistant'; content: string }> {
@@ -96,17 +109,19 @@ export async function POST(request: Request) {
   }
 
   const history = readTurns(body?.history);
-  const quoteContext = quoteContextFromUserText(message);
-  const escalateHint = /환불|분쟁|결제 오류|입금|누락|해킹/.test(message);
-  if (quoteContext && !escalateHint) {
-    return jsonOk(quoteContext);
+  const operatorCase = isOperatorSupportCase(message);
+  const local = answerSupportLocally(message);
+  if (local?.reply) {
+    return withEscalation(local.reply, operatorCase);
   }
+
+  const quoteContext = quoteContextFromUserText(message);
   const apiKey = getGeminiApiKey();
   if (!apiKey) {
     if (quoteContext) {
-      return jsonOk(`${quoteContext}\n\n${SUPPORT_ESCALATION_MESSAGE}`, true);
+      return withEscalation(quoteContext, operatorCase);
     }
-    return jsonOk(SUPPORT_FALLBACK_MESSAGE, true);
+    return withEscalation(SUPPORT_FALLBACK_MESSAGE, operatorCase);
   }
 
   const contents = [
@@ -131,7 +146,7 @@ export async function POST(request: Request) {
           contents,
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 1200,
+            maxOutputTokens: 2000,
             responseMimeType: 'application/json',
           },
         }),
@@ -162,12 +177,12 @@ export async function POST(request: Request) {
       if (!result) {
         lastError = new Error('schema mismatch');
         if (quoteContext) {
-          return jsonOk(quoteContext);
+          return withEscalation(quoteContext, operatorCase);
         }
         continue;
       }
       const reply = sanitizeSupportReply(result.reply, quoteContext);
-      return jsonOk(result.escalate ? `${reply}\n\n${SUPPORT_ESCALATION_MESSAGE}` : reply, result.escalate);
+      return withEscalation(reply, operatorCase);
     } catch (error) {
       rethrowPrerenderError(error);
       lastError = error instanceof Error ? error : new Error('request failed');
@@ -176,7 +191,7 @@ export async function POST(request: Request) {
 
   console.warn('[Clink] 고객 상담 모델 응답 실패', lastError?.message);
   if (quoteContext) {
-    return jsonOk(quoteContext);
+    return withEscalation(quoteContext, operatorCase);
   }
-  return jsonOk(SUPPORT_FALLBACK_MESSAGE, true);
+  return withEscalation(SUPPORT_FALLBACK_MESSAGE, operatorCase);
 }
