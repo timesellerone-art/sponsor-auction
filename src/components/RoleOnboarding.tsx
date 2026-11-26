@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { Briefcase, Clapperboard, Loader2 } from 'lucide-react';
+import { PhoneOtpForm } from '@/components/PhoneOtpForm';
 import { showToast } from '@/components/Toast';
-import { AUTH_FAIL_MESSAGE, saveMemberRole } from '@/lib/auth';
+import { ACCOUNT_UNIFIED_MESSAGE } from '@/lib/account-unify';
+import { AUTH_FAIL_MESSAGE, saveMemberRole, type PhoneVerifyResult } from '@/lib/auth';
 import { isPlaceholderOAuthEmail, isValidContactEmail, isValidPhone } from '@/lib/contact';
 import { cn } from '@/lib/utils';
 import { isMemberRole, type MemberRole } from '@/types/auth';
@@ -48,6 +50,7 @@ export function RoleOnboarding({
   const providerEmail = isPlaceholderOAuthEmail(email) ? '' : (email?.trim() ?? '');
   const [contactEmail, setContactEmail] = useState(providerEmail);
   const [phone, setPhone] = useState('');
+  const [phoneVerified, setPhoneVerified] = useState(false);
   const [busy, setBusy] = useState<MemberRole | null>(null);
   const Heading = headingLevel;
   const options = intent ? ROLE_OPTIONS.filter((option) => option.value === intent) : ROLE_OPTIONS;
@@ -58,11 +61,16 @@ export function RoleOnboarding({
         ? `${name}님, 크리에이터 채널 정보를 입력해 주세요`
         : `${name}님, 역할을 선택해 주세요`;
   const description =
-    intent === 'advertiser'
-      ? '캠페인을 등록하려면 연락처를 남겨 주세요. 대표 이메일이나 전화번호가 기존 계정과 같으면 하나로 합쳐집니다.'
-      : intent === 'creator'
-        ? '콘텐츠를 제안하려면 연락처를 남겨 주세요. 채널 주소는 제안 화면에서 입력합니다.'
-        : '대표 이메일이나 전화번호가 기존 계정과 같으면 추가 로그인 없이 바로 하나로 합쳐집니다.';
+    '휴대전화 인증으로 본인을 확인합니다. 카카오·네이버·구글·이메일이 달라도 같은 번호면 하나의 계정으로 연결됩니다.';
+
+  const finishIfExistingMember = (result: PhoneVerifyResult) => {
+    setPhoneVerified(true);
+    if (result.onboardingComplete && result.roles.length > 0) {
+      onCompleted(result.roles);
+      return true;
+    }
+    return false;
+  };
 
   const handleChoose = async (role: MemberRole) => {
     if (!isMemberRole(role) || busy) {
@@ -72,8 +80,8 @@ export function RoleOnboarding({
       showToast('대표 이메일을 입력해 주세요.');
       return;
     }
-    if (phone.trim() && !isValidPhone(phone)) {
-      showToast('전화번호 형식을 확인해 주세요.');
+    if (!phoneVerified || !isValidPhone(phone)) {
+      showToast('휴대전화 인증을 완료해 주세요.');
       return;
     }
 
@@ -87,10 +95,14 @@ export function RoleOnboarding({
         showToast(result.error ?? AUTH_FAIL_MESSAGE);
         return;
       }
-      showToast(
-        role === 'advertiser' ? '광고주로 시작합니다.' : '크리에이터로 시작합니다.',
-        'success',
-      );
+      if (result.merged) {
+        showToast(result.message || ACCOUNT_UNIFIED_MESSAGE, 'success');
+      } else {
+        showToast(
+          role === 'advertiser' ? '광고주로 시작합니다.' : '크리에이터로 시작합니다.',
+          'success',
+        );
+      }
       const savedRoles = (result.data.roles ?? []).filter(isMemberRole);
       onCompleted(savedRoles.length > 0 ? savedRoles : [role]);
     } catch {
@@ -118,19 +130,18 @@ export function RoleOnboarding({
             placeholder="name@example.com"
           />
         </label>
-        <label className="block">
-          <span className="mb-1.5 block text-sm font-medium text-zinc-800">
-            전화번호 <span className="font-normal text-zinc-400">(선택)</span>
-          </span>
-          <input
-            type="tel"
-            autoComplete="tel"
-            value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-            className="h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm text-zinc-950 outline-none focus:border-clink-accent focus:ring-2 focus:ring-clink-peach-strong"
-            placeholder="01012345678"
-          />
-        </label>
+        <PhoneOtpForm
+          phone={phone}
+          onPhoneChange={(value) => {
+            setPhone(value);
+            setPhoneVerified(false);
+          }}
+          verified={phoneVerified}
+          onVerified={(result) => {
+            finishIfExistingMember(result);
+          }}
+          disabled={Boolean(busy)}
+        />
       </div>
 
       <div className="mt-6 flex flex-col gap-3">
@@ -141,7 +152,7 @@ export function RoleOnboarding({
             <button
               key={option.value}
               type="button"
-              disabled={Boolean(busy)}
+              disabled={Boolean(busy) || !phoneVerified}
               onClick={() => {
                 void handleChoose(option.value);
               }}

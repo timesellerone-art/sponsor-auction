@@ -1,3 +1,4 @@
+import type { User } from '@supabase/supabase-js';
 import {
   isDemoAccountEmail,
   isDemoCredentials,
@@ -49,6 +50,8 @@ import {
   type SessionUser,
 } from '@/types/auth';
 import { isValidPhone, toE164Kr } from '@/lib/contact';
+import { authRequestInit } from '@/lib/auth-request';
+import { ACCOUNT_UNIFIED_MESSAGE } from '@/lib/account-unify';
 import type { DataResult } from '@/types/auction';
 
 export const AUTH_FAIL_MESSAGE = '요청을 처리하지 못했습니다. 다시 시도해 주세요.';
@@ -793,15 +796,111 @@ type RoleApiPayload = {
     role?: string | null;
     roles?: unknown;
     currentMode?: unknown;
+    merged?: boolean;
+    message?: string | null;
   };
   sessionSwitch?: { tokenHash?: string };
+  merged?: boolean;
+  message?: string | null;
   error?: string;
 };
+
+export type PhoneVerifyResult = {
+  merged: boolean;
+  message: string | null;
+  roles: MemberRole[];
+  onboardingComplete: boolean;
+  phone?: string | null;
+};
+
+async function applySessionSwitch(tokenHash: string): Promise<DataResult<User | null>> {
+  const supabase = createClient();
+  if (!supabase) {
+    return fail(null, '계정이 통합되었지만 세션 전환에 실패했습니다. 다시 로그인해 주세요.');
+  }
+  const verified = await supabase.auth.verifyOtp({
+    token_hash: tokenHash,
+    type: 'magiclink',
+  });
+  if (verified.error || !verified.data.user) {
+    return fail(null, '계정이 통합되었지만 세션 전환에 실패했습니다. 다시 로그인해 주세요.');
+  }
+  void supabase.auth.refreshSession().catch(() => null);
+  notifyAuthChanged();
+  return ok(verified.data.user);
+}
+
+export async function sendPhoneOtp(phone: string): Promise<DataResult<{ sent: boolean }>> {
+  try {
+    const response = await fetch(
+      '/api/auth/phone/send-otp',
+      await authRequestInit({
+        method: 'POST',
+        body: JSON.stringify({ phone }),
+      }),
+    );
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    if (!response.ok) {
+      return fail({ sent: false }, payload?.error || '인증번호를 보내지 못했습니다.');
+    }
+    return ok({ sent: true });
+  } catch {
+    return fail({ sent: false }, AUTH_FAIL_MESSAGE);
+  }
+}
+
+export async function verifyPhoneOtp(
+  phone: string,
+  code: string,
+): Promise<DataResult<PhoneVerifyResult | null>> {
+  try {
+    const response = await fetch(
+      '/api/auth/phone/verify',
+      await authRequestInit({
+        method: 'POST',
+        body: JSON.stringify({ phone, code }),
+      }),
+    );
+    const payload = (await response.json().catch(() => null)) as {
+      data?: {
+        merged?: boolean;
+        message?: string | null;
+        roles?: unknown;
+        onboardingComplete?: boolean;
+        phone?: string | null;
+      };
+      sessionSwitch?: { tokenHash?: string };
+      error?: string;
+    } | null;
+    if (!response.ok || !payload?.data) {
+      return fail(null, payload?.error || '휴대전화를 확인하지 못했습니다.');
+    }
+
+    const tokenHash = payload.sessionSwitch?.tokenHash?.trim() ?? '';
+    if (tokenHash) {
+      const switched = await applySessionSwitch(tokenHash);
+      if (switched.error || !switched.data) {
+        return fail(null, switched.error ?? '계정이 통합되었지만 세션 전환에 실패했습니다. 다시 로그인해 주세요.');
+      }
+    }
+
+    const roles = parseAuthRoles(payload.data.roles).filter(isMemberRole);
+    return ok({
+      merged: Boolean(payload.data.merged),
+      message: payload.data.message ?? (payload.data.merged ? ACCOUNT_UNIFIED_MESSAGE : null),
+      roles,
+      onboardingComplete: Boolean(payload.data.onboardingComplete) || roles.length > 0,
+      phone: payload.data.phone ?? phone,
+    });
+  } catch {
+    return fail(null, AUTH_FAIL_MESSAGE);
+  }
+}
 
 export async function saveMemberRole(
   role: MemberRole,
   contact?: { email?: string; phone?: string },
-): Promise<DataResult<SessionUser | null>> {
+): Promise<DataResult<SessionUser | null> & { merged?: boolean; message?: string | null }> {
   if (!isMemberRole(role)) {
     return fail(null, '광고주 또는 크리에이터 역할을 선택해 주세요.');
   }
@@ -845,14 +944,11 @@ export async function saveMemberRole(
     let sessionUser = session.user;
     const tokenHash = payload.sessionSwitch?.tokenHash?.trim() ?? '';
     if (tokenHash) {
-      const verified = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: 'magiclink',
-      });
-      if (verified.error || !verified.data.user) {
-        return fail(null, '계정이 통합되었지만 세션 전환에 실패했습니다. 다시 로그인해 주세요.');
+      const switched = await applySessionSwitch(tokenHash);
+      if (switched.error || !switched.data) {
+        return fail(null, switched.error ?? '계정이 통합되었지만 세션 전환에 실패했습니다. 다시 로그인해 주세요.');
       }
-      sessionUser = verified.data.user;
+      sessionUser = switched.data;
     }
 
     const user = mapSessionUser(
@@ -873,7 +969,12 @@ export async function saveMemberRole(
     void supabase.auth.refreshSession().catch(() => null);
     applyKnownSession(user);
     notifyAuthChanged();
-    return ok(user);
+    const merged = Boolean(payload.data.merged || payload.merged);
+    return {
+      ...ok(user),
+      merged,
+      message: payload.data.message ?? payload.message ?? (merged ? ACCOUNT_UNIFIED_MESSAGE : null),
+    };
   } catch (error) {
     console.warn('[SponsorAuction] 역할 저장 중 예외가 발생했습니다.', error);
     return fail(null, AUTH_FAIL_MESSAGE);

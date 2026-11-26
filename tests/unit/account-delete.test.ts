@@ -1,22 +1,22 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { pickPhoneLinkMergePair } from '../../src/lib/account-link';
+import { pickPhoneMergeIntoExisting } from '../../src/lib/account-link';
 
-describe('phone link merge pair', () => {
-  it('같은 번호의 다른 계정만 현재 UID로 합친다', () => {
-    const current = { id: 'usr-current' };
+describe('phone merge into existing', () => {
+  it('신규 소셜 세션을 기존 번호 소유 계정으로 합친다', () => {
+    const current = { id: 'usr-new-social' };
     const existing = { id: 'usr-existing' };
-    assert.deepEqual(pickPhoneLinkMergePair(current, null), {
+    assert.deepEqual(pickPhoneMergeIntoExisting(current, null), {
       canonical: current,
       incoming: null,
     });
-    assert.deepEqual(pickPhoneLinkMergePair(current, current), {
+    assert.deepEqual(pickPhoneMergeIntoExisting(current, current), {
       canonical: current,
       incoming: null,
     });
-    assert.deepEqual(pickPhoneLinkMergePair(current, existing), {
-      canonical: current,
-      incoming: existing,
+    assert.deepEqual(pickPhoneMergeIntoExisting(current, existing), {
+      canonical: existing,
+      incoming: current,
     });
   });
 });

@@ -54,6 +54,50 @@ function digitsPhone(value: string | null | undefined) {
   return (value || '').replace(/\D/g, '');
 }
 
+export async function sendSolapiSms(to: string, text: string) {
+  const apiKey = solapiKey();
+  const apiSecret = (process.env.SOLAPI_API_SECRET || process.env.SOLAPI_SECRET || '').trim();
+  const from = (process.env.SOLAPI_SENDER || '').replace(/\D/g, '');
+  const digits = digitsPhone(to);
+
+  if (!apiKey || !apiSecret || !digits) {
+    return { mocked: true as const };
+  }
+
+  const { createHmac, randomBytes } = await import('crypto');
+  const date = new Date().toISOString();
+  const salt = randomBytes(16).toString('hex');
+  const signature = createHmac('sha256', apiSecret).update(date + salt).digest('hex');
+  const authorization = `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`;
+
+  const response = await fetch('https://api.solapi.com/messages/v4/send', {
+    method: 'POST',
+    headers: {
+      Authorization: authorization,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message: {
+        to: digits,
+        from: from || digits,
+        text,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    console.warn('[SponsorAuction] 솔라피 SMS 실패', {
+      status: response.status,
+      body: body.slice(0, 200),
+      to: digits,
+    });
+    throw new Error('인증번호를 발송하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+
+  return { mocked: false as const };
+}
+
 async function sendViaSolapi(to: string, text: string, event: LifecycleEvent) {
   const apiKey = solapiKey();
   const apiSecret = (process.env.SOLAPI_API_SECRET || process.env.SOLAPI_SECRET || '').trim();

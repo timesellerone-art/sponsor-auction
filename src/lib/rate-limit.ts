@@ -54,6 +54,7 @@ export function shouldRateLimitPath(pathname: string) {
     pathname.startsWith('/api/chat') ||
     pathname.startsWith('/api/auth/naver') ||
     pathname.startsWith('/api/auth/identities') ||
+    pathname.startsWith('/api/auth/phone') ||
     pathname.startsWith('/api/auth/account') ||
     pathname.startsWith('/api/auth/logout') ||
     pathname.startsWith('/api/onboarding') ||

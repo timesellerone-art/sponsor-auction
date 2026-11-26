@@ -267,6 +267,12 @@ export async function mergeUserInto(
       current_mode: currentMode,
       onboarding_complete: roles.length > 0,
       phone: phone || canonical.user_metadata?.phone || incoming.user_metadata?.phone,
+      phone_verified: Boolean(phone),
+      phone_otp_hash: null,
+      phone_otp_phone: null,
+      phone_otp_exp: null,
+      phone_otp_attempts: null,
+      phone_otp_sent_at: null,
       linked_providers: linkedProviders,
     },
     app_metadata: {

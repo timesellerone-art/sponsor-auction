@@ -10,6 +10,7 @@ import {
   mergeUserInto,
 } from '@/lib/auth-identity';
 import { LEGACY_PENDING_MERGE_COOKIE } from '@/lib/auth-paths';
+import { ACCOUNT_UNIFIED_MESSAGE } from '@/lib/account-unify';
 import {
   isPlaceholderOAuthEmail,
   isValidContactEmail,
@@ -18,6 +19,7 @@ import {
   normalizePhone,
 } from '@/lib/contact';
 import { parseOnboardingRoles, resolveOnboardingActor, type OnboardingBody } from '@/lib/onboarding';
+import { isVerifiedServicePhone } from '@/lib/phone-otp';
 import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 import {
   MEMBER_ROLES,
@@ -56,10 +58,22 @@ export async function POST(request: Request) {
     if (!contactEmail) {
       return NextResponse.json({ error: '대표 이메일을 입력해 주세요.' }, { status: 400 });
     }
-    if (body?.phone?.trim() && !isValidPhone(body.phone)) {
+    if (!body?.phone?.trim()) {
+      return NextResponse.json({ error: '휴대전화 인증을 완료해 주세요.' }, { status: 400 });
+    }
+    if (!isValidPhone(body.phone)) {
       return NextResponse.json({ error: '전화번호 형식을 확인해 주세요.' }, { status: 400 });
     }
-    const phone = normalizePhone(body?.phone) || null;
+    const phone = normalizePhone(body.phone);
+    if (!phone) {
+      return NextResponse.json({ error: '휴대전화 인증을 완료해 주세요.' }, { status: 400 });
+    }
+    if (!isVerifiedServicePhone(actor.user, phone)) {
+      return NextResponse.json(
+        { error: '휴대전화 인증을 완료한 뒤 역할을 선택할 수 있습니다.' },
+        { status: 400 },
+      );
+    }
 
     const existing = await findExistingAccountByContact({
       email: contactEmail,
@@ -74,13 +88,14 @@ export async function POST(request: Request) {
     let profileRoles: AuthProfileRole[] = [...new Set([...MEMBER_ROLES, ...selectedRoles])];
     let currentMode = selectedRoles[0];
     let sessionSwitch: { tokenHash: string } | undefined;
+    let merged = false;
 
     if (existing) {
-      const merged = await mergeUserInto(actor.user, existing, {
+      const mergedUser = await mergeUserInto(actor.user, existing, {
         roles: selectedRoles,
         phone,
       });
-      const tokenHash = await generateMagicLinkHash(actor.admin, merged);
+      const tokenHash = await generateMagicLinkHash(actor.admin, mergedUser);
       if (!tokenHash) {
         return NextResponse.json(
           {
@@ -91,18 +106,19 @@ export async function POST(request: Request) {
         );
       }
       sessionSwitch = { tokenHash };
+      merged = true;
 
       const stored = await actor.admin
         .from('profiles')
         .select('id, email, name, role, roles')
-        .eq('id', merged.id)
+        .eq('id', mergedUser.id)
         .maybeSingle();
-      profileId = stored.data?.id ?? merged.id;
-      profileEmail = stored.data?.email ?? collectAuthEmails(merged)[0] ?? contactEmail;
+      profileId = stored.data?.id ?? mergedUser.id;
+      profileEmail = stored.data?.email ?? collectAuthEmails(mergedUser)[0] ?? contactEmail;
       profileName = stored.data?.name ?? actor.name;
-      profileRoles = parseAuthRoles(stored.data?.roles, stored.data?.role, merged.user_metadata);
+      profileRoles = parseAuthRoles(stored.data?.roles, stored.data?.role, mergedUser.user_metadata);
       profileRole = stored.data?.role ?? primaryAuthRole(profileRoles);
-      const storedMode = merged.user_metadata?.current_mode;
+      const storedMode = mergedUser.user_metadata?.current_mode;
       currentMode = isMemberRole(storedMode)
         ? storedMode
         : (profileRoles.find(isMemberRole) ?? selectedRoles[0]);
@@ -127,6 +143,7 @@ export async function POST(request: Request) {
           name: actor.name || undefined,
           contact_email: contactEmail,
           phone,
+          phone_verified: true,
           current_mode: selectedRoles[0],
         },
         app_metadata: {
@@ -153,6 +170,8 @@ export async function POST(request: Request) {
         role: profileRole,
         roles: profileRoles,
         currentMode,
+        merged,
+        message: merged ? ACCOUNT_UNIFIED_MESSAGE : null,
       },
       sessionSwitch,
     });

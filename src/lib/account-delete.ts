@@ -1,12 +1,19 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
+import { pickPhoneMergeIntoExisting } from '@/lib/account-link';
+import { ACCOUNT_UNIFIED_MESSAGE } from '@/lib/account-unify';
 import {
   canUnlinkProvider,
   isNaverIdentityProvider,
   type SocialIdentityProvider,
 } from '@/lib/auth-identities';
-import { pickPhoneLinkMergePair } from '@/lib/account-link';
-import { findExistingAccountByContact, mergeUserInto } from '@/lib/auth-identity';
+import {
+  findExistingAccountByContact,
+  generateMagicLinkHash,
+  mergeUserInto,
+} from '@/lib/auth-identity';
 import { normalizePhone, toE164Kr } from '@/lib/contact';
+import { clearedPhoneOtpMetadata } from '@/lib/phone-otp';
+import { isMemberRole, parseAuthRoles, type MemberRole } from '@/types/auth';
 
 type AdminClient = SupabaseClient;
 
@@ -56,6 +63,8 @@ export async function unlinkSocialProvider(
   if (provider === 'phone') {
     metadata.phone = '';
     metadata.app_metadata.contact_phone = null;
+    metadata.user_metadata.phone = null;
+    metadata.user_metadata.phone_verified = false;
   }
   const updated = await admin.auth.admin.updateUserById(user.id, metadata);
   if (updated.error) {
@@ -100,7 +109,20 @@ export async function deleteAccountCompletely(admin: AdminClient, userId: string
   throw new Error('계정을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.');
 }
 
-export async function linkPhoneToAccount(admin: AdminClient, user: User, rawPhone: string) {
+export type VerifiedPhoneResult = {
+  user: User;
+  merged: boolean;
+  message: string | null;
+  tokenHash: string | null;
+  roles: MemberRole[];
+  onboardingComplete: boolean;
+};
+
+export async function completeVerifiedPhone(
+  admin: AdminClient,
+  user: User,
+  rawPhone: string,
+): Promise<VerifiedPhoneResult> {
   const phone = normalizePhone(rawPhone);
   const e164 = toE164Kr(phone);
   if (!phone || !e164) {
@@ -111,24 +133,21 @@ export async function linkPhoneToAccount(admin: AdminClient, user: User, rawPhon
     phone,
     excludeUserId: user.id,
   });
-  const pair = pickPhoneLinkMergePair(user, existing);
+  const pair = pickPhoneMergeIntoExisting(user, existing);
   let target = user;
+  let merged = false;
   if (pair.incoming) {
-    try {
-      target = await mergeUserInto(pair.incoming, pair.canonical, { phone });
-    } catch (error) {
-      console.warn('[SponsorAuction] 휴대전화 계정 통합 실패, 현재 계정에만 등록합니다', error);
-      target = user;
-    }
+    target = await mergeUserInto(pair.incoming, pair.canonical, { phone });
+    merged = true;
   }
 
   const withPhone = await admin.auth.admin.updateUserById(target.id, {
     phone: e164,
-    user_metadata: {
-      ...(target.user_metadata ?? {}),
+    user_metadata: clearedPhoneOtpMetadata(target, {
       phone,
+      phone_verified: true,
       linked_providers: [...new Set([...stringList(target.user_metadata?.linked_providers), 'phone'])],
-    },
+    }),
     app_metadata: {
       ...(target.app_metadata ?? {}),
       providers: [...new Set([...stringList(target.app_metadata?.providers), 'phone'])],
@@ -154,5 +173,33 @@ export async function linkPhoneToAccount(admin: AdminClient, user: User, rawPhon
   if (profile.error) {
     console.warn('[SponsorAuction] 프로필 휴대전화 저장 실패', profile.error.message);
   }
-  return (await admin.auth.admin.getUserById(target.id)).data.user ?? withPhone.data.user ?? target;
+
+  const refreshed = (await admin.auth.admin.getUserById(target.id)).data.user
+    ?? withPhone.data.user
+    ?? target;
+  const roles = parseAuthRoles(
+    refreshed.user_metadata?.roles,
+    refreshed.user_metadata?.role,
+  ).filter(isMemberRole);
+  const onboardingComplete =
+    refreshed.user_metadata?.onboarding_complete === true || roles.length > 0;
+
+  let tokenHash: string | null = null;
+  if (merged) {
+    tokenHash = await generateMagicLinkHash(admin, refreshed);
+    if (!tokenHash) {
+      throw new Error(
+        '계정을 통합했지만 세션을 전환하지 못했습니다. 기존 계정으로 다시 로그인해 주세요.',
+      );
+    }
+  }
+
+  return {
+    user: refreshed,
+    merged,
+    message: merged ? ACCOUNT_UNIFIED_MESSAGE : null,
+    tokenHash,
+    roles,
+    onboardingComplete,
+  };
 }

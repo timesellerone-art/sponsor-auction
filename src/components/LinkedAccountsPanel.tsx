@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { Loader2, Mail, Smartphone, X } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { PhoneOtpForm } from '@/components/PhoneOtpForm';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { linkSocialIdentity } from '@/lib/auth';
@@ -231,30 +232,15 @@ export function LinkedAccountsPanel() {
     }
   };
 
-  const handlePhoneLink = async () => {
-    if (phoneBusy) {
-      return;
-    }
+  const handlePhoneVerified = async () => {
     setPhoneBusy(true);
     try {
-      const response = await fetch(
-        '/api/auth/identities/phone',
-        await authRequestInit({
-          method: 'POST',
-          body: JSON.stringify({ phone }),
-        }),
-      );
-      const payload = (await response.json().catch(() => null)) as AccountsResponse | null;
-      if (!response.ok) {
-        throw new Error(payload?.error || '휴대전화를 연동하지 못했습니다.');
-      }
-      applyAccountsPayload(payload, user?.phone);
-      showToast('휴대전화를 연동했습니다.', 'success');
+      await refresh();
+      await loadAccounts();
       setPhoneOpen(false);
       setPhone('');
     } catch (error) {
-      console.warn('[SponsorAuction] 휴대전화 연동 실패', error);
-      showToast(error instanceof Error ? error.message : '휴대전화를 연동하지 못했습니다.');
+      console.warn('[SponsorAuction] 휴대전화 연동 후 갱신 실패', error);
     } finally {
       setPhoneBusy(false);
     }
@@ -485,21 +471,21 @@ export function LinkedAccountsPanel() {
                   </button>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-zinc-600">
-                  본인 확인용 휴대전화 번호를 등록하면 Phone 연동으로 표시됩니다.
+                  문자 인증번호로 본인 확인 후 연동합니다. 같은 번호의 기존 계정이 있으면 하나로
+                  합칩니다.
                 </p>
-                <label className="mt-4 block text-sm font-medium text-zinc-800">
-                  휴대전화
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    placeholder="010-0000-0000"
-                    value={phone}
+                <div className="mt-4">
+                  <PhoneOtpForm
+                    phone={phone}
+                    onPhoneChange={setPhone}
+                    verified={false}
                     disabled={phoneBusy}
-                    onChange={(event) => setPhone(event.target.value)}
-                    className="mt-1 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none ring-clink focus:ring-2"
+                    onVerified={() => {
+                      void handlePhoneVerified();
+                    }}
                   />
-                </label>
-                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                </div>
+                <div className="mt-5 flex justify-end">
                   <button
                     type="button"
                     disabled={phoneBusy}
@@ -507,17 +493,6 @@ export function LinkedAccountsPanel() {
                     className="inline-flex h-10 items-center justify-center rounded-full border border-zinc-200 px-4 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
                   >
                     취소
-                  </button>
-                  <button
-                    type="button"
-                    disabled={phoneBusy}
-                    onClick={() => {
-                      void handlePhoneLink();
-                    }}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
-                  >
-                    {phoneBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-                    연동하기
                   </button>
                 </div>
               </div>
