@@ -26,7 +26,7 @@ export async function GET(
     const { id } = await context.params;
     const result = await getTimeSlotById(id);
     if (result.error || !result.data) {
-      const message = result.error ?? '타임슬롯을 찾을 수 없습니다.';
+      const message = result.error ?? '크리에이터 상품을 찾을 수 없습니다.';
       return NextResponse.json(
         { error: message, errorMessage: message },
         { status: 404, headers: NO_STORE },
@@ -36,7 +36,7 @@ export async function GET(
   } catch (error) {
     rethrowPrerenderError(error);
     const message =
-      error instanceof Error ? error.message : '타임슬롯을 불러오지 못했습니다.';
+      error instanceof Error ? error.message : '크리에이터 상품을 불러오지 못했습니다.';
     return NextResponse.json(
       { error: message, errorMessage: message },
       { status: 500, headers: NO_STORE },
@@ -56,7 +56,7 @@ export async function PATCH(
     }
     const actor = await getPaymentActor();
     if (!actor) {
-      return unauthorizedJson('타임슬롯을 마감하려면 로그인해 주세요.');
+      return unauthorizedJson('크리에이터 상품을 마감하려면 로그인해 주세요.');
     }
     const { id } = await context.params;
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
@@ -69,14 +69,14 @@ export async function PATCH(
     const current = await getTimeSlotById(id);
     const ownerId = current.data?.creatorId;
     if (ownerId && isUuid(ownerId) && ownerId !== actor.userId) {
-      return forbiddenJson('본인 슬롯만 마감할 수 있습니다.');
+      return forbiddenJson('본인 상품만 마감할 수 있습니다.');
     }
     if (ownerId && actor.userId && ownerId !== actor.userId) {
-      return forbiddenJson('본인 슬롯만 마감할 수 있습니다.');
+      return forbiddenJson('본인 상품만 마감할 수 있습니다.');
     }
     const result = await closeTimeSlot(id, actor.userId);
     if (result.error || !result.data) {
-      const message = result.error ?? '타임슬롯을 마감하지 못했습니다.';
+      const message = result.error ?? '크리에이터 상품을 마감하지 못했습니다.';
       return NextResponse.json(
         { error: message, errorMessage: message },
         { status: 400, headers: NO_STORE },
@@ -86,7 +86,7 @@ export async function PATCH(
   } catch (error) {
     rethrowPrerenderError(error);
     const message =
-      error instanceof Error ? error.message : '타임슬롯을 마감하지 못했습니다.';
+      error instanceof Error ? error.message : '크리에이터 상품을 마감하지 못했습니다.';
     return NextResponse.json(
       { error: message, errorMessage: message },
       { status: 500, headers: NO_STORE },

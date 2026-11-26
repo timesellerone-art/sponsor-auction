@@ -25,7 +25,7 @@ const PUBLIC_PAGES = [
   { path: '/privacy', heading: '개인정보 처리방침' },
   { path: '/refund', heading: '환불 및 취소 규정' },
   { path: '/payment-verify', heading: '결제 테스트' },
-  { path: '/inventory', heading: '타임슬롯 마켓플레이스' },
+  { path: '/inventory', heading: '크리에이터 상품 마켓플레이스' },
 ] as const;
 
 async function expectNoPageError(page: Page, label: string) {
@@ -312,7 +312,7 @@ test.describe('전수 검증 C · 크리에이터', () => {
     await expect(page.getByText('아직 선정되지 않아 광고주 확인을 기다리는 제안입니다.')).toBeVisible();
 
     await page.goto('/inventory');
-    await expect(page.getByRole('heading', { name: '타임슬롯 마켓플레이스' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '크리에이터 상품 마켓플레이스' })).toBeVisible();
     const slotLink = page.locator('a[href^="/inventory/"]').first();
     if (await slotLink.count()) {
       await slotLink.click();

@@ -155,7 +155,7 @@ export function CreateTimeslotModal({
         if (response.ok && json?.data) {
           result = { error: null };
         } else {
-          result = { error: json?.errorMessage ?? json?.error ?? '타임슬롯을 등록하지 못했습니다.' };
+          result = { error: json?.errorMessage ?? json?.error ?? '크리에이터 상품을 등록하지 못했습니다.' };
         }
       } catch {
         result = await createTimeSlot(payload);
@@ -166,7 +166,7 @@ export function CreateTimeslotModal({
         showToast(result.error);
         return;
       }
-      showToast('타임슬롯을 등록했습니다.', 'success');
+      showToast('크리에이터 상품을 등록했습니다.', 'success');
       resetForm();
       window.dispatchEvent(new Event('timeslots:changed'));
       onClose();
@@ -179,7 +179,7 @@ export function CreateTimeslotModal({
       <div className="relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl">
         <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
           <h2 id={titleId} className="text-base font-bold text-zinc-950">
-            타임슬롯 등록
+            크리에이터 상품 등록
           </h2>
           <button type="button" onClick={onClose} className="rounded-lg p-1 hover:bg-zinc-100">
             <X className="size-5" />
@@ -187,14 +187,14 @@ export function CreateTimeslotModal({
         </div>
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-labelledby={titleId}>
           <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto px-4 py-4">
-            <Field label="슬롯 제목" htmlFor="slot-title" error={errors.title}>
+            <Field label="상품 제목" htmlFor="slot-title" error={errors.title}>
               <input
                 ref={firstFieldRef}
                 id="slot-title"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 className={inputClass(Boolean(errors.title))}
-                placeholder="예: 주말 숏폼 1편 슬롯"
+                placeholder="예: 주말 숏폼 1편 광고 상품"
               />
             </Field>
             <Field label="플랫폼" htmlFor="slot-platform">
@@ -229,7 +229,7 @@ export function CreateTimeslotModal({
                 className={inputClass(Boolean(errors.startingPrice))}
               />
             </Field>
-            <Field label="슬롯 시작" htmlFor="slot-start" error={errors.slotStart}>
+            <Field label="진행 시작" htmlFor="slot-start" error={errors.slotStart}>
               <input
                 id="slot-start"
                 type="datetime-local"
@@ -238,7 +238,7 @@ export function CreateTimeslotModal({
                 className={inputClass(Boolean(errors.slotStart))}
               />
             </Field>
-            <Field label="슬롯 종료" htmlFor="slot-end" error={errors.slotEnd}>
+            <Field label="진행 종료" htmlFor="slot-end" error={errors.slotEnd}>
               <input
                 id="slot-end"
                 type="datetime-local"
@@ -278,7 +278,7 @@ export function CreateTimeslotModal({
               className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
             >
               {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
-              {isSubmitting ? '등록 중...' : '타임슬롯 등록'}
+              {isSubmitting ? '등록 중...' : '크리에이터 상품 등록'}
             </button>
           </div>
         </form>

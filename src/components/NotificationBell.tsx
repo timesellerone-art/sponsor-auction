@@ -19,7 +19,7 @@ const TYPE_LABEL: Record<AppNotification['type'], string> = {
   award_complete: '낙찰 완료',
   payment_complete: '결제 완료',
   chat_message: '새 메시지',
-  timeslot_bid: '인벤토리 제안',
+  timeslot_bid: '상품 제안',
 };
 
 export function NotificationBell() {

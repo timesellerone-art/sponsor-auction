@@ -76,7 +76,7 @@ export async function POST(
       return unauthorizedJson('제안하려면 로그인해 주세요.');
     }
     if (!hasAuthRole(actor, 'advertiser') && !hasAuthRole(actor, 'admin')) {
-      return forbiddenJson('인벤토리 제안은 광고주만 할 수 있습니다.');
+      return forbiddenJson('상품 제안은 광고주만 할 수 있습니다.');
     }
     const { id } = await context.params;
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;

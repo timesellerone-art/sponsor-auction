@@ -24,7 +24,7 @@ export const VALIDATION = {
   expectedViewsRequired: '예상 조회수를 입력해 주세요.',
   expectedViewsTooLow: '예상 조회수는 1,000회 이상이어야 합니다.',
   startingPriceRequired: '시작가를 입력해 주세요.',
-  slotWindowInvalid: '슬롯 종료 시각은 시작 시각보다 뒤여야 합니다.',
+  slotWindowInvalid: '진행 종료 시각은 시작 시각보다 뒤여야 합니다.',
   timeslotBidTooLow: '현재 최고가보다 높은 금액으로 제안해 주세요.',
   bidRequired: '제안 금액을 입력해 주세요.',
   bidNotPositive: '제안 금액은 0원 이하일 수 없습니다.',

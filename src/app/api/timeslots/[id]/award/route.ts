@@ -35,16 +35,16 @@ export async function POST(
       return unauthorizedJson('낙찰하려면 로그인해 주세요.');
     }
     if (!hasAuthRole(actor, 'creator') && !hasAuthRole(actor, 'admin')) {
-      return forbiddenJson('타임슬롯 낙찰은 크리에이터만 할 수 있습니다.');
+      return forbiddenJson('상품 낙찰은 크리에이터만 할 수 있습니다.');
     }
     const { id } = await context.params;
     const slot = await getTimeSlotById(id);
     const ownerId = slot.data?.creatorId;
     if (ownerId && isUuid(ownerId) && ownerId !== actor.userId) {
-      return forbiddenJson('본인 슬롯만 낙찰할 수 있습니다.');
+      return forbiddenJson('본인 상품만 낙찰할 수 있습니다.');
     }
     if (ownerId && actor.userId && ownerId !== actor.userId) {
-      return forbiddenJson('본인 슬롯만 낙찰할 수 있습니다.');
+      return forbiddenJson('본인 상품만 낙찰할 수 있습니다.');
     }
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const bidId = asText(body?.bidId);
@@ -77,7 +77,7 @@ export async function POST(
         userId: payerId,
         referenceId: creditReference,
         bidAmount: winner.bidAmount,
-        title: slot.data?.title ?? '타임슬롯',
+        title: slot.data?.title ?? '크리에이터 상품',
       });
       if (!held.ok) {
         const status = held.code === 'INSUFFICIENT_CREDIT' ? 402 : 400;
@@ -92,7 +92,7 @@ export async function POST(
       if (admin && creditReference) {
         await releaseCampaignCredit(admin, {
           referenceId: creditReference,
-          reason: '타임슬롯 채택 실패로 크레딧 복구',
+          reason: '크리에이터 상품 채택 실패로 크레딧 복구',
         });
       }
       const message = result.error ?? '낙찰하지 못했습니다.';

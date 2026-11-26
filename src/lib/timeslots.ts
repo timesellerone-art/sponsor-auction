@@ -118,10 +118,10 @@ const seedSlots: TimeSlotItem[] = [
     id: 'slot-001',
     creatorId: 'usr-006',
     creatorName: '민지쇼츠',
-    title: '주말 한강 피크닉 숏폼 1편 슬롯',
+    title: '주말 한강 피크닉 숏폼 1편',
     platform: 'youtube_shorts',
     description:
-      '토요일 오후 업로드 예정. 제품 언박싱+실사용 15초. 평균 조회수 42만, 예상 조회수 40만 회 슬롯입니다.',
+      '토요일 오후 업로드 예정. 제품 언박싱+실사용 15초. 평균 조회수 42만, 예상 조회수 40만 회 광고 상품입니다.',
     expectedViews: 400_000,
     startingPrice: 800_000,
     currentHighestBid: 920_000,
@@ -139,7 +139,7 @@ const seedSlots: TimeSlotItem[] = [
     creatorName: '데모 크리에이터',
     title: '평일 루틴 브이로그 중간 광고 컷',
     platform: 'youtube',
-    description: '구독자 대상 루틴 영상에 브랜드 컷 20초를 넣을 수 있는 인벤토리입니다.',
+    description: '구독자 대상 루틴 영상에 브랜드 컷 20초를 넣을 수 있는 광고 상품입니다.',
     expectedViews: 80_000,
     startingPrice: 350_000,
     currentHighestBid: 0,
@@ -155,7 +155,7 @@ const seedSlots: TimeSlotItem[] = [
     id: 'slot-003',
     creatorId: 'usr-007',
     creatorName: '피부일기 하연',
-    title: '7일 스킨케어 트래킹 릴스 슬롯',
+    title: '7일 스킨케어 트래킹 릴스',
     platform: 'instagram_reels',
     description: '민감성 피부 루틴 시리즈 중 1회차. 예상 조회수 12만.',
     expectedViews: 120_000,
@@ -303,24 +303,24 @@ export async function listTimeSlots(options?: {
       if (isSchemaMismatch(error)) {
         return ok(await withScores(mockSlotList(creatorId)));
       }
-      console.warn('[SponsorAuction] 타임슬롯 목록 조회 실패', error.message);
-      return fail([], '타임슬롯 목록을 불러오지 못했습니다.');
+      console.warn('[SponsorAuction] 크리에이터 상품 목록 조회 실패', error.message);
+      return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');
     }
     return ok(await withScores((data ?? []).map((row) => mapSlot(row))));
   } catch {
-    return fail([], '타임슬롯 목록을 불러오지 못했습니다.');
+    return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');
   }
 }
 
 export async function getTimeSlotById(id: string): Promise<DataResult<TimeSlotItem | null>> {
   if (!id.trim()) {
-    return fail(null, '타임슬롯 ID가 필요합니다.');
+    return fail(null, '크리에이터 상품 ID가 필요합니다.');
   }
   const supabase = await getDataClient();
   if (!supabase || !isUuid(id)) {
     const found = slotsStore.find((item) => item.id === id) ?? null;
     if (!found) {
-      return fail(null, '타임슬롯을 찾을 수 없습니다.');
+      return fail(null, '크리에이터 상품을 찾을 수 없습니다.');
     }
     const [withScore] = await withScores([applySlotExpiry(found)]);
     return ok(withScore ?? applySlotExpiry(found));
@@ -338,18 +338,18 @@ export async function getTimeSlotById(id: string): Promise<DataResult<TimeSlotIt
         const [withScore] = await withScores([applySlotExpiry(found)]);
         return ok(withScore ?? applySlotExpiry(found));
       }
-      return fail(null, '타임슬롯을 찾을 수 없습니다.');
+      return fail(null, '크리에이터 상품을 찾을 수 없습니다.');
     }
     const [withScore] = await withScores([mapSlot(data)]);
     return ok(withScore ?? mapSlot(data));
   } catch {
-    return fail(null, '타임슬롯을 불러오지 못했습니다.');
+    return fail(null, '크리에이터 상품을 불러오지 못했습니다.');
   }
 }
 
 export async function listTimeSlotBids(slotId: string): Promise<DataResult<TimeSlotBidItem[]>> {
   if (!slotId.trim()) {
-    return fail([], '타임슬롯 ID가 필요합니다.');
+    return fail([], '크리에이터 상품 ID가 필요합니다.');
   }
   const supabase = await getDataClient();
   if (!supabase || !isUuid(slotId)) {
@@ -415,7 +415,7 @@ export async function createTimeSlot(
   const supabase = client ?? (await getDataClient());
   if (!supabase || !payload.creator_id) {
     if (supabase && !payload.creator_id) {
-      return fail(null, '타임슬롯을 등록할 크리에이터 정보가 없습니다.');
+      return fail(null, '크리에이터 상품을 등록할 계정 정보가 없습니다.');
     }
     const created: TimeSlotItem = {
       id: `slot-${Date.now()}`,
@@ -447,7 +447,7 @@ export async function createTimeSlot(
       .select(SLOT_COLUMNS)
       .single();
     if (error || !data) {
-      console.warn('[SponsorAuction] 타임슬롯 등록 실패', error?.message);
+      console.warn('[SponsorAuction] 크리에이터 상품 등록 실패', error?.message);
       return fail(null, INSERT_FAIL_MESSAGE);
     }
     const mapped = mapSlot(data);
@@ -462,10 +462,10 @@ export async function createTimeSlot(
 export async function closeTimeSlot(id: string, creatorId?: string | null) {
   const current = await getTimeSlotById(id);
   if (!current.data) {
-    return fail(null, current.error ?? '타임슬롯을 찾을 수 없습니다.');
+    return fail(null, current.error ?? '크리에이터 상품을 찾을 수 없습니다.');
   }
   if (creatorId && current.data.creatorId && current.data.creatorId !== creatorId) {
-    return fail(null, '본인 슬롯만 마감할 수 있습니다.');
+    return fail(null, '본인 상품만 마감할 수 있습니다.');
   }
   const supabase = await getDataClient();
   if (!supabase || !isUuid(id)) {
@@ -499,11 +499,11 @@ export async function placeTimeSlotBid(
     const slotResult = await getTimeSlotById(input.timeSlotId);
     const slot = slotResult.data;
     if (!slot) {
-      return fail(null, slotResult.error ?? '타임슬롯을 찾을 수 없습니다.');
+      return fail(null, slotResult.error ?? '크리에이터 상품을 찾을 수 없습니다.');
     }
     const live = applySlotExpiry(slot);
     if (live.status !== 'open' || live.winnerBidId) {
-      return fail(null, '마감된 타임슬롯에는 제안할 수 없습니다.');
+      return fail(null, '마감된 상품에는 제안할 수 없습니다.');
     }
     const minBid = nextInventoryMinBid(live.startingPrice, live.currentHighestBid);
     if (!Number.isFinite(input.bidAmount) || input.bidAmount < minBid) {
@@ -511,7 +511,7 @@ export async function placeTimeSlotBid(
     }
     let message = '';
     try {
-      message = sanitizeUserText(input.message || '인벤토리 제안', 'reject');
+      message = sanitizeUserText(input.message || '상품 제안', 'reject');
     } catch {
       return fail(null, VALIDATION.offPlatformContact);
     }
@@ -565,13 +565,13 @@ export async function awardTimeSlotBid(
   const slotResult = await getTimeSlotById(slotId);
   const slot = slotResult.data;
   if (!slot) {
-    return fail(null, slotResult.error ?? '타임슬롯을 찾을 수 없습니다.');
+    return fail(null, slotResult.error ?? '크리에이터 상품을 찾을 수 없습니다.');
   }
   if (creatorId && slot.creatorId && slot.creatorId !== creatorId) {
-    return fail(null, '본인 슬롯만 낙찰할 수 있습니다.');
+    return fail(null, '본인 상품만 낙찰할 수 있습니다.');
   }
   if (slot.status !== 'open' || slot.winnerBidId) {
-    return fail(null, '이미 마감된 타임슬롯입니다.');
+    return fail(null, '이미 마감된 상품입니다.');
   }
 
   const bids = await listTimeSlotBids(slotId);
@@ -604,7 +604,7 @@ export async function awardTimeSlotBid(
       return fail(null, UPDATE_FAIL_MESSAGE);
     }
     if (!data) {
-      return fail(null, '이미 마감된 타임슬롯입니다.');
+      return fail(null, '이미 마감된 상품입니다.');
     }
     return ok(mapSlot(data));
   } catch {

@@ -158,7 +158,7 @@ export function CreatorDashboard() {
           onClick={() => setCreateSlotOpen(true)}
           className="inline-flex h-10 items-center rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800"
         >
-          타임슬롯 등록
+          크리에이터 상품 등록
         </button>
       </div>
       <SettlementAccountSummary
@@ -169,9 +169,9 @@ export function CreatorDashboard() {
       />
 
       <section className="mt-8">
-        <h2 className="text-lg font-bold text-zinc-950">내 타임슬롯</h2>
+        <h2 className="text-lg font-bold text-zinc-950">내 크리에이터 상품</h2>
         {slots.length === 0 ? (
-          <p className="mt-4 text-sm text-zinc-500">등록한 타임슬롯이 없습니다.</p>
+          <p className="mt-4 text-sm text-zinc-500">등록한 크리에이터 상품이 없습니다.</p>
         ) : (
           <ul className="mt-4 flex max-h-[50vh] flex-col gap-3 overflow-y-auto pr-1">
             {slots.map((slot) => (

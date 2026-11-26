@@ -38,7 +38,7 @@ export function TimeslotDetail({ id }: { id: string }) {
       setBids(bidResult.data);
     } catch {
       setSlot(null);
-      setError('타임슬롯을 불러오지 못했습니다.');
+      setError('크리에이터 상품을 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
@@ -86,14 +86,14 @@ export function TimeslotDetail({ id }: { id: string }) {
         className="inline-flex w-fit items-center gap-1 text-sm font-medium text-zinc-600 hover:text-zinc-950"
       >
         <ArrowLeft className="size-4" aria-hidden />
-        인벤토리로
+        상품 목록으로
       </Link>
 
       {loading ? (
         <div className="mt-6 h-48 animate-pulse rounded-2xl bg-white" />
       ) : !slot ? (
         <div className="mt-6 rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-16 text-center">
-          <p className="font-medium text-zinc-800">타임슬롯을 찾을 수 없습니다</p>
+          <p className="font-medium text-zinc-800">크리에이터 상품을 찾을 수 없습니다</p>
           {error ? <p className="mt-2 text-sm text-zinc-500">{error}</p> : null}
         </div>
       ) : (
@@ -143,7 +143,7 @@ export function TimeslotDetail({ id }: { id: string }) {
             ) : (
               <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 {slot.status !== 'open' || slot.winnerBidId
-                  ? '이 슬롯은 마감되었거나 낙찰되었습니다.'
+                  ? '이 상품은 마감되었거나 낙찰되었습니다.'
                   : '로그인 후 제안할 수 있습니다.'}
               </p>
             )}

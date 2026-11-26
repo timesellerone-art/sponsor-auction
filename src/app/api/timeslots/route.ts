@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     const mine = new URL(request.url).searchParams.get('mine') === '1';
     const actor = mine ? await getPaymentActor() : null;
     if (mine && !actor) {
-      return unauthorizedJson('내 타임슬롯을 보려면 로그인해 주세요.');
+      return unauthorizedJson('내 크리에이터 상품을 보려면 로그인해 주세요.');
     }
     const result = await listTimeSlots({
       creatorId: mine ? actor?.userId : undefined,
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
   } catch (error) {
     rethrowPrerenderError(error);
     const message =
-      error instanceof Error ? error.message : '타임슬롯 목록을 불러오지 못했습니다.';
+      error instanceof Error ? error.message : '크리에이터 상품 목록을 불러오지 못했습니다.';
     return NextResponse.json(
       { error: message, errorMessage: message },
       { status: 500, headers: NO_STORE },
@@ -79,10 +79,10 @@ export async function POST(request: Request) {
     }
     const actor = await getPaymentActor();
     if (!actor) {
-      return unauthorizedJson('타임슬롯을 등록하려면 로그인해 주세요.');
+      return unauthorizedJson('크리에이터 상품을 등록하려면 로그인해 주세요.');
     }
     if (!hasAuthRole(actor, 'creator') && !hasAuthRole(actor, 'admin')) {
-      return forbiddenJson('타임슬롯 등록은 크리에이터만 할 수 있습니다.');
+      return forbiddenJson('크리에이터 상품 등록은 크리에이터만 할 수 있습니다.');
     }
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
       await timeslotWriter(),
     );
     if (result.error || !result.data) {
-      const message = result.error ?? '타임슬롯을 등록하지 못했습니다.';
+      const message = result.error ?? '크리에이터 상품을 등록하지 못했습니다.';
       return NextResponse.json(
         { error: message, errorMessage: message },
         { status: 400, headers: NO_STORE },
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
   } catch (error) {
     rethrowPrerenderError(error);
     const message =
-      error instanceof Error ? error.message : '타임슬롯을 등록하지 못했습니다.';
+      error instanceof Error ? error.message : '크리에이터 상품을 등록하지 못했습니다.';
     return NextResponse.json(
       { error: message, errorMessage: message },
       { status: 500, headers: NO_STORE },

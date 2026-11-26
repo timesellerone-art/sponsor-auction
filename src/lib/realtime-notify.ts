@@ -123,7 +123,7 @@ async function slotMeta(slotId: string) {
   }
   const client = getSupabaseClient();
   if (!client) {
-    return { creatorId: null as string | null, title: '인벤토리', at: Date.now() };
+    return { creatorId: null as string | null, title: '크리에이터 상품', at: Date.now() };
   }
   try {
     const { data } = await client
@@ -133,13 +133,13 @@ async function slotMeta(slotId: string) {
       .maybeSingle();
     const next = {
       creatorId: asText(data?.creator_id) || null,
-      title: asText(data?.title) || '인벤토리',
+      title: asText(data?.title) || '크리에이터 상품',
       at: Date.now(),
     };
     writeCache(slotOwnerCache, slotId, next);
     return next;
   } catch {
-    return { creatorId: null as string | null, title: '인벤토리', at: Date.now() };
+    return { creatorId: null as string | null, title: '크리에이터 상품', at: Date.now() };
   }
 }
 
@@ -209,7 +209,7 @@ export async function applyRealtimeChange(change: RealtimeChange, userId: string
     emitInApp({
       userId,
       type: 'timeslot_bid',
-      title: '인벤토리 제안',
+      title: '상품 제안',
       body: `"${meta.title}"에 ${name}님의 제안(${formatWon(amount)})이 도착했습니다.`,
       href: `/inventory/${slotId}`,
     });

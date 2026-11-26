@@ -92,7 +92,7 @@ export function Navbar() {
             오픈 캠페인
           </Link>
           <Link href="/inventory" className={navLinkClass}>
-            크리에이터
+            크리에이터 상품
           </Link>
           <Link href="/#guide" className={navLinkClass}>
             이용안내
@@ -190,7 +190,7 @@ export function Navbar() {
             className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
             onClick={() => setOpen(false)}
           >
-            크리에이터
+            크리에이터 상품
           </Link>
           <Link
             href="/#guide"

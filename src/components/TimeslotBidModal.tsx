@@ -126,7 +126,7 @@ function TimeslotBidForm({
       >
         <div className="flex items-center justify-between">
           <h2 id={titleId} className="text-base font-bold text-zinc-950">
-            인벤토리 제안
+            상품 제안
           </h2>
           <button type="button" onClick={onClose} className="rounded-lg p-1 hover:bg-zinc-100">
             <X className="size-5" />
