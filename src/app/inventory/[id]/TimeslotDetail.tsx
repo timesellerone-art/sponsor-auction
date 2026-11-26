@@ -19,8 +19,39 @@ import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import { BID_STATUS_LABEL } from '@/lib/status-labels';
 import { getTimeSlotById, listTimeSlotBids } from '@/lib/timeslots';
 import { formatDateTime, formatViews, formatWon } from '@/lib/utils';
-import { hasAuthRole } from '@/types/auth';
+import { hasAuthRole, type SessionUser } from '@/types/auth';
 import { isTimeSlotOpen, type TimeSlotBidItem, type TimeSlotItem } from '@/types/timeslot';
+
+function mergeTimeslotBids(current: TimeSlotBidItem[], incoming: TimeSlotBidItem[]) {
+  const byId = new Map<string, TimeSlotBidItem>();
+  for (const bid of current) {
+    byId.set(bid.id, bid);
+  }
+  for (const bid of incoming) {
+    byId.set(bid.id, bid);
+  }
+  const list = [...byId.values()];
+  const leading = Math.max(0, ...list.map((item) => item.bidAmount));
+  return list
+    .map((item) => ({
+      ...item,
+      isLeading: leading > 0 && item.bidAmount === leading,
+    }))
+    .sort((left, right) => right.bidAmount - left.bidAmount);
+}
+
+function isMyTimeslotBid(
+  bid: TimeSlotBidItem,
+  user: Pick<SessionUser, 'id' | 'name'> | null | undefined,
+) {
+  if (!user?.id) {
+    return false;
+  }
+  if (bid.advertiserId && bid.advertiserId === user.id) {
+    return true;
+  }
+  return !bid.advertiserId && Boolean(user.name) && bid.advertiserName === user.name;
+}
 
 export function TimeslotDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -33,21 +64,44 @@ export function TimeslotDetail({ id }: { id: string }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingBid, setPendingBid] = useState<TimeSlotBidItem | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       const [slotResult, bidResult] = await Promise.all([
         getTimeSlotById(id),
         listTimeSlotBids(id),
       ]);
-      setSlot(slotResult.data);
+      const incoming = Array.isArray(bidResult.data) ? bidResult.data : [];
+      setBids((current) => mergeTimeslotBids(silent ? current : [], incoming));
+      setSlot((current) => {
+        const next = slotResult.data;
+        if (!next) {
+          return silent ? current : null;
+        }
+        const highest = Math.max(
+          next.currentHighestBid,
+          ...incoming.map((item) => item.bidAmount),
+          silent && current ? current.currentHighestBid : 0,
+        );
+        const count = Math.max(
+          next.bidsCount,
+          incoming.length,
+          silent && current ? current.bidsCount : 0,
+        );
+        return { ...next, currentHighestBid: highest, bidsCount: count };
+      });
       setError(slotResult.error);
-      setBids(bidResult.data);
     } catch {
-      setSlot(null);
-      setError('크리에이터 상품을 불러오지 못했습니다.');
+      if (!silent) {
+        setSlot(null);
+        setError('크리에이터 상품을 불러오지 못했습니다.');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [id]);
 
@@ -56,7 +110,7 @@ export function TimeslotDetail({ id }: { id: string }) {
       void load();
     }, 0);
     const onChanged = () => {
-      void load();
+      void load(true);
     };
     window.addEventListener('timeslots:changed', onChanged);
     return () => {
@@ -72,11 +126,32 @@ export function TimeslotDetail({ id }: { id: string }) {
       (activeRole === 'advertiser' || hasAuthRole(user, 'advertiser') || hasAuthRole(user, 'admin')),
   );
   const slotOpen = Boolean(slot && isTimeSlotOpen(slot));
+  const myBid = user ? bids.find((bid) => isMyTimeslotBid(bid, user)) ?? null : null;
+  const alreadyBid = Boolean(myBid);
   const winnerBid = slot?.winnerBidId
     ? bids.find((item) => item.id === slot.winnerBidId) ?? null
     : null;
   const holdQuote = pendingBid ? describeSettlementAmounts(pendingBid.bidAmount) : null;
   const awardedClosed = Boolean(slot && !slotOpen);
+
+  const handleBidSubmitted = (bid?: TimeSlotBidItem | null) => {
+    if (bid) {
+      setBids((current) => {
+        const next = mergeTimeslotBids(current, [bid]);
+        setSlot((currentSlot) =>
+          currentSlot
+            ? {
+                ...currentSlot,
+                currentHighestBid: Math.max(currentSlot.currentHighestBid, bid.bidAmount),
+                bidsCount: Math.max(currentSlot.bidsCount, next.length),
+              }
+            : currentSlot,
+        );
+        return next;
+      });
+    }
+    void load(true);
+  };
 
   const awardBid = async (bid: TimeSlotBidItem) => {
     if (!slot || busyId) {
@@ -209,7 +284,28 @@ export function TimeslotDetail({ id }: { id: string }) {
             )}
           </article>
           {slotOpen && authSettled && isAdvertiserActing && !isOwner ? (
-            <TimeslotBidForm slot={slot} />
+            alreadyBid ? (
+              <div className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
+                <h2 className="text-base font-bold text-zinc-950">크리에이터 상품 제안</h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  이미 이 상품에 제안을 제출했습니다. 아래 현황에서 확인할 수 있습니다.
+                </p>
+                {myBid ? (
+                  <p className="mt-2 text-sm font-semibold text-zinc-950">
+                    내 제안 {formatWon(myBid.bidAmount)}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  disabled
+                  className="mt-4 inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-full bg-zinc-300 text-sm font-semibold text-zinc-500"
+                >
+                  제안 완료
+                </button>
+              </div>
+            ) : (
+              <TimeslotBidForm slot={slot} onSubmitted={handleBidSubmitted} />
+            )
           ) : null}
 
           <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
@@ -238,11 +334,24 @@ export function TimeslotDetail({ id }: { id: string }) {
               <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
                 {bids.map((bid) => {
                   const winner = Boolean(slot.winnerBidId && slot.winnerBidId === bid.id);
+                  const mine = isMyTimeslotBid(bid, user);
                   return (
-                    <li key={bid.id} className="rounded-xl border border-zinc-200 p-4">
+                    <li
+                      key={bid.id}
+                      className={
+                        mine
+                          ? 'rounded-xl border border-clink-peach-strong bg-clink-peach/30 p-4'
+                          : 'rounded-xl border border-zinc-200 p-4'
+                      }
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="font-semibold text-zinc-950">{bid.advertiserName}</p>
+                          <p className="font-semibold text-zinc-950">
+                            {bid.advertiserName}
+                            {mine ? (
+                              <span className="ml-2 text-xs font-semibold text-clink-accent">내 제안</span>
+                            ) : null}
+                          </p>
                           <p className="mt-1 text-lg font-bold">{formatWon(bid.bidAmount)}</p>
                         </div>
                         {winner ? (
@@ -256,6 +365,10 @@ export function TimeslotDetail({ id }: { id: string }) {
                         ) : bid.isLeading ? (
                           <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
                             최고 제안가
+                          </span>
+                        ) : mine ? (
+                          <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-clink-accent">
+                            제안 완료
                           </span>
                         ) : null}
                       </div>

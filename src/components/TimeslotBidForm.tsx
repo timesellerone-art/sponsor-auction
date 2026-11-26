@@ -16,7 +16,7 @@ import { placeTimeSlotBid } from '@/lib/timeslots';
 import { formatWon } from '@/lib/utils';
 import { MIN_PROPOSAL_LENGTH, VALIDATION } from '@/lib/validation';
 import { hasAuthRole } from '@/types/auth';
-import type { TimeSlotItem } from '@/types/timeslot';
+import type { TimeSlotBidItem, TimeSlotItem } from '@/types/timeslot';
 import { hasOffPlatformContact } from '@/utils/filter';
 
 export function TimeslotBidForm({
@@ -24,7 +24,7 @@ export function TimeslotBidForm({
   onSubmitted,
 }: {
   slot: TimeSlotItem;
-  onSubmitted?: () => void;
+  onSubmitted?: (bid?: TimeSlotBidItem | null) => void;
 }) {
   const { user, activeRole } = useAuth();
   const { requireUser } = useRequireAuth();
@@ -128,7 +128,7 @@ export function TimeslotBidForm({
       window.dispatchEvent(new Event('timeslots:changed'));
       setMessage('');
       setError(null);
-      onSubmitted?.();
+      onSubmitted?.(result.data);
     });
   };
 
