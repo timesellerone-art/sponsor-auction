@@ -1,8 +1,12 @@
 'use client';
 
+import { useState } from 'react';
+import Link from 'next/link';
 import { Play } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/components/AuthProvider';
+import { CreateTimeslotModal } from '@/components/CreateTimeslotModal';
+import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { CreatorAvatar } from '@/components/home/CreatorAvatar';
 import { LANDING_INTRO } from '@/components/home/landing-audience';
 import { LandingRoleToggle } from '@/components/home/LandingRoleToggle';
@@ -11,11 +15,20 @@ import { getShowcaseCreator, SHORTFORM_CARDS } from '@/components/home/showcase'
 import { PageContainer } from '@/components/PageContainer';
 import { cn } from '@/lib/utils';
 
+const primaryAdvertiserClass =
+  'inline-flex w-full items-center justify-center whitespace-nowrap rounded-xl bg-[#1C1917] px-8 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 sm:w-auto';
+const primaryCreatorClass =
+  'inline-flex w-full items-center justify-center whitespace-nowrap rounded-xl bg-[#EA580C] px-8 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_rgb(234,88,12,0.22)] hover:bg-orange-600 sm:w-auto';
+const outlineCtaClass =
+  'inline-flex w-full items-center justify-center whitespace-nowrap rounded-xl border border-stone-300 bg-white px-8 py-3.5 text-sm font-semibold text-[#1C1917] shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:bg-stone-50 sm:w-auto';
+
 export function HomeHero() {
   const { ready } = useAuth();
+  const { requestCreator } = useRoleIntent();
   const { audience } = useLandingAudience();
   const copy = LANDING_INTRO[audience];
   const createDisabled = !ready;
+  const [createSlotOpen, setCreateSlotOpen] = useState(false);
 
   const openCreateAuction = () => {
     window.dispatchEvent(new Event('create-auction:open'));
@@ -23,6 +36,13 @@ export function HomeHero() {
 
   const scrollToAuctions = () => {
     document.getElementById('auctions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const openCreateTimeslot = () => {
+    if (!ready) {
+      return;
+    }
+    requestCreator(() => setCreateSlotOpen(true));
   };
 
   return (
@@ -50,30 +70,49 @@ export function HomeHero() {
               {copy.headline}
             </h1>
             <p className="mt-5 max-w-2xl text-sm leading-6 text-[#78716C] sm:text-base">{copy.sub}</p>
-            <div className="mt-8 flex w-full flex-col items-center justify-center sm:w-auto">
+            <div className="mt-8 flex w-full max-w-xl flex-col items-stretch justify-center gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center">
               {audience === 'advertiser' ? (
-                <motion.button
-                  type="button"
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                  disabled={createDisabled}
-                  onClick={openCreateAuction}
-                  className="inline-flex w-full items-center justify-center whitespace-nowrap rounded-xl bg-[#1C1917] px-8 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 sm:w-auto"
-                >
-                  {copy.cta}
-                </motion.button>
+                <>
+                  <motion.button
+                    type="button"
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    disabled={createDisabled}
+                    onClick={openCreateAuction}
+                    className={primaryAdvertiserClass}
+                  >
+                    {copy.cta}
+                  </motion.button>
+                  <motion.div whileHover={{ y: -2 }} className="w-full sm:w-auto">
+                    <Link href="/timeslots" className={outlineCtaClass}>
+                      {copy.secondaryCta}
+                    </Link>
+                  </motion.div>
+                </>
               ) : (
-                <motion.a
-                  href="#auctions"
-                  whileHover={{ y: -2 }}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    scrollToAuctions();
-                  }}
-                  className="inline-flex w-full items-center justify-center whitespace-nowrap rounded-xl bg-[#EA580C] px-8 py-3.5 text-sm font-semibold text-white shadow-[0_8px_30px_rgb(234,88,12,0.22)] hover:bg-orange-600 sm:w-auto"
-                >
-                  {copy.cta}
-                </motion.a>
+                <>
+                  <motion.a
+                    href="#auctions"
+                    whileHover={{ y: -2 }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      scrollToAuctions();
+                    }}
+                    className={primaryCreatorClass}
+                  >
+                    {copy.cta}
+                  </motion.a>
+                  <motion.button
+                    type="button"
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    disabled={createDisabled}
+                    onClick={openCreateTimeslot}
+                    className={outlineCtaClass}
+                  >
+                    {copy.secondaryCta}
+                  </motion.button>
+                </>
               )}
             </div>
           </motion.div>
@@ -87,6 +126,7 @@ export function HomeHero() {
           <ShortformShowcase />
         </motion.div>
       </PageContainer>
+      <CreateTimeslotModal open={createSlotOpen} onClose={() => setCreateSlotOpen(false)} />
     </section>
   );
 }

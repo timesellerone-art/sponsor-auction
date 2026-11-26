@@ -107,7 +107,7 @@ export function CreateTimeslotModal({
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await run('timeslot', async () => {
-      if (!requireCreator('/inventory') || !user) {
+      if (!requireCreator() || !user) {
         return;
       }
       const nextErrors = validateTimeSlotForm({
