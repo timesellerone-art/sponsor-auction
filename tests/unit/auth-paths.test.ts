@@ -16,7 +16,7 @@ import {
   shouldApplyRequestCookie,
   writeCookies,
 } from '../../src/lib/auth-paths';
-import { resolveActiveMemberRole, switchableMemberRoles } from '../../src/types/auth';
+import { isAdmin, resolveActiveMemberRole, switchableMemberRoles } from '../../src/types/auth';
 
 describe('auth path helpers', () => {
   it('콜백과 온보딩은 공개 통과 경로이다', () => {
@@ -79,6 +79,15 @@ describe('post-auth destination', () => {
 
   it('광고주에게 /admin next를 강제하지 않는다', () => {
     assert.equal(postAuthPath({ roles: ['advertiser'] }, '/admin'), '/');
+  });
+
+  it('관리자 메뉴는 admin 역할일 때만 허용한다', () => {
+    assert.equal(isAdmin(null), false);
+    assert.equal(isAdmin({ roles: ['advertiser'] }), false);
+    assert.equal(isAdmin({ roles: ['creator'], email: 'user@example.com' }), false);
+    assert.equal(isAdmin({ roles: ['admin'] }), true);
+    assert.equal(isAdmin({ role: 'admin', roles: ['admin'], email: 'ops@example.com' }), true);
+    assert.equal(postAuthPath({ roles: ['admin'] }, '/admin'), '/admin');
   });
 
   it('로그인 성공 시 유효한 next가 있으면 그 경로로 보낸다', () => {

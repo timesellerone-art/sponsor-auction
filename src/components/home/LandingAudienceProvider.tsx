@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -21,22 +22,22 @@ const LandingAudienceContext = createContext<LandingAudienceContextValue | null>
 
 export function LandingAudienceProvider({ children }: { children: ReactNode }) {
   const { user, activeRole, switchableRoles, setActiveRole } = useAuth();
-  const [guestAudience, setGuestAudience] = useState<LandingAudience>('advertiser');
+  const [audience, setLocalAudience] = useState<LandingAudience>(
+    activeRole === 'creator' || activeRole === 'advertiser' ? activeRole : 'advertiser',
+  );
 
-  const audience: LandingAudience =
-    user && activeRole === 'creator'
-      ? 'creator'
-      : user && activeRole === 'advertiser'
-        ? 'advertiser'
-        : guestAudience;
+  useEffect(() => {
+    if (activeRole === 'advertiser' || activeRole === 'creator') {
+      setLocalAudience(activeRole);
+    }
+  }, [activeRole]);
 
   const setAudience = useCallback(
     (next: LandingAudience) => {
+      setLocalAudience(next);
       if (user && isMemberRole(next) && switchableRoles.includes(next)) {
         setActiveRole(next);
-        return;
       }
-      setGuestAudience(next);
     },
     [setActiveRole, switchableRoles, user],
   );

@@ -6,17 +6,15 @@ import { Menu, X } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { CreateAuctionModal } from '@/components/CreateAuctionModal';
 import { useRoleIntent } from '@/components/RoleIntentProvider';
-import { NotificationBell } from '@/components/NotificationBell';
 import { signOut } from '@/lib/auth';
 import { cn } from '@/lib/utils';
-import { RoleSwitcher } from '@/components/RoleSwitcher';
-import { isAdmin, memberRolesLabel } from '@/types/auth';
+import { isAdmin } from '@/types/auth';
 
 export function Navbar() {
   const { user, ready } = useAuth();
   const { requestAdvertiser } = useRoleIntent();
-  const showAdmin = Boolean(ready && isAdmin(user));
-  const showDashboard = Boolean(ready && user);
+  const showAdmin = Boolean(ready && user && isAdmin(user));
+  const signedIn = Boolean(ready && user);
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const menuId = useId();
@@ -69,11 +67,13 @@ export function Navbar() {
 
   const navLinkClass =
     'shrink-0 whitespace-nowrap text-sm font-medium text-stone-600 transition-colors hover:text-stone-950';
+  const accountButtonClass =
+    'inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-800 shadow-sm hover:shadow-md lg:h-10 lg:px-4 lg:text-sm';
 
   return (
     <header className="sticky top-0 z-50 w-full overflow-x-clip border-b border-clink-border bg-[#FAF8F5]/80 backdrop-blur-md">
       <div className="flex h-14 w-full items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
-        {ready && user ? <span className="sr-only">{user.name}</span> : null}
+        {signedIn ? <span className="sr-only">{user?.name}</span> : null}
         <Link
           href="/"
           aria-label="Clink"
@@ -104,10 +104,8 @@ export function Navbar() {
           ) : null}
 
           <div className="ml-auto flex shrink-0 items-center gap-1.5 lg:gap-2">
-            {ready && user ? (
+            {signedIn ? (
               <>
-                <RoleSwitcher />
-                <NotificationBell />
                 <button
                   type="button"
                   onClick={() => {
@@ -117,44 +115,39 @@ export function Navbar() {
                 >
                   로그아웃
                 </button>
-                {showDashboard ? (
-                  <Link
-                    href="/my"
-                    className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-800 shadow-sm hover:shadow-md lg:h-10 lg:px-4 lg:text-sm"
-                  >
-                    마이페이지
-                  </Link>
-                ) : null}
+                <Link href="/my" className={accountButtonClass}>
+                  마이페이지
+                </Link>
               </>
             ) : (
-              <Link
-                href="/login"
-                className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-800 shadow-sm hover:shadow-md lg:h-10 lg:px-4 lg:text-sm"
-              >
+              <Link href="/login" className={accountButtonClass}>
                 로그인
               </Link>
             )}
-            <button
-              type="button"
-              disabled={!ready}
-              onClick={requestCreateAuction}
-              className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full bg-clink px-3 text-xs font-semibold text-white transition-colors hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300 lg:h-10 lg:px-4 lg:text-sm"
-            >
-              + 캠페인 등록
-            </button>
           </div>
         </nav>
 
         <div className="flex shrink-0 items-center gap-1.5 md:hidden">
-          <NotificationBell />
-          <button
-            type="button"
-            disabled={!ready}
-            onClick={requestCreateAuction}
-            className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:bg-stone-300"
-          >
-            + 캠페인 등록
-          </button>
+          {signedIn ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  void handleSignOut();
+                }}
+                className={navLinkClass}
+              >
+                로그아웃
+              </button>
+              <Link href="/my" className={accountButtonClass}>
+                마이페이지
+              </Link>
+            </>
+          ) : (
+            <Link href="/login" className={accountButtonClass}>
+              로그인
+            </Link>
+          )}
           <button
             type="button"
             className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-stone-800 hover:bg-white/80"
@@ -206,7 +199,7 @@ export function Navbar() {
           >
             이용안내
           </Link>
-          {showDashboard ? (
+          {signedIn ? (
             <Link
               href="/my"
               className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
@@ -224,21 +217,16 @@ export function Navbar() {
               관리자
             </Link>
           ) : null}
-          {ready && user ? (
-            <>
-              <div className="px-3 py-2">
-                <RoleSwitcher />
-              </div>
-              <button
-                type="button"
-                className="rounded-lg px-3 py-3 text-left text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
-                onClick={() => {
-                  void handleSignOut();
-                }}
-              >
-                로그아웃 ({memberRolesLabel(user)})
-              </button>
-            </>
+          {signedIn ? (
+            <button
+              type="button"
+              className="rounded-lg px-3 py-3 text-left text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
+              onClick={() => {
+                void handleSignOut();
+              }}
+            >
+              로그아웃
+            </button>
           ) : (
             <Link
               href="/login"
@@ -248,14 +236,6 @@ export function Navbar() {
               로그인
             </Link>
           )}
-          <button
-            type="button"
-            className="rounded-lg px-3 py-3 text-left text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white disabled:text-stone-400"
-            disabled={!ready}
-            onClick={requestCreateAuction}
-          >
-            캠페인 등록
-          </button>
         </nav>
       </div>
 
