@@ -13,7 +13,11 @@ import {
   type AdminBidLifecycle,
 } from '@/lib/admin-bid-status';
 import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
-import { DELETED_CAMPAIGN_LABEL } from '@/lib/admin-integrity';
+import { DELETED_CAMPAIGN_LABEL, DELETED_TIMESLOT_LABEL } from '@/lib/admin-integrity';
+import {
+  PAYOUT_DEAL_KIND_LABEL,
+  isCreatorProductAuction,
+} from '@/lib/timeslot-deal';
 import { creatorCombinedFeeAmount, floorToTenWon, platformNetFeeFromBid } from '@/lib/fees';
 import { cn, formatAdminTimestamp, formatWon } from '@/lib/utils';
 import type { BidAdminFilter, PayoutItem, ProfileItem } from '@/types/admin';
@@ -43,13 +47,18 @@ function bidView(
   const auction = auctionById.get(bid.auctionId);
   const lifecycle = resolveAdminBidStatus(bid, auction, payouts);
   const payout = payouts.find((item) => payoutLinkedToBid(item, bid, auction));
+  const timeslot = isCreatorProductAuction(auction);
   const profile =
     (bid.creatorId ? profileByKey.get(bid.creatorId) : undefined) ||
     profileByKey.get(bid.creatorName || '');
   return {
     lifecycle,
-    campaign: auction?.title || DELETED_CAMPAIGN_LABEL,
-    advertiser: auction?.authorName || '미상',
+    dealKind: (timeslot ? 'timeslot' : 'campaign') as 'campaign' | 'timeslot',
+    campaign:
+      auction?.title || (timeslot ? DELETED_TIMESLOT_LABEL : DELETED_CAMPAIGN_LABEL),
+    advertiser: timeslot
+      ? bid.bidderName || '미상'
+      : auction?.authorName || '미상',
     email: profile?.email || payout?.creatorEmail || '',
     account: payout?.bankAccount || '',
     creatorFee: floorToTenWon(creatorCombinedFeeAmount(bid.bidAmount)),
@@ -104,8 +113,14 @@ export function AdminBidTable({
         return true;
       }
       const name = (bid.creatorName || '').toLowerCase();
+      const bidder = (bid.bidderName || '').toLowerCase();
       const campaign = (auction?.title || '').toLowerCase();
-      return name.includes(keyword) || email.includes(keyword) || campaign.includes(keyword);
+      return (
+        name.includes(keyword) ||
+        bidder.includes(keyword) ||
+        email.includes(keyword) ||
+        campaign.includes(keyword)
+      );
     });
 
     return sortByAdminList(
@@ -123,23 +138,19 @@ export function AdminBidTable({
   const handleExport = () => {
     downloadCsv(
       `bids-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['크리에이터', '이메일', '계좌', '캠페인', '광고주', '상태', '제안가', '처리일시'],
+      ['크리에이터', '이메일', '계좌', '거래 유형', '캠페인/상품', '광고주', '상태', '제안가', '처리일시'],
       filtered.map((bid) => {
-        const auction = auctionById.get(bid.auctionId);
-        const lifecycle = resolveAdminBidStatus(bid, auction, payouts);
-        const payout = payouts.find((item) => payoutLinkedToBid(item, bid, auction));
-        const profile =
-          (bid.creatorId ? profileByKey.get(bid.creatorId) : undefined) ||
-          profileByKey.get(bid.creatorName || '');
+        const row = bidView(bid, auctionById, payouts, profileByKey);
         return [
           bid.creatorName,
-          profile?.email || payout?.creatorEmail || '',
-          payout?.bankAccount || '',
-          auction?.title || DELETED_CAMPAIGN_LABEL,
-          auction?.authorName || '',
-          ADMIN_BID_STATUS_LABEL[lifecycle],
+          row.email,
+          row.account,
+          PAYOUT_DEAL_KIND_LABEL[row.dealKind],
+          row.campaign,
+          row.advertiser,
+          ADMIN_BID_STATUS_LABEL[row.lifecycle],
           bid.bidAmount,
-          formatAdminTimestamp(payout?.paidAt || payout?.requestedAt || bid.createdAt),
+          row.processedAt,
         ];
       }),
     );
@@ -154,7 +165,7 @@ export function AdminBidTable({
       <AdminFilterBar
         query={query}
         onQueryChange={setQuery}
-        placeholder="크리에이터 이름, 이메일, 캠페인 제목 검색"
+        placeholder="크리에이터/광고주 이름, 이메일, 캠페인/상품 제목 검색"
         searchLabel="제안 검색"
         filters={FILTERS}
         filter={filter}
@@ -208,7 +219,12 @@ export function AdminBidTable({
                     {ADMIN_BID_STATUS_LABEL[row.lifecycle]}
                   </span>
                 </div>
-                <p className="mt-2 break-words text-sm text-zinc-700">{row.campaign}</p>
+                <p className="mt-2 break-words text-sm text-zinc-700">
+                  <span className="mr-1 inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600">
+                    {PAYOUT_DEAL_KIND_LABEL[row.dealKind]}
+                  </span>
+                  {row.campaign}
+                </p>
                 <p className="mt-1 break-words text-xs text-zinc-500">광고주 {row.advertiser}</p>
                 <dl className="mt-3 space-y-2 border-t border-zinc-100 pt-3 text-sm">
                   <div className="min-w-0">
@@ -267,7 +283,7 @@ export function AdminBidTable({
             <thead className="sticky top-0 z-10 border-b border-zinc-200 bg-zinc-50 text-xs text-zinc-500">
               <tr>
                 <th className="px-1 py-1.5 sm:px-2 font-medium">크리에이터</th>
-                <th className="px-1 py-1.5 sm:px-2 font-medium">캠페인</th>
+                <th className="px-1 py-1.5 sm:px-2 font-medium">캠페인/상품</th>
                 <th className="px-1 py-1.5 sm:px-2 font-medium">광고주</th>
                 <th className="px-1 py-1.5 sm:px-2 font-medium">제안 상태</th>
                 <th className="px-1 py-1.5 sm:px-2 font-medium">처리 일시</th>
@@ -300,6 +316,9 @@ export function AdminBidTable({
                       <AdminCopyText value={account} emptyLabel="계좌 미등록" className="mt-0.5 max-w-[120px]" />
                     </td>
                     <td className="min-w-0 max-w-[120px] overflow-hidden px-1 py-1.5 align-top text-ellipsis whitespace-nowrap text-zinc-600 sm:px-2">
+                      <span className="mb-0.5 block truncate text-[10px] font-semibold text-zinc-500">
+                        {PAYOUT_DEAL_KIND_LABEL[row.dealKind]}
+                      </span>
                       <span className="block min-w-0 max-w-[120px] truncate" title={campaign}>
                         {campaign}
                       </span>

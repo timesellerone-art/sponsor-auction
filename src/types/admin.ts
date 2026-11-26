@@ -63,6 +63,7 @@ export interface PayoutItem {
   businessRegistrationNumber?: string;
   businessVerificationStatus?: BusinessVerificationStatus;
   platformNetFee?: number;
+  dealKind?: 'campaign' | 'timeslot';
 }
 
 export type PayoutPeriodFilter = 'all' | 'today' | '7d' | 'month' | 'range';
@@ -74,3 +75,14 @@ export type ProfileAdminFilter = 'all' | 'active' | 'suspended';
 export type PayoutAdminFilter = 'all' | 'pending' | 'paid' | 'cancelled' | 'hold';
 
 export type BidAdminFilter = 'all' | 'pending' | 'awarded' | 'paid' | 'rejected';
+
+export type TimeslotAdminFilter =
+  | 'all'
+  | 'open'
+  | 'awarded'
+  | 'delivered'
+  | 'confirmed'
+  | 'closed'
+  | 'blind';
+
+export type PayoutDealKindFilter = 'all' | 'campaign' | 'timeslot';

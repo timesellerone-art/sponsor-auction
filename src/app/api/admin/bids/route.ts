@@ -8,6 +8,8 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { timeSlotBidToBidItem } from '@/lib/timeslot-deal';
+import { listTimeSlotBidsBySlotIds, listTimeSlots } from '@/lib/timeslots';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -36,8 +38,21 @@ export async function GET() {
       );
     }
 
-    const bids = await listBidsFromDatabase(client);
-    return NextResponse.json({ data: bids }, { headers: NO_STORE });
+    const [bids, slotResult] = await Promise.all([
+      listBidsFromDatabase(client),
+      listTimeSlots({ client, includeHidden: true }),
+    ]);
+    const slots = Array.isArray(slotResult.data) ? slotResult.data : [];
+    const slotBids = await listTimeSlotBidsBySlotIds(
+      slots.map((item) => item.id),
+      client,
+    );
+    const slotById = new Map(slots.map((item) => [item.id, item]));
+    const mappedSlotBids = (Array.isArray(slotBids.data) ? slotBids.data : []).flatMap((bid) => {
+      const slot = slotById.get(bid.timeSlotId);
+      return slot ? [timeSlotBidToBidItem(bid, slot)] : [];
+    });
+    return NextResponse.json({ data: [...bids, ...mappedSlotBids] }, { headers: NO_STORE });
   } catch (error) {
     rethrowPrerenderError(error);
     const message =

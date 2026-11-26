@@ -72,10 +72,15 @@ function formatHoldBreakdown(
   return `공급가액 ${won(quote.supply)}원(낙찰 ${won(quote.bid)}+수수료 ${won(quote.fee)}) · 부가세 ${won(quote.vat)}원 · 총 ${won(quote.amount)}원`;
 }
 
-export function campaignHoldDescription(input: { title?: string | null; bidAmount: number }) {
+export function campaignHoldDescription(input: {
+  title?: string | null;
+  bidAmount: number;
+  kind?: 'campaign' | 'timeslot';
+}) {
   const quote = campaignHoldQuote(input.bidAmount);
-  const title = input.title?.trim() || '캠페인';
-  return `${title} 채택: ${formatHoldBreakdown(quote)}`;
+  const title = input.title?.trim() || (input.kind === 'timeslot' ? '크리에이터 상품' : '캠페인');
+  const kindLabel = input.kind === 'timeslot' ? '크리에이터 상품' : '캠페인';
+  return `${kindLabel} ${title} 채택: ${formatHoldBreakdown(quote)}`;
 }
 
 export function parseCampaignHoldBidAmount(description?: string | null) {
@@ -90,25 +95,41 @@ export function parseCampaignHoldBidAmount(description?: string | null) {
   return Number.isFinite(bid) && bid > 0 ? bid : null;
 }
 
+export function creditDealKindFromDescription(
+  description?: string | null,
+): 'campaign' | 'timeslot' | null {
+  const text = description ?? '';
+  if (text.includes('크리에이터 상품')) {
+    return 'timeslot';
+  }
+  if (text.includes('캠페인')) {
+    return 'campaign';
+  }
+  return null;
+}
+
 export function campaignHoldLedgerLabel(input: {
   type: 'HOLD' | 'RELEASE' | 'CHARGE' | 'REFUND';
   amount: number;
   description?: string | null;
 }) {
+  const dealKind = creditDealKindFromDescription(input.description);
+  const kind =
+    dealKind === 'timeslot' ? '크리에이터 상품 ' : dealKind === 'campaign' ? '오픈 캠페인 ' : '';
   if (input.type !== 'HOLD' && input.type !== 'RELEASE') {
-    return input.description?.trim() || '';
+    return `${kind}${input.description?.trim() || ''}`.trim();
   }
   const prefix = input.type === 'HOLD' ? '예치' : '예치 해제';
   const bid = parseCampaignHoldBidAmount(input.description);
   if (bid != null) {
     const quote = campaignHoldQuote(bid);
-    return `${prefix}: ${formatHoldBreakdown(quote, { locale: true })}`;
+    return `${kind}${prefix}: ${formatHoldBreakdown(quote, { locale: true })}`.trim();
   }
   const fromText = input.description?.trim() || '';
   if (fromText && !/부가세\s*(?:10%\s*)?0원/.test(fromText)) {
     return fromText;
   }
-  return `${prefix}: 총 ${Math.round(input.amount).toLocaleString('ko-KR')}원`;
+  return `${kind}${prefix}: 총 ${Math.round(input.amount).toLocaleString('ko-KR')}원`.trim();
 }
 
 export function holdRestorePlan(rows: CreditLedgerSnap[], referenceId: string) {
@@ -146,6 +167,7 @@ export async function holdCampaignCredit(
     referenceId: string;
     bidAmount: number;
     title?: string | null;
+    kind?: 'campaign' | 'timeslot';
   },
 ): Promise<CampaignHoldResult> {
   const userId = input.userId.trim();
@@ -191,7 +213,11 @@ export async function holdCampaignCredit(
     amount: quote.amount,
     type: 'HOLD',
     referenceId,
-    description: campaignHoldDescription({ title: input.title, bidAmount: quote.bid }),
+    description: campaignHoldDescription({
+      title: input.title,
+      bidAmount: quote.bid,
+      kind: input.kind,
+    }),
   });
   if (held.ok) {
     console.info('[SponsorAuction] 캠페인 크레딧 차감', {
@@ -456,6 +482,7 @@ async function holdTimeslotPayment(
     referenceId: campaignPayReference(input.orderId),
     bidAmount,
     title: slotResult.data.title,
+    kind: 'timeslot',
   });
 }
 

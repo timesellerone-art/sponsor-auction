@@ -129,6 +129,7 @@ export type Database = {
           deadline: string;
           status: 'open' | 'closed' | 'awarded';
           winner_bid_id: string | null;
+          is_blind: boolean;
           delivery_url: string | null;
           delivered_at: string | null;
           purchase_confirmed_at: string | null;
@@ -158,6 +159,7 @@ export type Database = {
           deadline: string;
           status?: 'open' | 'closed' | 'awarded';
           winner_bid_id?: string | null;
+          is_blind?: boolean;
           delivery_url?: string | null;
           delivered_at?: string | null;
           purchase_confirmed_at?: string | null;
@@ -175,6 +177,7 @@ export type Database = {
           deadline?: string;
           status?: 'open' | 'closed' | 'awarded';
           winner_bid_id?: string | null;
+          is_blind?: boolean;
           delivery_url?: string | null;
           delivered_at?: string | null;
           purchase_confirmed_at?: string | null;

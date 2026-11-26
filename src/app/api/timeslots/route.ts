@@ -46,6 +46,7 @@ export async function GET(request: Request) {
     const result = await listTimeSlots({
       creatorId: mine ? actor?.userId : undefined,
       client: await timeslotWriter(),
+      includeHidden: mine,
     });
     if (result.error) {
       return NextResponse.json(

@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { CreditLedgerEntry } from '@/components/CreditLedgerEntry';
-import { campaignHoldLedgerLabel } from '@/lib/campaign-credit';
+import {
+  campaignHoldLedgerLabel,
+  creditDealKindFromDescription,
+} from '@/lib/campaign-credit';
+import { PAYOUT_DEAL_KIND_LABEL } from '@/lib/timeslot-deal';
 import { authRequestInit } from '@/lib/auth-request';
 import { formatDateTime, formatWon } from '@/lib/utils';
 
@@ -110,7 +114,8 @@ export function AdminCreditLedger() {
     <div className="rounded-2xl border border-zinc-200 bg-white p-4">
       <h2 className="text-base font-bold text-zinc-950">크레딧 원장</h2>
       <p className="mt-1 text-sm text-zinc-500">
-        이메일 또는 회원 ID로 최근 100건을 보고, 환불·지급·차감을 원장에 남깁니다.
+        이메일 또는 회원 ID로 최근 100건을 보고, 오픈 캠페인·크리에이터 상품 예치·환불을 포함해
+        환불·지급·차감을 원장에 남깁니다.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <input
@@ -160,8 +165,9 @@ export function AdminCreditLedger() {
       {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
       <ul className="mt-3 flex flex-col gap-3 pb-24 md:hidden">
         {rows.map((row) => {
+          const dealKind = creditDealKindFromDescription(row.description);
           const breakdown =
-            row.type === 'HOLD' || row.type === 'RELEASE'
+            row.type === 'HOLD' || row.type === 'RELEASE' || row.type === 'REFUND'
               ? campaignHoldLedgerLabel({
                   type: row.type,
                   amount: row.amount,
@@ -172,13 +178,16 @@ export function AdminCreditLedger() {
             row.type === 'CHARGE'
               ? '충전'
               : row.type === 'HOLD'
-                ? '이용'
+                ? '예치'
                 : row.type === 'RELEASE'
-                  ? '해제'
+                  ? '예치 해제'
                   : '환불';
           return (
             <li key={row.id} className="rounded-2xl border border-zinc-200 p-3">
-              <p className="text-sm font-semibold text-zinc-950">{typeLabel}</p>
+              <p className="text-sm font-semibold text-zinc-950">
+                {dealKind ? `${PAYOUT_DEAL_KIND_LABEL[dealKind]} · ` : ''}
+                {typeLabel}
+              </p>
               <dl className="mt-2 space-y-2 text-sm">
                 <div>
                   <dt className="text-[11px] font-medium text-zinc-500">금액</dt>

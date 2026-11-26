@@ -9,6 +9,7 @@ import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminPayoutTable } from '@/components/admin/AdminPayoutTable';
 import { AdminStats } from '@/components/admin/AdminStats';
 import { AdminCreditLedger } from '@/components/admin/AdminCreditLedger';
+import { AdminTimeslotTable } from '@/components/admin/AdminTimeslotTable';
 import { AdminUserTable } from '@/components/admin/AdminUserTable';
 import { showToast } from '@/components/Toast';
 import { authRequestInit } from '@/lib/auth-request';
@@ -19,13 +20,17 @@ import {
   approvePayout,
   getAdminAuctions,
   getAdminBids,
+  getAdminTimeslots,
   getPayouts,
   getProfiles,
+  patchAdminTimeslot,
   savePayoutMemo,
   updateProfileStatus,
 } from '@/lib/admin';
 import { applyAdminPayoutIntegrity } from '@/lib/admin-integrity';
 import { applyHoldPayoutLocal, applyPaidPayoutLocal, payoutsMatch } from '@/lib/payouts';
+import { canForceCloseTimeslot } from '@/lib/timeslot-admin';
+import { isCreatorProductAuction, timeSlotToAuctionItem } from '@/lib/timeslot-deal';
 import { VALIDATION } from '@/lib/validation';
 import {
   UPDATE_FAIL_MESSAGE,
@@ -37,8 +42,9 @@ import type { PayoutItem, ProfileItem } from '@/types/admin';
 import { isAdmin, isAdvertiser, isCreator } from '@/types/auth';
 import type { AuctionItem, BidItem } from '@/types/auction';
 import type { ComplianceLog } from '@/types/compliance';
+import { isTimeSlotOpen, type TimeSlotItem } from '@/types/timeslot';
 
-type TabId = 'auctions' | 'users' | 'payouts' | 'bids' | 'compliance' | 'credits';
+type TabId = 'auctions' | 'timeslots' | 'users' | 'payouts' | 'bids' | 'compliance' | 'credits';
 
 function asAuctionList(value: unknown): AuctionItem[] {
   if (!Array.isArray(value)) {
@@ -80,20 +86,36 @@ function asPayoutList(value: unknown): PayoutItem[] {
   });
 }
 
+function asTimeSlotList(value: unknown): TimeSlotItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is TimeSlotItem => {
+    return Boolean(item && typeof item === 'object' && 'id' in item && 'title' in item);
+  });
+}
+
+function asCampaignList(value: unknown): AuctionItem[] {
+  return asAuctionList(value).filter((item) => !isCreatorProductAuction(item));
+}
+
 export function AdminDashboard({
   initialPayouts = [],
   initialBids = [],
   initialProfiles = [],
   initialAuctions = [],
+  initialTimeslots = [],
 }: {
   initialPayouts?: PayoutItem[];
   initialBids?: BidItem[];
   initialProfiles?: ProfileItem[];
   initialAuctions?: AuctionItem[];
+  initialTimeslots?: TimeSlotItem[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<TabId>('auctions');
-  const [auctions, setAuctions] = useState<AuctionItem[]>(() => asAuctionList(initialAuctions));
+  const [auctions, setAuctions] = useState<AuctionItem[]>(() => asCampaignList(initialAuctions));
+  const [timeslots, setTimeslots] = useState<TimeSlotItem[]>(() => asTimeSlotList(initialTimeslots));
   const [bids, setBids] = useState<BidItem[]>(() => asBidList(initialBids));
   const [profiles, setProfiles] = useState<ProfileItem[]>(() =>
     asProfileList(initialProfiles),
@@ -139,9 +161,10 @@ export function AdminDashboard({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [auctionResult, bidResult, profileResult, payoutResult, complianceResponse] =
+      const [auctionResult, timeslotResult, bidResult, profileResult, payoutResult, complianceResponse] =
         await Promise.all([
-          getAdminAuctions(asAuctionList(initialAuctions)),
+          getAdminAuctions(asCampaignList(initialAuctions)),
+          getAdminTimeslots(asTimeSlotList(initialTimeslots)),
           getAdminBids(asBidList(initialBids)),
           getProfiles(),
           getPayouts(asPayoutList(initialPayouts)),
@@ -149,9 +172,14 @@ export function AdminDashboard({
         ]);
 
       setAuctions(
-        asAuctionList(auctionResult.data).length > 0
-          ? asAuctionList(auctionResult.data)
-          : asAuctionList(initialAuctions),
+        asCampaignList(auctionResult.data).length > 0
+          ? asCampaignList(auctionResult.data)
+          : asCampaignList(initialAuctions),
+      );
+      setTimeslots(
+        asTimeSlotList(timeslotResult.data).length > 0
+          ? asTimeSlotList(timeslotResult.data)
+          : asTimeSlotList(initialTimeslots),
       );
       setBids(asBidList(bidResult.data));
       const nextProfiles = asProfileList(profileResult.data);
@@ -166,13 +194,15 @@ export function AdminDashboard({
 
       const firstError =
         (auctionResult.data.length === 0 ? auctionResult.error : null) ||
+        (timeslotResult.data.length === 0 ? timeslotResult.error : null) ||
         (profileResult.data.length === 0 ? profileResult.error : null) ||
         (payoutResult.data.length === 0 ? payoutResult.error : null) ||
         (bidResult.data.length === 0 ? bidResult.error : null);
       setLoadError(firstError);
     } catch (error) {
       console.warn('[SponsorAuction] 관리자 데이터를 불러오지 못했습니다.', error);
-      setAuctions(asAuctionList(initialAuctions));
+      setAuctions(asCampaignList(initialAuctions));
+      setTimeslots(asTimeSlotList(initialTimeslots));
       setBids(asBidList(initialBids));
       setProfiles(asProfileList(initialProfiles));
       setPayouts(asPayoutList(initialPayouts));
@@ -182,15 +212,23 @@ export function AdminDashboard({
     } finally {
       setLoading(false);
     }
-  }, [initialAuctions, initialBids, initialPayouts, initialProfiles]);
+  }, [initialAuctions, initialBids, initialPayouts, initialProfiles, initialTimeslots]);
 
   const refreshAuctions = useCallback(async () => {
-    const result = await getAdminAuctions(asAuctionList(initialAuctions));
-    const next = asAuctionList(result.data);
+    const result = await getAdminAuctions(asCampaignList(initialAuctions));
+    const next = asCampaignList(result.data);
     if (next.length > 0 || !result.error) {
       setAuctions(next);
     }
   }, [initialAuctions]);
+
+  const refreshTimeslots = useCallback(async () => {
+    const result = await getAdminTimeslots(asTimeSlotList(initialTimeslots));
+    const next = asTimeSlotList(result.data);
+    if (next.length > 0 || !result.error) {
+      setTimeslots(next);
+    }
+  }, [initialTimeslots]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -199,26 +237,41 @@ export function AdminDashboard({
     const onChanged = () => {
       void refreshAuctions();
     };
+    const onTimeslotsChanged = () => {
+      void refreshTimeslots();
+    };
     window.addEventListener('auctions:changed', onChanged);
+    window.addEventListener('timeslots:changed', onTimeslotsChanged);
     return () => {
       window.clearTimeout(timer);
       window.removeEventListener('auctions:changed', onChanged);
+      window.removeEventListener('timeslots:changed', onTimeslotsChanged);
     };
-  }, [load, refreshAuctions]);
+  }, [load, refreshAuctions, refreshTimeslots]);
+
+  const campaignAuctions = useMemo(() => asCampaignList(auctions), [auctions]);
+  const dealAuctions = useMemo(
+    () => [
+      ...campaignAuctions,
+      ...asTimeSlotList(timeslots).map((slot) => timeSlotToAuctionItem(slot)),
+    ],
+    [campaignAuctions, timeslots],
+  );
 
   const reconciledPayouts = useMemo(
     () =>
       applyAdminPayoutIntegrity(
         asPayoutList(payouts),
-        asAuctionList(auctions),
+        dealAuctions,
         asBidList(bids),
         asProfileList(profiles),
       ),
-    [auctions, bids, payouts, profiles],
+    [bids, dealAuctions, payouts, profiles],
   );
 
   const stats = useMemo(() => {
-    const safeAuctions = asAuctionList(auctions);
+    const safeAuctions = campaignAuctions;
+    const safeSlots = asTimeSlotList(timeslots);
     const safeProfiles = asProfileList(profiles);
     const members = safeProfiles.filter((item) => !isAdmin(item));
 
@@ -227,11 +280,16 @@ export function AdminDashboard({
       activeAuctionCount: safeAuctions.filter(
         (item) => item.status === 'active' && !item.isBlind,
       ).length,
+      timeslotCount: safeSlots.length,
+      activeTimeslotCount: safeSlots.filter(
+        (item) => isTimeSlotOpen(item) && !item.isBlind,
+      ).length,
       advertiserCount: members.filter((item) => isAdvertiser(item)).length,
       creatorCount: members.filter((item) => isCreator(item)).length,
       blindedCount: safeAuctions.filter((item) => item.isBlind).length,
+      timeslotBlindedCount: safeSlots.filter((item) => item.isBlind).length,
     };
-  }, [auctions, profiles]);
+  }, [campaignAuctions, profiles, timeslots]);
 
   const handleBlind = async (auction: AuctionItem) => {
     if (!auction?.id) {
@@ -378,6 +436,95 @@ export function AdminDashboard({
       } catch {
         showToast(UPDATE_FAIL_MESSAGE);
       }
+    });
+  };
+
+  const handleTimeslotBlind = async (slot: TimeSlotItem) => {
+    if (!slot?.id) {
+      return;
+    }
+    if (isBusy) {
+      showToast(VALIDATION.actionInFlight);
+      return;
+    }
+    const latest = timeslots.find((item) => item.id === slot.id) ?? slot;
+    if (latest.isBlind) {
+      showToast(VALIDATION.blindAlready);
+      return;
+    }
+    const confirmed = window.confirm(`"${slot.title || '제목 없음'}"을 숨김 처리할까요?`);
+    if (!confirmed) {
+      return;
+    }
+    await run(slot.id, async () => {
+      const result = await patchAdminTimeslot(slot.id, { isBlind: true });
+      if (result.error || !result.data) {
+        showToast(result.error ?? ADMIN_UPDATE_FAIL_MESSAGE);
+        return;
+      }
+      showToast('숨김 처리했습니다.', 'success');
+      await load();
+      window.dispatchEvent(new Event('timeslots:changed'));
+    });
+  };
+
+  const handleTimeslotUnblind = async (slot: TimeSlotItem) => {
+    if (!slot?.id) {
+      return;
+    }
+    if (isBusy) {
+      showToast(VALIDATION.actionInFlight);
+      return;
+    }
+    const latest = timeslots.find((item) => item.id === slot.id) ?? slot;
+    if (!latest.isBlind) {
+      showToast(VALIDATION.unblindAlready);
+      return;
+    }
+    const confirmed = window.confirm(`"${slot.title || '제목 없음'}"의 숨김을 해제할까요?`);
+    if (!confirmed) {
+      return;
+    }
+    await run(slot.id, async () => {
+      const result = await patchAdminTimeslot(slot.id, { isBlind: false });
+      if (result.error || !result.data) {
+        showToast(result.error ?? ADMIN_UPDATE_FAIL_MESSAGE);
+        return;
+      }
+      showToast('숨김을 해제했습니다.', 'success');
+      await load();
+      window.dispatchEvent(new Event('timeslots:changed'));
+    });
+  };
+
+  const handleTimeslotClose = async (slot: TimeSlotItem) => {
+    if (!slot?.id) {
+      return;
+    }
+    if (isBusy) {
+      showToast(VALIDATION.actionInFlight);
+      return;
+    }
+    const latest = timeslots.find((item) => item.id === slot.id) ?? slot;
+    if (!canForceCloseTimeslot(latest)) {
+      showToast('낙찰된 상품은 마감할 수 없습니다. 숨김 처리를 이용해 주세요.');
+      return;
+    }
+    const confirmed = window.confirm(
+      `"${slot.title || '제목 없음'}"을 강제 마감할까요? 미선정 제안의 예치 크레딧은 복구됩니다.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+    await run(slot.id, async () => {
+      const result = await patchAdminTimeslot(slot.id, { status: 'closed' });
+      if (result.error || !result.data) {
+        showToast(result.error ?? ADMIN_UPDATE_FAIL_MESSAGE);
+        return;
+      }
+      showToast('강제 마감했습니다.', 'success');
+      await load();
+      window.dispatchEvent(new Event('timeslots:changed'));
     });
   };
 
@@ -642,6 +789,7 @@ export function AdminDashboard({
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'auctions', label: '캠페인 관리' },
+    { id: 'timeslots', label: '크리에이터 상품' },
     { id: 'users', label: '회원 관리' },
     { id: 'payouts', label: '정산 관리' },
     { id: 'bids', label: '제안 관리' },
@@ -657,14 +805,14 @@ export function AdminDashboard({
             관리자 대시보드
           </h1>
           <p className="mt-1 text-sm text-zinc-500">
-            캠페인, 회원, 정산, 우회 시도를 한곳에서 모니터링하고 처리할 수 있습니다. 캠페인
-            1건은 크리에이터(개인 또는 팀) 1곳과 1:1로 매칭되며 계약·정산 주체는 대표 계정입니다.
+            오픈 캠페인과 크리에이터 상품, 회원, 정산, 우회 시도를 한곳에서 모니터링하고 처리할 수
+            있습니다. 거래 1건은 크리에이터 1곳과 1:1로 매칭되며 계약·정산 주체는 대표 계정입니다.
           </p>
         </div>
 
         {loading ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
+            {Array.from({ length: 5 }).map((_, index) => (
               <div
                 key={index}
                 className="h-28 animate-pulse rounded-2xl bg-white"
@@ -675,9 +823,12 @@ export function AdminDashboard({
           <AdminStats
             auctionCount={stats.auctionCount}
             activeAuctionCount={stats.activeAuctionCount}
+            timeslotCount={stats.timeslotCount}
+            activeTimeslotCount={stats.activeTimeslotCount}
             advertiserCount={stats.advertiserCount}
             creatorCount={stats.creatorCount}
             blindedCount={stats.blindedCount}
+            timeslotBlindedCount={stats.timeslotBlindedCount}
           />
         )}
 
@@ -702,16 +853,28 @@ export function AdminDashboard({
         {loading ? (
           <div className="h-64 w-full min-w-0 animate-pulse rounded-2xl bg-white" />
         ) : tab === 'auctions' ? (
-          asAuctionList(auctions).length === 0 ? (
+          campaignAuctions.length === 0 ? (
             <AdminEmptyState message={loadError ?? undefined} />
           ) : (
             <AdminAuctionTable
-              auctions={asAuctionList(auctions)}
+              auctions={campaignAuctions}
               profiles={asProfileList(profiles)}
               busyId={busyId}
               onBlind={handleBlind}
               onUnblind={handleUnblind}
               onDelete={handleDelete}
+            />
+          )
+        ) : tab === 'timeslots' ? (
+          asTimeSlotList(timeslots).length === 0 ? (
+            <AdminEmptyState message={loadError ?? '등록된 크리에이터 상품이 없습니다.'} />
+          ) : (
+            <AdminTimeslotTable
+              timeslots={asTimeSlotList(timeslots)}
+              busyId={busyId}
+              onBlind={handleTimeslotBlind}
+              onUnblind={handleTimeslotUnblind}
+              onClose={handleTimeslotClose}
             />
           )
         ) : tab === 'users' ? (
@@ -751,7 +914,7 @@ export function AdminDashboard({
         ) : (
           <AdminBidTable
             bids={asBidList(bids)}
-            auctions={asAuctionList(auctions)}
+            auctions={dealAuctions}
             payouts={reconciledPayouts}
             profiles={asProfileList(profiles)}
           />

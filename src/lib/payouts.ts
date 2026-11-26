@@ -428,6 +428,8 @@ type AuctionLookup = {
   winner_bid_id: string | null;
   updated_at: string | null;
   created_at: string | null;
+  category?: string | null;
+  dealKind?: 'campaign' | 'timeslot';
 };
 
 async function loadByIds<T extends { id: string }>(
@@ -498,6 +500,8 @@ async function loadTimeslotPayoutLookup(
       winner_bid_id: slot.winner_bid_id,
       updated_at: slot.created_at,
       created_at: slot.created_at,
+      category: 'creator_product',
+      dealKind: 'timeslot',
     },
     bid: {
       id: slotBid.id,
@@ -508,6 +512,108 @@ async function loadTimeslotPayoutLookup(
       status: slot.winner_bid_id === slotBid.id ? 'selected' : 'pending',
     },
   };
+}
+
+type TimeslotPayoutRow = {
+  id: string;
+  title: string | null;
+  status: string | null;
+  winner_bid_id: string | null;
+  created_at: string | null;
+  creator_id: string | null;
+  creator_name: string | null;
+};
+
+function timeslotRowToAuctionLookup(slot: TimeslotPayoutRow): AuctionLookup {
+  return {
+    id: slot.id,
+    title: slot.title ?? '',
+    status: slot.status === 'awarded' || slot.winner_bid_id ? 'closed' : slot.status === 'closed' ? 'cancelled' : 'open',
+    winner_bid_id: slot.winner_bid_id,
+    updated_at: slot.created_at,
+    created_at: slot.created_at,
+    category: 'creator_product',
+    dealKind: 'timeslot',
+  };
+}
+
+async function loadTimeslotPayoutLookups(
+  client: SponsorAuctionClient,
+  extraIds: string[],
+): Promise<{ auctions: AuctionLookup[]; bids: BidLookup[] }> {
+  const extra = uuidIds(extraIds);
+  const awarded = await client
+    .from('time_slots')
+    .select('id, title, status, winner_bid_id, created_at, creator_id, creator_name')
+    .not('winner_bid_id', 'is', null);
+  if (awarded.error && isSchemaMismatch(awarded.error)) {
+    return { auctions: [], bids: [] };
+  }
+  const extras =
+    extra.length > 0
+      ? await client
+          .from('time_slots')
+          .select('id, title, status, winner_bid_id, created_at, creator_id, creator_name')
+          .in('id', extra)
+      : { data: [] as TimeslotPayoutRow[], error: null };
+  const slots = new Map<string, TimeslotPayoutRow>();
+  for (const row of [
+    ...((awarded.error ? [] : awarded.data) ?? []),
+    ...((extras.error ? [] : extras.data) ?? []),
+  ] as TimeslotPayoutRow[]) {
+    if (row?.id) {
+      slots.set(row.id, row);
+    }
+  }
+  if (slots.size === 0) {
+    return { auctions: [], bids: [] };
+  }
+  const slotList = [...slots.values()];
+  const winnerIds = uuidIds(slotList.map((item) => item.winner_bid_id ?? ''));
+  const slotIds = uuidIds(slotList.map((item) => item.id));
+  const bidResult =
+    winnerIds.length > 0 || slotIds.length > 0
+      ? await client
+          .from('time_slot_bids')
+          .select('id, time_slot_id, advertiser_id, advertiser_name, bid_amount')
+          .in(winnerIds.length > 0 ? 'id' : 'time_slot_id', winnerIds.length > 0 ? winnerIds : slotIds)
+      : { data: [] as Array<{
+          id: string;
+          time_slot_id: string;
+          advertiser_id: string | null;
+          advertiser_name: string | null;
+          bid_amount: number | null;
+        }>, error: null };
+  if (bidResult.error && isSchemaMismatch(bidResult.error)) {
+    return { auctions: slotList.map(timeslotRowToAuctionLookup), bids: [] };
+  }
+  const auctions = slotList.map(timeslotRowToAuctionLookup);
+  const bids: BidLookup[] = ((bidResult.error ? [] : bidResult.data) ?? []).flatMap((row) => {
+    const slot = slots.get(row.time_slot_id);
+    if (!slot) {
+      return [];
+    }
+    return [
+      {
+        id: row.id,
+        auction_id: slot.id,
+        creator_id: slot.creator_id,
+        creator_name: slot.creator_name ?? '',
+        bid_amount: row.bid_amount ?? 0,
+        status: slot.winner_bid_id === row.id ? 'selected' : 'pending',
+      },
+    ];
+  });
+  return { auctions, bids };
+}
+
+function stampPayoutDealKinds(payouts: PayoutItem[], timeslotIds: Set<string>): PayoutItem[] {
+  return payouts.map((item) => ({
+    ...item,
+    dealKind:
+      item.dealKind ??
+      (item.auctionId && timeslotIds.has(item.auctionId) ? 'timeslot' : 'campaign'),
+  }));
 }
 
 type CreatorPayoutProfile = {
@@ -827,7 +933,7 @@ export async function listPayoutsFromDatabase(
     }
   });
 
-  const [bids, auctions, extraBids] = await Promise.all([
+  const [bids, auctions, extraBids, timeslotLookups] = await Promise.all([
     loadBidsForPayout(client, bidIds),
     loadByIds<AuctionLookup>(
       client,
@@ -836,11 +942,18 @@ export async function listPayoutsFromDatabase(
       auctionIds,
     ),
     loadBidsForPayout(client, completedAuctions.map((item) => item.winner_bid_id ?? '')),
+    loadTimeslotPayoutLookups(client, auctionIds),
   ]);
 
-  const bidMap = new Map([...bids, ...extraBids].map((item) => [item.id, item]));
+  const bidMap = new Map(
+    [...bids, ...extraBids, ...timeslotLookups.bids].map((item) => [item.id, item]),
+  );
   const auctionMap = new Map(
-    [...auctions, ...completedAuctions].map((item) => [item.id, item]),
+    [...auctions, ...completedAuctions, ...timeslotLookups.auctions].map((item) => [item.id, item]),
+  );
+  const timeslotIds = new Set(timeslotLookups.auctions.map((item) => item.id));
+  const completedTimeslots = timeslotLookups.auctions.filter(
+    (item) => item.dealKind === 'timeslot' && item.winner_bid_id,
   );
   const creatorIds = [
     ...[...bidMap.values()].map((item) => item.creator_id),
@@ -901,7 +1014,10 @@ export async function listPayoutsFromDatabase(
         orderId: payment.orderId,
         auctionId: payment.auctionId,
         bidId: payment.bidId,
-        auctionTitle: auction?.title || payment.orderName || '캠페인',
+        auctionTitle:
+          auction?.title ||
+          payment.orderName ||
+          (timeslotIds.has(payment.auctionId) ? '크리에이터 상품' : '캠페인'),
         creatorId: bid?.creator_id ?? null,
         creatorName: profile?.name || bid?.creator_name || '이름 없음',
         creatorEmail: profile?.email || '',
@@ -941,6 +1057,33 @@ export async function listPayoutsFromDatabase(
     );
   }
 
+  for (const auction of completedTimeslots) {
+    const bid =
+      (auction.winner_bid_id ? bidMap.get(auction.winner_bid_id) : undefined) ??
+      [...bidMap.values()].find(
+        (item) => item.auction_id === auction.id && item.status === 'selected',
+      );
+    if (!bid) {
+      continue;
+    }
+    const profile = bid.creator_id ? profileMap.get(bid.creator_id) : undefined;
+    consider(
+      buildInsert({
+        auctionId: auction.id,
+        bidId: bid.id,
+        auctionTitle: auction.title || '크리에이터 상품',
+        creatorId: bid.creator_id,
+        creatorName: profile?.name || bid.creator_name,
+        creatorEmail: profile?.email || '',
+        amount: payoutRequestAmount(bid.bid_amount, 0, profile),
+        requestedAt: auction.updated_at || auction.created_at || new Date().toISOString(),
+        bid,
+        profile,
+      }),
+      `auction:${auction.id}`,
+    );
+  }
+
   if (pendingInserts.length > 0) {
     const withOrder = pendingInserts.filter((row) => row.payment_order_id);
     const withoutOrder = pendingInserts.filter((row) => !row.payment_order_id);
@@ -962,7 +1105,10 @@ export async function listPayoutsFromDatabase(
     try {
       const latest = await selectPayouts(client);
       return applyAdminPayoutIntegrity(
-        overlayDbPayoutStatus(latest, mergePayoutLists(latest, virtual)),
+        stampPayoutDealKinds(
+          overlayDbPayoutStatus(latest, mergePayoutLists(latest, virtual)),
+          timeslotIds,
+        ),
         [...auctionMap.values()],
         [...bidMap.values()].map((item) => ({
           id: item.id,
@@ -974,7 +1120,10 @@ export async function listPayoutsFromDatabase(
       );
     } catch {
       return applyAdminPayoutIntegrity(
-        overlayDbPayoutStatus(existing, mergePayoutLists(existing, virtual)),
+        stampPayoutDealKinds(
+          overlayDbPayoutStatus(existing, mergePayoutLists(existing, virtual)),
+          timeslotIds,
+        ),
         [...auctionMap.values()],
         [...bidMap.values()].map((item) => ({
           id: item.id,
@@ -988,7 +1137,10 @@ export async function listPayoutsFromDatabase(
   }
 
   return applyAdminPayoutIntegrity(
-    overlayDbPayoutStatus(existing, mergePayoutLists(existing, virtual)),
+    stampPayoutDealKinds(
+      overlayDbPayoutStatus(existing, mergePayoutLists(existing, virtual)),
+      timeslotIds,
+    ),
     [...auctionMap.values()],
     [...bidMap.values()].map((item) => ({
       id: item.id,

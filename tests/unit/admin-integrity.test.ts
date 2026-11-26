@@ -83,5 +83,31 @@ describe('관리자 정산 정합성', () => {
   it('없는 캠페인은 삭제된 캠페인으로 표기한다', () => {
     const [row] = applyAdminPayoutIntegrity([basePayout], []);
     assert.equal(row.auctionTitle, DELETED_CAMPAIGN_LABEL);
+    assert.equal(row.dealKind, 'campaign');
+  });
+
+  it('크리에이터 상품 정산은 오픈 캠페인과 구분해 유지한다', () => {
+    const [row] = applyAdminPayoutIntegrity(
+      [
+        {
+          ...basePayout,
+          id: 'payout-slot-1',
+          auctionId: 'slot-001',
+          auctionTitle: '쇼츠 15초 상품',
+          dealKind: 'timeslot',
+        },
+      ],
+      [
+        {
+          ...auction('closed'),
+          id: 'slot-001',
+          title: '쇼츠 15초 상품',
+          category: 'creator_product',
+        },
+      ],
+    );
+    assert.equal(row.dealKind, 'timeslot');
+    assert.equal(row.auctionTitle, '쇼츠 15초 상품');
+    assert.equal(row.status, 'pending');
   });
 });

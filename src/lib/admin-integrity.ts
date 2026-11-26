@@ -8,8 +8,12 @@ import type { PayoutItem } from '@/types/admin';
 import type { AuctionItem, BidItem } from '@/types/auction';
 
 export const DELETED_CAMPAIGN_LABEL = '(삭제된 캠페인)';
+export const DELETED_TIMESLOT_LABEL = '(삭제된 크리에이터 상품)';
 
-type AuctionRef = Pick<AuctionItem, 'id' | 'title'> & { status?: string | null };
+type AuctionRef = Pick<AuctionItem, 'id' | 'title'> & {
+  status?: string | null;
+  category?: string | null;
+};
 type BidRef = Pick<BidItem, 'id' | 'auctionId' | 'bidAmount' | 'status'>;
 type ProfileTaxRef = {
   id: string;
@@ -72,6 +76,10 @@ export function campaignTitleForAdmin(
   return fallback || DELETED_CAMPAIGN_LABEL;
 }
 
+function deletedDealLabel(dealKind?: 'campaign' | 'timeslot' | null) {
+  return dealKind === 'timeslot' ? DELETED_TIMESLOT_LABEL : DELETED_CAMPAIGN_LABEL;
+}
+
 export function enrichPayoutAmounts(
   item: PayoutItem,
   bids: BidRef[] = [],
@@ -119,11 +127,14 @@ export function applyAdminPayoutIntegrity(
     const auction = item.auctionId ? auctionsMap.get(item.auctionId) : undefined;
     const cancelled = auction?.status === 'cancelled';
     const missingCampaign = Boolean(item.auctionId) && !auction;
+    const dealKind =
+      item.dealKind ?? (auction?.category === 'creator_product' ? 'timeslot' : 'campaign');
 
     return {
       ...enriched,
+      dealKind,
       auctionTitle: missingCampaign
-        ? DELETED_CAMPAIGN_LABEL
+        ? deletedDealLabel(dealKind)
         : campaignTitleForAdmin(auction, item.auctionId, item.auctionTitle),
       amount: cancelled
         ? enriched.netPayoutAmount || enriched.amount

@@ -9,6 +9,25 @@ import {
 
 export type { DealKind };
 
+export const PAYOUT_DEAL_KIND_LABEL: Record<'campaign' | 'timeslot', string> = {
+  campaign: '오픈 캠페인',
+  timeslot: '크리에이터 상품',
+};
+
+export function isCreatorProductAuction(auction?: { category?: string | null } | null) {
+  return auction?.category === 'creator_product';
+}
+
+export function resolvePayoutDealKind(
+  payout: { dealKind?: 'campaign' | 'timeslot'; auctionId?: string | null },
+  auction?: { category?: string | null } | null,
+): 'campaign' | 'timeslot' {
+  if (payout.dealKind === 'timeslot' || payout.dealKind === 'campaign') {
+    return payout.dealKind;
+  }
+  return isCreatorProductAuction(auction) ? 'timeslot' : 'campaign';
+}
+
 export function timeSlotAuctionStatus(slot: TimeSlotItem): AuctionStatus {
   if (slot.status === 'awarded' || slot.winnerBidId) {
     return 'closed';
@@ -31,7 +50,7 @@ export function timeSlotToAuctionItem(
     budget: slot.startingPrice,
     description: slot.description,
     status: timeSlotAuctionStatus(slot),
-    isBlind: false,
+    isBlind: Boolean(slot.isBlind),
     authorId: author?.authorId ?? slot.creatorId,
     authorName: author?.authorName?.trim() || slot.creatorName || '미상',
     winnerBidId: slot.winnerBidId,
@@ -60,6 +79,8 @@ export function timeSlotBidToBidItem(
     proposalText: bid.message,
     status: selected ? 'selected' : 'pending',
     createdAt: bid.createdAt,
+    bidderId: bid.advertiserId,
+    bidderName: bid.advertiserName,
   };
 }
 

@@ -917,6 +917,7 @@ create table if not exists public.time_slots (
   deadline timestamptz not null,
   status public.time_slot_status not null default 'open',
   winner_bid_id uuid,
+  is_blind boolean not null default false,
   delivery_url text,
   delivered_at timestamptz,
   purchase_confirmed_at timestamptz,

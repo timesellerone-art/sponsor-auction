@@ -7,13 +7,14 @@ export const instant = false;
 
 async function AdminDashboardGate() {
   await connection();
-  const { payouts, bids, profiles, auctions } = await getAdminBoardFromDatabase();
+  const { payouts, bids, profiles, auctions, timeslots } = await getAdminBoardFromDatabase();
   return (
     <AdminDashboard
       initialPayouts={payouts}
       initialBids={bids}
       initialProfiles={profiles}
       initialAuctions={auctions}
+      initialTimeslots={timeslots}
     />
   );
 }

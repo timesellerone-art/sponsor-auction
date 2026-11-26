@@ -79,6 +79,7 @@ function mapSlot(row: Partial<SlotRow> & Pick<SlotRow, 'id'>): TimeSlotItem {
     deadline: row.deadline ?? '',
     status: (row.status ?? 'open') as TimeSlotStatus,
     winnerBidId: row.winner_bid_id ?? null,
+    isBlind: Boolean(row.is_blind),
     deliveryUrl: row.delivery_url ?? null,
     deliveredAt: row.delivered_at ?? null,
     purchaseConfirmedAt: row.purchase_confirmed_at ?? null,
@@ -270,14 +271,21 @@ async function attachFulfillment(
     return slots;
   }
   try {
-    const { data, error } = await supabase
+    const full = await supabase
       .from('time_slots')
-      .select('id, delivery_url, delivered_at, purchase_confirmed_at')
+      .select('id, delivery_url, delivered_at, purchase_confirmed_at, is_blind')
       .in('id', ids);
-    if (error || !data) {
+    const result =
+      full.error && isSchemaMismatch(full.error)
+        ? await supabase
+            .from('time_slots')
+            .select('id, delivery_url, delivered_at, purchase_confirmed_at')
+            .in('id', ids)
+        : full;
+    if (result.error || !result.data) {
       return slots;
     }
-    const extra = new Map(data.map((row) => [row.id, row]));
+    const extra = new Map(result.data.map((row) => [row.id, row]));
     return slots.map((item) => {
       const row = extra.get(item.id);
       if (!row) {
@@ -285,6 +293,7 @@ async function attachFulfillment(
       }
       return {
         ...item,
+        isBlind: 'is_blind' in row ? Boolean(row.is_blind) : item.isBlind,
         deliveryUrl: row.delivery_url ?? null,
         deliveredAt: row.delivered_at ?? null,
         purchaseConfirmedAt: row.purchase_confirmed_at ?? null,
@@ -317,6 +326,7 @@ export function partitionTimeSlots(slots: TimeSlotItem[]) {
 export async function listTimeSlots(options?: {
   creatorId?: string;
   client?: SponsorAuctionClient | null;
+  includeHidden?: boolean;
 }): Promise<DataResult<TimeSlotItem[]>> {
   const creatorId = options?.creatorId?.trim() || undefined;
   if (creatorId && !isUuid(creatorId)) {
@@ -325,7 +335,8 @@ export async function listTimeSlots(options?: {
 
   const supabase = await getTimeslotReadClient(options?.client);
   if (!supabase) {
-    return ok(await withScores(mockSlotList(creatorId)));
+    const mock = await withScores(mockSlotList(creatorId));
+    return ok(options?.includeHidden ? mock : mock.filter((item) => !item.isBlind));
   }
 
   try {
@@ -343,9 +354,10 @@ export async function listTimeSlots(options?: {
       console.warn('[SponsorAuction] 크리에이터 상품 목록 조회 실패', error.message);
       return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');
     }
-    return ok(
-      await withScores(await attachFulfillment(supabase, (data ?? []).map((row) => mapSlot(row)))),
+    const mapped = await withScores(
+      await attachFulfillment(supabase, (data ?? []).map((row) => mapSlot(row))),
     );
+    return ok(options?.includeHidden ? mapped : mapped.filter((item) => !item.isBlind));
   } catch {
     return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');
   }
@@ -539,6 +551,9 @@ export async function closeTimeSlot(
   if (creatorId && current.data.creatorId && current.data.creatorId !== creatorId) {
     return fail(null, '본인 상품만 마감할 수 있습니다.');
   }
+  if (current.data.status === 'awarded' || current.data.winnerBidId) {
+    return fail(null, '낙찰된 상품은 마감할 수 없습니다. 숨김 처리를 이용해 주세요.');
+  }
   const supabase = client ?? (await getDataClient());
   if (!supabase || !isUuid(slotId)) {
     slotsStore = slotsStore.map((item) =>
@@ -563,6 +578,46 @@ export async function closeTimeSlot(
   }
 }
 
+export async function setTimeSlotBlind(
+  id: string,
+  isBlind: boolean,
+  client?: SponsorAuctionClient | null,
+): Promise<DataResult<TimeSlotItem | null>> {
+  const slotId = normalizeSlotId(id);
+  const current = await getTimeSlotById(slotId, client);
+  if (!current.data) {
+    return fail(null, current.error ?? '크리에이터 상품을 찾을 수 없습니다.');
+  }
+  const supabase = client ?? (await getDataClient());
+  if (!supabase || !isUuid(slotId)) {
+    slotsStore = slotsStore.map((item) =>
+      item.id === slotId ? { ...item, isBlind } : item,
+    );
+    persistSlots();
+    return getTimeSlotById(slotId, client);
+  }
+  try {
+    const { data, error } = await supabase
+      .from('time_slots')
+      .update({ is_blind: isBlind })
+      .eq('id', slotId)
+      .select(SLOT_COLUMNS)
+      .maybeSingle();
+    if (error) {
+      if (isSchemaMismatch(error)) {
+        return fail(null, '숨김 처리 컬럼이 없습니다. 마이그레이션을 적용해 주세요.');
+      }
+      return fail(null, UPDATE_FAIL_MESSAGE);
+    }
+    if (!data) {
+      return fail(null, UPDATE_FAIL_MESSAGE);
+    }
+    return ok({ ...mapSlot(data), isBlind });
+  } catch {
+    return fail(null, UPDATE_FAIL_MESSAGE);
+  }
+}
+
 export async function placeTimeSlotBid(
   input: PlaceTimeSlotBidInput,
   client?: SponsorAuctionClient | null,
@@ -576,6 +631,9 @@ export async function placeTimeSlotBid(
       return fail(null, slotResult.error ?? '크리에이터 상품을 찾을 수 없습니다.');
     }
     const live = applySlotExpiry(slot);
+    if (live.isBlind) {
+      return fail(null, '숨김 처리된 상품에는 제안할 수 없습니다.');
+    }
     if (live.status !== 'open' || live.winnerBidId) {
       return fail(null, '마감된 상품에는 제안할 수 없습니다.');
     }

@@ -529,13 +529,17 @@ export async function getCreatorDashboard(
 
     const auctions = Array.isArray(auctionResult.data) ? auctionResult.data : [];
     const auctionById = new Map(auctions.map((item) => [item.id, item]));
-    const payouts = applyAdminPayoutIntegrity(rawPayouts, auctions, [
-      ...bids,
-      ...slotBids.flatMap((bid) => {
-        const slot = slots.find((item) => item.id === bid.timeSlotId);
-        return slot ? [timeSlotBidToBidItem(bid, slot)] : [];
-      }),
-    ]);
+    const payouts = applyAdminPayoutIntegrity(
+      rawPayouts,
+      [...auctions, ...slots.map((slot) => timeSlotToAuctionItem(slot))],
+      [
+        ...bids,
+        ...slotBids.flatMap((bid) => {
+          const slot = slots.find((item) => item.id === bid.timeSlotId);
+          return slot ? [timeSlotBidToBidItem(bid, slot)] : [];
+        }),
+      ],
+    );
 
     const deals: CreatorDeal[] = bids.map((bid) =>
       toCreatorDeal(bid, auctionById.get(bid.auctionId) ?? null, payouts),

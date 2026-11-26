@@ -52,6 +52,8 @@ export interface BidItem {
   accountHolder?: string | null;
   creatorRating?: number;
   creatorCompletionRate?: number;
+  bidderId?: string | null;
+  bidderName?: string | null;
 }
 
 export type CreateAuctionInput = Omit<

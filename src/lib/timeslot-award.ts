@@ -154,7 +154,7 @@ export async function awardTimeslotWithCredit(
           orderId: campaignAwardOrderId(slotId, item.id),
           auctionId: slotId,
           bidId: item.id,
-          reason: '미선정 제안 크레딧 복구',
+          reason: '크리에이터 상품 미선정 제안 크레딧 복구',
         }),
       ),
   );

@@ -24,6 +24,7 @@ import type {
 } from '@/types/admin';
 import { isAuthProfileRole, parseAuthRoles, primaryAuthRole } from '@/types/auth';
 import type { AuctionItem, BidItem, DataResult } from '@/types/auction';
+import type { TimeSlotItem } from '@/types/timeslot';
 
 export const ADMIN_UPDATE_FAIL_MESSAGE =
   '변경에 실패했습니다. 다시 시도해 주세요.';
@@ -182,7 +183,7 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
   return ok(fromDb);
 }
 
-async function parseAdminJson(response: Response, method: 'GET' | 'POST') {
+async function parseAdminJson(response: Response, method: 'GET' | 'POST' | 'PATCH') {
   const payload = (await response.json().catch(() => null)) as {
     data?: unknown;
     error?: string;
@@ -262,6 +263,75 @@ export async function getAdminAuctions(
   }
 
   return fail([], '등록된 캠페인이 없습니다.');
+}
+
+function asTimeSlotItems(value: unknown): TimeSlotItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is TimeSlotItem => {
+    return Boolean(item && typeof item === 'object' && 'id' in item && 'title' in item);
+  });
+}
+
+export async function getAdminTimeslots(
+  seedFromServer: TimeSlotItem[] = [],
+): Promise<DataResult<TimeSlotItem[]>> {
+  let fromDb: TimeSlotItem[] = asTimeSlotItems(seedFromServer);
+  let apiOk = false;
+
+  try {
+    const response = await fetch('/api/admin/timeslots', {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-store' },
+    });
+    const payload = await parseAdminJson(response, 'GET');
+    if (response.ok && Array.isArray(payload?.data)) {
+      fromDb = asTimeSlotItems(payload.data);
+      apiOk = true;
+    } else if (!payload?.fallbackMock && response.status !== 409 && !response.ok && fromDb.length === 0) {
+      return fail(
+        [],
+        payload?.error || payload?.errorMessage || '크리에이터 상품 목록을 불러오지 못했습니다.',
+      );
+    }
+  } catch (error) {
+    console.warn('[SponsorAuction] 크리에이터 상품 API 목록 조회 실패', error);
+  }
+
+  if (apiOk || fromDb.length > 0) {
+    return ok(fromDb);
+  }
+
+  return fail([], '등록된 크리에이터 상품이 없습니다.');
+}
+
+export async function patchAdminTimeslot(
+  id: string,
+  body: { isBlind?: boolean; status?: 'closed' },
+): Promise<DataResult<TimeSlotItem | null>> {
+  return withExclusiveAction(`timeslot:${id}`, fail(null, VALIDATION.actionInFlight), async () => {
+    try {
+      const response = await fetch(
+        `/api/admin/timeslots/${encodeURIComponent(id)}`,
+        await authRequestInit({
+          method: 'PATCH',
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-store' },
+          body: JSON.stringify(body),
+        }),
+      );
+      const payload = await parseAdminJson(response, 'PATCH');
+      if (response.ok && payload?.data && typeof payload.data === 'object') {
+        return ok(payload.data as TimeSlotItem);
+      }
+      return fail(null, payload?.error || payload?.errorMessage || ADMIN_UPDATE_FAIL_MESSAGE);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : ADMIN_UPDATE_FAIL_MESSAGE;
+      return fail(null, message);
+    }
+  });
 }
 
 export async function getAdminBids(seedFromServer: BidItem[] = []): Promise<DataResult<BidItem[]>> {

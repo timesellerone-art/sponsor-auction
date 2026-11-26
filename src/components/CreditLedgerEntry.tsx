@@ -1,7 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { campaignHoldLedgerLabel } from '@/lib/campaign-credit';
+import {
+  campaignHoldLedgerLabel,
+  creditDealKindFromDescription,
+} from '@/lib/campaign-credit';
+import { PAYOUT_DEAL_KIND_LABEL } from '@/lib/timeslot-deal';
 import { formatDateTime, formatWon } from '@/lib/utils';
 
 export type CreditLedgerEntryRow = {
@@ -22,6 +26,9 @@ const TYPE_LABEL: Record<CreditLedgerEntryRow['type'], string> = {
 
 export function CreditLedgerEntry({ row }: { row: CreditLedgerEntryRow }) {
   const [open, setOpen] = useState(false);
+  const dealKind = creditDealKindFromDescription(row.description);
+  const typeLabel =
+    row.type === 'HOLD' ? '예치' : row.type === 'RELEASE' ? '예치 해제' : TYPE_LABEL[row.type];
   const breakdown =
     row.type === 'HOLD' || row.type === 'RELEASE'
       ? campaignHoldLedgerLabel({
@@ -29,7 +36,13 @@ export function CreditLedgerEntry({ row }: { row: CreditLedgerEntryRow }) {
           amount: row.amount,
           description: row.description,
         })
-      : '';
+      : row.type === 'REFUND'
+        ? campaignHoldLedgerLabel({
+            type: row.type,
+            amount: row.amount,
+            description: row.description,
+          })
+        : '';
   const memo = row.description?.trim() || '';
   const extraMemo = memo && memo !== breakdown ? memo : '';
   const hasDetail = Boolean(breakdown || extraMemo || row.reference_id);
@@ -38,7 +51,8 @@ export function CreditLedgerEntry({ row }: { row: CreditLedgerEntryRow }) {
     <li className="py-1.5">
       <div className="flex items-baseline justify-between gap-2">
         <p className="min-w-0 truncate text-sm font-semibold text-zinc-950">
-          {TYPE_LABEL[row.type]} {formatWon(row.amount)} · 잔액 {formatWon(row.balance_after)}
+          {dealKind ? `${PAYOUT_DEAL_KIND_LABEL[dealKind]} · ` : ''}
+          {typeLabel} {formatWon(row.amount)} · 잔액 {formatWon(row.balance_after)}
         </p>
         {hasDetail ? (
           <button

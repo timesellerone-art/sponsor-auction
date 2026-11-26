@@ -1,21 +1,27 @@
-import { EyeOff, Gavel, PlayCircle, Users } from 'lucide-react';
+import { EyeOff, Gavel, Package, PlayCircle, Users } from 'lucide-react';
 
 const numberFormatter = new Intl.NumberFormat('ko-KR');
 
 type AdminStatsProps = {
   auctionCount: number;
   activeAuctionCount: number;
+  timeslotCount?: number;
+  activeTimeslotCount?: number;
   advertiserCount: number;
   creatorCount: number;
   blindedCount: number;
+  timeslotBlindedCount?: number;
 };
 
 export function AdminStats({
   auctionCount,
   activeAuctionCount,
+  timeslotCount = 0,
+  activeTimeslotCount = 0,
   advertiserCount,
   creatorCount,
   blindedCount,
+  timeslotBlindedCount = 0,
 }: AdminStatsProps) {
   const memberTotal = advertiserCount + creatorCount;
   const cards = [
@@ -26,9 +32,15 @@ export function AdminStats({
       icon: Gavel,
     },
     {
+      label: '총 크리에이터 상품 수',
+      value: numberFormatter.format(timeslotCount),
+      hint: `진행 중 ${numberFormatter.format(activeTimeslotCount)}건`,
+      icon: Package,
+    },
+    {
       label: '진행 중인 캠페인 수',
       value: numberFormatter.format(activeAuctionCount),
-      hint: '블라인드되지 않은 진행중 캠페인',
+      hint: '숨김 처리되지 않은 진행중 캠페인',
       icon: PlayCircle,
     },
     {
@@ -38,9 +50,9 @@ export function AdminStats({
       icon: Users,
     },
     {
-      label: '블라인드 처리된 게시글 수',
-      value: numberFormatter.format(blindedCount),
-      hint: '관리자가 숨김 처리한 캠페인',
+      label: '숨김 처리된 게시글 수',
+      value: numberFormatter.format(blindedCount + timeslotBlindedCount),
+      hint: `캠페인 ${numberFormatter.format(blindedCount)} / 크리에이터 상품 ${numberFormatter.format(timeslotBlindedCount)}`,
       icon: EyeOff,
     },
   ];

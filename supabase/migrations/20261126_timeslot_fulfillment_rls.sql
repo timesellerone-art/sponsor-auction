@@ -3,7 +3,8 @@
 alter table public.time_slots
   add column if not exists delivery_url text,
   add column if not exists delivered_at timestamptz,
-  add column if not exists purchase_confirmed_at timestamptz;
+  add column if not exists purchase_confirmed_at timestamptz,
+  add column if not exists is_blind boolean not null default false;
 
 alter table public.time_slots enable row level security;
 alter table public.time_slot_bids enable row level security;

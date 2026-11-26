@@ -20,8 +20,10 @@ import { formatSettlementAccount } from '@/lib/settlement-account';
 import { WITHHOLDING_PERCENT } from '@/lib/fee-policy';
 import { applyPaidPayoutLocal } from '@/lib/payouts';
 import { formatAdminTimestamp, formatWon } from '@/lib/utils';
+import { PAYOUT_DEAL_KIND_LABEL, resolvePayoutDealKind } from '@/lib/timeslot-deal';
 import type {
   PayoutAdminFilter,
+  PayoutDealKindFilter,
   PayoutItem,
   PayoutPeriodFilter,
   PayoutStatus,
@@ -48,6 +50,12 @@ const PERIODS: { id: PayoutPeriodFilter; label: string }[] = [
   { id: '7d', label: '최근 7일' },
   { id: 'month', label: '이번 달' },
   { id: 'range', label: '날짜 범위' },
+];
+
+const DEAL_KIND_FILTERS: { id: PayoutDealKindFilter; label: string }[] = [
+  { id: 'all', label: '전체 거래' },
+  { id: 'campaign', label: '오픈 캠페인' },
+  { id: 'timeslot', label: '크리에이터 상품' },
 ];
 
 function payoutStatusClass(status: PayoutStatus) {
@@ -158,6 +166,7 @@ export function AdminPayoutTable({
 }: AdminPayoutTableProps) {
   const router = useRouter();
   const [period, setPeriod] = useState<PayoutPeriodFilter>('all');
+  const [dealKindFilter, setDealKindFilter] = useState<PayoutDealKindFilter>('all');
   const [statusFilter, setStatusFilter] = useState<PayoutAdminFilter>('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<AdminListSort>('newest');
@@ -201,6 +210,9 @@ export function AdminPayoutTable({
       if (statusFilter !== 'all' && item.status !== statusFilter) {
         return false;
       }
+      if (dealKindFilter !== 'all' && resolvePayoutDealKind(item) !== dealKindFilter) {
+        return false;
+      }
       if (!keyword) {
         return true;
       }
@@ -222,7 +234,7 @@ export function AdminPayoutTable({
       (item) => item.paidAt || item.requestedAt,
       (item) => item.amount,
     );
-  }, [period, query, rangeFrom, rangeTo, rows, sort, statusFilter]);
+  }, [dealKindFilter, period, query, rangeFrom, rangeTo, rows, sort, statusFilter]);
 
   const stats = useMemo(() => summarizePayouts(filtered), [filtered]);
   const pendingVisible = filtered.filter((item) => item.status === 'pending');
@@ -351,7 +363,7 @@ export function AdminPayoutTable({
         <AdminFilterBar
           query={query}
           onQueryChange={setQuery}
-          placeholder="크리에이터 이름, 이메일, 캠페인 제목 검색"
+          placeholder="크리에이터 이름, 이메일, 캠페인/상품 제목 검색"
           searchLabel="정산 검색"
           filters={STATUS_FILTERS}
           filter={statusFilter}
@@ -382,6 +394,22 @@ export function AdminPayoutTable({
           }
           extra={
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="flex min-w-0 gap-1 overflow-x-auto rounded-full bg-zinc-100 p-1">
+                {DEAL_KIND_FILTERS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setDealKindFilter(item.id)}
+                    className={
+                      dealKindFilter === item.id
+                        ? 'h-8 shrink-0 rounded-full bg-white px-3 text-xs font-semibold text-zinc-950 shadow-sm'
+                        : 'h-8 shrink-0 rounded-full px-3 text-xs font-semibold text-zinc-500'
+                    }
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
               <div className="flex min-w-0 gap-1 overflow-x-auto rounded-full bg-zinc-100 p-1">
                 {PERIODS.map((item) => (
                   <button
@@ -489,6 +517,9 @@ export function AdminPayoutTable({
                   </span>
                 </div>
                 <p className="mt-2 break-words text-sm text-zinc-700">
+                  <span className="mr-1 inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-semibold text-zinc-600">
+                    {PAYOUT_DEAL_KIND_LABEL[resolvePayoutDealKind(row)]}
+                  </span>
                   {row.auctionTitle || '(삭제된 캠페인)'}
                 </p>
                 <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
@@ -613,7 +644,7 @@ export function AdminPayoutTable({
                     />
                   </th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">크리에이터</th>
-                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">캠페인</th>
+                  <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">거래</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">처리 일시</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">낙찰 금액</th>
                   <th className="overflow-hidden px-1 py-1.5 sm:px-2 font-medium">부가세</th>
@@ -687,6 +718,9 @@ export function AdminPayoutTable({
                         data-col="campaign"
                         className="min-w-0 max-w-[120px] overflow-hidden px-1 py-1.5 sm:px-2 align-top text-zinc-600"
                       >
+                        <span className="mb-0.5 block truncate text-[10px] font-semibold text-zinc-500">
+                          {PAYOUT_DEAL_KIND_LABEL[resolvePayoutDealKind(row)]}
+                        </span>
                         <span
                           className="block min-w-0 max-w-[120px] truncate"
                           title={row.auctionTitle || '(삭제된 캠페인)'}
