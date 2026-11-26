@@ -7,6 +7,7 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { timeslotIdFromParam, timeslotWriter } from '@/lib/timeslot-http';
 import { awardTimeslotWithCredit } from '@/lib/timeslot-award';
 import { awardTimeSlotBid, getTimeSlotById } from '@/lib/timeslots';
 import { isUuid } from '@/lib/uuid';
@@ -38,18 +39,30 @@ export async function POST(
       return forbiddenJson('상품 낙찰은 크리에이터만 할 수 있습니다.');
     }
     const { id } = await context.params;
-    const slot = await getTimeSlotById(id);
-    const ownerId = slot.data?.creatorId;
-    if (ownerId && isUuid(ownerId) && ownerId !== actor.userId) {
+    const slotId = timeslotIdFromParam(id);
+    const writer = await timeslotWriter();
+    const slot = await getTimeSlotById(slotId, writer);
+    if (!slot.data) {
+      return NextResponse.json(
+        {
+          error: slot.error ?? '크리에이터 상품을 찾을 수 없습니다.',
+          errorMessage: slot.error ?? '크리에이터 상품을 찾을 수 없습니다.',
+          errorCode: 'TIMESLOT_NOT_FOUND',
+        },
+        { status: 404, headers: NO_STORE },
+      );
+    }
+    const ownerId = slot.data.creatorId;
+    if (ownerId && isUuid(ownerId) && ownerId !== actor.userId && !hasAuthRole(actor, 'admin')) {
       return forbiddenJson('본인 상품만 낙찰할 수 있습니다.');
     }
-    if (ownerId && actor.userId && ownerId !== actor.userId) {
+    if (ownerId && actor.userId && ownerId !== actor.userId && !hasAuthRole(actor, 'admin')) {
       return forbiddenJson('본인 상품만 낙찰할 수 있습니다.');
     }
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const bidId = asText(body?.bidId);
 
-    if (isUuid(id) && isUuid(bidId)) {
+    if (isUuid(slot.data.id) && isUuid(bidId)) {
       const admin = createAdminClient();
       if (!admin) {
         return NextResponse.json(
@@ -61,7 +74,7 @@ export async function POST(
         );
       }
       const awarded = await awardTimeslotWithCredit(admin, {
-        slotId: id,
+        slotId: slot.data.id,
         bidId,
         actorUserId: actor.userId,
         actorIsAdmin: hasAuthRole(actor, 'admin'),
@@ -83,7 +96,7 @@ export async function POST(
       );
     }
 
-    const result = await awardTimeSlotBid(id, bidId, actor.userId);
+    const result = await awardTimeSlotBid(slot.data.id, bidId, actor.userId, writer);
     if (result.error || !result.data) {
       const message = result.error ?? '낙찰하지 못했습니다.';
       return NextResponse.json(

@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { useAuth } from '@/components/AuthProvider';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { CreditChargeModal } from '@/components/CreditChargeModal';
 import { CreatorRatingBadge } from '@/components/CreatorRatingBadge';
 import { TimeslotBidForm } from '@/components/TimeslotBidForm';
 import { showToast } from '@/components/Toast';
@@ -63,6 +64,9 @@ export function TimeslotDetail({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingBid, setPendingBid] = useState<TimeSlotBidItem | null>(null);
+  const [chargeNeeded, setChargeNeeded] = useState<number | null>(null);
+  const [deliveryUrl, setDeliveryUrl] = useState('');
+  const [fulfillBusy, setFulfillBusy] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) {
@@ -101,6 +105,14 @@ export function TimeslotDetail({ id }: { id: string }) {
       };
       const incoming = bidsFromApi ?? (Array.isArray(bidFallback?.data) ? bidFallback.data : []);
       setBids((current) => mergeTimeslotBids(silent ? current : [], incoming));
+      setDeliveryUrl((current) => {
+        const next = slotFromApi ?? slotFallback?.data ?? null;
+        const fromServer = next?.deliveryUrl?.trim() || '';
+        if (fromServer) {
+          return fromServer;
+        }
+        return silent ? current : '';
+      });
       setSlot((current) => {
         const next = slotResult.data;
         if (!next) {
@@ -157,6 +169,11 @@ export function TimeslotDetail({ id }: { id: string }) {
   const winnerBid = slot?.winnerBidId
     ? bids.find((item) => item.id === slot.winnerBidId) ?? null
     : null;
+  const isWinningAdvertiser = Boolean(
+    winnerBid && user?.id && winnerBid.advertiserId === user.id,
+  );
+  const delivered = Boolean(slot?.deliveredAt || slot?.deliveryUrl);
+  const purchaseConfirmed = Boolean(slot?.purchaseConfirmedAt);
   const holdQuote = pendingBid ? describeSettlementAmounts(pendingBid.bidAmount) : null;
   const awardedClosed = Boolean(slot && !slotOpen);
 
@@ -186,7 +203,7 @@ export function TimeslotDetail({ id }: { id: string }) {
     setBusyId(bid.id);
     try {
       const response = await fetch(
-        `/api/timeslots/${slot.id}/award`,
+        `/api/timeslots/${encodeURIComponent(slot.id)}/award`,
         await authRequestInit({
           method: 'POST',
           body: JSON.stringify({ bidId: bid.id }),
@@ -209,15 +226,85 @@ export function TimeslotDetail({ id }: { id: string }) {
       window.dispatchEvent(new Event('timeslots:changed'));
       window.dispatchEvent(new Event('auctions:changed'));
       window.dispatchEvent(new Event('payouts:changed'));
+      void load(true);
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const submitDelivery = async () => {
+    if (!slot || fulfillBusy) {
+      return;
+    }
+    setFulfillBusy(true);
+    try {
+      const response = await fetch(
+        `/api/timeslots/${encodeURIComponent(slot.id)}/deliver`,
+        await authRequestInit({
+          method: 'POST',
+          body: JSON.stringify({ deliveryUrl }),
+        }),
+      );
+      const payload = (await response.json().catch(() => null)) as {
+        data?: TimeSlotItem;
+        error?: string;
+        errorMessage?: string;
+      } | null;
+      if (!response.ok) {
+        showToast(payload?.errorMessage || payload?.error || '납품하지 못했습니다.');
+        return;
+      }
+      if (payload?.data) {
+        setSlot(payload.data);
+      }
+      showToast('결과물을 납품했습니다.', 'success');
+      window.dispatchEvent(new Event('timeslots:changed'));
+      window.dispatchEvent(new Event('payouts:changed'));
+      void load(true);
+    } finally {
+      setFulfillBusy(false);
+    }
+  };
+
+  const submitPurchaseConfirm = async () => {
+    if (!slot || fulfillBusy) {
+      return;
+    }
+    setFulfillBusy(true);
+    try {
+      const response = await fetch(
+        `/api/timeslots/${encodeURIComponent(slot.id)}/confirm`,
+        await authRequestInit({
+          method: 'POST',
+          body: JSON.stringify({}),
+        }),
+      );
+      const payload = (await response.json().catch(() => null)) as {
+        data?: TimeSlotItem;
+        error?: string;
+        errorMessage?: string;
+      } | null;
+      if (!response.ok) {
+        showToast(payload?.errorMessage || payload?.error || '구매 확정하지 못했습니다.');
+        return;
+      }
+      if (payload?.data) {
+        setSlot(payload.data);
+      }
+      showToast('구매를 확정했습니다. 정산이 생성되었습니다.', 'success');
+      window.dispatchEvent(new Event('timeslots:changed'));
+      window.dispatchEvent(new Event('auctions:changed'));
+      window.dispatchEvent(new Event('payouts:changed'));
+      void load(true);
+    } finally {
+      setFulfillBusy(false);
     }
   };
 
   return (
     <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10">
       <Link
-        href="/inventory"
+        href="/timeslots"
         className="inline-flex w-fit items-center gap-1 text-sm font-medium text-zinc-600 hover:text-zinc-950"
       >
         <ArrowLeft className="size-4" aria-hidden />
@@ -330,7 +417,11 @@ export function TimeslotDetail({ id }: { id: string }) {
                 </button>
               </div>
             ) : (
-              <TimeslotBidForm slot={slot} onSubmitted={handleBidSubmitted} />
+              <TimeslotBidForm
+                slot={slot}
+                onSubmitted={handleBidSubmitted}
+                onPrepaid={setChargeNeeded}
+              />
             )
           ) : null}
 
@@ -416,6 +507,85 @@ export function TimeslotDetail({ id }: { id: string }) {
               </ul>
             )}
           </section>
+          {awardedClosed && winnerBid ? (
+            <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
+              <h2 className="text-lg font-bold text-zinc-950">납품 · 구매 확정</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                선정된 크리에이터가 결과물 링크를 제출하면, 광고주가 구매 확정한 뒤 정산이 이어집니다.
+              </p>
+              {delivered ? (
+                <div className="mt-4 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-700">
+                  <p className="font-semibold">결과물 링크</p>
+                  <a
+                    href={slot.deliveryUrl || '#'}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 block break-all font-medium text-clink-accent hover:underline"
+                  >
+                    {slot.deliveryUrl}
+                  </a>
+                  {slot.deliveredAt ? (
+                    <p className="mt-1 text-xs text-zinc-400">
+                      납품 {formatDateTime(slot.deliveredAt)}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              {purchaseConfirmed ? (
+                <p className="mt-4 rounded-xl bg-clink-peach px-4 py-3 text-sm font-semibold text-clink">
+                  구매 확정 완료 · 정산이 생성되었습니다.
+                  {slot.purchaseConfirmedAt
+                    ? ` (${formatDateTime(slot.purchaseConfirmedAt)})`
+                    : ''}
+                </p>
+              ) : isOwner && !delivered ? (
+                <form
+                  className="mt-4 flex flex-col gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void submitDelivery();
+                  }}
+                >
+                  <label className="text-sm font-medium text-zinc-800" htmlFor="timeslot-delivery-url">
+                    결과물 링크
+                  </label>
+                  <input
+                    id="timeslot-delivery-url"
+                    value={deliveryUrl}
+                    onChange={(event) => setDeliveryUrl(event.target.value)}
+                    placeholder="https://"
+                    className="h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm"
+                  />
+                  <button
+                    type="submit"
+                    disabled={fulfillBusy}
+                    className="inline-flex h-11 items-center justify-center rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800 disabled:bg-zinc-300"
+                  >
+                    {fulfillBusy ? '납품 중...' : '제작 완료(납품)'}
+                  </button>
+                </form>
+              ) : isOwner && delivered ? (
+                <p className="mt-4 text-sm text-zinc-600">
+                  광고주의 구매 확정을 기다리고 있습니다.
+                </p>
+              ) : isWinningAdvertiser && delivered ? (
+                <button
+                  type="button"
+                  disabled={fulfillBusy}
+                  onClick={() => {
+                    void submitPurchaseConfirm();
+                  }}
+                  className="mt-4 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800 disabled:bg-zinc-300"
+                >
+                  {fulfillBusy ? '확정 중...' : '구매 확정'}
+                </button>
+              ) : isWinningAdvertiser ? (
+                <p className="mt-4 text-sm text-zinc-600">
+                  크리에이터가 결과물을 납품하면 구매 확정할 수 있습니다.
+                </p>
+              ) : null}
+            </section>
+          ) : null}
           <ConfirmModal
             open={Boolean(pendingBid) && slotOpen}
             title="이 제안을 낙찰할까요?"
@@ -466,6 +636,16 @@ export function TimeslotDetail({ id }: { id: string }) {
               </dl>
             ) : null}
           </ConfirmModal>
+          <CreditChargeModal
+            open={chargeNeeded != null}
+            neededAmount={chargeNeeded ?? 0}
+            hint={
+              chargeNeeded
+                ? `크리에이터 상품 선정 시 차감액(공급가액 + 부가세 10%)은 ${formatWon(chargeNeeded)}입니다. 충전 후 낙찰 때 예치됩니다.`
+                : undefined
+            }
+            onClose={() => setChargeNeeded(null)}
+          />
         </div>
       )}
     </div>

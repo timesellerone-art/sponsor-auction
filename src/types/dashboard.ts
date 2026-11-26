@@ -13,12 +13,19 @@ export type PaymentRecord = {
   confirmedAt: string | null;
 };
 
+export type TimeslotFulfillment = {
+  deliveryUrl: string | null;
+  deliveredAt: string | null;
+  purchaseConfirmedAt: string | null;
+};
+
 export type AdvertiserDeal = {
   auction: AuctionItem;
   bid: BidItem | null;
   bids: BidItem[];
   payment: PaymentRecord | null;
   kind?: DealKind;
+  fulfillment?: TimeslotFulfillment | null;
 };
 
 export type CreatorPayoutStatus = 'none' | 'pending' | 'hold' | 'paid';
@@ -30,4 +37,5 @@ export type CreatorDeal = {
   payout: PayoutItem | null;
   payoutStatus: CreatorPayoutStatus;
   kind?: DealKind;
+  fulfillment?: TimeslotFulfillment | null;
 };

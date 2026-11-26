@@ -129,6 +129,9 @@ export type Database = {
           deadline: string;
           status: 'open' | 'closed' | 'awarded';
           winner_bid_id: string | null;
+          delivery_url: string | null;
+          delivered_at: string | null;
+          purchase_confirmed_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -155,6 +158,9 @@ export type Database = {
           deadline: string;
           status?: 'open' | 'closed' | 'awarded';
           winner_bid_id?: string | null;
+          delivery_url?: string | null;
+          delivered_at?: string | null;
+          purchase_confirmed_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -169,6 +175,9 @@ export type Database = {
           deadline?: string;
           status?: 'open' | 'closed' | 'awarded';
           winner_bid_id?: string | null;
+          delivery_url?: string | null;
+          delivered_at?: string | null;
+          purchase_confirmed_at?: string | null;
         };
         Relationships: [];
       };

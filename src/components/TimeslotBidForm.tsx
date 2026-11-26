@@ -22,9 +22,11 @@ import { hasOffPlatformContact } from '@/utils/filter';
 export function TimeslotBidForm({
   slot,
   onSubmitted,
+  onPrepaid,
 }: {
   slot: TimeSlotItem;
   onSubmitted?: (bid?: TimeSlotBidItem | null) => void;
+  onPrepaid?: (neededAmount: number) => void;
 }) {
   const { user, activeRole } = useAuth();
   const { requireUser } = useRequireAuth();
@@ -63,72 +65,77 @@ export function TimeslotBidForm({
     return true;
   };
 
+  const submitProposal = async () => {
+    if (!requireUser('auth-required', `/timeslots/${slot.id}`) || !user) {
+      return false;
+    }
+    if (!ensureAdvertiser()) {
+      return false;
+    }
+    if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
+      setError(`제안가는 ${formatWon(minBid)} 이상이어야 합니다.`);
+      return false;
+    }
+    if (message.trim().length < MIN_PROPOSAL_LENGTH) {
+      setError(`콘텐츠/협찬 메시지는 ${MIN_PROPOSAL_LENGTH}자 이상 입력해 주세요.`);
+      return false;
+    }
+    if (hasOffPlatformContact(message)) {
+      setError(VALIDATION.offPlatformContact);
+      return false;
+    }
+
+    const payload = {
+      timeSlotId: slot.id,
+      advertiserId: user.id,
+      advertiserName: user.name,
+      bidAmount,
+      message: message.trim(),
+    };
+
+    let result: Awaited<ReturnType<typeof placeTimeSlotBid>>;
+    try {
+      const response = await fetch(
+        `/api/timeslots/${encodeURIComponent(slot.id)}/bids`,
+        await authRequestInit({
+          method: 'POST',
+          body: JSON.stringify({ ...payload, timeSlotId: slot.id }),
+        }),
+      );
+      const json = (await response.json().catch(() => null)) as {
+        data?: Awaited<ReturnType<typeof placeTimeSlotBid>>['data'];
+        error?: string;
+        errorMessage?: string;
+      } | null;
+      if (response.ok && json?.data) {
+        result = { data: json.data, error: null };
+      } else {
+        result = {
+          data: null,
+          error: json?.errorMessage ?? json?.error ?? '제안을 등록하지 못했습니다.',
+        };
+      }
+    } catch {
+      result = await placeTimeSlotBid(payload);
+    }
+
+    if (result.error) {
+      setError(result.error);
+      showToast(result.error);
+      return false;
+    }
+    showToast('제안을 등록했습니다.', 'success');
+    window.dispatchEvent(new Event('timeslots:changed'));
+    setMessage('');
+    setError(null);
+    onSubmitted?.(result.data);
+    return true;
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     await run('slot-bid', async () => {
-      if (!requireUser('auth-required', `/timeslots/${slot.id}`) || !user) {
-        return;
-      }
-      if (!ensureAdvertiser()) {
-        return;
-      }
-      if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
-        setError(`제안가는 ${formatWon(minBid)} 이상이어야 합니다.`);
-        return;
-      }
-      if (message.trim().length < MIN_PROPOSAL_LENGTH) {
-        setError(`콘텐츠/협찬 메시지는 ${MIN_PROPOSAL_LENGTH}자 이상 입력해 주세요.`);
-        return;
-      }
-      if (hasOffPlatformContact(message)) {
-        setError(VALIDATION.offPlatformContact);
-        return;
-      }
-
-      const payload = {
-        timeSlotId: slot.id,
-        advertiserId: user.id,
-        advertiserName: user.name,
-        bidAmount,
-        message: message.trim(),
-      };
-
-      let result: Awaited<ReturnType<typeof placeTimeSlotBid>>;
-      try {
-        const response = await fetch(
-          `/api/timeslots/${encodeURIComponent(slot.id)}/bids`,
-          await authRequestInit({
-            method: 'POST',
-            body: JSON.stringify({ ...payload, timeSlotId: slot.id }),
-          }),
-        );
-        const json = (await response.json().catch(() => null)) as {
-          data?: Awaited<ReturnType<typeof placeTimeSlotBid>>['data'];
-          error?: string;
-          errorMessage?: string;
-        } | null;
-        if (response.ok && json?.data) {
-          result = { data: json.data, error: null };
-        } else {
-          result = {
-            data: null,
-            error: json?.errorMessage ?? json?.error ?? '제안을 등록하지 못했습니다.',
-          };
-        }
-      } catch {
-        result = await placeTimeSlotBid(payload);
-      }
-
-      if (result.error) {
-        setError(result.error);
-        showToast(result.error);
-        return;
-      }
-      showToast('제안을 등록했습니다.', 'success');
-      window.dispatchEvent(new Event('timeslots:changed'));
-      setMessage('');
-      setError(null);
-      onSubmitted?.(result.data);
+      await submitProposal();
     });
   };
 
@@ -178,12 +185,20 @@ export function TimeslotBidForm({
       <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <button
           type="button"
+          disabled={isBusy}
           onClick={(event) => {
             event.preventDefault();
             if (!ensureAdvertiser()) {
               return;
             }
-            setChargeOpen(true);
+            if (onPrepaid) {
+              onPrepaid(quoteAmount);
+            } else {
+              setChargeOpen(true);
+            }
+            void run('slot-bid', async () => {
+              await submitProposal();
+            });
           }}
           className="inline-flex h-11 items-center justify-center rounded-full border border-zinc-300 bg-white text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
         >

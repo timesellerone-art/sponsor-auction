@@ -18,6 +18,9 @@ export type TimeSlotItem = {
   deadline: string;
   status: TimeSlotStatus;
   winnerBidId: string | null;
+  deliveryUrl?: string | null;
+  deliveredAt?: string | null;
+  purchaseConfirmedAt?: string | null;
   createdAt: string;
   creatorRating?: number;
   creatorCompletionRate?: number;

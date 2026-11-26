@@ -91,7 +91,7 @@ export function Navbar() {
           <Link href="/#auctions" className={navLinkClass}>
             오픈 캠페인
           </Link>
-          <Link href="/inventory" className={navLinkClass}>
+          <Link href="/timeslots" className={navLinkClass}>
             크리에이터 상품
           </Link>
           <Link href="/#guide" className={navLinkClass}>
@@ -186,7 +186,7 @@ export function Navbar() {
             오픈 캠페인 둘러보기
           </Link>
           <Link
-            href="/inventory"
+            href="/timeslots"
             className="rounded-lg px-3 py-3 text-sm font-medium whitespace-nowrap text-stone-800 hover:bg-white"
             onClick={() => setOpen(false)}
           >

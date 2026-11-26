@@ -146,6 +146,19 @@ export async function awardTimeslotWithCredit(
     awarded = applied.data;
   }
 
+  await Promise.all(
+    bids.data
+      .filter((item) => item.id !== bidId)
+      .map((item) =>
+        releaseCampaignPaymentIfOpen(admin, {
+          orderId: campaignAwardOrderId(slotId, item.id),
+          auctionId: slotId,
+          bidId: item.id,
+          reason: '미선정 제안 크레딧 복구',
+        }),
+      ),
+  );
+
   await upsertPaidPayout(admin, {
     orderId,
     auctionId: slotId,

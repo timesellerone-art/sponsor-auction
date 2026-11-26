@@ -917,6 +917,9 @@ create table if not exists public.time_slots (
   deadline timestamptz not null,
   status public.time_slot_status not null default 'open',
   winner_bid_id uuid,
+  delivery_url text,
+  delivered_at timestamptz,
+  purchase_confirmed_at timestamptz,
   created_at timestamptz not null default timezone('utc', now()),
   constraint time_slots_title_len check (char_length(trim(title)) >= 5),
   constraint time_slots_views_positive check (expected_views >= 1000),
@@ -941,6 +944,12 @@ drop policy if exists "time_slots_select_public" on public.time_slots;
 create policy "time_slots_select_public" on public.time_slots for select to anon, authenticated using (true);
 drop policy if exists "time_slots_insert_own" on public.time_slots;
 create policy "time_slots_insert_own" on public.time_slots for insert to authenticated with check (creator_id = auth.uid() or public.is_admin());
+drop policy if exists "time_slots_update_own" on public.time_slots;
+create policy "time_slots_update_own" on public.time_slots for update to authenticated using (creator_id = auth.uid() or public.is_admin()) with check (creator_id = auth.uid() or public.is_admin());
+drop policy if exists "time_slots_delete_own" on public.time_slots;
+create policy "time_slots_delete_own" on public.time_slots for delete to authenticated using (creator_id = auth.uid() or public.is_admin());
+drop policy if exists "time_slots_confirm_winner" on public.time_slots;
+create policy "time_slots_confirm_winner" on public.time_slots for update to authenticated using (winner_bid_id is not null and exists (select 1 from public.time_slot_bids b where b.id = time_slots.winner_bid_id and b.advertiser_id = auth.uid())) with check (winner_bid_id is not null and exists (select 1 from public.time_slot_bids b where b.id = time_slots.winner_bid_id and b.advertiser_id = auth.uid()));
 drop policy if exists "time_slot_bids_select_public" on public.time_slot_bids;
 create policy "time_slot_bids_select_public" on public.time_slot_bids for select to anon, authenticated using (true);
 drop policy if exists "time_slot_bids_insert_own" on public.time_slot_bids;

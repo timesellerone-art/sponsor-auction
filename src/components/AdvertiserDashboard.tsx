@@ -370,6 +370,25 @@ function PaidCampaignsPanel({ deals }: { deals: AdvertiserDeal[] }) {
               {auctionStatusLabel(deal.auction.status)}
             </span>
           </div>
+          {deal.kind === 'timeslot' ? (
+            <p className="mt-2 text-sm text-zinc-500">
+              {deal.fulfillment?.purchaseConfirmedAt
+                ? '구매 확정 · 정산 생성됨'
+                : deal.fulfillment?.deliveredAt || deal.fulfillment?.deliveryUrl
+                  ? '결과물 납품됨 · 구매 확정 필요'
+                  : '낙찰됨 · 크리에이터 납품 대기'}
+            </p>
+          ) : null}
+          {deal.kind === 'timeslot' &&
+          (deal.fulfillment?.deliveredAt || deal.fulfillment?.deliveryUrl) &&
+          !deal.fulfillment?.purchaseConfirmedAt ? (
+            <Link
+              href={dealDetailHref('timeslot', deal.auction.id)}
+              className="mt-3 inline-flex h-9 items-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800"
+            >
+              구매 확정하기
+            </Link>
+          ) : null}
           {deal.bid ? (
             <div className="mt-3">
               <FeeBreakdownCard role="advertiser" amount={deal.bid.bidAmount} />

@@ -40,6 +40,7 @@ export const VALIDATION = {
   selfCampaignBid: '본인이 등록한 캠페인에는 제안할 수 없습니다.',
   selfCampaignHint: '본인이 등록한 캠페인입니다',
   duplicateBid: '이미 이 캠페인에 제안을 제출했습니다.',
+  duplicateTimeslotBid: '이미 이 상품에 제안을 제출했습니다.',
   alreadyAwarded: '이미 매칭이 완료된 캠페인입니다.',
   alreadyProcessed: '이미 처리된 요청입니다.',
   actionInFlight: '이미 처리 중입니다. 잠시만 기다려 주세요.',

@@ -31,7 +31,16 @@ import {
   type DataResult,
 } from '@/types/auction';
 import type { SessionUser } from '@/types/auth';
-import type { AdvertiserDeal, CreatorDeal, PaymentRecord } from '@/types/dashboard';
+import type { AdvertiserDeal, CreatorDeal, PaymentRecord, TimeslotFulfillment } from '@/types/dashboard';
+import type { TimeSlotItem } from '@/types/timeslot';
+
+function fulfillmentFromSlot(slot: TimeSlotItem): TimeslotFulfillment {
+  return {
+    deliveryUrl: slot.deliveryUrl ?? null,
+    deliveredAt: slot.deliveredAt ?? null,
+    purchaseConfirmedAt: slot.purchaseConfirmedAt ?? null,
+  };
+}
 
 const PAYMENT_COLUMNS =
   'order_id, auction_id, bid_id, amount, status, order_name, confirmed_at';
@@ -267,10 +276,14 @@ async function loadAdvertiserTimeslotDeals(
     }
     return [timeSlotBidToBidItem(bid, slot)];
   });
-  return assembleAdvertiserDeals(auctions, mappedBids, livePayments).map((deal) => ({
-    ...deal,
-    kind: 'timeslot' as const,
-  }));
+  return assembleAdvertiserDeals(auctions, mappedBids, livePayments).map((deal) => {
+    const slot = slotById.get(deal.auction.id);
+    return {
+      ...deal,
+      kind: 'timeslot' as const,
+      fulfillment: slot ? fulfillmentFromSlot(slot) : null,
+    };
+  });
 }
 
 function toCreatorDeal(
@@ -278,6 +291,7 @@ function toCreatorDeal(
   auction: AuctionItem | null,
   payouts: PayoutItem[],
   kind?: AdvertiserDeal['kind'],
+  fulfillment?: TimeslotFulfillment | null,
 ): CreatorDeal {
   const won =
     bid.status === 'selected' || Boolean(auction && isBidSelected(bid, auction.winnerBidId));
@@ -300,6 +314,7 @@ function toCreatorDeal(
     payout,
     payoutStatus,
     kind,
+    fulfillment: fulfillment ?? null,
   };
 }
 
@@ -320,7 +335,7 @@ function assembleCreatorTimeslotDeals(
       authorName: winner.advertiserName,
     });
     const bid = timeSlotBidToBidItem(winner, slot);
-    return [toCreatorDeal(bid, auction, payouts, 'timeslot')];
+    return [toCreatorDeal(bid, auction, payouts, 'timeslot', fulfillmentFromSlot(slot))];
   });
 }
 
@@ -478,7 +493,23 @@ export async function getCreatorDashboard(
     });
     const bids = pickCreatorBids(Array.isArray(bidResult.data) ? bidResult.data : [], user);
     const slotResult = await listTimeSlots({ creatorId: user.id });
-    const slots = Array.isArray(slotResult.data) ? slotResult.data : [];
+    let slots = Array.isArray(slotResult.data) ? slotResult.data : [];
+    if (typeof window !== 'undefined') {
+      try {
+        const response = await fetch(
+          '/api/timeslots?mine=1',
+          await authRequestInit({ cache: 'no-store' }),
+        );
+        const payload = (await response.json().catch(() => null)) as {
+          data?: TimeSlotItem[];
+        } | null;
+        if (response.ok && Array.isArray(payload?.data)) {
+          slots = payload.data;
+        }
+      } catch {
+        // 로컬 조회 결과를 유지합니다.
+      }
+    }
     const slotBidResult = await listTimeSlotBidsBySlotIds(slots.map((item) => item.id));
     const slotBids = Array.isArray(slotBidResult.data) ? slotBidResult.data : [];
     const auctionIds = [

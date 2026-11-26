@@ -7,8 +7,7 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { recordBypassIfNeeded } from '@/lib/compliance';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient as createServerClient } from '@/lib/supabase/server';
+import { timeslotIdFromParam, timeslotWriter } from '@/lib/timeslot-http';
 import { getTimeSlotById, listTimeSlotBids, placeTimeSlotBid } from '@/lib/timeslots';
 import { hasAuthRole } from '@/types/auth';
 import { VALIDATION } from '@/lib/validation';
@@ -17,10 +16,6 @@ import { OffPlatformContactError, assertNoOffPlatformContact } from '@/utils/fil
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
 } as const;
-
-async function timeslotWriter() {
-  return createAdminClient() ?? (await createServerClient());
-}
 
 function asText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
@@ -37,14 +32,6 @@ function asNumber(value: unknown) {
   return NaN;
 }
 
-function slotIdFromParams(id: string) {
-  try {
-    return decodeURIComponent(id.trim());
-  } catch {
-    return id.trim();
-  }
-}
-
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
@@ -56,7 +43,7 @@ export async function GET(
       // 조회는 계속합니다.
     }
     const { id } = await context.params;
-    const slotId = slotIdFromParams(id);
+    const slotId = timeslotIdFromParam(id);
     const result = await listTimeSlotBids(slotId, await timeslotWriter());
     if (result.error) {
       return NextResponse.json(
@@ -91,7 +78,7 @@ export async function POST(
       return unauthorizedJson('제안하려면 로그인해 주세요.');
     }
     const { id } = await context.params;
-    const slotId = slotIdFromParams(id);
+    const slotId = timeslotIdFromParam(id);
     const writer = await timeslotWriter();
     const slot = await getTimeSlotById(slotId, writer);
     if (!slot.data) {
@@ -147,8 +134,13 @@ export async function POST(
     );
     if (result.error || !result.data) {
       const text = result.error ?? '제안을 등록하지 못했습니다.';
+      const duplicate = text === VALIDATION.duplicateTimeslotBid;
       return NextResponse.json(
-        { error: text, errorMessage: text },
+        {
+          error: text,
+          errorMessage: text,
+          ...(duplicate ? { errorCode: 'DUPLICATE_BID' } : {}),
+        },
         { status: 400, headers: NO_STORE },
       );
     }

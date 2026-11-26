@@ -7,15 +7,10 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { isPlatformType } from '@/lib/platforms';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient as createServerClient } from '@/lib/supabase/server';
+import { timeslotWriter } from '@/lib/timeslot-http';
 import { createTimeSlot, listTimeSlots } from '@/lib/timeslots';
 import { hasAuthRole } from '@/types/auth';
 import type { PlatformType } from '@/types/auction';
-
-async function timeslotWriter() {
-  return createAdminClient() ?? (await createServerClient());
-}
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -44,7 +39,7 @@ export async function GET(request: Request) {
       // 목록 조회는 계속합니다.
     }
     const mine = new URL(request.url).searchParams.get('mine') === '1';
-    const actor = mine ? await getPaymentActor() : null;
+    const actor = mine ? await getPaymentActor(request) : null;
     if (mine && !actor) {
       return unauthorizedJson('내 크리에이터 상품을 보려면 로그인해 주세요.');
     }
@@ -77,7 +72,7 @@ export async function POST(request: Request) {
     } catch {
       // 등록은 계속합니다.
     }
-    const actor = await getPaymentActor();
+    const actor = await getPaymentActor(request);
     if (!actor) {
       return unauthorizedJson('크리에이터 상품을 등록하려면 로그인해 주세요.');
     }

@@ -312,9 +312,8 @@ async function releaseOtherPendingHolds(
 ) {
   const { data, error } = await client
     .from('payments')
-    .select('order_id, status')
-    .eq('auction_id', auctionId)
-    .eq('bid_id', bidId);
+    .select('order_id, status, bid_id')
+    .eq('auction_id', auctionId);
   if (error || !data) {
     return;
   }

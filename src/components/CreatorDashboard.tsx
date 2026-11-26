@@ -10,7 +10,6 @@ import { SettlementAccountSummary } from '@/components/SettlementAccountSummary'
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { authRequestInit } from '@/lib/auth-request';
 import { getCreatorDashboard } from '@/lib/dashboard';
-import { closeTimeSlot } from '@/lib/timeslots';
 import { addBusinessDays, formatSeoulDateLabel } from '@/lib/business-days';
 import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import {
@@ -191,8 +190,14 @@ export function CreatorDashboard() {
                     <button
                       type="button"
                       onClick={async () => {
-                        const result = await closeTimeSlot(slot.id, user?.id);
-                        if (result.error) {
+                        const response = await fetch(
+                          `/api/timeslots/${encodeURIComponent(slot.id)}`,
+                          await authRequestInit({
+                            method: 'PATCH',
+                            body: JSON.stringify({ status: 'closed' }),
+                          }),
+                        );
+                        if (!response.ok) {
                           return;
                         }
                         window.dispatchEvent(new Event('timeslots:changed'));
@@ -388,6 +393,13 @@ function DealCard({
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-zinc-600">
         <span>제안 {formatWon(deal.bid.bidAmount)}</span>
         {awarded ? <span>실지급액 {formatWon(amounts.transferAmount)}</span> : null}
+        {deal.kind === 'timeslot' && awarded && !deal.fulfillment?.deliveredAt && !deal.fulfillment?.deliveryUrl ? (
+          <span>납품 필요</span>
+        ) : null}
+        {deal.kind === 'timeslot' && awarded && (deal.fulfillment?.deliveredAt || deal.fulfillment?.deliveryUrl) && !deal.fulfillment?.purchaseConfirmedAt ? (
+          <span>구매 확정 대기</span>
+        ) : null}
+        {deal.kind === 'timeslot' && deal.fulfillment?.purchaseConfirmedAt ? <span>구매 확정</span> : null}
         {dateLabel ? <span>{dateLabel}</span> : null}
         <button
           type="button"

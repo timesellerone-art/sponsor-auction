@@ -79,6 +79,9 @@ function mapSlot(row: Partial<SlotRow> & Pick<SlotRow, 'id'>): TimeSlotItem {
     deadline: row.deadline ?? '',
     status: (row.status ?? 'open') as TimeSlotStatus,
     winnerBidId: row.winner_bid_id ?? null,
+    deliveryUrl: row.delivery_url ?? null,
+    deliveredAt: row.delivered_at ?? null,
+    purchaseConfirmedAt: row.purchase_confirmed_at ?? null,
     createdAt: row.created_at ?? '',
   });
 }
@@ -258,6 +261,40 @@ async function withScores(slots: TimeSlotItem[]): Promise<TimeSlotItem[]> {
   return slots.map((item) => attachScore(item, scores));
 }
 
+async function attachFulfillment(
+  supabase: SponsorAuctionClient,
+  slots: TimeSlotItem[],
+): Promise<TimeSlotItem[]> {
+  const ids = uuidIds(slots.map((item) => item.id));
+  if (ids.length === 0) {
+    return slots;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('time_slots')
+      .select('id, delivery_url, delivered_at, purchase_confirmed_at')
+      .in('id', ids);
+    if (error || !data) {
+      return slots;
+    }
+    const extra = new Map(data.map((row) => [row.id, row]));
+    return slots.map((item) => {
+      const row = extra.get(item.id);
+      if (!row) {
+        return item;
+      }
+      return {
+        ...item,
+        deliveryUrl: row.delivery_url ?? null,
+        deliveredAt: row.delivered_at ?? null,
+        purchaseConfirmedAt: row.purchase_confirmed_at ?? null,
+      };
+    });
+  } catch {
+    return slots;
+  }
+}
+
 function mockSlotList(creatorId?: string) {
   return slotsStore
     .map((item) => applySlotExpiry(item))
@@ -306,7 +343,9 @@ export async function listTimeSlots(options?: {
       console.warn('[SponsorAuction] 크리에이터 상품 목록 조회 실패', error.message);
       return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');
     }
-    return ok(await withScores((data ?? []).map((row) => mapSlot(row))));
+    return ok(
+      await withScores(await attachFulfillment(supabase, (data ?? []).map((row) => mapSlot(row)))),
+    );
   } catch {
     return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');
   }
@@ -363,8 +402,9 @@ export async function getTimeSlotById(
       }
       return fail(null, '크리에이터 상품을 찾을 수 없습니다.');
     }
-    const [withScore] = await withScores([mapSlot(data)]);
-    return ok(withScore ?? mapSlot(data));
+    const [mapped] = await attachFulfillment(supabase, [mapSlot(data)]);
+    const [withScore] = await withScores([mapped ?? mapSlot(data)]);
+    return ok(withScore ?? mapped ?? mapSlot(data));
   } catch {
     return fail(null, '크리에이터 상품을 불러오지 못했습니다.');
   }
@@ -486,27 +526,32 @@ export async function createTimeSlot(
   }
 }
 
-export async function closeTimeSlot(id: string, creatorId?: string | null) {
-  const current = await getTimeSlotById(id);
+export async function closeTimeSlot(
+  id: string,
+  creatorId?: string | null,
+  client?: SponsorAuctionClient | null,
+) {
+  const slotId = normalizeSlotId(id);
+  const current = await getTimeSlotById(slotId, client);
   if (!current.data) {
     return fail(null, current.error ?? '크리에이터 상품을 찾을 수 없습니다.');
   }
   if (creatorId && current.data.creatorId && current.data.creatorId !== creatorId) {
     return fail(null, '본인 상품만 마감할 수 있습니다.');
   }
-  const supabase = await getDataClient();
-  if (!supabase || !isUuid(id)) {
+  const supabase = client ?? (await getDataClient());
+  if (!supabase || !isUuid(slotId)) {
     slotsStore = slotsStore.map((item) =>
-      item.id === id ? { ...item, status: 'closed' as const } : item,
+      item.id === slotId ? { ...item, status: 'closed' as const } : item,
     );
     persistSlots();
-    return getTimeSlotById(id);
+    return getTimeSlotById(slotId, client);
   }
   try {
     const { data, error } = await supabase
       .from('time_slots')
       .update({ status: 'closed' })
-      .eq('id', id)
+      .eq('id', slotId)
       .select(SLOT_COLUMNS)
       .single();
     if (error || !data) {
@@ -523,7 +568,7 @@ export async function placeTimeSlotBid(
   client?: SponsorAuctionClient | null,
 ): Promise<DataResult<TimeSlotBidItem | null>> {
   const slotId = normalizeSlotId(input.timeSlotId);
-  const lockKey = `slot-bid:${slotId}:${(input.advertiserName ?? '').trim().toLowerCase()}`;
+  const lockKey = `slot-bid:${slotId}:${(input.advertiserId || input.advertiserName || '').trim().toLowerCase()}`;
   return withExclusiveAction(lockKey, fail(null, VALIDATION.actionInFlight), async () => {
     const slotResult = await getTimeSlotById(slotId, client);
     const slot = slotResult.data;
@@ -536,6 +581,17 @@ export async function placeTimeSlotBid(
     }
     if (input.advertiserId && slot.creatorId && input.advertiserId === slot.creatorId) {
       return fail(null, '본인 상품에는 제안할 수 없습니다.');
+    }
+    const advertiserId = input.advertiserId?.trim() || '';
+    if (advertiserId) {
+      const already = isUuid(slotId)
+        ? null
+        : slotBidsStore.find(
+            (item) => item.timeSlotId === slotId && item.advertiserId === advertiserId,
+          );
+      if (already) {
+        return fail(null, VALIDATION.duplicateTimeslotBid);
+      }
     }
     const minBid = nextInventoryMinBid(live.startingPrice, live.currentHighestBid);
     if (!Number.isFinite(input.bidAmount) || input.bidAmount < minBid) {
@@ -552,6 +608,17 @@ export async function placeTimeSlotBid(
     if (isUuid(slotId)) {
       if (!supabase) {
         return fail(null, INSERT_FAIL_MESSAGE);
+      }
+      if (advertiserId && isUuid(advertiserId)) {
+        const existing = await supabase
+          .from('time_slot_bids')
+          .select('id')
+          .eq('time_slot_id', slotId)
+          .eq('advertiser_id', advertiserId)
+          .maybeSingle();
+        if (existing.data?.id) {
+          return fail(null, VALIDATION.duplicateTimeslotBid);
+        }
       }
       try {
         const { data, error } = await supabase
@@ -618,7 +685,9 @@ export async function listTimeSlotsByIds(
       }
       return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');
     }
-    return ok(await withScores((data ?? []).map((row) => mapSlot(row))));
+    return ok(
+      await withScores(await attachFulfillment(supabase, (data ?? []).map((row) => mapSlot(row)))),
+    );
   } catch {
     return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');
   }
@@ -736,6 +805,151 @@ export async function awardTimeSlotBid(
       return fail(null, '이미 마감된 상품입니다.');
     }
     return ok(mapSlot(data));
+  } catch {
+    return fail(null, UPDATE_FAIL_MESSAGE);
+  }
+}
+
+function isHttpUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function applyFulfillment(
+  slot: TimeSlotItem,
+  patch: {
+    deliveryUrl?: string | null;
+    deliveredAt?: string | null;
+    purchaseConfirmedAt?: string | null;
+  },
+): TimeSlotItem {
+  return {
+    ...slot,
+    deliveryUrl: patch.deliveryUrl ?? slot.deliveryUrl ?? null,
+    deliveredAt: patch.deliveredAt ?? slot.deliveredAt ?? null,
+    purchaseConfirmedAt: patch.purchaseConfirmedAt ?? slot.purchaseConfirmedAt ?? null,
+  };
+}
+
+function persistMockSlot(slot: TimeSlotItem) {
+  slotsStore = slotsStore.map((item) => (item.id === slot.id ? slot : item));
+  persistSlots();
+}
+
+export async function deliverTimeSlot(
+  slotId: string,
+  deliveryUrl: string,
+  actorUserId?: string | null,
+  client?: SponsorAuctionClient | null,
+): Promise<DataResult<TimeSlotItem | null>> {
+  const id = normalizeSlotId(slotId);
+  const url = deliveryUrl.trim();
+  if (!isHttpUrl(url)) {
+    return fail(null, '결과물 링크는 http(s) 주소여야 합니다.');
+  }
+  const current = await getTimeSlotById(id, client);
+  const slot = current.data;
+  if (!slot) {
+    return fail(null, current.error ?? '크리에이터 상품을 찾을 수 없습니다.');
+  }
+  if (actorUserId && slot.creatorId && slot.creatorId !== actorUserId) {
+    return fail(null, '본인 상품만 납품할 수 있습니다.');
+  }
+  if (!slot.winnerBidId || slot.status !== 'awarded') {
+    return fail(null, '낙찰된 상품만 납품할 수 있습니다.');
+  }
+  if (slot.purchaseConfirmedAt) {
+    return fail(null, '이미 구매 확정된 상품입니다.');
+  }
+  const deliveredAt = new Date().toISOString();
+  const supabase = client ?? (await getDataClient());
+  if (!supabase || !isUuid(id)) {
+    const next = applyFulfillment(slot, { deliveryUrl: url, deliveredAt });
+    persistMockSlot(next);
+    return ok(next);
+  }
+  try {
+    const { data, error } = await supabase
+      .from('time_slots')
+      .update({ delivery_url: url, delivered_at: deliveredAt })
+      .eq('id', id)
+      .select(SLOT_COLUMNS)
+      .maybeSingle();
+    if (error) {
+      if (isSchemaMismatch(error)) {
+        const next = applyFulfillment(slot, { deliveryUrl: url, deliveredAt });
+        persistMockSlot(next);
+        return ok(next);
+      }
+      return fail(null, UPDATE_FAIL_MESSAGE);
+    }
+    if (!data) {
+      return fail(null, UPDATE_FAIL_MESSAGE);
+    }
+    return ok(applyFulfillment(mapSlot(data), { deliveryUrl: url, deliveredAt }));
+  } catch {
+    return fail(null, UPDATE_FAIL_MESSAGE);
+  }
+}
+
+export async function confirmTimeSlotPurchase(
+  slotId: string,
+  actorUserId?: string | null,
+  client?: SponsorAuctionClient | null,
+): Promise<DataResult<TimeSlotItem | null>> {
+  const id = normalizeSlotId(slotId);
+  const current = await getTimeSlotById(id, client);
+  const slot = current.data;
+  if (!slot) {
+    return fail(null, current.error ?? '크리에이터 상품을 찾을 수 없습니다.');
+  }
+  if (!slot.winnerBidId || slot.status !== 'awarded') {
+    return fail(null, '낙찰된 상품만 구매 확정할 수 있습니다.');
+  }
+  if (!slot.deliveredAt && !slot.deliveryUrl) {
+    return fail(null, '결과물이 납품된 뒤에 구매 확정할 수 있습니다.');
+  }
+  const bids = await listTimeSlotBids(id, client);
+  const winner = bids.data.find((item) => item.id === slot.winnerBidId);
+  if (!winner) {
+    return fail(null, '선정된 제안을 찾을 수 없습니다.');
+  }
+  if (actorUserId && winner.advertiserId && winner.advertiserId !== actorUserId) {
+    return fail(null, '선정된 광고주만 구매 확정할 수 있습니다.');
+  }
+  if (slot.purchaseConfirmedAt) {
+    return ok(slot);
+  }
+  const confirmedAt = new Date().toISOString();
+  const supabase = client ?? (await getDataClient());
+  if (!supabase || !isUuid(id)) {
+    const next = applyFulfillment(slot, { purchaseConfirmedAt: confirmedAt });
+    persistMockSlot(next);
+    return ok(next);
+  }
+  try {
+    const { data, error } = await supabase
+      .from('time_slots')
+      .update({ purchase_confirmed_at: confirmedAt })
+      .eq('id', id)
+      .select(SLOT_COLUMNS)
+      .maybeSingle();
+    if (error) {
+      if (isSchemaMismatch(error)) {
+        const next = applyFulfillment(slot, { purchaseConfirmedAt: confirmedAt });
+        persistMockSlot(next);
+        return ok(next);
+      }
+      return fail(null, UPDATE_FAIL_MESSAGE);
+    }
+    if (!data) {
+      return fail(null, UPDATE_FAIL_MESSAGE);
+    }
+    return ok(applyFulfillment(mapSlot(data), { purchaseConfirmedAt: confirmedAt }));
   } catch {
     return fail(null, UPDATE_FAIL_MESSAGE);
   }
