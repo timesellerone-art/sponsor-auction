@@ -9,10 +9,12 @@ import {
   normalizeBusinessNumber,
   normalizeOpeningDate,
   openingDateError,
+  parseBusinessIdentityInput,
   profileStatusFromNts,
   profileStatusFromNtsAndValidate,
   representativeNameError,
 } from '../../src/lib/business-registration';
+import { parseNtsValidateCode } from '../../src/lib/nts-business-status';
 
 function withCheckDigit(firstNine: string) {
   const weights = [1, 3, 7, 1, 3, 7, 1, 3, 5];
@@ -51,6 +53,29 @@ describe('business registration number', () => {
     assert.equal(formatOpeningDateInput('20240115'), '2024-01-15');
     assert.equal(openingDateError('20241399'), '개업일자가 올바른 날짜가 아닙니다.');
     assert.equal(openingDateError('20240115'), null);
+  });
+
+  it('대표자 성명이나 개업일자가 없으면 진위확인 입력으로 받지 않는다', () => {
+    const number = withCheckDigit('533060373');
+    const missingName = parseBusinessIdentityInput({
+      businessNumber: number,
+      representativeName: '',
+      openedOn: '20200101',
+    });
+    assert.equal(missingName.errorCode, 'INVALID_REPRESENTATIVE');
+    const missingDate = parseBusinessIdentityInput({
+      businessNumber: number,
+      representativeName: '홍길동',
+      openedOn: '',
+    });
+    assert.equal(missingDate.errorCode, 'INVALID_OPENING_DATE');
+  });
+
+  it('국세청 validate 응답은 valid가 01일 때만 일치로 본다', () => {
+    assert.equal(parseNtsValidateCode({ data: [{ valid: '01' }] }), '01');
+    assert.equal(parseNtsValidateCode({ data: [{ valid: '02', valid_msg: '확인할 수 없습니다' }] }), '02');
+    assert.equal(parseNtsValidateCode({ data: [{ b_stt_cd: '01', b_stt: '계속사업자' }] }), null);
+    assert.equal(parseNtsValidateCode({ status_code: 'OK' }), null);
   });
 
   it('진위확인 불일치는 검수필요로 올리지 않고, 일치하면 기존 status 매핑을 유지한다', () => {

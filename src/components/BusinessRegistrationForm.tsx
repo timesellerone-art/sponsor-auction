@@ -81,8 +81,11 @@ export function BusinessRegistrationForm() {
     };
   }, []);
 
+  const identityError = () =>
+    businessNumberError(number) || representativeNameError(representativeName) || openingDateError(openedOn);
+
   const lookupStatus = async () => {
-    const invalid = businessNumberError(number);
+    const invalid = identityError();
     if (invalid) {
       setError(invalid);
       return;
@@ -95,10 +98,24 @@ export function BusinessRegistrationForm() {
         await authRequestInit({
           method: 'POST',
           cache: 'no-store',
-          body: JSON.stringify({ businessNumber: number }),
+          body: JSON.stringify({
+            businessNumber: number,
+            representativeName,
+            openedOn: normalizeOpeningDate(openedOn),
+          }),
         }),
       );
       const body = (await response.json().catch(() => null)) as BusinessPayload | null;
+      if (body?.errorCode === 'MISMATCH' || body?.mismatch) {
+        setNtsLabel(body.ntsLabel || '불일치');
+        setDetail(body.detail ?? '');
+        setNotice('');
+        setError(
+          body.error ||
+            '대표자 성명 또는 개업일자가 국세청 등록 정보와 일치하지 않습니다.',
+        );
+        return;
+      }
       if (!response.ok || !body) {
         throw new Error(body?.error || '사업자 상태를 조회하지 못했습니다.');
       }
@@ -113,19 +130,9 @@ export function BusinessRegistrationForm() {
   };
 
   const persist = async () => {
-    const numberInvalid = businessNumberError(number);
-    if (numberInvalid) {
-      setError(numberInvalid);
-      return;
-    }
-    const nameInvalid = representativeNameError(representativeName);
-    if (nameInvalid) {
-      setError(nameInvalid);
-      return;
-    }
-    const dateInvalid = openingDateError(openedOn);
-    if (dateInvalid) {
-      setError(dateInvalid);
+    const invalid = identityError();
+    if (invalid) {
+      setError(invalid);
       return;
     }
     setBusy(true);
@@ -155,7 +162,7 @@ export function BusinessRegistrationForm() {
       if (!response.ok || !body?.status) {
         throw new Error(body?.error || '사업자등록번호를 저장하지 못했습니다.');
       }
-      setError(body.lookupError?.message ?? null);
+      setError(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '사업자 상태를 조회하지 못했습니다.');
     } finally {

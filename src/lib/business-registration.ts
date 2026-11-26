@@ -94,6 +94,57 @@ export function formatOpeningDateInput(value: string | null | undefined) {
   return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
 }
 
+export function parseBusinessIdentityInput(body: {
+  businessNumber?: unknown;
+  representativeName?: unknown;
+  openedOn?: unknown;
+} | null) {
+  const businessNumber = normalizeBusinessNumber(
+    typeof body?.businessNumber === 'string' ? body.businessNumber : '',
+  );
+  const representativeName = normalizeRepresentativeName(
+    typeof body?.representativeName === 'string' ? body.representativeName : '',
+  );
+  const openedOn = normalizeOpeningDate(typeof body?.openedOn === 'string' ? body.openedOn : '');
+  const numberError = businessNumberError(businessNumber);
+  if (numberError) {
+    return {
+      businessNumber,
+      representativeName,
+      openedOn,
+      error: numberError,
+      errorCode: 'INVALID_NUMBER' as const,
+    };
+  }
+  const nameError = representativeNameError(representativeName);
+  if (nameError) {
+    return {
+      businessNumber,
+      representativeName,
+      openedOn,
+      error: nameError,
+      errorCode: 'INVALID_REPRESENTATIVE' as const,
+    };
+  }
+  const dateError = openingDateError(openedOn);
+  if (dateError) {
+    return {
+      businessNumber,
+      representativeName,
+      openedOn,
+      error: dateError,
+      errorCode: 'INVALID_OPENING_DATE' as const,
+    };
+  }
+  return {
+    businessNumber,
+    representativeName,
+    openedOn,
+    error: null,
+    errorCode: null,
+  };
+}
+
 export function openingDateError(value: string | null | undefined) {
   const digits = normalizeOpeningDate(value);
   if (!digits) {

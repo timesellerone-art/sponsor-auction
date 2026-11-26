@@ -251,6 +251,24 @@ export function ntsValidateMismatchMessage(validMsg = '') {
   return '대표자 성명 또는 개업일자가 국세청 등록 정보와 일치하지 않습니다. 상호명이 아닌 대표자 성명과 개업일자(YYYYMMDD)를 확인해 주세요.';
 }
 
+export function parseNtsValidateCode(payload: unknown): NtsValidateCode | null {
+  const record = asRecord(payload);
+  if (!record) {
+    return null;
+  }
+  const data = record.data;
+  const row = Array.isArray(data) ? asRecord(data[0]) : asRecord(data);
+  const nested = asRecord(row?.status);
+  const values = [row?.valid, row?.valid_cd, nested?.valid, record.valid];
+  for (const value of values) {
+    const code = String(value ?? '').trim();
+    if (code === '01' || code === '02') {
+      return code;
+    }
+  }
+  return null;
+}
+
 export async function validateNtsBusinessIdentity(input: {
   businessNumber: string;
   representativeName: string;
@@ -286,6 +304,11 @@ export async function validateNtsBusinessIdentity(input: {
           b_no: digits,
           start_dt: openedOn,
           p_nm: name,
+          p_nm2: '',
+          b_nm: '',
+          corp_no: '',
+          b_sector: '',
+          b_type: '',
         },
       ],
     },
@@ -295,10 +318,16 @@ export async function validateNtsBusinessIdentity(input: {
     return posted;
   }
 
+  const valid = parseNtsValidateCode(posted.record);
+  if (!valid) {
+    return {
+      ok: false,
+      code: 'LOOKUP_FAILED',
+      message: '국세청 진위확인 결과(valid)를 확인하지 못했습니다. 대표자 성명과 개업일자를 다시 저장해 주세요.',
+    };
+  }
   const rows = Array.isArray(posted.record.data) ? posted.record.data : [];
-  const row = asRecord(rows[0]);
-  const validRaw = String(row?.valid ?? '').trim();
-  const valid: NtsValidateCode = validRaw === '01' ? '01' : '02';
+  const row = asRecord(rows[0]) ?? asRecord(posted.record.data);
   const validMsg = String(row?.valid_msg ?? '').trim();
   const matched = valid === '01';
   return {

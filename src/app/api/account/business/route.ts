@@ -2,18 +2,15 @@ import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
-  businessNumberError,
   businessStatusNotice,
   formatBusinessNumber,
   formatOpeningDateInput,
   isBusinessVerificationStatus,
-  normalizeBusinessNumber,
-  normalizeOpeningDate,
   normalizeRepresentativeName,
   ntsBusinessLabelFromText,
-  openingDateError,
+  parseBusinessIdentityInput,
+  profileStatusFromNts,
   profileStatusFromNtsAndValidate,
-  representativeNameError,
   type BusinessVerificationStatus,
 } from '@/lib/business-registration';
 import { lookupNtsBusinessStatus, validateNtsBusinessIdentity } from '@/lib/nts-business-status';
@@ -129,40 +126,23 @@ export async function POST(request: Request) {
     ) {
       return forbiddenJson('사업자등록번호는 광고주 또는 크리에이터 계정에서 관리합니다.');
     }
-    const body = (await request.json().catch(() => null)) as {
-      businessNumber?: unknown;
-      representativeName?: unknown;
-      openedOn?: unknown;
-    } | null;
-    const businessNumber = normalizeBusinessNumber(
-      typeof body?.businessNumber === 'string' ? body.businessNumber : '',
+    const parsed = parseBusinessIdentityInput(
+      (await request.json().catch(() => null)) as {
+        businessNumber?: unknown;
+        representativeName?: unknown;
+        openedOn?: unknown;
+      } | null,
     );
-    const representativeName = normalizeRepresentativeName(
-      typeof body?.representativeName === 'string' ? body.representativeName : '',
-    );
-    const openedOn = normalizeOpeningDate(typeof body?.openedOn === 'string' ? body.openedOn : '');
-    if (businessNumber && businessNumberError(businessNumber)) {
+    const clearing = !parsed.businessNumber && !parsed.representativeName && !parsed.openedOn;
+    if (!clearing && parsed.error) {
       return NextResponse.json(
-        { error: businessNumberError(businessNumber), errorCode: 'INVALID_NUMBER' },
+        { error: parsed.error, errorCode: parsed.errorCode },
         { status: 400, headers: NO_STORE },
       );
     }
-    if (businessNumber) {
-      const nameError = representativeNameError(representativeName);
-      if (nameError) {
-        return NextResponse.json(
-          { error: nameError, errorCode: 'INVALID_REPRESENTATIVE' },
-          { status: 400, headers: NO_STORE },
-        );
-      }
-      const dateError = openingDateError(openedOn);
-      if (dateError) {
-        return NextResponse.json(
-          { error: dateError, errorCode: 'INVALID_OPENING_DATE' },
-          { status: 400, headers: NO_STORE },
-        );
-      }
-    }
+    const businessNumber = clearing ? '' : parsed.businessNumber;
+    const representativeName = clearing ? '' : parsed.representativeName;
+    const openedOn = clearing ? '' : parsed.openedOn;
 
     const admin = createAdminClient();
     if (!admin) {
@@ -172,47 +152,54 @@ export async function POST(request: Request) {
       );
     }
 
-    const current = await loadBusinessRow(admin, actor.userId);
-    const currentRaw = current.data?.business_verification_status ?? '';
-    const currentStatus: BusinessVerificationStatus = isBusinessVerificationStatus(currentRaw)
-      ? currentRaw
-      : 'unregistered';
-
-    let status: BusinessVerificationStatus = businessNumber ? currentStatus : 'unregistered';
-    let detail = businessNumber ? (current.data?.business_status_detail ?? '') : '';
-    let lookupError: { code: string; message: string } | null = null;
+    let status: BusinessVerificationStatus = 'unregistered';
+    let detail = '';
     let ntsLabel = '';
     let mismatch = false;
     if (businessNumber) {
-      const lookup = await lookupNtsBusinessStatus(businessNumber);
       const authenticity = await validateNtsBusinessIdentity({
         businessNumber,
         representativeName,
         openedOn,
       });
-      if (authenticity.ok === false && (authenticity.code === 'INVALID_NUMBER' || authenticity.code === 'INVALID_INPUT')) {
+      if (!authenticity.ok) {
+        const httpStatus =
+          authenticity.code === 'INVALID_NUMBER' || authenticity.code === 'INVALID_INPUT'
+            ? 400
+            : authenticity.code === 'UNCONFIGURED'
+              ? 503
+              : 502;
         return NextResponse.json(
           { error: authenticity.message, errorCode: authenticity.code },
-          { status: 400, headers: NO_STORE },
+          { status: httpStatus, headers: NO_STORE },
         );
       }
-      if (lookup.ok && authenticity.ok) {
+      if (!authenticity.matched) {
         const saved = profileStatusFromNtsAndValidate(
-          lookup.code,
-          lookup.label,
+          '01',
+          '계속사업자',
           authenticity.valid,
           authenticity.message,
         );
         status = saved.status;
         detail = saved.detail;
         ntsLabel = saved.ntsLabel;
-        mismatch = saved.mismatch;
-      } else if (!lookup.ok) {
-        lookupError = { code: lookup.code, message: lookup.message };
-        detail = lookup.message;
-      } else if (!authenticity.ok) {
-        lookupError = { code: authenticity.code, message: authenticity.message };
-        detail = authenticity.message;
+        mismatch = true;
+      } else {
+        const lookup = await lookupNtsBusinessStatus(businessNumber);
+        if (!lookup.ok) {
+          return NextResponse.json(
+            { error: lookup.message, errorCode: lookup.code },
+            {
+              status: lookup.code === 'INVALID_NUMBER' ? 400 : lookup.code === 'UNCONFIGURED' ? 503 : 502,
+              headers: NO_STORE,
+            },
+          );
+        }
+        const saved = profileStatusFromNts(lookup.code, lookup.label);
+        status = saved.status;
+        detail = saved.detail;
+        ntsLabel = saved.ntsLabel;
       }
     }
 
@@ -270,7 +257,6 @@ export async function POST(request: Request) {
           row.business_representative_name ?? (businessNumber ? representativeName : ''),
         business_opened_on: row.business_opened_on ?? (businessNumber ? openedOn : ''),
       }),
-      lookupError,
       mismatch,
       ntsLabel:
         ntsLabel ||
@@ -285,16 +271,6 @@ export async function POST(request: Request) {
           errorCode: 'MISMATCH',
         },
         { status: 409, headers: NO_STORE },
-      );
-    }
-    if (lookupError && (lookupError.code === 'UNCONFIGURED' || lookupError.code === 'LOOKUP_FAILED')) {
-      return NextResponse.json(
-        {
-          ...presented,
-          error: lookupError.message,
-          errorCode: lookupError.code,
-        },
-        { status: lookupError.code === 'UNCONFIGURED' ? 503 : 502, headers: NO_STORE },
       );
     }
 
