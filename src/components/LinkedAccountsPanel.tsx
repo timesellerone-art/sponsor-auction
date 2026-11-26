@@ -480,7 +480,14 @@ export function LinkedAccountsPanel() {
                     onPhoneChange={setPhone}
                     verified={false}
                     disabled={phoneBusy}
-                    onVerified={() => {
+                    onVerified={(result) => {
+                      if (result.duplicate) {
+                        showToast(
+                          result.message ||
+                            '이미 가입된 번호입니다. 기존 계정으로 로그인해 주세요.',
+                        );
+                        return;
+                      }
                       void handlePhoneVerified();
                     }}
                   />

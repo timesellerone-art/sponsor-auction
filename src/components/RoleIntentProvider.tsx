@@ -16,6 +16,7 @@ import { RoleOnboarding } from '@/components/RoleOnboarding';
 import { showToast } from '@/components/Toast';
 import { ACCESS_REASON, syncActiveRoleCookie } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
+import { PHONE_ONBOARDING_PATH, needsPhoneOnboarding } from '@/lib/phone-signup';
 import { hasAuthRole, type MemberRole } from '@/types/auth';
 
 type RoleIntentContextValue = {
@@ -50,6 +51,10 @@ export function RoleIntentProvider({ children }: { children: ReactNode }) {
         const reason = intent === 'advertiser' ? 'advertiser-auth' : 'creator-auth';
         showToast(ACCESS_REASON[reason]);
         router.push(loginPath(reason, `${window.location.pathname}${window.location.search}`));
+        return;
+      }
+      if (needsPhoneOnboarding(user)) {
+        router.push(PHONE_ONBOARDING_PATH);
         return;
       }
       if (hasAuthRole(user, intent)) {
@@ -103,6 +108,8 @@ export function RoleIntentProvider({ children }: { children: ReactNode }) {
                 <RoleOnboarding
                   name={user.name || '회원'}
                   email={user.email}
+                  phone={user.phone}
+                  phoneVerified={user.phoneVerified === true}
                   intent={pending.intent}
                   headingLevel="h2"
                   onCompleted={() => {

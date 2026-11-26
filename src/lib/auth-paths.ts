@@ -1,5 +1,5 @@
 import { AUTH_COOKIE_MAX_AGE, AUTH_PRESENT_COOKIE_NAME } from '@/lib/access';
-import { POST_AUTH_HOME, ROLE_SELECT_PATH } from '@/lib/auth-guard';
+import { ROLE_SELECT_PATH } from '@/lib/auth-guard';
 import { authCookieDomain } from '@/lib/site-origin';
 
 export function isAuthPassthroughPath(pathname: string) {
@@ -54,12 +54,8 @@ export type CookieToSet = {
 };
 
 export function onboardingCanonicalPath(pathname: string) {
-  if (
-    pathname === '/onboarding' ||
-    pathname === '/select-role' ||
-    pathname.startsWith('/onboarding/')
-  ) {
-    return POST_AUTH_HOME;
+  if (pathname === '/select-role' || pathname === '/onboarding/role-select') {
+    return '/onboarding';
   }
   return null;
 }

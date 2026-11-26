@@ -64,6 +64,9 @@ export async function POST(request: NextRequest) {
       {
         data: {
           ...linkedAccountsPayload(result.user),
+          duplicate: result.duplicate,
+          deleted: result.deleted,
+          existingMethods: result.existingMethods,
           merged: result.merged,
           message: result.message,
           roles: result.roles,
@@ -74,9 +77,9 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE },
     );
     applyAuthCookies(response.cookies, {
-      present: true,
+      present: !result.deleted,
       roles: result.roles,
-      activeRole: result.roles[0] ?? null,
+      activeRole: result.deleted ? null : result.roles[0] ?? null,
       hostname: request.headers.get('x-forwarded-host') || request.headers.get('host'),
     });
     return response;

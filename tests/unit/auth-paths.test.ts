@@ -31,9 +31,9 @@ describe('auth path helpers', () => {
     assert.equal(needsProtectedAuthValidation('/my'), true);
     assert.equal(needsProtectedAuthValidation('/admin/users'), true);
     assert.equal(needsProtectedAuthValidation('/payments/checkout'), true);
-    assert.equal(onboardingCanonicalPath('/select-role'), '/');
-    assert.equal(onboardingCanonicalPath('/onboarding'), '/');
-    assert.equal(onboardingCanonicalPath('/onboarding/role-select'), '/');
+    assert.equal(onboardingCanonicalPath('/select-role'), '/onboarding');
+    assert.equal(onboardingCanonicalPath('/onboarding'), null);
+    assert.equal(onboardingCanonicalPath('/onboarding/role-select'), '/onboarding');
     assert.match(
       describeOAuthError('Invalid scope: account_email'),
       /카카오 로그인 동의 항목/,
@@ -57,6 +57,18 @@ describe('post-auth destination', () => {
   it('역할 없는 신규 유저도 홈으로 보낸다', () => {
     assert.equal(postSocialAuthPath({ roles: [] }, '/admin'), '/');
     assert.equal(postAuthPath({ roles: [] }), '/');
+  });
+
+  it('휴대폰 미인증 소셜 세션은 온보딩으로 보낸다', () => {
+    assert.equal(postSocialAuthPath({ id: 'usr-new', roles: [] }, '/#auctions'), '/onboarding');
+    assert.equal(
+      postSocialAuthPath({ id: 'usr-new', roles: [], phoneVerified: true }, '/#auctions'),
+      '/#auctions',
+    );
+    assert.equal(
+      postSocialAuthPath({ id: 'usr-old', roles: ['advertiser'] }, '/my'),
+      '/my',
+    );
   });
 
   it('역할이 있는 기존 회원도 온보딩 next를 무시하고 홈으로 보낸다', () => {

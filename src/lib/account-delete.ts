@@ -1,18 +1,19 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
-import { pickPhoneMergeIntoExisting } from '@/lib/account-link';
-import { ACCOUNT_UNIFIED_MESSAGE } from '@/lib/account-unify';
 import {
   canUnlinkProvider,
   isNaverIdentityProvider,
   type SocialIdentityProvider,
 } from '@/lib/auth-identities';
-import {
-  findExistingAccountByContact,
-  generateMagicLinkHash,
-  mergeUserInto,
-} from '@/lib/auth-identity';
+import { collectAuthEmails } from '@/lib/auth-emails';
+import { findExistingAccountByContact } from '@/lib/auth-identity';
 import { normalizePhone, toE164Kr } from '@/lib/contact';
 import { clearedPhoneOtpMetadata } from '@/lib/phone-otp';
+import {
+  existingAccountLoginMessage,
+  isProvisionalSignupUser,
+  signupMethodLabels,
+} from '@/lib/phone-signup';
+import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 import { isMemberRole, parseAuthRoles, type MemberRole } from '@/types/auth';
 
 type AdminClient = SupabaseClient;
@@ -110,13 +111,28 @@ export async function deleteAccountCompletely(admin: AdminClient, userId: string
 }
 
 export type VerifiedPhoneResult = {
-  user: User;
+  user: User | null;
+  duplicate: boolean;
+  deleted: boolean;
+  existingMethods: string[];
   merged: boolean;
   message: string | null;
   tokenHash: string | null;
   roles: MemberRole[];
   onboardingComplete: boolean;
 };
+
+async function deleteProvisionalAuthUser(admin: AdminClient, userId: string) {
+  await admin.from('profiles').delete().eq('id', userId);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await admin.auth.admin.deleteUser(userId);
+    const remaining = await admin.auth.admin.getUserById(userId);
+    if (!remaining.data.user) {
+      return;
+    }
+  }
+  throw new Error('임시 계정을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+}
 
 export async function completeVerifiedPhone(
   admin: AdminClient,
@@ -133,24 +149,37 @@ export async function completeVerifiedPhone(
     phone,
     excludeUserId: user.id,
   });
-  const pair = pickPhoneMergeIntoExisting(user, existing);
-  let target = user;
-  let merged = false;
-  if (pair.incoming) {
-    target = await mergeUserInto(pair.incoming, pair.canonical, { phone });
-    merged = true;
+  if (existing) {
+    const existingMethods = signupMethodLabels(existing);
+    const message = existingAccountLoginMessage(existingMethods);
+    const provisional = isProvisionalSignupUser(user);
+    if (provisional) {
+      await deleteProvisionalAuthUser(admin, user.id);
+    }
+    return {
+      user: provisional ? null : user,
+      duplicate: true,
+      deleted: provisional,
+      existingMethods,
+      merged: false,
+      message,
+      tokenHash: null,
+      roles: [],
+      onboardingComplete: false,
+    };
   }
 
-  const withPhone = await admin.auth.admin.updateUserById(target.id, {
+  const withPhone = await admin.auth.admin.updateUserById(user.id, {
     phone: e164,
-    user_metadata: clearedPhoneOtpMetadata(target, {
+    user_metadata: clearedPhoneOtpMetadata(user, {
       phone,
       phone_verified: true,
-      linked_providers: [...new Set([...stringList(target.user_metadata?.linked_providers), 'phone'])],
+      onboarding_complete: true,
+      linked_providers: [...new Set([...stringList(user.user_metadata?.linked_providers), 'phone'])],
     }),
     app_metadata: {
-      ...(target.app_metadata ?? {}),
-      providers: [...new Set([...stringList(target.app_metadata?.providers), 'phone'])],
+      ...(user.app_metadata ?? {}),
+      providers: [...new Set([...stringList(user.app_metadata?.providers), 'phone'])],
       contact_phone: phone,
     },
   });
@@ -159,47 +188,46 @@ export async function completeVerifiedPhone(
   }
 
   const linked = await admin.rpc('link_provider_identity', {
-    p_user_id: target.id,
+    p_user_id: user.id,
     p_provider: 'phone',
     p_provider_id: e164.replace(/^\+/, ''),
-    p_email: target.email ?? null,
-    p_name: typeof target.user_metadata?.name === 'string' ? target.user_metadata.name : null,
+    p_email: user.email ?? null,
+    p_name: typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : null,
   });
   if (linked.error && linked.error.code !== 'PGRST202') {
     console.warn('[SponsorAuction] 휴대전화 identity 연결 실패', linked.error.message);
   }
 
-  const profile = await admin.from('profiles').update({ phone }).eq('id', target.id);
-  if (profile.error) {
-    console.warn('[SponsorAuction] 프로필 휴대전화 저장 실패', profile.error.message);
+  const synced = await upsertAppProfile(admin, {
+    id: user.id,
+    email: collectAuthEmails(user)[0] ?? user.email,
+    name: typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : null,
+    phone,
+  });
+  if (!synced) {
+    const profile = await admin.from('profiles').update({ phone }).eq('id', user.id);
+    if (profile.error) {
+      console.warn('[SponsorAuction] 프로필 휴대전화 저장 실패', profile.error.message);
+    }
   }
 
-  const refreshed = (await admin.auth.admin.getUserById(target.id)).data.user
+  const refreshed = (await admin.auth.admin.getUserById(user.id)).data.user
     ?? withPhone.data.user
-    ?? target;
+    ?? user;
   const roles = parseAuthRoles(
     refreshed.user_metadata?.roles,
     refreshed.user_metadata?.role,
   ).filter(isMemberRole);
-  const onboardingComplete =
-    refreshed.user_metadata?.onboarding_complete === true || roles.length > 0;
-
-  let tokenHash: string | null = null;
-  if (merged) {
-    tokenHash = await generateMagicLinkHash(admin, refreshed);
-    if (!tokenHash) {
-      throw new Error(
-        '계정을 통합했지만 세션을 전환하지 못했습니다. 기존 계정으로 다시 로그인해 주세요.',
-      );
-    }
-  }
 
   return {
     user: refreshed,
-    merged,
-    message: merged ? ACCOUNT_UNIFIED_MESSAGE : null,
-    tokenHash,
+    duplicate: false,
+    deleted: false,
+    existingMethods: [],
+    merged: false,
+    message: null,
+    tokenHash: null,
     roles,
-    onboardingComplete,
+    onboardingComplete: true,
   };
 }

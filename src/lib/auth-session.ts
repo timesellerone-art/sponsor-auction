@@ -30,6 +30,7 @@ export function sessionUserFromAuthUser(user: {
     createdAt: user.created_at,
     lastSignInAt: user.last_sign_in_at,
     onboardingComplete: meta.onboarding_complete === true,
+    phoneVerified: meta.phone_verified === true,
     currentMode: isMemberRole(meta.current_mode) ? meta.current_mode : null,
   };
 }
@@ -47,5 +48,6 @@ export function sessionUserWithProfileRoles(
     role: primaryAuthRole(roles),
     roles,
     onboardingComplete: base.onboardingComplete || roles.length > 0,
+    phoneVerified: base.phoneVerified || Boolean(profilePhone),
   };
 }

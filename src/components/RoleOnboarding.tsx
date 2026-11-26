@@ -13,6 +13,8 @@ import { isMemberRole, type MemberRole } from '@/types/auth';
 type RoleOnboardingProps = {
   name: string;
   email?: string | null;
+  phone?: string | null;
+  phoneVerified?: boolean;
   intent?: MemberRole;
   headingLevel?: 'h1' | 'h2';
   onCompleted: (roles: MemberRole[]) => void;
@@ -43,14 +45,16 @@ const ROLE_OPTIONS: {
 export function RoleOnboarding({
   name,
   email,
+  phone: initialPhone,
+  phoneVerified: initialPhoneVerified = false,
   intent,
   headingLevel = 'h1',
   onCompleted,
 }: RoleOnboardingProps) {
   const providerEmail = isPlaceholderOAuthEmail(email) ? '' : (email?.trim() ?? '');
   const [contactEmail, setContactEmail] = useState(providerEmail);
-  const [phone, setPhone] = useState('');
-  const [phoneVerified, setPhoneVerified] = useState(false);
+  const [phone, setPhone] = useState(initialPhone?.trim() ?? '');
+  const [phoneVerified, setPhoneVerified] = useState(initialPhoneVerified);
   const [busy, setBusy] = useState<MemberRole | null>(null);
   const Heading = headingLevel;
   const options = intent ? ROLE_OPTIONS.filter((option) => option.value === intent) : ROLE_OPTIONS;
@@ -61,9 +65,13 @@ export function RoleOnboarding({
         ? `${name}님, 크리에이터 채널 정보를 입력해 주세요`
         : `${name}님, 역할을 선택해 주세요`;
   const description =
-    '휴대전화 인증으로 본인을 확인합니다. 카카오·네이버·구글·이메일이 달라도 같은 번호면 하나의 계정으로 연결됩니다.';
+    '캠페인 등록이나 제안을 하려면 역할을 선택해 주세요. 휴대폰 인증은 가입 시 1회만 완료하면 됩니다.';
 
   const finishIfExistingMember = (result: PhoneVerifyResult) => {
+    if (result.duplicate) {
+      showToast(result.message || '이미 가입된 번호입니다. 기존 계정으로 로그인해 주세요.');
+      return true;
+    }
     setPhoneVerified(true);
     if (result.onboardingComplete && result.roles.length > 0) {
       onCompleted(result.roles);
@@ -130,18 +138,22 @@ export function RoleOnboarding({
             placeholder="name@example.com"
           />
         </label>
-        <PhoneOtpForm
-          phone={phone}
-          onPhoneChange={(value) => {
-            setPhone(value);
-            setPhoneVerified(false);
-          }}
-          verified={phoneVerified}
-          onVerified={(result) => {
-            finishIfExistingMember(result);
-          }}
-          disabled={Boolean(busy)}
-        />
+        {initialPhoneVerified ? (
+          <p className="text-sm text-zinc-600">휴대전화 인증이 완료된 계정입니다.</p>
+        ) : (
+          <PhoneOtpForm
+            phone={phone}
+            onPhoneChange={(value) => {
+              setPhone(value);
+              setPhoneVerified(false);
+            }}
+            verified={phoneVerified}
+            onVerified={(result) => {
+              finishIfExistingMember(result);
+            }}
+            disabled={Boolean(busy)}
+          />
+        )}
       </div>
 
       <div className="mt-6 flex flex-col gap-3">

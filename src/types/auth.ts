@@ -14,6 +14,7 @@ export interface SessionUser {
   createdAt?: string;
   lastSignInAt?: string | null;
   onboardingComplete?: boolean;
+  phoneVerified?: boolean;
   currentMode?: MemberRole | null;
 }
 

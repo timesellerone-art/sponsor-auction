@@ -176,6 +176,7 @@ function mapSessionUser(
     createdAt: authUser?.created_at,
     lastSignInAt: authUser?.last_sign_in_at,
     onboardingComplete: meta.onboarding_complete === true,
+    phoneVerified: meta.phone_verified === true,
     currentMode: isMemberRole(modeRaw) ? modeRaw : null,
   };
 }
@@ -806,6 +807,9 @@ type RoleApiPayload = {
 };
 
 export type PhoneVerifyResult = {
+  duplicate: boolean;
+  deleted: boolean;
+  existingMethods: string[];
   merged: boolean;
   message: string | null;
   roles: MemberRole[];
@@ -863,6 +867,9 @@ export async function verifyPhoneOtp(
     );
     const payload = (await response.json().catch(() => null)) as {
       data?: {
+        duplicate?: boolean;
+        deleted?: boolean;
+        existingMethods?: unknown;
         merged?: boolean;
         message?: string | null;
         roles?: unknown;
@@ -885,9 +892,15 @@ export async function verifyPhoneOtp(
     }
 
     const roles = parseAuthRoles(payload.data.roles).filter(isMemberRole);
+    const existingMethods = Array.isArray(payload.data.existingMethods)
+      ? payload.data.existingMethods.filter((item): item is string => typeof item === 'string')
+      : [];
     return ok({
+      duplicate: Boolean(payload.data.duplicate),
+      deleted: Boolean(payload.data.deleted),
+      existingMethods,
       merged: Boolean(payload.data.merged),
-      message: payload.data.message ?? (payload.data.merged ? ACCOUNT_UNIFIED_MESSAGE : null),
+      message: payload.data.message ?? null,
       roles,
       onboardingComplete: Boolean(payload.data.onboardingComplete) || roles.length > 0,
       phone: payload.data.phone ?? phone,

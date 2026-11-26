@@ -108,6 +108,7 @@ async function sessionLikeFor(
     createdAt: authUser.created_at,
     lastSignInAt: authUser.last_sign_in_at,
     onboardingComplete: authUser.user_metadata?.onboarding_complete === true,
+    phoneVerified: authUser.user_metadata?.phone_verified === true,
     currentMode: isMemberRole(authUser.user_metadata?.current_mode)
       ? authUser.user_metadata.current_mode
       : null,

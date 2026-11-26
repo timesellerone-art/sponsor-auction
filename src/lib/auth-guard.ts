@@ -1,8 +1,10 @@
 import { ACCESS_REASON, type AccessReason } from '@/lib/access';
+import { PHONE_ONBOARDING_PATH, needsPhoneOnboarding } from '@/lib/phone-signup';
 import { parseAuthRoles } from '@/types/auth';
 
 export const ROLE_SELECT_PATH = '/onboarding/role-select';
 export const POST_AUTH_HOME = '/';
+export { PHONE_ONBOARDING_PATH };
 
 export function sanitizeNextPath(value: string | null | undefined) {
   if (!value || !value.startsWith('/') || value.startsWith('//')) {
@@ -126,5 +128,8 @@ export function postAuthPath(role: unknown, nextPath?: string | null) {
 }
 
 export function postSocialAuthPath(role: unknown, nextPath?: string | null) {
+  if (needsPhoneOnboarding(role)) {
+    return PHONE_ONBOARDING_PATH;
+  }
   return postAuthPath(role, nextPath);
 }

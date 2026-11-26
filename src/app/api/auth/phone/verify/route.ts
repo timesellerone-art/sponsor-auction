@@ -52,12 +52,16 @@ export async function POST(request: NextRequest) {
     const result = await completeVerifiedPhone(admin, user, verifiedPhone);
     const roles = result.roles;
     const currentMode = roles[0] ?? null;
+    const hostname = request.headers.get('x-forwarded-host') || request.headers.get('host');
 
     const response = NextResponse.json(
       {
         data: {
-          ...linkedAccountsPayload(result.user),
-          id: result.user.id,
+          ...(result.user ? linkedAccountsPayload(result.user) : {}),
+          id: result.user?.id ?? null,
+          duplicate: result.duplicate,
+          deleted: result.deleted,
+          existingMethods: result.existingMethods,
           merged: result.merged,
           message: result.message,
           roles,
@@ -68,10 +72,10 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE },
     );
     applyAuthCookies(response.cookies, {
-      present: true,
+      present: !result.deleted,
       roles,
-      activeRole: currentMode,
-      hostname: request.headers.get('x-forwarded-host') || request.headers.get('host'),
+      activeRole: result.deleted ? null : currentMode,
+      hostname,
     });
     return response;
   } catch (error) {

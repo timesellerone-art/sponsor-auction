@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { showToast } from '@/components/Toast';
-import { ACCOUNT_UNIFIED_MESSAGE } from '@/lib/account-unify';
 import { AUTH_FAIL_MESSAGE, sendPhoneOtp, verifyPhoneOtp, type PhoneVerifyResult } from '@/lib/auth';
 import { isValidPhone } from '@/lib/contact';
 import { cn } from '@/lib/utils';
@@ -87,11 +86,11 @@ export function PhoneOtpForm({
         showToast(result.error ?? AUTH_FAIL_MESSAGE);
         return;
       }
-      if (result.data.merged) {
-        showToast(result.data.message || ACCOUNT_UNIFIED_MESSAGE, 'success');
-      } else {
-        showToast('휴대전화 인증이 완료되었습니다.', 'success');
+      if (result.data.duplicate) {
+        await onVerified(result.data);
+        return;
       }
+      showToast('휴대전화 인증이 완료되었습니다.', 'success');
       setCode('');
       setDone(true);
       await onVerified(result.data);

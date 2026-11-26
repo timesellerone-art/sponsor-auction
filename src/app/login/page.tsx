@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { AgreementFields } from '@/components/AgreementFields';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { InAppBrowserBanner } from '@/components/InAppBrowserBanner';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
@@ -26,6 +27,7 @@ import {
   sanitizeNextPath,
 } from '@/lib/auth-guard';
 import { cn } from '@/lib/utils';
+import { EXISTING_ACCOUNT_NOTICE } from '@/lib/phone-signup';
 import { type SessionUser } from '@/types/auth';
 
 type Mode = 'signin' | 'signup';
@@ -54,6 +56,7 @@ export default function LoginPage() {
     agreeTerms?: string;
     agreePrivacy?: string;
   }>({});
+  const [existingNotice, setExistingNotice] = useState<string | null>(null);
 
   const destinationAfterLogin = (sessionUser: SessionUser | null) => {
     const params = new URLSearchParams(window.location.search);
@@ -78,7 +81,15 @@ export default function LoginPage() {
           return;
         }
         const sessionUser = result.data;
-        if (sessionUser && !oauthInFlight.current) {
+        const notice = params.get('notice');
+        const noticeMessage = params.get('message')?.trim() || '';
+        if (notice === EXISTING_ACCOUNT_NOTICE) {
+          setExistingNotice(
+            noticeMessage || '이미 가입된 회원입니다. 기존 계정으로 로그인해 주세요.',
+          );
+        }
+
+        if (sessionUser && !oauthInFlight.current && notice !== EXISTING_ACCOUNT_NOTICE) {
           router.replace(destinationAfterLogin(sessionUser));
           return;
         }
@@ -111,11 +122,11 @@ export default function LoginPage() {
   }, [router]);
 
   useEffect(() => {
-    if (isLoading || !ready || !user || oauthBusy) {
+    if (isLoading || !ready || !user || oauthBusy || existingNotice) {
       return;
     }
     router.replace(destinationAfterLogin(user));
-  }, [isLoading, oauthBusy, ready, router, user]);
+  }, [existingNotice, isLoading, oauthBusy, ready, router, user]);
 
   const ensureSignupAgreements = () => {
     if (mode !== 'signup') {
@@ -399,6 +410,16 @@ export default function LoginPage() {
           홈으로 돌아가기
         </Link>
       </p>
+
+      <ConfirmModal
+        open={Boolean(existingNotice)}
+        title="이미 가입된 회원입니다"
+        description={existingNotice || ''}
+        confirmLabel="확인"
+        cancelLabel="닫기"
+        onConfirm={() => setExistingNotice(null)}
+        onClose={() => setExistingNotice(null)}
+      />
     </div>
   );
 }
