@@ -4,6 +4,16 @@ import { normalizePhone } from './contact';
 export const SOCIAL_IDENTITY_PROVIDERS = ['google', 'kakao', 'naver', 'phone'] as const;
 export type SocialIdentityProvider = (typeof SOCIAL_IDENTITY_PROVIDERS)[number];
 
+export const SOCIAL_LINK_PROVIDERS = ['email', 'google', 'kakao', 'naver'] as const;
+export type SocialLinkProvider = (typeof SOCIAL_LINK_PROVIDERS)[number];
+export type LinkedIdentityProvider = SocialLinkProvider | 'phone';
+export const LINKABLE_SOCIAL_PROVIDERS = ['google', 'kakao', 'naver'] as const;
+export type LinkableSocialProvider = (typeof LINKABLE_SOCIAL_PROVIDERS)[number];
+
+export function isLinkableSocialProvider(value: string): value is LinkableSocialProvider {
+  return (LINKABLE_SOCIAL_PROVIDERS as readonly string[]).includes(value);
+}
+
 type AdminClient = SupabaseClient;
 
 function identitySub(identity: {
@@ -67,15 +77,22 @@ export const SOCIAL_IDENTITY_LABELS: Record<SocialIdentityProvider, string> = {
   phone: 'Phone',
 };
 
+export const SOCIAL_LINK_LABELS: Record<SocialLinkProvider, string> = {
+  email: 'Email',
+  google: 'Google',
+  kakao: 'Kakao',
+  naver: 'Naver',
+};
+
 export type LinkedAccountStatus = {
-  provider: SocialIdentityProvider;
+  provider: LinkedIdentityProvider;
   label: string;
   linked: boolean;
   canUnlink: boolean;
   hint: string | null;
 };
 
-function identityHint(identity: UserIdentity | undefined, provider: SocialIdentityProvider) {
+function identityHint(identity: UserIdentity | undefined, provider: LinkedIdentityProvider) {
   const data = (identity?.identity_data ?? {}) as Record<string, unknown>;
   if (provider === 'phone') {
     const phone =
@@ -83,6 +100,10 @@ function identityHint(identity: UserIdentity | undefined, provider: SocialIdenti
       (typeof data.sub === 'string' && data.sub) ||
       '';
     return normalizePhone(phone) || null;
+  }
+  const identityEmail = (identity as { email?: unknown } | undefined)?.email;
+  if (typeof identityEmail === 'string' && identityEmail.includes('@')) {
+    return identityEmail;
   }
   if (typeof data.email === 'string' && data.email.includes('@')) {
     return data.email;
@@ -107,6 +128,10 @@ function metadataProviders(user: User | null | undefined) {
   return values.filter((item): item is string => typeof item === 'string');
 }
 
+export function isEmailIdentityLinked(user: User | null | undefined) {
+  return (user?.identities ?? []).some((identity) => identity.provider === 'email');
+}
+
 export function isProviderLinked(user: User | null | undefined, provider: SocialIdentityProvider) {
   if (provider === 'phone') {
     return userHasPhoneLogin(user);
@@ -125,30 +150,79 @@ export function linkedSocialProviderCount(user: User | null | undefined) {
   return SOCIAL_IDENTITY_PROVIDERS.filter((provider) => isProviderLinked(user, provider)).length;
 }
 
+export function linkedAuthMethodCount(user: User | null | undefined) {
+  return (
+    (isEmailIdentityLinked(user) ? 1 : 0) +
+    SOCIAL_IDENTITY_PROVIDERS.filter((provider) => isProviderLinked(user, provider)).length
+  );
+}
+
+export function isAuthMethodLinked(
+  user: User | null | undefined,
+  provider: LinkedIdentityProvider,
+) {
+  if (provider === 'email') {
+    return isEmailIdentityLinked(user);
+  }
+  return isProviderLinked(user, provider);
+}
+
 export function findProviderIdentity(user: User | null | undefined, provider: SocialIdentityProvider) {
   return (user?.identities ?? []).find((identity) =>
     matchesIdentityProvider(identity.provider, provider),
   );
 }
 
-export function canUnlinkProvider(user: User | null | undefined, provider: SocialIdentityProvider) {
-  return isProviderLinked(user, provider) && linkedSocialProviderCount(user) >= 2;
+export function findLinkedIdentity(user: User | null | undefined, provider: LinkedIdentityProvider) {
+  if (provider === 'email') {
+    return (user?.identities ?? []).find((identity) => identity.provider === 'email');
+  }
+  return findProviderIdentity(user, provider);
+}
+
+export function canUnlinkProvider(user: User | null | undefined, provider: LinkedIdentityProvider) {
+  return isAuthMethodLinked(user, provider) && linkedAuthMethodCount(user) >= 2;
+}
+
+function accountStatus(
+  user: User | null | undefined,
+  provider: LinkedIdentityProvider,
+  unlinkable: boolean,
+): LinkedAccountStatus {
+  const linked = isAuthMethodLinked(user, provider);
+  const identity =
+    provider === 'email'
+      ? (user?.identities ?? []).find((item) => item.provider === 'email')
+      : findProviderIdentity(user, provider);
+  const phoneHint = provider === 'phone' ? normalizePhone(user?.phone) : null;
+  return {
+    provider,
+    label: provider === 'email' ? SOCIAL_LINK_LABELS.email : SOCIAL_IDENTITY_LABELS[provider],
+    linked,
+    canUnlink: linked && unlinkable,
+    hint: identityHint(identity, provider) || phoneHint,
+  };
 }
 
 export function listLinkedAccountStatuses(user: User | null | undefined): LinkedAccountStatus[] {
-  const unlinkable = linkedSocialProviderCount(user) >= 2;
-  return SOCIAL_IDENTITY_PROVIDERS.map((provider) => {
-    const linked = isProviderLinked(user, provider);
-    const identity = findProviderIdentity(user, provider);
-    const phoneHint = provider === 'phone' ? normalizePhone(user?.phone) : null;
-    return {
-      provider,
-      label: SOCIAL_IDENTITY_LABELS[provider],
-      linked,
-      canUnlink: linked && unlinkable,
-      hint: identityHint(identity, provider) || phoneHint,
-    };
-  });
+  const unlinkable = linkedAuthMethodCount(user) >= 2;
+  return SOCIAL_IDENTITY_PROVIDERS.map((provider) => accountStatus(user, provider, unlinkable));
+}
+
+export function listSocialLinkStatuses(user: User | null | undefined): LinkedAccountStatus[] {
+  const unlinkable = linkedAuthMethodCount(user) >= 2;
+  return SOCIAL_LINK_PROVIDERS.map((provider) => accountStatus(user, provider, unlinkable));
+}
+
+export function linkedAccountsPayload(user: User | null | undefined) {
+  const phone = accountStatus(user, 'phone', linkedAuthMethodCount(user) >= 2);
+  return {
+    accounts: listSocialLinkStatuses(user),
+    phone: user?.phone ?? phone.hint ?? null,
+    phoneLinked: phone.linked,
+    phoneCanUnlink: phone.canUnlink,
+    phoneHint: phone.hint,
+  };
 }
 
 let providerRpcAvailable = true;

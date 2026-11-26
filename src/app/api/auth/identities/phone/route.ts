@@ -3,7 +3,7 @@ import { connection } from 'next/server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { linkPhoneToAccount } from '@/lib/account-delete';
 import { getApiAuthUser } from '@/lib/auth-api-user';
-import { listLinkedAccountStatuses } from '@/lib/auth-identities';
+import { linkedAccountsPayload } from '@/lib/auth-identities';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     const updated = await linkPhoneToAccount(admin, user, phone);
     return NextResponse.json(
-      { data: { accounts: listLinkedAccountStatuses(updated) } },
+      { data: linkedAccountsPayload(updated) },
       { headers: NO_STORE },
     );
   } catch (error) {

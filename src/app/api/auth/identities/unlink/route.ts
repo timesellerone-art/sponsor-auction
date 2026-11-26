@@ -6,8 +6,9 @@ import { getApiAuthUser } from '@/lib/auth-api-user';
 import {
   SOCIAL_IDENTITY_PROVIDERS,
   canUnlinkProvider,
-  findProviderIdentity,
-  listLinkedAccountStatuses,
+  findLinkedIdentity,
+  linkedAccountsPayload,
+  type LinkedIdentityProvider,
   type SocialIdentityProvider,
 } from '@/lib/auth-identities';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
@@ -18,8 +19,8 @@ const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
 } as const;
 
-function isSocialProvider(value: string): value is SocialIdentityProvider {
-  return (SOCIAL_IDENTITY_PROVIDERS as readonly string[]).includes(value);
+function isUnlinkProvider(value: string): value is LinkedIdentityProvider {
+  return value === 'email' || (SOCIAL_IDENTITY_PROVIDERS as readonly string[]).includes(value);
 }
 
 export async function POST(request: NextRequest) {
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json().catch(() => null)) as { provider?: string } | null;
     const provider = body?.provider?.trim().toLowerCase() ?? '';
-    if (!isSocialProvider(provider)) {
+    if (!isUnlinkProvider(provider)) {
       return NextResponse.json({ error: '해제할 계정을 선택해 주세요.' }, { status: 400, headers: NO_STORE });
     }
 
@@ -56,12 +57,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const identity = findProviderIdentity(user, provider);
+    const identity = findLinkedIdentity(user, provider);
     if (identity) {
       const unlinked = await supabase.auth.unlinkIdentity(identity);
       if (unlinked.error) {
         console.warn('[SponsorAuction] GoTrue unlinkIdentity 실패, RPC로 이어갑니다', unlinked.error.message);
       }
+    }
+
+    if (provider === 'email') {
+      const latest = await supabase.auth.getUser();
+      return NextResponse.json(
+        { data: linkedAccountsPayload(latest.data.user ?? user) },
+        { headers: NO_STORE },
+      );
     }
 
     const admin = createAdminClient();
@@ -72,9 +81,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const updated = await unlinkSocialProvider(admin, user, provider);
+    const updated = await unlinkSocialProvider(admin, user, provider as SocialIdentityProvider);
     return NextResponse.json(
-      { data: { accounts: listLinkedAccountStatuses(updated) } },
+      { data: linkedAccountsPayload(updated) },
       { headers: NO_STORE },
     );
   } catch (error) {

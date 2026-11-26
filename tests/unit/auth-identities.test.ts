@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   canUnlinkProvider,
   listLinkedAccountStatuses,
+  listSocialLinkStatuses,
   userHasBundledSocialIdentities,
   userHasProviderIdentity,
 } from '../../src/lib/auth-identities';
@@ -93,6 +94,34 @@ describe('소셜 identity 묶음', () => {
     assert.equal(canUnlinkProvider(afterMagicLink, 'kakao'), true);
     assert.equal(
       listLinkedAccountStatuses(afterMagicLink).find((item) => item.provider === 'google')?.linked,
+      true,
+    );
+  });
+
+  it('Email·Google·Kakao·Naver 연결 여부를 identities 기준으로 보여 주고 2개 이상일 때만 해제한다', () => {
+    const googleOnly = {
+      identities: [{ provider: 'google', id: 'g-1', identity_data: { email: 'a@x.com' } }],
+      email: 'a@x.com',
+    } as never;
+    const social = listSocialLinkStatuses(googleOnly);
+    assert.deepEqual(
+      social.map((item) => item.provider),
+      ['email', 'google', 'kakao', 'naver'],
+    );
+    assert.equal(social.find((item) => item.provider === 'email')?.linked, false);
+    assert.equal(social.find((item) => item.provider === 'google')?.linked, true);
+    assert.equal(canUnlinkProvider(googleOnly, 'google'), false);
+
+    const emailAndGoogle = {
+      identities: [
+        { provider: 'email', id: 'e-1', email: 'a@x.com' },
+        { provider: 'google', id: 'g-1', identity_data: { email: 'b@y.com' } },
+      ],
+    } as never;
+    assert.equal(canUnlinkProvider(emailAndGoogle, 'google'), true);
+    assert.equal(canUnlinkProvider(emailAndGoogle, 'email'), true);
+    assert.equal(
+      listSocialLinkStatuses(emailAndGoogle).find((item) => item.provider === 'email')?.linked,
       true,
     );
   });

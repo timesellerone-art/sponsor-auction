@@ -306,6 +306,60 @@ function authorizeUrlForProvider(provider: SocialOAuthProvider, url: string) {
   return sanitizeKakaoAuthorizeUrl(url, getSupabaseOAuthCallbackUrl());
 }
 
+function socialOAuthOptions(provider: Exclude<SocialOAuthProvider, 'naver'>) {
+  const oauthOptions: {
+    redirectTo: string;
+    skipBrowserRedirect: boolean;
+    scopes?: string;
+    queryParams?: Record<string, string>;
+  } = {
+    redirectTo: buildAppOAuthCallbackUrl(publicAppOrigin()),
+    skipBrowserRedirect: true,
+  };
+  if (provider === 'kakao') {
+    oauthOptions.scopes = kakaoOAuthScopesOption();
+    oauthOptions.queryParams = { scope: kakaoOAuthScopeQuery() };
+  } else {
+    oauthOptions.queryParams = { access_type: 'offline', prompt: 'consent' };
+  }
+  return oauthOptions;
+}
+
+export async function linkSocialIdentity(
+  provider: SocialOAuthProvider,
+): Promise<DataResult<boolean>> {
+  if (provider === 'naver') {
+    return signInWithNaver('/my/settings');
+  }
+  const supabase = createClient();
+  if (!supabase) {
+    return fail(false, 'Supabase가 설정되지 않아 소셜 계정을 연결할 수 없습니다.');
+  }
+  try {
+    const session = await supabase.auth.getSession();
+    if (!session.data.session?.user) {
+      return fail(false, '로그인이 필요합니다.');
+    }
+    rememberOAuthStart(provider, '/my/settings');
+    const linked = await supabase.auth.linkIdentity({
+      provider,
+      options: socialOAuthOptions(provider),
+    });
+    if (linked.error || !linked.data.url) {
+      console.warn('[SponsorAuction] linkIdentity 실패', linked.error?.message);
+      return fail(
+        false,
+        linked.error?.message || '소셜 계정을 현재 계정에 연결하지 못했습니다.',
+      );
+    }
+    window.location.assign(authorizeUrlForProvider(provider, linked.data.url));
+    return ok(true);
+  } catch (error) {
+    console.warn('[SponsorAuction] 소셜 계정 연결 중 예외가 발생했습니다.', error);
+    return fail(false, AUTH_FAIL_MESSAGE);
+  }
+}
+
 export async function signInWithOAuth(
   provider: SocialOAuthProvider,
   nextPath?: string | null,
@@ -321,21 +375,7 @@ export async function signInWithOAuth(
 
   try {
     rememberOAuthStart(provider, nextPath);
-    const oauthOptions: {
-      redirectTo: string;
-      skipBrowserRedirect: boolean;
-      scopes?: string;
-      queryParams?: Record<string, string>;
-    } = {
-      redirectTo: buildAppOAuthCallbackUrl(publicAppOrigin()),
-      skipBrowserRedirect: true,
-    };
-    if (provider === 'kakao') {
-      oauthOptions.scopes = kakaoOAuthScopesOption();
-      oauthOptions.queryParams = { scope: kakaoOAuthScopeQuery() };
-    } else if (provider === 'google') {
-      oauthOptions.queryParams = { access_type: 'offline', prompt: 'consent' };
-    }
+    const oauthOptions = socialOAuthOptions(provider);
 
     const wantsAccountLink = Boolean(sanitizeNextPath(nextPath)?.startsWith('/my/settings'));
     if (wantsAccountLink) {

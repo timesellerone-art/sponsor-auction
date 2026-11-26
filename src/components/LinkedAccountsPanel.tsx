@@ -3,16 +3,17 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { Loader2, Smartphone, X } from 'lucide-react';
+import { Loader2, Mail, Smartphone, X } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
-import { signInWithOAuth } from '@/lib/auth';
+import { linkSocialIdentity } from '@/lib/auth';
 import { loginPath } from '@/lib/auth-guard';
 import {
-  listLinkedAccountStatuses,
+  isLinkableSocialProvider,
+  listSocialLinkStatuses,
   type LinkedAccountStatus,
-  type SocialIdentityProvider,
+  type LinkedIdentityProvider,
 } from '@/lib/auth-identities';
 import { isDemoAccountEmail } from '@/lib/auth-mock';
 import { authRequestInit } from '@/lib/auth-request';
@@ -23,12 +24,15 @@ type AccountsResponse = {
     name?: string | null;
     email?: string | null;
     phone?: string | null;
+    phoneLinked?: boolean;
+    phoneCanUnlink?: boolean;
+    phoneHint?: string | null;
     accounts?: LinkedAccountStatus[];
   };
   error?: string;
 };
 
-function providerButtonClass(provider: SocialIdentityProvider, linked: boolean) {
+function providerButtonClass(provider: LinkedIdentityProvider, linked: boolean) {
   if (linked) {
     return 'border-zinc-200 bg-white';
   }
@@ -44,7 +48,10 @@ function providerButtonClass(provider: SocialIdentityProvider, linked: boolean) 
   return 'border-clink-peach-strong bg-clink-peach';
 }
 
-function ProviderMark({ provider }: { provider: SocialIdentityProvider }) {
+function ProviderMark({ provider }: { provider: LinkedIdentityProvider }) {
+  if (provider === 'email') {
+    return <Mail className="size-5 text-zinc-600" aria-hidden />;
+  }
   if (provider === 'google') {
     return (
       <svg viewBox="0 0 24 24" className="size-5" aria-hidden>
@@ -92,17 +99,32 @@ export function LinkedAccountsPanel() {
   const router = useRouter();
   const { user, ready, refresh } = useAuth();
   const [accounts, setAccounts] = useState<LinkedAccountStatus[]>(() =>
-    listLinkedAccountStatuses(null),
+    listSocialLinkStatuses(null),
   );
   const [loading, setLoading] = useState(true);
-  const [busyProvider, setBusyProvider] = useState<SocialIdentityProvider | null>(null);
-  const [unlinkTarget, setUnlinkTarget] = useState<SocialIdentityProvider | null>(null);
+  const [busyProvider, setBusyProvider] = useState<LinkedIdentityProvider | null>(null);
+  const [unlinkTarget, setUnlinkTarget] = useState<LinkedIdentityProvider | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [phone, setPhone] = useState('');
   const [phoneBusy, setPhoneBusy] = useState(false);
   const [profilePhone, setProfilePhone] = useState<string | null>(null);
+  const [phoneLinked, setPhoneLinked] = useState(false);
+  const [phoneCanUnlink, setPhoneCanUnlink] = useState(false);
+
+  const applyAccountsPayload = useCallback(
+    (payload: AccountsResponse | null, fallbackPhone?: string | null) => {
+      const nextAccounts = Array.isArray(payload?.data?.accounts)
+        ? payload.data.accounts
+        : listSocialLinkStatuses(null);
+      setAccounts(nextAccounts);
+      setProfilePhone(payload?.data?.phone || payload?.data?.phoneHint || fallbackPhone || null);
+      setPhoneLinked(Boolean(payload?.data?.phoneLinked));
+      setPhoneCanUnlink(Boolean(payload?.data?.phoneCanUnlink));
+    },
+    [],
+  );
 
   const loadAccounts = useCallback(async () => {
     if (!ready) {
@@ -114,8 +136,10 @@ export function LinkedAccountsPanel() {
       return;
     }
     if (isDemoAccountEmail(user.email)) {
-      setAccounts(listLinkedAccountStatuses(null));
+      setAccounts(listSocialLinkStatuses(null));
       setProfilePhone(user.phone || null);
+      setPhoneLinked(Boolean(user.phone));
+      setPhoneCanUnlink(false);
       setLoading(false);
       return;
     }
@@ -127,7 +151,7 @@ export function LinkedAccountsPanel() {
         response = await fetch('/api/auth/identities', await authRequestInit());
       }
       if (response.status === 401) {
-        setAccounts(listLinkedAccountStatuses(null));
+        setAccounts(listSocialLinkStatuses(null));
         setLoading(false);
         return;
       }
@@ -135,19 +159,14 @@ export function LinkedAccountsPanel() {
       if (!response.ok) {
         throw new Error(payload?.error || '연동 계정을 불러오지 못했습니다.');
       }
-      const accounts = Array.isArray(payload?.data?.accounts) ? payload.data.accounts : [];
-      setAccounts(accounts);
-      const linkedPhone = accounts.find(
-        (account) => account.provider === 'phone' && account.linked,
-      )?.hint;
-      setProfilePhone(payload?.data?.phone || linkedPhone || user.phone || null);
+      applyAccountsPayload(payload, user.phone);
     } catch (error) {
       console.warn('[SponsorAuction] 연동 계정 조회 실패', error);
       showToast(error instanceof Error ? error.message : '연동 계정을 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
-  }, [ready, refresh, router, user]);
+  }, [applyAccountsPayload, ready, refresh, router, user]);
 
   useEffect(() => {
     if (!ready) {
@@ -159,7 +178,7 @@ export function LinkedAccountsPanel() {
     return () => window.clearTimeout(timer);
   }, [loadAccounts, ready]);
 
-  const handleLink = async (provider: SocialIdentityProvider) => {
+  const handleLink = async (provider: LinkedIdentityProvider) => {
     if (busyProvider) {
       return;
     }
@@ -167,9 +186,12 @@ export function LinkedAccountsPanel() {
       setPhoneOpen(true);
       return;
     }
+    if (provider === 'email' || !isLinkableSocialProvider(provider)) {
+      return;
+    }
     setBusyProvider(provider);
     try {
-      const result = await signInWithOAuth(provider, '/my/settings');
+      const result = await linkSocialIdentity(provider);
       if (result.error) {
         showToast(result.error);
       }
@@ -198,7 +220,7 @@ export function LinkedAccountsPanel() {
       if (!response.ok) {
         throw new Error(payload?.error || '연동을 해제하지 못했습니다.');
       }
-      setAccounts(Array.isArray(payload?.data?.accounts) ? payload.data.accounts : []);
+      applyAccountsPayload(payload, user?.phone);
       showToast('연동을 해제했습니다.', 'success');
     } catch (error) {
       console.warn('[SponsorAuction] 소셜 연동 해제 실패', error);
@@ -226,7 +248,7 @@ export function LinkedAccountsPanel() {
       if (!response.ok) {
         throw new Error(payload?.error || '휴대전화를 연동하지 못했습니다.');
       }
-      setAccounts(Array.isArray(payload?.data?.accounts) ? payload.data.accounts : []);
+      applyAccountsPayload(payload, user?.phone);
       showToast('휴대전화를 연동했습니다.', 'success');
       setPhoneOpen(false);
       setPhone('');
@@ -280,17 +302,44 @@ export function LinkedAccountsPanel() {
           </div>
           <div className="rounded-xl bg-zinc-50 px-4 py-3">
             <dt className="text-xs font-medium text-zinc-500">휴대전화번호</dt>
-            <dd className="mt-1 truncate text-sm font-semibold text-zinc-950">
-              {profilePhone || user?.phone || '미등록'}
+            <dd className="mt-1 flex min-w-0 items-center justify-between gap-2">
+              <span className="truncate text-sm font-semibold text-zinc-950">
+                {profilePhone || user?.phone || '미등록'}
+              </span>
+              {phoneLinked ? (
+                <button
+                  type="button"
+                  disabled={!phoneCanUnlink || Boolean(busyProvider)}
+                  title={
+                    phoneCanUnlink
+                      ? '휴대전화 연동 해제'
+                      : '마지막 로그인 수단은 해제할 수 없습니다.'
+                  }
+                  onClick={() => setUnlinkTarget('phone')}
+                  className="h-8 shrink-0 rounded-full border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  연동 해제
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={Boolean(busyProvider)}
+                  onClick={() => setPhoneOpen(true)}
+                  className="h-8 shrink-0 rounded-full bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  연동하기
+                </button>
+              )}
             </dd>
           </div>
         </dl>
       </section>
 
       <section className="mt-4 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
-        <h2 className="text-lg font-bold text-zinc-950">연동된 계정</h2>
+        <h2 className="text-lg font-bold text-zinc-950">소셜 계정 연동</h2>
         <p className="mt-1 text-sm text-zinc-500">
-          Google, Kakao, Naver, Phone 연동 상태를 확인하고 추가로 연결하거나 해제할 수 있습니다.
+          Email, Google, Kakao, Naver 연결 여부를 확인하고, 이메일이 다른 소셜 계정도 현재 계정에
+          합칠 수 있습니다. 인증 수단이 2개 이상일 때만 연동을 해제할 수 있습니다.
         </p>
 
         {loading ? (
@@ -315,14 +364,14 @@ export function LinkedAccountsPanel() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-zinc-950">{account.label}</p>
                     <p className="truncate text-xs text-zinc-500">
-                      {account.linked ? account.hint || '연동됨' : '미연동'}
+                      {account.linked ? account.hint || '연결됨' : '미연결'}
                     </p>
                   </div>
                 </div>
                 {account.linked ? (
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="rounded-full bg-clink-peach px-2 py-0.5 text-xs font-semibold text-clink-accent">
-                      연동됨
+                      연결됨
                     </span>
                     <button
                       type="button"
@@ -330,7 +379,7 @@ export function LinkedAccountsPanel() {
                       title={
                         account.canUnlink
                           ? `${account.label} 연동 해제`
-                          : '마지막 로그인 수단은 해제할 수 없습니다.'
+                          : '인증 수단이 2개 이상일 때만 해제할 수 있습니다.'
                       }
                       onClick={() => setUnlinkTarget(account.provider)}
                       className="h-8 rounded-full border border-zinc-200 bg-white px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -338,6 +387,10 @@ export function LinkedAccountsPanel() {
                       연동 해제
                     </button>
                   </div>
+                ) : account.provider === 'email' ? (
+                  <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-500">
+                    미연결
+                  </span>
                 ) : (
                   <button
                     type="button"
@@ -347,7 +400,7 @@ export function LinkedAccountsPanel() {
                     }}
                     className="h-8 shrink-0 rounded-full bg-zinc-950 px-3 text-xs font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {busyProvider === account.provider ? '연결 중...' : '연동하기'}
+                    {busyProvider === account.provider ? '연결 중...' : '연결하기'}
                   </button>
                 )}
               </li>
@@ -371,7 +424,7 @@ export function LinkedAccountsPanel() {
         key={unlinkTarget ? `unlink-${unlinkTarget}` : 'unlink-closed'}
         open={Boolean(unlinkTarget)}
         title="연동을 해제할까요?"
-        description="이 로그인 수단으로 더 이상 접속할 수 없습니다. 다른 연동 계정이 하나 이상 남아 있어야 합니다."
+        description="이 로그인 수단으로 더 이상 접속할 수 없습니다. 인증 수단이 2개 이상 남아 있어야 해제할 수 있습니다."
         confirmLabel="연동 해제"
         busyLabel="해제 중..."
         busy={Boolean(busyProvider)}

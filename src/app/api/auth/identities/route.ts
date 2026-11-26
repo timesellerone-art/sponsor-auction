@@ -2,7 +2,7 @@ import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getApiAuthUser } from '@/lib/auth-api-user';
-import { listLinkedAccountStatuses } from '@/lib/auth-identities';
+import { linkedAccountsPayload } from '@/lib/auth-identities';
 import { clientIp, consumeRateLimit } from '@/lib/rate-limit';
 
 
@@ -40,8 +40,7 @@ export async function GET(request: Request) {
             (typeof user.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
             null,
           email: user.email ?? null,
-          phone: user.phone ?? null,
-          accounts: listLinkedAccountStatuses(user),
+          ...linkedAccountsPayload(user),
         },
       },
       { headers: NO_STORE },

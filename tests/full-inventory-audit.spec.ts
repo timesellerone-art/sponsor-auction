@@ -249,7 +249,7 @@ test.describe('전수 검증 B · 광고주', () => {
     await expect(page.getByRole('link', { name: '제안 현황 보기' }).first()).toBeVisible();
 
     await page.goto('/my/settings');
-    await expect(page.getByRole('heading', { name: '연동된 계정' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '소셜 계정 연동' })).toBeVisible();
     await expect(page.getByRole('button', { name: '회원 탈퇴' })).toBeVisible();
 
     const png = Buffer.from(

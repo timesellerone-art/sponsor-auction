@@ -13,7 +13,7 @@ test.describe('마이페이지 대시보드', () => {
     await expect(page.getByText('결제 완료').first()).toBeVisible();
     await page.getByRole('link', { name: '계정 설정' }).click();
     await expect(page).toHaveURL(/\/my\/settings/);
-    await expect(page.getByRole('heading', { name: '연동된 계정' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '소셜 계정 연동' })).toBeVisible();
     await expect(page.getByText('연동 상태를 확인하는 중')).toHaveCount(0);
     expect(consoleNoise, consoleNoise.join('\n')).toEqual([]);
   });

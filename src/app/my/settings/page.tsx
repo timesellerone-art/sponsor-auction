@@ -18,7 +18,8 @@ export default function AccountSettingsPage() {
         <p className="mt-6 text-sm font-semibold tracking-wide text-clink-accent">계정</p>
         <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">계정 설정</h1>
         <p className="mt-2 max-w-2xl text-sm text-zinc-500">
-          연동된 소셜 계정과 휴대전화를 관리할 수 있습니다.
+          소셜 계정 연동과 휴대전화를 관리할 수 있습니다. 이메일이 다른 Google·Kakao·Naver도 현재
+          계정에 합칠 수 있습니다.
         </p>
         <LinkedAccountsPanel />
         {activeRole === 'creator' ? <SettlementAccountForm /> : null}
