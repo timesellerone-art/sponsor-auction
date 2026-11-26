@@ -7,6 +7,8 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { recordBypassIfNeeded } from '@/lib/compliance';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getTimeSlotById, listTimeSlotBids, placeTimeSlotBid } from '@/lib/timeslots';
 import { hasAuthRole } from '@/types/auth';
 import { VALIDATION } from '@/lib/validation';
@@ -15,6 +17,10 @@ import { OffPlatformContactError, assertNoOffPlatformContact } from '@/utils/fil
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
 } as const;
+
+async function timeslotWriter() {
+  return createAdminClient() ?? (await createServerClient());
+}
 
 function asText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
@@ -31,6 +37,14 @@ function asNumber(value: unknown) {
   return NaN;
 }
 
+function slotIdFromParams(id: string) {
+  try {
+    return decodeURIComponent(id.trim());
+  } catch {
+    return id.trim();
+  }
+}
+
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
@@ -42,7 +56,8 @@ export async function GET(
       // 조회는 계속합니다.
     }
     const { id } = await context.params;
-    const result = await listTimeSlotBids(id);
+    const slotId = slotIdFromParams(id);
+    const result = await listTimeSlotBids(slotId, await timeslotWriter());
     if (result.error) {
       return NextResponse.json(
         { error: result.error, errorMessage: result.error },
@@ -76,8 +91,20 @@ export async function POST(
       return unauthorizedJson('제안하려면 로그인해 주세요.');
     }
     const { id } = await context.params;
-    const slot = await getTimeSlotById(id);
-    if (slot.data?.creatorId && actor.userId && slot.data.creatorId === actor.userId) {
+    const slotId = slotIdFromParams(id);
+    const writer = await timeslotWriter();
+    const slot = await getTimeSlotById(slotId, writer);
+    if (!slot.data) {
+      return NextResponse.json(
+        {
+          error: slot.error ?? '크리에이터 상품을 찾을 수 없습니다.',
+          errorMessage: slot.error ?? '크리에이터 상품을 찾을 수 없습니다.',
+          errorCode: 'TIMESLOT_NOT_FOUND',
+        },
+        { status: 404, headers: NO_STORE },
+      );
+    }
+    if (slot.data.creatorId && actor.userId && slot.data.creatorId === actor.userId) {
       return forbiddenJson('본인 상품에는 제안할 수 없습니다.');
     }
     const actingAdvertiser =
@@ -92,7 +119,7 @@ export async function POST(
       text: message,
       source: 'timeslot_bid',
       actorId: actor.userId,
-      auctionId: id,
+      auctionId: slotId,
     });
     try {
       assertNoOffPlatformContact(message);
@@ -108,13 +135,16 @@ export async function POST(
       );
     }
 
-    const result = await placeTimeSlotBid({
-      timeSlotId: id,
-      advertiserId: (actor.userId ?? asText(body?.advertiserId)) || null,
-      advertiserName: asText(body?.advertiserName) || '광고주',
-      bidAmount: asNumber(body?.bidAmount),
-      message,
-    });
+    const result = await placeTimeSlotBid(
+      {
+        timeSlotId: slot.data.id,
+        advertiserId: (actor.userId ?? asText(body?.advertiserId)) || null,
+        advertiserName: asText(body?.advertiserName) || '광고주',
+        bidAmount: asNumber(body?.bidAmount),
+        message,
+      },
+      writer,
+    );
     if (result.error || !result.data) {
       const text = result.error ?? '제안을 등록하지 못했습니다.';
       return NextResponse.json(

@@ -69,11 +69,37 @@ export function TimeslotDetail({ id }: { id: string }) {
       setLoading(true);
     }
     try {
-      const [slotResult, bidResult] = await Promise.all([
-        getTimeSlotById(id),
-        listTimeSlotBids(id),
+      const encodedId = encodeURIComponent(id);
+      const [slotRes, bidRes] = await Promise.all([
+        fetch(`/api/timeslots/${encodedId}`, { cache: 'no-store' }).catch(() => null),
+        fetch(`/api/timeslots/${encodedId}/bids`, { cache: 'no-store' }).catch(() => null),
       ]);
-      const incoming = Array.isArray(bidResult.data) ? bidResult.data : [];
+      const slotJson = slotRes
+        ? ((await slotRes.json().catch(() => null)) as {
+            data?: TimeSlotItem | null;
+            error?: string;
+          } | null)
+        : null;
+      const bidJson = bidRes
+        ? ((await bidRes.json().catch(() => null)) as {
+            data?: TimeSlotBidItem[];
+            error?: string;
+          } | null)
+        : null;
+      const slotFromApi = slotRes?.ok ? slotJson?.data ?? null : null;
+      const bidsFromApi = bidRes?.ok && Array.isArray(bidJson?.data) ? bidJson.data : null;
+      const [slotFallback, bidFallback] =
+        slotFromApi && bidsFromApi
+          ? [null, null]
+          : await Promise.all([
+              slotFromApi ? Promise.resolve(null) : getTimeSlotById(id),
+              bidsFromApi ? Promise.resolve(null) : listTimeSlotBids(id),
+            ]);
+      const slotResult = {
+        data: slotFromApi ?? slotFallback?.data ?? null,
+        error: slotFromApi ? null : slotFallback?.error ?? slotJson?.error ?? null,
+      };
+      const incoming = bidsFromApi ?? (Array.isArray(bidFallback?.data) ? bidFallback.data : []);
       setBids((current) => mergeTimeslotBids(silent ? current : [], incoming));
       setSlot((current) => {
         const next = slotResult.data;

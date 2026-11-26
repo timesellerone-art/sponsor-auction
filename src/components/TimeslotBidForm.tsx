@@ -96,10 +96,10 @@ export function TimeslotBidForm({
       let result: Awaited<ReturnType<typeof placeTimeSlotBid>>;
       try {
         const response = await fetch(
-          `/api/timeslots/${slot.id}/bids`,
+          `/api/timeslots/${encodeURIComponent(slot.id)}/bids`,
           await authRequestInit({
             method: 'POST',
-            body: JSON.stringify(payload),
+            body: JSON.stringify({ ...payload, timeSlotId: slot.id }),
           }),
         );
         const json = (await response.json().catch(() => null)) as {
@@ -178,7 +178,8 @@ export function TimeslotBidForm({
       <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <button
           type="button"
-          onClick={() => {
+          onClick={(event) => {
+            event.preventDefault();
             if (!ensureAdvertiser()) {
               return;
             }

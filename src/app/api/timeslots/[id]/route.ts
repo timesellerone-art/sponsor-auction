@@ -6,8 +6,14 @@ import {
   getPaymentActor,
   unauthorizedJson,
 } from '@/lib/payments/guard';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient as createServerClient } from '@/lib/supabase/server';
 import { closeTimeSlot, getTimeSlotById } from '@/lib/timeslots';
 import { isUuid } from '@/lib/uuid';
+
+async function timeslotWriter() {
+  return createAdminClient() ?? (await createServerClient());
+}
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -24,7 +30,7 @@ export async function GET(
       // 조회는 계속합니다.
     }
     const { id } = await context.params;
-    const result = await getTimeSlotById(id);
+    const result = await getTimeSlotById(id, await timeslotWriter());
     if (result.error || !result.data) {
       const message = result.error ?? '크리에이터 상품을 찾을 수 없습니다.';
       return NextResponse.json(
@@ -66,7 +72,7 @@ export async function PATCH(
         { status: 400, headers: NO_STORE },
       );
     }
-    const current = await getTimeSlotById(id);
+    const current = await getTimeSlotById(id, await timeslotWriter());
     const ownerId = current.data?.creatorId;
     if (ownerId && isUuid(ownerId) && ownerId !== actor.userId) {
       return forbiddenJson('본인 상품만 마감할 수 있습니다.');

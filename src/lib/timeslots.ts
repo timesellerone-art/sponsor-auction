@@ -312,16 +312,25 @@ export async function listTimeSlots(options?: {
   }
 }
 
+function normalizeSlotId(id: string) {
+  try {
+    return decodeURIComponent(id.trim());
+  } catch {
+    return id.trim();
+  }
+}
+
 export async function getTimeSlotById(
   id: string,
   client?: SponsorAuctionClient | null,
 ): Promise<DataResult<TimeSlotItem | null>> {
-  if (!id.trim()) {
+  const slotId = normalizeSlotId(id);
+  if (!slotId) {
     return fail(null, '크리에이터 상품 ID가 필요합니다.');
   }
-  const supabase = client ?? (await getDataClient());
-  if (!supabase || !isUuid(id)) {
-    const found = slotsStore.find((item) => item.id === id) ?? null;
+  const supabase = await getTimeslotReadClient(client);
+  if (!supabase || !isUuid(slotId)) {
+    const found = slotsStore.find((item) => item.id === slotId) ?? null;
     if (!found) {
       return fail(null, '크리에이터 상품을 찾을 수 없습니다.');
     }
@@ -333,10 +342,21 @@ export async function getTimeSlotById(
     const { data, error } = await supabase
       .from('time_slots')
       .select(SLOT_COLUMNS)
-      .eq('id', id)
+      .eq('id', slotId)
       .maybeSingle();
-    if (error || !data) {
-      const found = slotsStore.find((item) => item.id === id) ?? null;
+    if (error) {
+      if (isSchemaMismatch(error)) {
+        const found = slotsStore.find((item) => item.id === slotId) ?? null;
+        if (found) {
+          const [withScore] = await withScores([applySlotExpiry(found)]);
+          return ok(withScore ?? applySlotExpiry(found));
+        }
+      }
+      console.warn('[SponsorAuction] 크리에이터 상품 조회 실패', error.message);
+      return fail(null, '크리에이터 상품을 찾을 수 없습니다.');
+    }
+    if (!data) {
+      const found = slotsStore.find((item) => item.id === slotId) ?? null;
       if (found) {
         const [withScore] = await withScores([applySlotExpiry(found)]);
         return ok(withScore ?? applySlotExpiry(found));
@@ -354,13 +374,14 @@ export async function listTimeSlotBids(
   slotId: string,
   client?: SponsorAuctionClient | null,
 ): Promise<DataResult<TimeSlotBidItem[]>> {
-  if (!slotId.trim()) {
+  const id = normalizeSlotId(slotId);
+  if (!id) {
     return fail([], '크리에이터 상품 ID가 필요합니다.');
   }
-  const supabase = client ?? (await getDataClient());
-  if (!supabase || !isUuid(slotId)) {
+  const supabase = await getTimeslotReadClient(client);
+  if (!supabase || !isUuid(id)) {
     const bids = slotBidsStore
-      .filter((item) => item.timeSlotId === slotId)
+      .filter((item) => item.timeSlotId === id)
       .sort((left, right) => right.bidAmount - left.bidAmount);
     const leading = bids[0]?.bidAmount ?? 0;
     return ok(bids.map((item) => ({ ...item, isLeading: item.bidAmount === leading })));
@@ -370,12 +391,12 @@ export async function listTimeSlotBids(
     const { data, error } = await supabase
       .from('time_slot_bids')
       .select(SLOT_BID_COLUMNS)
-      .eq('time_slot_id', slotId)
+      .eq('time_slot_id', id)
       .order('bid_amount', { ascending: false });
     if (error) {
       if (isSchemaMismatch(error)) {
         const bids = slotBidsStore
-          .filter((item) => item.timeSlotId === slotId)
+          .filter((item) => item.timeSlotId === id)
           .sort((left, right) => right.bidAmount - left.bidAmount);
         const leading = bids[0]?.bidAmount ?? 0;
         return ok(bids.map((item) => ({ ...item, isLeading: item.bidAmount === leading })));
@@ -499,10 +520,12 @@ export async function closeTimeSlot(id: string, creatorId?: string | null) {
 
 export async function placeTimeSlotBid(
   input: PlaceTimeSlotBidInput,
+  client?: SponsorAuctionClient | null,
 ): Promise<DataResult<TimeSlotBidItem | null>> {
-  const lockKey = `slot-bid:${input.timeSlotId}:${(input.advertiserName ?? '').trim().toLowerCase()}`;
+  const slotId = normalizeSlotId(input.timeSlotId);
+  const lockKey = `slot-bid:${slotId}:${(input.advertiserName ?? '').trim().toLowerCase()}`;
   return withExclusiveAction(lockKey, fail(null, VALIDATION.actionInFlight), async () => {
-    const slotResult = await getTimeSlotById(input.timeSlotId);
+    const slotResult = await getTimeSlotById(slotId, client);
     const slot = slotResult.data;
     if (!slot) {
       return fail(null, slotResult.error ?? '크리에이터 상품을 찾을 수 없습니다.');
@@ -525,44 +548,48 @@ export async function placeTimeSlotBid(
       return fail(null, VALIDATION.offPlatformContact);
     }
 
-    const supabase = await getDataClient();
-    if (!supabase || !isUuid(input.timeSlotId)) {
-      const created: TimeSlotBidItem = {
-        id: `slot-bid-${Date.now()}`,
-        timeSlotId: input.timeSlotId,
-        advertiserId: input.advertiserId ?? null,
-        advertiserName: (input.advertiserName ?? '').trim() || '광고주',
-        bidAmount: input.bidAmount,
-        message,
-        createdAt: new Date().toISOString(),
-        isLeading: true,
-      };
-      slotBidsStore = [created, ...slotBidsStore];
-      refreshMockSlotEngine(input.timeSlotId);
-      persistSlots();
-      return ok(created);
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('time_slot_bids')
-        .insert({
-          time_slot_id: input.timeSlotId,
-          advertiser_id:
-            input.advertiserId && isUuid(input.advertiserId) ? input.advertiserId : null,
-          advertiser_name: (input.advertiserName ?? '').trim() || '광고주',
-          bid_amount: input.bidAmount,
-          message,
-        })
-        .select(SLOT_BID_COLUMNS)
-        .single();
-      if (error || !data) {
+    const supabase = client ?? (await getDataClient());
+    if (isUuid(slotId)) {
+      if (!supabase) {
         return fail(null, INSERT_FAIL_MESSAGE);
       }
-      return ok(mapSlotBid(data, input.bidAmount));
-    } catch {
-      return fail(null, INSERT_FAIL_MESSAGE);
+      try {
+        const { data, error } = await supabase
+          .from('time_slot_bids')
+          .insert({
+            time_slot_id: slotId,
+            advertiser_id:
+              input.advertiserId && isUuid(input.advertiserId) ? input.advertiserId : null,
+            advertiser_name: (input.advertiserName ?? '').trim() || '광고주',
+            bid_amount: input.bidAmount,
+            message,
+          })
+          .select(SLOT_BID_COLUMNS)
+          .single();
+        if (error || !data) {
+          console.warn('[SponsorAuction] 크리에이터 상품 제안 등록 실패', error?.message);
+          return fail(null, INSERT_FAIL_MESSAGE);
+        }
+        return ok(mapSlotBid(data, input.bidAmount));
+      } catch {
+        return fail(null, INSERT_FAIL_MESSAGE);
+      }
     }
+
+    const created: TimeSlotBidItem = {
+      id: `slot-bid-${Date.now()}`,
+      timeSlotId: slotId,
+      advertiserId: input.advertiserId ?? null,
+      advertiserName: (input.advertiserName ?? '').trim() || '광고주',
+      bidAmount: input.bidAmount,
+      message,
+      createdAt: new Date().toISOString(),
+      isLeading: true,
+    };
+    slotBidsStore = [created, ...slotBidsStore];
+    refreshMockSlotEngine(slotId);
+    persistSlots();
+    return ok(created);
   });
 }
 
