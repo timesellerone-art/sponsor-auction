@@ -82,8 +82,27 @@ export function AiSupportWidget() {
         body: JSON.stringify({ message, history }),
       });
       const payload = (await response.json().catch(() => null)) as
-        | { reply?: string; error?: string; escalate?: boolean }
+        | {
+            reply?: string;
+            error?: string;
+            escalate?: boolean;
+            debug?: {
+              source?: string;
+              reason?: string;
+              status?: number;
+              model?: string;
+              hasApiKey?: boolean;
+              keyEnv?: string | null;
+              triedModels?: string[];
+              detail?: string;
+            };
+          }
         | null;
+      if (payload?.debug) {
+        const failed = payload.debug.source !== 'gemini';
+        const log = failed ? console.warn : console.info;
+        log('[클링크 상담]', payload.debug);
+      }
       if (!response.ok || !payload?.reply) {
         throw new Error(payload?.error || '상담 응답을 받지 못했습니다.');
       }

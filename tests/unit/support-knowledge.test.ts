@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  SUPPORT_CHAT_MODELS,
   SUPPORT_QUICK_PROMPTS,
   answerSupportLocally,
   buildSupportSystemPrompt,
+  classifyGeminiHttpStatus,
+  classifyGeminiThrown,
   isOperatorSupportCase,
   matchSupportKnowledge,
   parseSupportModelPayload,
   quoteContextFromUserText,
   sanitizeSupportReply,
+  supportReplyFromModelText,
 } from '../../src/lib/support-knowledge';
 
 describe('클링크 상담 지식', () => {
@@ -53,6 +57,13 @@ describe('클링크 상담 지식', () => {
     assert.match(biz, /계정 설정/);
     assert.match(biz, /상태 조회/);
 
+    const signup = matchSupportKnowledge('가입절차는?');
+    assert.match(signup, /\/login/);
+    assert.match(signup, /Google/);
+
+    const settle = matchSupportKnowledge('정산은?');
+    assert.match(settle, /정산 계좌/);
+
     assert.equal(isOperatorSupportCase('환불 규정이 궁금해요'), false);
     assert.equal(isOperatorSupportCase('정산이 누락됐어요'), true);
     assert.equal(isOperatorSupportCase('결제 오류로 돈이 빠졌어요'), true);
@@ -80,5 +91,22 @@ describe('클링크 상담 지식', () => {
       sanitizeSupportReply('{"reply":"잘렸습니다"}', '확정 계산: 10%'),
       /확정 계산/,
     );
+  });
+
+  it('Gemini JSON·일반 텍스트를 상담 답변으로 읽고 HTTP 원인을 분류한다', () => {
+    assert.equal(
+      supportReplyFromModelText('{"reply":"가입은 /login 에서 합니다.","escalate":false}')?.reply.includes('/login'),
+      true,
+    );
+    assert.equal(supportReplyFromModelText('광고주는 상단 [+ 캠페인 등록]을 누릅니다.')?.escalate, false);
+    assert.equal(supportReplyFromModelText('{"oops":true}'), null);
+    assert.equal(classifyGeminiHttpStatus(401), 'invalid_api_key');
+    assert.equal(classifyGeminiHttpStatus(429), 'quota');
+    assert.equal(classifyGeminiHttpStatus(404), 'model_not_found');
+    const aborted = new Error('The operation was aborted');
+    aborted.name = 'AbortError';
+    assert.equal(classifyGeminiThrown(aborted), 'timeout');
+    assert.equal((SUPPORT_CHAT_MODELS as readonly string[]).includes('gemini-2.5-flash'), false);
+    assert.equal(SUPPORT_CHAT_MODELS[0], 'gemini-3.5-flash-lite');
   });
 });

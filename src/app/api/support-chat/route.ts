@@ -1,7 +1,12 @@
 import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
-import { extractJsonPayload, geminiGenerateUrl, getGeminiApiKey } from '@/lib/ai-guide';
+import {
+  GEMINI_API_KEY_ENV_NAMES,
+  geminiGenerateUrl,
+  getGeminiApiKey,
+  getGeminiApiKeyEnvName,
+} from '@/lib/ai-guide';
 import { clientIp, consumeKeyedRateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import {
   SUPPORT_CHAT_MODELS,
@@ -11,33 +16,37 @@ import {
   SUPPORT_MESSAGE_MAX_LENGTH,
   answerSupportLocally,
   buildSupportSystemPrompt,
+  classifyGeminiHttpStatus,
+  classifyGeminiThrown,
   isOperatorSupportCase,
-  parseSupportModelPayload,
   quoteContextFromUserText,
   sanitizeSupportReply,
+  supportReplyFromModelText,
+  type SupportAiDebug,
 } from '@/lib/support-knowledge';
 
-const TIMEOUT_MS = 12_000;
+const TIMEOUT_MS = 20_000;
 const HISTORY_MAX = 8;
+const FATAL_REASONS = new Set(['invalid_api_key', 'forbidden', 'quota']);
 
 type ChatTurn = {
   role?: unknown;
   content?: unknown;
 };
 
-function jsonOk(reply: string, escalate = false) {
-  return NextResponse.json({ reply, escalate });
+function jsonOk(reply: string, escalate = false, debug?: SupportAiDebug) {
+  return NextResponse.json({ reply, escalate, debug });
 }
 
-function withEscalation(reply: string, escalate: boolean) {
+function withEscalation(reply: string, escalate: boolean, debug?: SupportAiDebug) {
   const text = reply.trim() || SUPPORT_FALLBACK_MESSAGE;
   if (!escalate) {
-    return jsonOk(text, false);
+    return jsonOk(text, false, debug);
   }
   if (text.includes('1:1 문의')) {
-    return jsonOk(text, true);
+    return jsonOk(text, true, debug);
   }
-  return jsonOk(`${text}\n\n${SUPPORT_ESCALATION_MESSAGE}`, true);
+  return jsonOk(`${text}\n\n${SUPPORT_ESCALATION_MESSAGE}`, true, debug);
 }
 
 function readTurns(value: unknown): Array<{ role: 'user' | 'assistant'; content: string }> {
@@ -80,6 +89,29 @@ function readCandidateText(payload: {
   );
 }
 
+async function readGeminiErrorBody(response: Response) {
+  const raw = await response.text().catch(() => '');
+  try {
+    const json = JSON.parse(raw) as { error?: { message?: string; status?: string; code?: number } };
+    const message = json.error?.message || json.error?.status || '';
+    return message.slice(0, 180);
+  } catch {
+    return raw.replace(/\s+/g, ' ').slice(0, 180);
+  }
+}
+
+function logSupportFailure(debug: SupportAiDebug) {
+  console.warn('[Clink] 고객 상담 Gemini 실패', {
+    reason: debug.reason,
+    status: debug.status,
+    model: debug.model,
+    hasApiKey: debug.hasApiKey,
+    keyEnv: debug.keyEnv,
+    triedModels: debug.triedModels,
+    detail: debug.detail,
+  });
+}
+
 export async function POST(request: Request) {
   try {
     await connection();
@@ -110,18 +142,27 @@ export async function POST(request: Request) {
 
   const history = readTurns(body?.history);
   const operatorCase = isOperatorSupportCase(message);
-  const local = answerSupportLocally(message);
-  if (local?.reply) {
-    return withEscalation(local.reply, operatorCase);
-  }
-
   const quoteContext = quoteContextFromUserText(message);
   const apiKey = getGeminiApiKey();
+  const keyEnv = getGeminiApiKeyEnvName();
+  const local = answerSupportLocally(message);
+
   if (!apiKey) {
-    if (quoteContext) {
-      return withEscalation(quoteContext, operatorCase);
+    const debug: SupportAiDebug = {
+      source: local?.reply ? 'knowledge' : 'fallback',
+      reason: 'missing_api_key',
+      hasApiKey: false,
+      keyEnv: null,
+      detail: `${GEMINI_API_KEY_ENV_NAMES.join(', ')} 중 하나가 Vercel/서버 환경변수에 필요합니다.`,
+    };
+    logSupportFailure(debug);
+    if (local?.reply) {
+      return withEscalation(local.reply, operatorCase || local.escalate, debug);
     }
-    return withEscalation(SUPPORT_FALLBACK_MESSAGE, operatorCase);
+    if (quoteContext) {
+      return withEscalation(quoteContext, operatorCase, debug);
+    }
+    return withEscalation(SUPPORT_FALLBACK_MESSAGE, operatorCase, debug);
   }
 
   const contents = [
@@ -132,8 +173,17 @@ export async function POST(request: Request) {
     { role: 'user', parts: [{ text: message }] },
   ];
 
-  let lastError: Error | null = null;
+  const triedModels: string[] = [];
+  let lastDebug: SupportAiDebug = {
+    source: 'fallback',
+    reason: 'empty',
+    hasApiKey: true,
+    keyEnv,
+    triedModels,
+  };
+
   for (const model of SUPPORT_CHAT_MODELS) {
+    triedModels.push(model);
     try {
       const response = await fetchWithTimeout(geminiGenerateUrl(model), {
         method: 'POST',
@@ -145,18 +195,36 @@ export async function POST(request: Request) {
           systemInstruction: { parts: [{ text: buildSupportSystemPrompt(quoteContext) }] },
           contents,
           generationConfig: {
-            temperature: 0.2,
+            temperature: 0.4,
             maxOutputTokens: 2000,
             responseMimeType: 'application/json',
+            responseSchema: {
+              type: 'OBJECT',
+              properties: {
+                reply: { type: 'STRING' },
+                escalate: { type: 'BOOLEAN' },
+              },
+              required: ['reply', 'escalate'],
+            },
           },
         }),
       });
-      if (response.status === 404) {
-        lastError = new Error(`model unavailable: ${model}`);
-        continue;
-      }
       if (!response.ok) {
-        lastError = new Error(`HTTP ${response.status}`);
+        const detail = await readGeminiErrorBody(response);
+        const reason = classifyGeminiHttpStatus(response.status);
+        lastDebug = {
+          source: 'fallback',
+          reason,
+          status: response.status,
+          model,
+          hasApiKey: true,
+          keyEnv,
+          triedModels: [...triedModels],
+          detail: detail || undefined,
+        };
+        if (FATAL_REASONS.has(reason) || response.status === 401 || response.status === 403 || response.status === 429) {
+          break;
+        }
         continue;
       }
       const payload = (await response.json()) as {
@@ -164,34 +232,62 @@ export async function POST(request: Request) {
       };
       const text = readCandidateText(payload);
       if (!text) {
-        lastError = new Error('empty content');
+        lastDebug = {
+          source: 'fallback',
+          reason: 'empty',
+          status: response.status,
+          model,
+          hasApiKey: true,
+          keyEnv,
+          triedModels: [...triedModels],
+        };
         continue;
       }
-      let parsed: unknown = text;
-      try {
-        parsed = extractJsonPayload(text);
-      } catch {
-        parsed = quoteContext ? { reply: quoteContext, escalate: false } : null;
-      }
-      const result = parseSupportModelPayload(parsed);
+      const result = supportReplyFromModelText(text);
       if (!result) {
-        lastError = new Error('schema mismatch');
-        if (quoteContext) {
-          return withEscalation(quoteContext, operatorCase);
-        }
+        lastDebug = {
+          source: 'fallback',
+          reason: 'schema',
+          status: response.status,
+          model,
+          hasApiKey: true,
+          keyEnv,
+          triedModels: [...triedModels],
+        };
         continue;
       }
       const reply = sanitizeSupportReply(result.reply, quoteContext);
-      return withEscalation(reply, operatorCase);
+      return withEscalation(reply, operatorCase || result.escalate, {
+        source: 'gemini',
+        model,
+        hasApiKey: true,
+        keyEnv,
+        triedModels: [...triedModels],
+      });
     } catch (error) {
       rethrowPrerenderError(error);
-      lastError = error instanceof Error ? error : new Error('request failed');
+      lastDebug = {
+        source: 'fallback',
+        reason: classifyGeminiThrown(error),
+        model,
+        hasApiKey: true,
+        keyEnv,
+        triedModels: [...triedModels],
+        detail: error instanceof Error ? error.message.slice(0, 180) : 'request failed',
+      };
     }
   }
 
-  console.warn('[Clink] 고객 상담 모델 응답 실패', lastError?.message);
-  if (quoteContext) {
-    return withEscalation(quoteContext, operatorCase);
+  lastDebug.triedModels = [...triedModels];
+  if (local?.reply) {
+    lastDebug.source = 'knowledge';
+    logSupportFailure(lastDebug);
+    return withEscalation(local.reply, operatorCase || local.escalate, lastDebug);
   }
-  return withEscalation(SUPPORT_FALLBACK_MESSAGE, operatorCase);
+  if (quoteContext) {
+    logSupportFailure(lastDebug);
+    return withEscalation(quoteContext, operatorCase, lastDebug);
+  }
+  logSupportFailure(lastDebug);
+  return withEscalation(SUPPORT_FALLBACK_MESSAGE, operatorCase, lastDebug);
 }

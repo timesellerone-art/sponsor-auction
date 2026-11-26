@@ -30,12 +30,33 @@ function cleanEnvValue(value: string | undefined) {
   return raw;
 }
 
+export const GEMINI_API_KEY_ENV_NAMES = [
+  'GEMINI_API_KEY',
+  'GOOGLE_GENERATIVE_AI_API_KEY',
+  'GOOGLE_API_KEY',
+] as const;
+
 export function getGeminiApiKey(env: Record<string, string | undefined> = process.env) {
   return (
     cleanEnvValue(env.GEMINI_API_KEY) ||
     cleanEnvValue(env.GOOGLE_GENERATIVE_AI_API_KEY) ||
     cleanEnvValue(env.GOOGLE_API_KEY)
   );
+}
+
+export function getGeminiApiKeyEnvName(
+  env: Record<string, string | undefined> = process.env,
+): (typeof GEMINI_API_KEY_ENV_NAMES)[number] | null {
+  if (cleanEnvValue(env.GEMINI_API_KEY)) {
+    return 'GEMINI_API_KEY';
+  }
+  if (cleanEnvValue(env.GOOGLE_GENERATIVE_AI_API_KEY)) {
+    return 'GOOGLE_GENERATIVE_AI_API_KEY';
+  }
+  if (cleanEnvValue(env.GOOGLE_API_KEY)) {
+    return 'GOOGLE_API_KEY';
+  }
+  return null;
 }
 
 export function geminiGenerateUrl(model: string) {

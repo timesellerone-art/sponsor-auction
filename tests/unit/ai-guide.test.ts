@@ -4,6 +4,7 @@ import {
   GEMINI_FLASH_MODELS,
   buildGuidePrompt,
   getGeminiApiKey,
+  getGeminiApiKeyEnvName,
   guideFingerprint,
   guideToAiReport,
   isLowQualityDescription,
@@ -91,6 +92,8 @@ describe('AI 가이드 JSON 정규화', () => {
       getGeminiApiKey({ GOOGLE_GENERATIVE_AI_API_KEY: 'alias-key-value' }),
       'alias-key-value',
     );
+    assert.equal(getGeminiApiKeyEnvName({ GEMINI_API_KEY: 'real-key-value' }), 'GEMINI_API_KEY');
+    assert.equal(getGeminiApiKeyEnvName({}), null);
   });
 
   it('신규 키에서 막힌 2.5 Flash 대신 현재 Flash 모델을 쓴다', () => {

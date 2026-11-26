@@ -11,12 +11,23 @@ import {
 
 export const SUPPORT_MESSAGE_MAX_LENGTH = 500;
 export const SUPPORT_CHAT_RATE_LIMIT = 15;
+/** 신규 Gemini 키에서 막히는 gemini-2.5-flash 는 쓰지 않는다. 캠페인 가이드와 같은 Flash 계열. */
 export const SUPPORT_CHAT_MODELS = [
-  'gemini-2.5-flash',
   'gemini-3.5-flash-lite',
   'gemini-3.6-flash',
   'gemini-flash-latest',
 ] as const;
+
+export type SupportAiDebug = {
+  source: 'gemini' | 'knowledge' | 'fallback';
+  reason?: string;
+  status?: number;
+  model?: string;
+  hasApiKey?: boolean;
+  keyEnv?: string | null;
+  triedModels?: string[];
+  detail?: string;
+};
 
 export const SUPPORT_QUICK_PROMPTS = [
   '광고 등록 방법은?',
@@ -168,7 +179,17 @@ ${CREATOR_BRACKET_COPY}
   },
   {
     id: 'settlement-account',
-    keywords: ['정산계좌', '계좌등록', '입금계좌', '은행계좌', '예금주'],
+    keywords: [
+      '정산계좌',
+      '정산은',
+      '정산방법',
+      '정산절차',
+      '정산하나요',
+      '계좌등록',
+      '입금계좌',
+      '은행계좌',
+      '예금주',
+    ],
     answer: `크리에이터 정산 계좌는 마이페이지 > 계정 설정(/my/settings)의 정산 계좌 폼에서 등록합니다. 은행, 계좌번호, 예금주, 정산 유형(개인/사업자)을 저장하세요.
 
 콘텐츠 제안 모달에서도 같은 계좌를 입력할 수 있습니다. 사업자등록번호는 계정 설정의 사업자 폼에 따로 저장하고, 관리자 검증이 끝나면 세금계산서로 정산됩니다.`,
@@ -207,7 +228,18 @@ ${CREATOR_BRACKET_COPY}
   },
   {
     id: 'login-role',
-    keywords: ['로그인', '회원가입', '역할전환', '광고주모드', '크리에이터모드', '마이페이지'],
+    keywords: [
+      '로그인',
+      '회원가입',
+      '가입절차',
+      '가입방법',
+      '가입은',
+      '어떻게가입',
+      '역할전환',
+      '광고주모드',
+      '크리에이터모드',
+      '마이페이지',
+    ],
     answer: `로그인은 /login 에서 Google, 카카오, 네이버로 합니다. 로그인 후 상단 [마이페이지](/my)로 이동합니다.
 
 역할은 상단 역할 전환에서 광고주/크리에이터를 바꿉니다. 광고주면 마이페이지 탭이 내 캠페인·크레딧·계정 설정, 크리에이터면 내 제안·계정 설정입니다. 소셜 계정·휴대전화 연결은 마이페이지 > 계정 설정입니다.`,
@@ -377,8 +409,63 @@ export function parseSupportModelPayload(value: unknown): { reply: string; escal
   };
 }
 
+export function supportReplyFromModelText(text: string): { reply: string; escalate: boolean } | null {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const jsonPayload = (() => {
+    try {
+      const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      return JSON.parse((fenced?.[1] ?? trimmed).trim()) as unknown;
+    } catch {
+      return null;
+    }
+  })();
+  const fromJson = parseSupportModelPayload(jsonPayload);
+  if (fromJson) {
+    return fromJson;
+  }
+
+  if (trimmed.startsWith('{') || trimmed.startsWith('```')) {
+    return null;
+  }
+  return { reply: trimmed.slice(0, 2500), escalate: false };
+}
+
+export function classifyGeminiHttpStatus(status: number) {
+  if (status === 401) {
+    return 'invalid_api_key';
+  }
+  if (status === 403) {
+    return 'forbidden';
+  }
+  if (status === 404) {
+    return 'model_not_found';
+  }
+  if (status === 429) {
+    return 'quota';
+  }
+  if (status === 400) {
+    return 'bad_request';
+  }
+  return `http_${status}`;
+}
+
+export function classifyGeminiThrown(error: unknown) {
+  if (
+    error instanceof Error &&
+    (error.name === 'AbortError' || /aborted|timeout|The operation was aborted/i.test(error.message))
+  ) {
+    return 'timeout';
+  }
+  return 'network';
+}
+
 export function sanitizeSupportReply(reply: string, quoteContext = '') {
-  const trimmed = reply.trim().replace(/\s*\{"reply"\s*:[\s\S]*$/, '').trim();
+  const extracted = supportReplyFromModelText(reply);
+  const trimmed = (extracted?.reply || reply).trim().replace(/\s*\{"reply"\s*:[\s\S]*$/, '').trim();
   if (!trimmed || trimmed.startsWith('{')) {
     return quoteContext || SUPPORT_FALLBACK_MESSAGE;
   }
