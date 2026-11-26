@@ -2,28 +2,29 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { useAuth } from '@/components/AuthProvider';
-import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { CreatorRatingBadge } from '@/components/CreatorRatingBadge';
-import { TimeslotBidModal } from '@/components/TimeslotBidModal';
+import { TimeslotBidForm } from '@/components/TimeslotBidForm';
 import { showToast } from '@/components/Toast';
-import { isDeadlinePassed } from '@/lib/auction-engine';
+import { ACCESS_REASON } from '@/lib/access';
+import { loginPath } from '@/lib/auth-guard';
 import { PLATFORM_LABELS } from '@/lib/platforms';
 import { authRequestInit } from '@/lib/auth-request';
 import { getTimeSlotById, listTimeSlotBids } from '@/lib/timeslots';
 import { formatDateTime, formatViews, formatWon } from '@/lib/utils';
-import type { TimeSlotBidItem, TimeSlotItem } from '@/types/timeslot';
+import { isTimeSlotOpen, type TimeSlotBidItem, type TimeSlotItem } from '@/types/timeslot';
 
 export function TimeslotDetail({ id }: { id: string }) {
-  const { user, canPlaceBid } = useAuth();
-  const { requestAdvertiser } = useRoleIntent();
+  const router = useRouter();
+  const { user, profileReady } = useAuth();
+  const authSettled = Boolean(user) || profileReady;
   const [slot, setSlot] = useState<TimeSlotItem | null>(null);
   const [bids, setBids] = useState<TimeSlotBidItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [bidOpen, setBidOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -58,26 +59,8 @@ export function TimeslotDetail({ id }: { id: string }) {
     };
   }, [load]);
 
-  const [canBid, setCanBid] = useState(false);
-  const isOwner = Boolean(slot?.creatorId && user?.id && slot.creatorId === user.id && canPlaceBid);
-
-  useEffect(() => {
-    const tick = () => {
-      setCanBid(
-        Boolean(slot) &&
-          slot?.status === 'open' &&
-          !slot?.winnerBidId &&
-          !(slot?.creatorId && user?.id && slot.creatorId === user.id) &&
-          !isDeadlinePassed(slot?.deadline),
-      );
-    };
-    const timer = window.setTimeout(tick, 0);
-    const interval = window.setInterval(tick, 1000);
-    return () => {
-      window.clearTimeout(timer);
-      window.clearInterval(interval);
-    };
-  }, [slot, user]);
+  const isOwner = Boolean(slot?.creatorId && user?.id && slot.creatorId === user.id);
+  const slotOpen = Boolean(slot && isTimeSlotOpen(slot));
 
   return (
     <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10">
@@ -86,7 +69,7 @@ export function TimeslotDetail({ id }: { id: string }) {
         className="inline-flex w-fit items-center gap-1 text-sm font-medium text-zinc-600 hover:text-zinc-950"
       >
         <ArrowLeft className="size-4" aria-hidden />
-        상품 목록으로
+        크리에이터 상품 목록으로
       </Link>
 
       {loading ? (
@@ -131,23 +114,46 @@ export function TimeslotDetail({ id }: { id: string }) {
                 <p className="text-xs text-zinc-400">모집 마감</p>
                 <AuctionCountdown deadline={slot.deadline} />
               </div>
+              {slot.slotStart ? (
+                <div>
+                  <p className="text-xs text-zinc-400">진행 시작</p>
+                  <p className="font-semibold">{formatDateTime(slot.slotStart)}</p>
+                </div>
+              ) : null}
+              {slot.slotEnd ? (
+                <div>
+                  <p className="text-xs text-zinc-400">진행 종료</p>
+                  <p className="font-semibold">{formatDateTime(slot.slotEnd)}</p>
+                </div>
+              ) : null}
             </div>
-            {canBid ? (
-              <button
-                type="button"
-                onClick={() => requestAdvertiser(() => setBidOpen(true))}
-                className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
-              >
-                제안하기
-              </button>
-            ) : (
+            {!slotOpen ? (
               <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                {slot.status !== 'open' || slot.winnerBidId
-                  ? '이 상품은 마감되었거나 낙찰되었습니다.'
-                  : '로그인 후 제안할 수 있습니다.'}
+                이 상품은 마감되었거나 낙찰되었습니다.
               </p>
+            ) : !authSettled ? (
+              <div className="mt-6 h-24 animate-pulse rounded-xl bg-zinc-100" aria-hidden />
+            ) : isOwner ? (
+              <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+                내가 등록한 크리에이터 상품입니다.
+              </p>
+            ) : user ? null : (
+              <div className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+                <p>로그인 후 제안할 수 있습니다.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    showToast(ACCESS_REASON['auth-required']);
+                    router.push(loginPath('auth-required', `/timeslots/${slot.id}`));
+                  }}
+                  className="mt-2 block text-sm font-semibold text-clink-accent hover:underline"
+                >
+                  로그인하러 가기
+                </button>
+              </div>
             )}
           </article>
+          {slotOpen && authSettled && user && !isOwner ? <TimeslotBidForm slot={slot} /> : null}
 
           <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
             <h2 className="text-lg font-bold text-zinc-950">제안 현황</h2>
@@ -171,7 +177,7 @@ export function TimeslotDetail({ id }: { id: string }) {
                     </div>
                     <p className="mt-2 text-sm whitespace-pre-wrap text-zinc-600">{bid.message}</p>
                     <p className="mt-2 text-xs text-zinc-400">{formatDateTime(bid.createdAt)}</p>
-                    {isOwner && slot.status === 'open' ? (
+                    {isOwner && slotOpen ? (
                       <button
                         type="button"
                         disabled={Boolean(busyId)}
@@ -211,8 +217,6 @@ export function TimeslotDetail({ id }: { id: string }) {
           </section>
         </div>
       )}
-
-      <TimeslotBidModal open={bidOpen} slot={slot} onClose={() => setBidOpen(false)} />
     </div>
   );
 }

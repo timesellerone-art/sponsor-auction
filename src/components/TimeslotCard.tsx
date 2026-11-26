@@ -27,7 +27,7 @@ export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
       window.clearInterval(interval);
     };
   }, [slot.status, slot.winnerBidId, slot.deadline]);
-  const href = `/inventory/${slot.id}`;
+  const href = `/timeslots/${slot.id}`;
   const price = slot.currentHighestBid > 0 ? slot.currentHighestBid : slot.startingPrice;
 
   return (

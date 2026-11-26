@@ -211,7 +211,7 @@ export async function applyRealtimeChange(change: RealtimeChange, userId: string
       type: 'timeslot_bid',
       title: '상품 제안',
       body: `"${meta.title}"에 ${name}님의 제안(${formatWon(amount)})이 도착했습니다.`,
-      href: `/inventory/${slotId}`,
+      href: `/timeslots/${slotId}`,
     });
     return;
   }

@@ -284,7 +284,7 @@ test.describe('전수 검증 B · 광고주', () => {
 });
 
 test.describe('전수 검증 C · 크리에이터', () => {
-  test('크리에이터 탐색·AI 가이드·AI 제안서·내 제안·인벤토리가 동작한다', async ({ page }) => {
+  test('크리에이터 탐색·AI 가이드·AI 제안서·내 제안·크리에이터 상품이 동작한다', async ({ page }) => {
     await signIn(page, CREATOR);
     await page.goto('/');
     await expect(page.getByRole('tab', { name: '크리에이터' }).first()).toHaveAttribute(
@@ -313,10 +313,10 @@ test.describe('전수 검증 C · 크리에이터', () => {
 
     await page.goto('/inventory');
     await expect(page.getByRole('heading', { name: '크리에이터 상품 마켓플레이스' })).toBeVisible();
-    const slotLink = page.locator('a[href^="/inventory/"]').first();
+    const slotLink = page.locator('a[href^="/timeslots/"]').first();
     if (await slotLink.count()) {
       await slotLink.click();
-      await expect(page).toHaveURL(/\/inventory\//);
+      await expect(page).toHaveURL(/\/timeslots\//);
       await expect(page.getByRole('heading').first()).toBeVisible();
     }
 

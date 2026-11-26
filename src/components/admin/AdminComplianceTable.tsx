@@ -4,7 +4,7 @@ import type { ComplianceLog } from '@/types/compliance';
 const SOURCE_LABEL: Record<ComplianceLog['source'], string> = {
   bid: '제안',
   chat: '채팅',
-  timeslot_bid: '상품 제안',
+  timeslot_bid: '크리에이터 상품 제안',
 };
 
 export function AdminComplianceTable({ logs }: { logs: ComplianceLog[] }) {

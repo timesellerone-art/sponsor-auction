@@ -8,10 +8,12 @@ export function CreditChargeModal({
   open,
   neededAmount,
   onClose,
+  hint,
 }: {
   open: boolean;
   neededAmount: number;
   onClose: () => void;
+  hint?: string;
 }) {
   if (!open) {
     return null;
@@ -35,8 +37,8 @@ export function CreditChargeModal({
               크레딧 충전
             </h2>
             <p className="mt-1 text-sm text-zinc-500">
-              낙찰 총 차감액(공급가액 + 부가세 10%)은 {formatWon(neededAmount)}입니다.
-              충전 후 다시 낙찰해 주세요.
+              {hint ??
+                `낙찰 총 차감액(공급가액 + 부가세 10%)은 ${formatWon(neededAmount)}입니다. 충전 후 다시 낙찰해 주세요.`}
             </p>
           </div>
           <button
