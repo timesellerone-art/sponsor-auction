@@ -6,7 +6,6 @@ import { useAuth } from '@/components/AuthProvider';
 import { CreditChargeModal } from '@/components/CreditChargeModal';
 import { EscrowNotice } from '@/components/EscrowNotice';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
-import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
@@ -27,9 +26,8 @@ export function TimeslotBidForm({
   slot: TimeSlotItem;
   onSubmitted?: () => void;
 }) {
-  const { user, canCreateAuction, setActiveRole } = useAuth();
+  const { user, activeRole } = useAuth();
   const { requireUser } = useRequireAuth();
-  const { requestAdvertiser } = useRoleIntent();
   const minBid = nextInventoryMinBid(slot.startingPrice, slot.currentHighestBid);
   const [amount, setAmount] = useState(String(minBid));
   const [message, setMessage] = useState('');
@@ -43,19 +41,26 @@ export function TimeslotBidForm({
     return campaignHoldQuote(value).amount;
   }, [bidAmount, minBid]);
 
+  const canSubmitBid = Boolean(
+    user &&
+      activeRole !== 'creator' &&
+      (hasAuthRole(user, 'advertiser') || hasAuthRole(user, 'admin')) &&
+      !(slot.creatorId && user.id === slot.creatorId),
+  );
+
   const ensureAdvertiser = () => {
     if (!user) {
       return false;
     }
-    if (hasAuthRole(user, 'advertiser') || hasAuthRole(user, 'admin')) {
-      if (!canCreateAuction) {
-        setActiveRole('advertiser');
-      }
-      return true;
+    if (slot.creatorId && user.id === slot.creatorId) {
+      setError('본인 상품에는 제안할 수 없습니다.');
+      return false;
     }
-    requestAdvertiser();
-    setError('광고주 계정으로 전환한 뒤 다시 제출해 주세요.');
-    return false;
+    if (!canSubmitBid) {
+      setError('크리에이터 상품 제안은 광고주 계정에서만 가능합니다.');
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {

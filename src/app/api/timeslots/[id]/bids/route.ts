@@ -7,7 +7,7 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { recordBypassIfNeeded } from '@/lib/compliance';
-import { listTimeSlotBids, placeTimeSlotBid } from '@/lib/timeslots';
+import { getTimeSlotById, listTimeSlotBids, placeTimeSlotBid } from '@/lib/timeslots';
 import { hasAuthRole } from '@/types/auth';
 import { VALIDATION } from '@/lib/validation';
 import { OffPlatformContactError, assertNoOffPlatformContact } from '@/utils/filter';
@@ -71,14 +71,21 @@ export async function POST(
     } catch {
       // 입찰은 계속합니다.
     }
-    const actor = await getPaymentActor();
+    const actor = await getPaymentActor(request);
     if (!actor) {
       return unauthorizedJson('제안하려면 로그인해 주세요.');
     }
-    if (!hasAuthRole(actor, 'advertiser') && !hasAuthRole(actor, 'admin')) {
-      return forbiddenJson('상품 제안은 광고주만 할 수 있습니다.');
-    }
     const { id } = await context.params;
+    const slot = await getTimeSlotById(id);
+    if (slot.data?.creatorId && actor.userId && slot.data.creatorId === actor.userId) {
+      return forbiddenJson('본인 상품에는 제안할 수 없습니다.');
+    }
+    const actingAdvertiser =
+      actor.activeRole !== 'creator' &&
+      (hasAuthRole(actor, 'advertiser') || hasAuthRole(actor, 'admin'));
+    if (!actingAdvertiser) {
+      return forbiddenJson('크리에이터 상품 제안은 광고주 계정에서만 가능합니다.');
+    }
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const message = asText(body?.message);
     await recordBypassIfNeeded({

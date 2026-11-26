@@ -505,6 +505,9 @@ export async function placeTimeSlotBid(
     if (live.status !== 'open' || live.winnerBidId) {
       return fail(null, '마감된 상품에는 제안할 수 없습니다.');
     }
+    if (input.advertiserId && slot.creatorId && input.advertiserId === slot.creatorId) {
+      return fail(null, '본인 상품에는 제안할 수 없습니다.');
+    }
     const minBid = nextInventoryMinBid(live.startingPrice, live.currentHighestBid);
     if (!Number.isFinite(input.bidAmount) || input.bidAmount < minBid) {
       return fail(null, `제안가는 ${minBid.toLocaleString('ko-KR')}원 이상이어야 합니다.`);

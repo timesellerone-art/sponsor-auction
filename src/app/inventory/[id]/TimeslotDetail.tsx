@@ -15,11 +15,12 @@ import { PLATFORM_LABELS } from '@/lib/platforms';
 import { authRequestInit } from '@/lib/auth-request';
 import { getTimeSlotById, listTimeSlotBids } from '@/lib/timeslots';
 import { formatDateTime, formatViews, formatWon } from '@/lib/utils';
+import { hasAuthRole } from '@/types/auth';
 import { isTimeSlotOpen, type TimeSlotBidItem, type TimeSlotItem } from '@/types/timeslot';
 
 export function TimeslotDetail({ id }: { id: string }) {
   const router = useRouter();
-  const { user, profileReady } = useAuth();
+  const { user, profileReady, activeRole } = useAuth();
   const authSettled = Boolean(user) || profileReady;
   const [slot, setSlot] = useState<TimeSlotItem | null>(null);
   const [bids, setBids] = useState<TimeSlotBidItem[]>([]);
@@ -60,6 +61,11 @@ export function TimeslotDetail({ id }: { id: string }) {
   }, [load]);
 
   const isOwner = Boolean(slot?.creatorId && user?.id && slot.creatorId === user.id);
+  const isAdvertiserActing = Boolean(
+    user &&
+      activeRole !== 'creator' &&
+      (activeRole === 'advertiser' || hasAuthRole(user, 'advertiser') || hasAuthRole(user, 'admin')),
+  );
   const slotOpen = Boolean(slot && isTimeSlotOpen(slot));
 
   return (
@@ -137,7 +143,11 @@ export function TimeslotDetail({ id }: { id: string }) {
               <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 내가 등록한 크리에이터 상품입니다.
               </p>
-            ) : user ? null : (
+            ) : isAdvertiserActing ? null : user ? (
+              <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+                크리에이터 상품 제안은 광고주 계정에서만 가능합니다.
+              </p>
+            ) : (
               <div className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 <p>로그인 후 제안할 수 있습니다.</p>
                 <button
@@ -153,7 +163,9 @@ export function TimeslotDetail({ id }: { id: string }) {
               </div>
             )}
           </article>
-          {slotOpen && authSettled && user && !isOwner ? <TimeslotBidForm slot={slot} /> : null}
+          {slotOpen && authSettled && isAdvertiserActing && !isOwner ? (
+            <TimeslotBidForm slot={slot} />
+          ) : null}
 
           <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
             <h2 className="text-lg font-bold text-zinc-950">제안 현황</h2>
