@@ -34,6 +34,30 @@ type AdminBidTableProps = {
   profiles?: ProfileItem[];
 };
 
+function bidView(
+  bid: BidItem,
+  auctionById: Map<string, AuctionItem>,
+  payouts: PayoutItem[],
+  profileByKey: Map<string, ProfileItem>,
+) {
+  const auction = auctionById.get(bid.auctionId);
+  const lifecycle = resolveAdminBidStatus(bid, auction, payouts);
+  const payout = payouts.find((item) => payoutLinkedToBid(item, bid, auction));
+  const profile =
+    (bid.creatorId ? profileByKey.get(bid.creatorId) : undefined) ||
+    profileByKey.get(bid.creatorName || '');
+  return {
+    lifecycle,
+    campaign: auction?.title || DELETED_CAMPAIGN_LABEL,
+    advertiser: auction?.authorName || '미상',
+    email: profile?.email || payout?.creatorEmail || '',
+    account: payout?.bankAccount || '',
+    creatorFee: floorToTenWon(creatorCombinedFeeAmount(bid.bidAmount)),
+    platformNet: platformNetFeeFromBid(bid.bidAmount),
+    processedAt: formatAdminTimestamp(payout?.paidAt || payout?.requestedAt || bid.createdAt),
+  };
+}
+
 export function AdminBidTable({
   bids,
   auctions,
@@ -153,7 +177,82 @@ export function AdminBidTable({
           <AdminEmptyState message="조건에 맞는 제안이 없습니다." />
         </div>
       ) : (
-        <div className="max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto">
+        <>
+        <ul className="flex flex-col gap-3 p-3 pb-24 md:hidden">
+          {filtered.map((bid) => {
+            const row = bidView(bid, auctionById, payouts, profileByKey);
+            return (
+              <li key={bid.id} className="rounded-2xl border border-zinc-200 bg-white p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-sm font-semibold leading-5 text-zinc-950">
+                      {bid.creatorName || '이름 없음'}
+                    </p>
+                    <AdminCopyText
+                      value={row.email}
+                      emptyLabel="이메일 없음"
+                      className="mt-1 whitespace-normal break-all"
+                    />
+                    <AdminCopyText
+                      value={row.account}
+                      emptyLabel="계좌 미등록"
+                      className="mt-0.5 whitespace-normal break-all"
+                    />
+                  </div>
+                  <span
+                    className={cn(
+                      'shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold',
+                      ADMIN_BID_STATUS_CLASS[row.lifecycle],
+                    )}
+                  >
+                    {ADMIN_BID_STATUS_LABEL[row.lifecycle]}
+                  </span>
+                </div>
+                <p className="mt-2 break-words text-sm text-zinc-700">{row.campaign}</p>
+                <p className="mt-1 break-words text-xs text-zinc-500">광고주 {row.advertiser}</p>
+                <dl className="mt-3 space-y-2 border-t border-zinc-100 pt-3 text-sm">
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">처리 일시</dt>
+                    <dd className="mt-0.5 break-words tabular-nums text-zinc-800">{row.processedAt}</dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">제안가</dt>
+                    <dd className="mt-0.5 break-all font-medium tabular-nums text-zinc-950">
+                      {formatWon(bid.bidAmount)}
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">예상 수수료</dt>
+                    <dd className="mt-0.5 break-all tabular-nums text-zinc-800">
+                      {formatWon(row.platformNet)}
+                    </dd>
+                    <dd className="mt-0.5 break-all text-xs tabular-nums text-zinc-500">
+                      공제 {formatWon(row.creatorFee)}
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">채널</dt>
+                    <dd className="mt-0.5 break-all">
+                      {bid.creatorChannelUrl ? (
+                        <a
+                          href={bid.creatorChannelUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="break-all text-clink-accent hover:underline"
+                        >
+                          {bid.creatorChannelUrl}
+                        </a>
+                      ) : (
+                        <span className="text-zinc-400">URL 없음</span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="hidden max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto md:block">
           <table className="w-full min-w-0 table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[16%]" />
@@ -179,18 +278,14 @@ export function AdminBidTable({
             </thead>
             <tbody>
               {filtered.map((bid) => {
-                const auction = auctionById.get(bid.auctionId);
-                const lifecycle = resolveAdminBidStatus(bid, auction, payouts);
-                const campaign = auction?.title || DELETED_CAMPAIGN_LABEL;
-                const advertiser = auction?.authorName || '미상';
-                const payout = payouts.find((item) => payoutLinkedToBid(item, bid, auction));
-                const profile =
-                  (bid.creatorId ? profileByKey.get(bid.creatorId) : undefined) ||
-                  profileByKey.get(bid.creatorName || '');
-                const email = profile?.email || payout?.creatorEmail || '';
-                const account = payout?.bankAccount || '';
-                const creatorFee = floorToTenWon(creatorCombinedFeeAmount(bid.bidAmount));
-                const platformNet = platformNetFeeFromBid(bid.bidAmount);
+                const row = bidView(bid, auctionById, payouts, profileByKey);
+                const lifecycle = row.lifecycle;
+                const campaign = row.campaign;
+                const advertiser = row.advertiser;
+                const email = row.email;
+                const account = row.account;
+                const creatorFee = row.creatorFee;
+                const platformNet = row.platformNet;
 
                 return (
                   <tr key={bid.id} className="border-b border-zinc-100 last:border-0">
@@ -225,7 +320,7 @@ export function AdminBidTable({
                       </span>
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
-                      {formatAdminTimestamp(payout?.paidAt || payout?.requestedAt || bid.createdAt)}
+                      {row.processedAt}
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top font-medium whitespace-nowrap text-zinc-950">
                       {formatWon(bid.bidAmount)}
@@ -259,6 +354,7 @@ export function AdminBidTable({
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

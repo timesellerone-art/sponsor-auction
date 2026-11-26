@@ -430,7 +430,7 @@ export function AdminPayoutTable({
         </div>
       ) : (
         <>
-        <ul className="flex flex-col gap-3 p-3 md:hidden">
+        <ul className="flex flex-col gap-3 p-3 pb-24 md:hidden">
           {filtered.map((payout) => {
             const row = enrichPayout(payout);
             const pending = row.status === 'pending';

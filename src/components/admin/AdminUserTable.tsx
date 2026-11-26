@@ -21,6 +21,73 @@ const FILTERS: { id: ProfileAdminFilter; label: string }[] = [
   { id: 'suspended', label: '정지 회원' },
 ];
 
+function UserManageButtons({
+  profile,
+  busy,
+  anyBusy,
+  compact,
+  onToggleStatus,
+  onReviewBusiness,
+}: {
+  profile: ProfileItem;
+  busy: boolean;
+  anyBusy: boolean;
+  compact?: boolean;
+  onToggleStatus: (profile: ProfileItem) => void;
+  onReviewBusiness?: (profile: ProfileItem, decision: 'approve' | 'reject') => void;
+}) {
+  const suspended = profile.status === 'suspended';
+  const base = compact
+    ? 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-50'
+    : 'inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50';
+  const canReview =
+    Boolean(profile.businessRegistrationNumber) &&
+    profile.businessVerificationStatus &&
+    profile.businessVerificationStatus !== 'unregistered' &&
+    profile.businessVerificationStatus !== 'closed';
+  return (
+    <div className={compact ? 'flex flex-wrap gap-1' : 'flex flex-wrap gap-2'}>
+      {canReview ? (
+        <>
+          <button
+            type="button"
+            disabled={anyBusy || profile.businessVerificationStatus === 'verified'}
+            onClick={() => onReviewBusiness?.(profile, 'approve')}
+            className={`${base} border border-zinc-200 text-zinc-700 hover:bg-zinc-50 disabled:opacity-40`}
+          >
+            승인
+          </button>
+          <button
+            type="button"
+            disabled={anyBusy || profile.businessVerificationStatus === 'rejected'}
+            onClick={() => onReviewBusiness?.(profile, 'reject')}
+            className={`${base} border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-40`}
+          >
+            반려
+          </button>
+        </>
+      ) : null}
+      {isAdmin(profile) ? (
+        <span className="text-xs text-zinc-400">권한 고정</span>
+      ) : (
+        <button
+          type="button"
+          disabled={anyBusy}
+          onClick={() => onToggleStatus(profile)}
+          className={
+            suspended
+              ? `${base} border border-clink-peach-strong text-clink-accent hover:bg-clink-peach`
+              : `${base} border border-rose-200 text-rose-700 hover:bg-rose-50`
+          }
+        >
+          {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+          {busy ? '처리 중...' : suspended ? '정지 해제' : '정지'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 type AdminUserTableProps = {
   profiles: ProfileItem[];
   busyId: string | null;
@@ -106,7 +173,73 @@ export function AdminUserTable({
           <AdminEmptyState message="조건에 맞는 회원이 없습니다." />
         </div>
       ) : (
-        <div className="max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto">
+        <>
+        <ul className="flex flex-col gap-3 p-3 pb-24 md:hidden">
+          {filtered.map((profile) => {
+            const suspended = profile.status === 'suspended';
+            const busy = busyId === profile.id;
+            const anyBusy = Boolean(busyId);
+            return (
+              <li key={profile.id} className="rounded-2xl border border-zinc-200 bg-white p-3">
+                <p className="break-words text-sm font-semibold leading-5 text-zinc-950">
+                  {profile.name || '이름 없음'}
+                </p>
+                <p className="mt-1 break-all text-sm text-zinc-600">{profile.email || '이메일 없음'}</p>
+                <dl className="mt-3 space-y-2 text-sm">
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">역할</dt>
+                    <dd className="mt-0.5">
+                      <span className="inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700">
+                        {memberPrimaryRoleLabel(profile)}
+                      </span>
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">가입일</dt>
+                    <dd className="mt-0.5 break-words text-zinc-800">
+                      {formatAdminTimestamp(profile.createdAt)}
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">상태</dt>
+                    <dd className="mt-0.5">
+                      <span
+                        className={
+                          suspended
+                            ? 'inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700'
+                            : 'inline-flex rounded-full bg-clink-peach px-2 py-1 text-xs font-semibold text-clink-accent'
+                        }
+                      >
+                        {STATUS_LABEL[profile.status] ?? profile.status}
+                      </span>
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">사업자 검증</dt>
+                    <dd className="mt-0.5 break-words text-zinc-800">
+                      {businessVerificationLabel(profile.businessVerificationStatus ?? 'unregistered')}
+                      {profile.businessRegistrationNumber ? (
+                        <span className="mt-0.5 block break-all text-xs text-zinc-500">
+                          {profile.businessRegistrationNumber}
+                        </span>
+                      ) : null}
+                    </dd>
+                  </div>
+                </dl>
+                <div className="mt-3">
+                  <UserManageButtons
+                    profile={profile}
+                    busy={busy}
+                    anyBusy={anyBusy}
+                    onToggleStatus={onToggleStatus}
+                    onReviewBusiness={onReviewBusiness}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="hidden max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto md:block">
           <table className="w-full min-w-0 table-fixed text-left text-xs">
             <colgroup>
               <col className="w-1/3" />
@@ -153,29 +286,6 @@ export function AdminUserTable({
                           ? ` · ${profile.businessRegistrationNumber}`
                           : ''}
                       </p>
-                      {profile.businessRegistrationNumber &&
-                      profile.businessVerificationStatus &&
-                      profile.businessVerificationStatus !== 'unregistered' &&
-                      profile.businessVerificationStatus !== 'closed' ? (
-                        <div className="mt-1 flex gap-1">
-                          <button
-                            type="button"
-                            disabled={anyBusy || profile.businessVerificationStatus === 'verified'}
-                            onClick={() => onReviewBusiness?.(profile, 'approve')}
-                            className="rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 disabled:opacity-40"
-                          >
-                            승인
-                          </button>
-                          <button
-                            type="button"
-                            disabled={anyBusy || profile.businessVerificationStatus === 'rejected'}
-                            onClick={() => onReviewBusiness?.(profile, 'reject')}
-                            className="rounded-md border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 disabled:opacity-40"
-                          >
-                            반려
-                          </button>
-                        </div>
-                      ) : null}
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top whitespace-nowrap text-zinc-600">
                       <span className="inline-flex max-w-full truncate rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700">
@@ -197,23 +307,14 @@ export function AdminUserTable({
                       </span>
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top">
-                      {isAdmin(profile) ? (
-                        <span className="text-xs text-zinc-400">권한 고정</span>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={anyBusy}
-                          onClick={() => onToggleStatus(profile)}
-                          className={
-                            suspended
-                              ? 'inline-flex items-center gap-1 rounded-md border border-clink-peach-strong px-1.5 py-0.5 text-[10px] font-semibold text-clink-accent hover:bg-clink-peach disabled:cursor-not-allowed disabled:opacity-50'
-                              : 'inline-flex items-center gap-1 rounded-md border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50'
-                          }
-                        >
-                          {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-                          {busy ? '처리 중...' : suspended ? '정지 해제' : '정지'}
-                        </button>
-                      )}
+                      <UserManageButtons
+                        profile={profile}
+                        busy={busy}
+                        anyBusy={anyBusy}
+                        compact
+                        onToggleStatus={onToggleStatus}
+                        onReviewBusiness={onReviewBusiness}
+                      />
                     </td>
                   </tr>
                 );
@@ -221,6 +322,7 @@ export function AdminUserTable({
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

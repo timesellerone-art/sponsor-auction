@@ -207,7 +207,7 @@ export function AdminAuctionTable({
         </div>
       ) : (
         <>
-          <ul className="flex flex-col gap-3 p-3 md:hidden">
+          <ul className="flex flex-col gap-3 p-3 pb-24 md:hidden">
             {filtered.map((auction) => {
               const title = auction.title || '제목 없음';
               const blinded = isBlinded(auction);

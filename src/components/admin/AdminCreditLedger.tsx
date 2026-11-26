@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { useAuth } from '@/components/AuthProvider';
 import { CreditLedgerEntry } from '@/components/CreditLedgerEntry';
+import { campaignHoldLedgerLabel } from '@/lib/campaign-credit';
 import { authRequestInit } from '@/lib/auth-request';
-import { formatWon } from '@/lib/utils';
+import { formatDateTime, formatWon } from '@/lib/utils';
 
 type LedgerRow = {
   id: string;
@@ -157,7 +158,66 @@ export function AdminCreditLedger() {
         </button>
       </div>
       {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
-      <ul className="mt-3 max-h-96 divide-y divide-zinc-100 overflow-y-auto pr-1">
+      <ul className="mt-3 flex flex-col gap-3 pb-24 md:hidden">
+        {rows.map((row) => {
+          const breakdown =
+            row.type === 'HOLD' || row.type === 'RELEASE'
+              ? campaignHoldLedgerLabel({
+                  type: row.type,
+                  amount: row.amount,
+                  description: row.description,
+                })
+              : '';
+          const typeLabel =
+            row.type === 'CHARGE'
+              ? '충전'
+              : row.type === 'HOLD'
+                ? '이용'
+                : row.type === 'RELEASE'
+                  ? '해제'
+                  : '환불';
+          return (
+            <li key={row.id} className="rounded-2xl border border-zinc-200 p-3">
+              <p className="text-sm font-semibold text-zinc-950">{typeLabel}</p>
+              <dl className="mt-2 space-y-2 text-sm">
+                <div>
+                  <dt className="text-[11px] font-medium text-zinc-500">금액</dt>
+                  <dd className="mt-0.5 break-all tabular-nums text-zinc-950">{formatWon(row.amount)}</dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-medium text-zinc-500">잔액</dt>
+                  <dd className="mt-0.5 break-all tabular-nums text-zinc-800">
+                    {formatWon(row.balance_after)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[11px] font-medium text-zinc-500">일시</dt>
+                  <dd className="mt-0.5 break-words text-zinc-600">{formatDateTime(row.created_at)}</dd>
+                </div>
+                {breakdown ? (
+                  <div>
+                    <dt className="text-[11px] font-medium text-zinc-500">내역</dt>
+                    <dd className="mt-0.5 break-words text-zinc-600">{breakdown}</dd>
+                  </div>
+                ) : null}
+                {row.description && row.description !== breakdown ? (
+                  <div>
+                    <dt className="text-[11px] font-medium text-zinc-500">메모</dt>
+                    <dd className="mt-0.5 break-all text-zinc-600">{row.description}</dd>
+                  </div>
+                ) : null}
+                {row.reference_id ? (
+                  <div>
+                    <dt className="text-[11px] font-medium text-zinc-500">참조</dt>
+                    <dd className="mt-0.5 break-all text-xs text-zinc-500">{row.reference_id}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </li>
+          );
+        })}
+      </ul>
+      <ul className="mt-3 hidden max-h-96 divide-y divide-zinc-100 overflow-y-auto pr-1 md:block">
         {rows.map((row) => (
           <CreditLedgerEntry key={row.id} row={row} />
         ))}
