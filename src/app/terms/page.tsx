@@ -26,7 +26,10 @@ export default function TermsPage() {
       <LegalSection title="제2조 (정의)">
         <ul className="list-disc space-y-1 pl-5">
           <li>&quot;광고주&quot;는 오픈 캠페인을 등록하고 선정·결제를 하는 사업자 회원입니다.</li>
-          <li>&quot;크리에이터&quot;는 캠페인에 콘텐츠를 제안하고 선정 시 과업을 이행하는 회원입니다.</li>
+          <li>
+            &quot;크리에이터&quot;는 개인 또는 팀 단위로 캠페인에 콘텐츠를 제안하고 선정 시 과업을
+            이행하는 회원입니다. 캠페인 1건의 계약·정산 주체는 대표 계정 1곳입니다.
+          </li>
           <li>&quot;낙찰&quot;은 광고주가 제안을 선택하고 결제가 승인된 상태를 말합니다.</li>
           <li>
             &quot;과업&quot;은 캠페인에 명시된 콘텐츠 제작·게시·납품 등 광고주와 크리에이터 사이의

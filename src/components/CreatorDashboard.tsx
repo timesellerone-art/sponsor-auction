@@ -6,7 +6,7 @@ import { AuctionCardSkeleton } from '@/components/AuctionCard';
 import { CreateTimeslotModal } from '@/components/CreateTimeslotModal';
 import { PageContainer } from '@/components/PageContainer';
 import { useAuth } from '@/components/AuthProvider';
-import { SettlementAccountForm } from '@/components/SettlementAccountForm';
+import { SettlementAccountSummary } from '@/components/SettlementAccountSummary';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { authRequestInit } from '@/lib/auth-request';
 import { getCreatorDashboard } from '@/lib/dashboard';
@@ -14,7 +14,6 @@ import { closeTimeSlot, listTimeSlots } from '@/lib/timeslots';
 import { addBusinessDays, formatSeoulDateLabel } from '@/lib/business-days';
 import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import {
-  MISSING_SETTLEMENT_ACCOUNT_MESSAGE,
   parseSettlementType,
   settlementAccountError,
   settlementAccountFromParts,
@@ -36,6 +35,8 @@ export function CreatorDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [createSlotOpen, setCreateSlotOpen] = useState(false);
   const [settlementType, setSettlementType] = useState<SettlementType>('individual');
+  const [settlementBankName, setSettlementBankName] = useState('');
+  const [settlementAccountNumber, setSettlementAccountNumber] = useState('');
   const [accountMissing, setAccountMissing] = useState(false);
 
   useEffect(() => {
@@ -76,18 +77,15 @@ export function CreatorDashboard() {
         if (cancelled) {
           return;
         }
+        const account = settlementAccountFromParts({
+          bankName: settlementBody?.bankName,
+          accountNumber: settlementBody?.accountNumber,
+          accountHolder: settlementBody?.accountHolder,
+        });
         setSettlementType(parseSettlementType(settlementBody?.settlementType));
-        setAccountMissing(
-          Boolean(
-            settlementAccountError(
-              settlementAccountFromParts({
-                bankName: settlementBody?.bankName,
-                accountNumber: settlementBody?.accountNumber,
-                accountHolder: settlementBody?.accountHolder,
-              }),
-            ),
-          ),
-        );
+        setSettlementBankName(account.bankName);
+        setSettlementAccountNumber(account.accountNumber);
+        setAccountMissing(Boolean(settlementAccountError(account)));
         const list = Array.isArray(result.data) ? result.data : [];
         setDeals(list);
         setSlots(slotResult.data);
@@ -154,15 +152,12 @@ export function CreatorDashboard() {
           타임슬롯 등록
         </button>
       </div>
-      {accountMissing && awardedDeals.length > 0 ? (
-        <div
-          role="alert"
-          className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-        >
-          {MISSING_SETTLEMENT_ACCOUNT_MESSAGE}
-        </div>
-      ) : null}
-      <SettlementAccountForm />
+      <SettlementAccountSummary
+        settlementType={settlementType}
+        bankName={settlementBankName}
+        accountNumber={settlementAccountNumber}
+        missing={accountMissing}
+      />
 
       {slots.length > 0 ? (
         <section className="mt-8">

@@ -9,6 +9,8 @@ import {
   creatorSettlementError,
   creatorSettlementFromRow,
   formatSettlementAccount,
+  formatSettlementAccountSummary,
+  maskAccountNumber,
   parseSettlementType,
   SETTLEMENT_TYPE_LABEL,
   settlementAccountError,
@@ -106,6 +108,25 @@ describe('settlement account', () => {
         settlementType: 'individual',
       }),
       '은행명을 입력해 주세요.',
+    );
+    assert.equal(maskAccountNumber('110-123-456789'), '********6789');
+    assert.equal(
+      formatSettlementAccountSummary({
+        settlementType: 'business',
+        bankName: '국민은행',
+        accountNumber: '12345678901',
+        registered: true,
+      }),
+      '사업자 · 국민은행 · *******8901',
+    );
+    assert.match(
+      formatSettlementAccountSummary({
+        settlementType: 'individual',
+        bankName: '',
+        accountNumber: '',
+        registered: false,
+      }),
+      /등록되지 않아/,
     );
   });
 });

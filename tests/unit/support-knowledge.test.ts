@@ -27,6 +27,9 @@ describe('클링크 상담 지식', () => {
     assert.match(prompt, /계정 설정/);
     assert.match(prompt, /콘텐츠 제안하기/);
     assert.equal(prompt.includes('타임 경매'), true);
+    assert.match(prompt, /개인 또는 팀/);
+    assert.match(prompt, /대표 계정/);
+    assert.equal(prompt.includes('캠페인당 1명'), false);
     assert.match(prompt, /escalate=false/);
   });
 
@@ -34,6 +37,8 @@ describe('클링크 상담 지식', () => {
     const answer = matchSupportKnowledge('광고등록방법은?');
     assert.match(answer, /\+ 캠페인 등록/);
     assert.match(answer, /광고주/);
+    assert.match(answer, /개인 또는 팀/);
+    assert.equal(answer.includes('1명'), false);
     assert.equal(isOperatorSupportCase('광고등록방법은?'), false);
     assert.equal(answerSupportLocally('광고등록방법은?')?.escalate, false);
 

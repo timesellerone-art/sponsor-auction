@@ -27,9 +27,11 @@ describe('랜딩 역할별 소개 카피', () => {
       LANDING_INTRO.creator.headline,
       '내 채널에 어울리는 캠페인을 찾고, AI 제안서로 빠르게 스폰서십을 수주하세요',
     );
-    assert.match(LANDING_GUIDE.advertiser.steps[1].title, /1:1 단독 매칭/);
-    assert.match(LANDING_GUIDE.advertiser.steps[1].body, /가장 적합한 1명/);
+    assert.match(LANDING_GUIDE.advertiser.steps[1].title, /1:1 매칭/);
+    assert.match(LANDING_GUIDE.advertiser.steps[1].body, /개인 또는 팀/);
+    assert.equal(LANDING_GUIDE.advertiser.steps[1].body.includes('1명'), false);
     assert.match(LANDING_GUIDE.creator.steps[1].body, /1:1 매칭/);
+    assert.match(LANDING_GUIDE.creator.steps[1].body, /개인 또는 팀/);
   });
 
   it('1:N 분할 매칭 표현을 사용하지 않는다', () => {

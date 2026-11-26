@@ -30,6 +30,8 @@ describe('크리에이터 AI 제안서', () => {
     });
     assert.match(prompt, /한 줄 기획 콘셉트/);
     assert.match(prompt, /1:1 매칭/);
+    assert.match(prompt, /개인 또는 팀/);
+    assert.equal(prompt.includes('크리에이터 1명'), false);
     assert.match(prompt, /Gemini라는 단어는 쓰지 마세요/);
     assert.equal(prompt.includes('3~5명'), true);
   });

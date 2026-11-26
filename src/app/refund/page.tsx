@@ -14,7 +14,8 @@ export default function RefundPage() {
       <LegalSection title="제1조 (목적)">
         <p>
           이 규정은 {COMPANY.brand}에서 광고주가 결제한 스폰서십 대금 및 PG 검수 목적의
-          테스트 결제의 취소·환불과 크리에이터 과업 불이행에 대한 분쟁 처리 기준을 정합니다.
+          테스트 결제의 취소·환불과 크리에이터(개인 또는 팀, 계약·정산 주체는 대표 계정) 과업
+          불이행에 대한 분쟁 처리 기준을 정합니다.
         </p>
       </LegalSection>
       <LegalSection title="제2조 (용역 제공 개시 전 100% 전액 환불)">

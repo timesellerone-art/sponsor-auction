@@ -38,7 +38,7 @@ export function buildFallbackReport(input: AiAnalyzeInput): AiReport {
 
   return {
     concepts,
-    expectedEffect: `${platform} 기준으로 첫 3초 이탈을 줄이고, 저장·프로필 방문 같은 전환 지표를 중심으로 성과를 보는 것이 좋습니다. 예산 ${budget}으로는 기획력이 검증된 1명의 핵심 크리에이터와 1:1 매칭하여 고밀도 콘텐츠 1편에 집중하세요.`,
+    expectedEffect: `${platform} 기준으로 첫 3초 이탈을 줄이고, 저장·프로필 방문 같은 전환 지표를 중심으로 성과를 보는 것이 좋습니다. 예산 ${budget}으로는 크리에이터(개인 또는 팀) 1곳과 1:1 매칭하여, 대표 계정 기준으로 고밀도 콘텐츠에 집중하세요.`,
   };
 }
 

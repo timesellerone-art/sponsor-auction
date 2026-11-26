@@ -11,9 +11,9 @@ export default function PrivacyPage() {
       </LegalSection>
       <LegalSection title="1. 개인정보 처리 목적">
         <p>
-          {COMPANY.legalName}(이하 &quot;회사&quot;)는 회원가입, 캠페인 매칭, 선정·결제, 정산,
-          고객 지원 및 법령상 의무 이행을 위해 개인정보를 처리합니다. 동의 없는 마케팅 목적
-          이용은 하지 않습니다.
+          {COMPANY.legalName}(이하 &quot;회사&quot;)는 회원가입, 캠페인 매칭(크리에이터 개인 또는
+          팀, 계약·정산 주체는 대표 계정), 선정·결제, 정산, 고객 지원 및 법령상 의무 이행을 위해
+          개인정보를 처리합니다. 동의 없는 마케팅 목적 이용은 하지 않습니다.
         </p>
       </LegalSection>
       <LegalSection title="2. 수집하는 개인정보 항목">

@@ -5,6 +5,7 @@ import { BankSelect } from '@/components/BankSelect';
 import { authRequestInit } from '@/lib/auth-request';
 import { canonicalBankName } from '@/lib/banks';
 import {
+  SETTLEMENT_ACCOUNT_SECTION_ID,
   SETTLEMENT_TYPE_LABEL,
   type CreatorSettlementProfile,
   type SettlementType,
@@ -49,6 +50,18 @@ export function SettlementAccountForm() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (window.location.hash !== `#${SETTLEMENT_ACCOUNT_SECTION_ID}`) {
+      return;
+    }
+    document
+      .getElementById(SETTLEMENT_ACCOUNT_SECTION_ID)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
+
   const save = async () => {
     setBusy(true);
     setError(null);
@@ -79,7 +92,10 @@ export function SettlementAccountForm() {
   };
 
   return (
-    <section className="mt-8 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
+    <section
+      id={SETTLEMENT_ACCOUNT_SECTION_ID}
+      className="mt-8 scroll-mt-24 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6"
+    >
       <h2 className="text-lg font-bold text-zinc-950">정산 계좌</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
         정산 입금 계좌와 유형을 저장하면 이후 제안·정산에 기본값으로 불러옵니다.

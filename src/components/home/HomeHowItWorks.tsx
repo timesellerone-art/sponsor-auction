@@ -124,7 +124,7 @@ function AdvertiserSteps() {
               <Sparkles className="size-3.5 text-[#EA580C]" aria-hidden />
               크리에이터용 촬영 가이드
             </span>
-            <span className="text-[11px] text-[#78716C]">1:1 기준</span>
+            <span className="text-[11px] text-[#78716C]">개인·팀 1:1</span>
           </div>
           <ol className="space-y-2 text-left">
             {[
@@ -173,7 +173,7 @@ function AdvertiserSteps() {
               {index === 0 ? (
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#EA580C]">
                   <Check className="size-3.5" aria-hidden />
-                  1명 선정
+                  1곳 선정
                 </span>
               ) : null}
             </li>
@@ -188,7 +188,7 @@ function AdvertiserSteps() {
             Toss Payments 연동
           </span>
           <ol className="mt-3 space-y-2">
-            {['1. 크리에이터 1명 채택', '2. 토스 간편 결제', '3. 콘텐츠 발행 확인'].map(
+            {['1. 크리에이터(개인 또는 팀) 채택', '2. 토스 간편 결제', '3. 콘텐츠 발행 확인'].map(
               (step, index) => (
                 <li key={step} className="flex items-center gap-2 text-xs font-medium text-[#1C1917]">
                   <Check

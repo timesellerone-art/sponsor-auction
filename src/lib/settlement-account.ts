@@ -61,8 +61,37 @@ export function settlementAccountFromBankField(raw: string | null | undefined): 
   };
 }
 
+export const SETTLEMENT_ACCOUNT_SECTION_ID = 'settlement-account';
+export const SETTLEMENT_ACCOUNT_SETTINGS_HREF = `/my/settings#${SETTLEMENT_ACCOUNT_SECTION_ID}`;
+
 export const MISSING_SETTLEMENT_ACCOUNT_MESSAGE =
-  '정산 계좌가 등록되지 않아 정산 요청을 진행할 수 없습니다. 마이페이지에서 은행명, 계좌번호, 예금주를 저장해 주세요.';
+  '정산 계좌가 등록되지 않아 정산 요청을 진행할 수 없습니다. 계정 설정에서 은행명, 계좌번호, 예금주를 저장해 주세요.';
+
+export function maskAccountNumber(value: string | null | undefined) {
+  const digits = normalizeAccountNumber(value);
+  if (!digits) {
+    return '';
+  }
+  if (digits.length <= 4) {
+    return '*'.repeat(digits.length);
+  }
+  return `${'*'.repeat(digits.length - 4)}${digits.slice(-4)}`;
+}
+
+export function formatSettlementAccountSummary(input: {
+  settlementType?: SettlementType | null;
+  bankName?: string | null;
+  accountNumber?: string | null;
+  registered: boolean;
+}) {
+  if (!input.registered) {
+    return MISSING_SETTLEMENT_ACCOUNT_MESSAGE;
+  }
+  const typeLabel = SETTLEMENT_TYPE_LABEL[parseSettlementType(input.settlementType)];
+  const bankName = (input.bankName ?? '').trim() || '은행 미확인';
+  const masked = maskAccountNumber(input.accountNumber) || '계좌 미확인';
+  return `${typeLabel} · ${bankName} · ${masked}`;
+}
 
 export function settlementAccountError(account: SettlementAccount) {
   if (account.bankName.length < 2) {
