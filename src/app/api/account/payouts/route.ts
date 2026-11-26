@@ -31,13 +31,37 @@ export async function GET(request: Request) {
       );
     }
 
-    const bids = await client
-      .from('bids')
-      .select('id, auction_id, bid_amount, status')
-      .eq('creator_id', actor.userId);
-    const bidRows = bids.data ?? [];
+    const [bids, slots] = await Promise.all([
+      client
+        .from('bids')
+        .select('id, auction_id, bid_amount, status')
+        .eq('creator_id', actor.userId),
+      client.from('time_slots').select('id, winner_bid_id').eq('creator_id', actor.userId),
+    ]);
+    const slotRows = slots.data ?? [];
+    const slotIds = slotRows.map((row) => String(row.id || '')).filter(Boolean);
+    const slotBids =
+      slotIds.length > 0
+        ? await client
+            .from('time_slot_bids')
+            .select('id, time_slot_id, bid_amount')
+            .in('time_slot_id', slotIds)
+        : { data: [] as Array<{ id: string; time_slot_id: string; bid_amount: number | null }> };
+    const bidRows = [
+      ...(bids.data ?? []),
+      ...(slotBids.data ?? []).map((row) => ({
+        id: row.id,
+        auction_id: row.time_slot_id,
+        bid_amount: row.bid_amount,
+        status:
+          slotRows.some((slot) => slot.winner_bid_id === row.id) ? 'selected' : 'pending',
+      })),
+    ];
     const bidIds = bidRows.map((row) => String(row.id || '')).filter(Boolean);
-    const auctionIds = bidRows.map((row) => String(row.auction_id || '')).filter(Boolean);
+    const auctionIds = [
+      ...bidRows.map((row) => String(row.auction_id || '')).filter(Boolean),
+      ...slotIds,
+    ];
     const [payouts, profile] = await Promise.all([
       listPayoutsForCreator(client, {
         creatorId: actor.userId,

@@ -6,13 +6,17 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { useAuth } from '@/components/AuthProvider';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { CreatorRatingBadge } from '@/components/CreatorRatingBadge';
 import { TimeslotBidForm } from '@/components/TimeslotBidForm';
 import { showToast } from '@/components/Toast';
 import { ACCESS_REASON } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
+import { ADVERTISER_FEE_PERCENT, VAT_PERCENT } from '@/lib/fee-policy';
 import { PLATFORM_LABELS } from '@/lib/platforms';
 import { authRequestInit } from '@/lib/auth-request';
+import { describeSettlementAmounts } from '@/lib/settlement-amounts';
+import { BID_STATUS_LABEL } from '@/lib/status-labels';
 import { getTimeSlotById, listTimeSlotBids } from '@/lib/timeslots';
 import { formatDateTime, formatViews, formatWon } from '@/lib/utils';
 import { hasAuthRole } from '@/types/auth';
@@ -27,6 +31,7 @@ export function TimeslotDetail({ id }: { id: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [pendingBid, setPendingBid] = useState<TimeSlotBidItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,6 +72,46 @@ export function TimeslotDetail({ id }: { id: string }) {
       (activeRole === 'advertiser' || hasAuthRole(user, 'advertiser') || hasAuthRole(user, 'admin')),
   );
   const slotOpen = Boolean(slot && isTimeSlotOpen(slot));
+  const winnerBid = slot?.winnerBidId
+    ? bids.find((item) => item.id === slot.winnerBidId) ?? null
+    : null;
+  const holdQuote = pendingBid ? describeSettlementAmounts(pendingBid.bidAmount) : null;
+  const awardedClosed = Boolean(slot && !slotOpen);
+
+  const awardBid = async (bid: TimeSlotBidItem) => {
+    if (!slot || busyId) {
+      return;
+    }
+    setBusyId(bid.id);
+    try {
+      const response = await fetch(
+        `/api/timeslots/${slot.id}/award`,
+        await authRequestInit({
+          method: 'POST',
+          body: JSON.stringify({ bidId: bid.id }),
+        }),
+      );
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        errorMessage?: string;
+        errorCode?: string;
+      } | null;
+      if (response.status === 402 || payload?.errorCode === 'INSUFFICIENT_CREDIT') {
+        showToast(payload?.errorMessage || payload?.error || '광고주 크레딧이 부족해 선정할 수 없습니다.');
+        return;
+      }
+      if (!response.ok) {
+        showToast(payload?.errorMessage || payload?.error || '낙찰하지 못했습니다.');
+        return;
+      }
+      showToast('크레딧에서 예치하고 낙찰했습니다.', 'success');
+      window.dispatchEvent(new Event('timeslots:changed'));
+      window.dispatchEvent(new Event('auctions:changed'));
+      window.dispatchEvent(new Event('payouts:changed'));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-3xl min-w-0 flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10">
@@ -135,7 +180,7 @@ export function TimeslotDetail({ id }: { id: string }) {
             </div>
             {!slotOpen ? (
               <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                이 상품은 마감되었거나 낙찰되었습니다.
+                {slot.winnerBidId ? '낙찰된 상품입니다.' : '이 상품은 마감되었거나 낙찰되었습니다.'}
               </p>
             ) : !authSettled ? (
               <div className="mt-6 h-24 animate-pulse rounded-xl bg-zinc-100" aria-hidden />
@@ -168,65 +213,120 @@ export function TimeslotDetail({ id }: { id: string }) {
           ) : null}
 
           <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
-            <h2 className="text-lg font-bold text-zinc-950">제안 현황</h2>
-            <p className="mt-1 text-sm text-zinc-500">최고가가 위에 표시됩니다.</p>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h2 className="text-lg font-bold text-zinc-950">제안 현황</h2>
+                <p className="mt-1 text-sm text-zinc-500">최고가가 위에 표시됩니다.</p>
+              </div>
+              {awardedClosed && winnerBid ? (
+                <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
+                  낙찰된 상품입니다
+                </span>
+              ) : null}
+            </div>
+            {awardedClosed && winnerBid ? (
+              <div className="mt-4 rounded-xl border border-clink-peach-strong bg-clink-peach px-4 py-3 text-sm text-clink">
+                <p className="font-semibold">선택된 광고주</p>
+                <p className="mt-1">
+                  {winnerBid.advertiserName || '이름 없음'} · {formatWon(winnerBid.bidAmount)}
+                </p>
+              </div>
+            ) : null}
             {bids.length === 0 ? (
               <p className="mt-4 text-sm text-zinc-500">아직 제안이 없습니다.</p>
             ) : (
               <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
-                {bids.map((bid) => (
-                  <li key={bid.id} className="rounded-xl border border-zinc-200 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-zinc-950">{bid.advertiserName}</p>
-                        <p className="mt-1 text-lg font-bold">{formatWon(bid.bidAmount)}</p>
+                {bids.map((bid) => {
+                  const winner = Boolean(slot.winnerBidId && slot.winnerBidId === bid.id);
+                  return (
+                    <li key={bid.id} className="rounded-xl border border-zinc-200 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-zinc-950">{bid.advertiserName}</p>
+                          <p className="mt-1 text-lg font-bold">{formatWon(bid.bidAmount)}</p>
+                        </div>
+                        {winner ? (
+                          <span className="shrink-0 rounded-full bg-clink-peach px-3 py-1 text-xs font-semibold text-clink-accent">
+                            {BID_STATUS_LABEL.selected}
+                          </span>
+                        ) : awardedClosed ? (
+                          <span className="shrink-0 rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">
+                            미선정
+                          </span>
+                        ) : bid.isLeading ? (
+                          <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
+                            최고 제안가
+                          </span>
+                        ) : null}
                       </div>
-                      {bid.isLeading ? (
-                        <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
-                          최고 제안가
-                        </span>
+                      <p className="mt-2 text-sm whitespace-pre-wrap text-zinc-600">{bid.message}</p>
+                      <p className="mt-2 text-xs text-zinc-400">{formatDateTime(bid.createdAt)}</p>
+                      {isOwner && slotOpen ? (
+                        <button
+                          type="button"
+                          disabled={Boolean(busyId)}
+                          onClick={() => setPendingBid(bid)}
+                          className="mt-3 inline-flex h-9 items-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:bg-zinc-300"
+                        >
+                          {busyId === bid.id ? '선정 중...' : '낙찰하기 (선택)'}
+                        </button>
                       ) : null}
-                    </div>
-                    <p className="mt-2 text-sm whitespace-pre-wrap text-zinc-600">{bid.message}</p>
-                    <p className="mt-2 text-xs text-zinc-400">{formatDateTime(bid.createdAt)}</p>
-                    {isOwner && slotOpen ? (
-                      <button
-                        type="button"
-                        disabled={Boolean(busyId)}
-                        onClick={async () => {
-                          setBusyId(bid.id);
-                          try {
-                            const response = await fetch(
-                              `/api/timeslots/${slot.id}/award`,
-                              await authRequestInit({
-                                method: 'POST',
-                                body: JSON.stringify({ bidId: bid.id }),
-                              }),
-                            );
-                            const payload = (await response.json().catch(() => null)) as {
-                              error?: string;
-                              errorMessage?: string;
-                            } | null;
-                            if (!response.ok) {
-                              showToast(payload?.errorMessage || payload?.error || '낙찰하지 못했습니다.');
-                              return;
-                            }
-                            showToast('낙찰했습니다.', 'success');
-                            window.dispatchEvent(new Event('timeslots:changed'));
-                          } finally {
-                            setBusyId(null);
-                          }
-                        }}
-                        className="mt-3 inline-flex h-9 items-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:bg-zinc-300"
-                      >
-                        {busyId === bid.id ? '선정 중...' : '이 제안 선정'}
-                      </button>
-                    ) : null}
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
+          <ConfirmModal
+            open={Boolean(pendingBid) && slotOpen}
+            title="이 제안을 낙찰할까요?"
+            description={`"${pendingBid?.advertiserName || '광고주'}"의 제안을 선택하면 해당 광고주 크레딧에서 공급가액과 부가세가 즉시 예치 차감됩니다. 잔액이 부족하면 선정은 진행되지 않습니다.`}
+            confirmLabel="크레딧으로 낙찰하기"
+            busyLabel="낙찰 중..."
+            cancelLabel="취소"
+            busy={Boolean(pendingBid && busyId === pendingBid.id)}
+            onClose={() => {
+              if (!busyId) {
+                setPendingBid(null);
+              }
+            }}
+            onConfirm={() => {
+              if (!pendingBid || busyId) {
+                return;
+              }
+              const selected = pendingBid;
+              void awardBid(selected).finally(() => {
+                setPendingBid(null);
+              });
+            }}
+          >
+            {holdQuote ? (
+              <dl className="mt-3 space-y-1.5 rounded-xl bg-zinc-50 px-3 py-3 text-sm text-zinc-700">
+                <div className="flex items-center justify-between gap-3">
+                  <dt>낙찰 금액</dt>
+                  <dd className="font-medium tabular-nums text-zinc-950">
+                    {formatWon(holdQuote.bidAmount)}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt>공급가액 (낙찰 + 수수료 {ADVERTISER_FEE_PERCENT}%)</dt>
+                  <dd className="font-medium tabular-nums text-zinc-950">
+                    {formatWon(holdQuote.advertiserSupply)}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt>부가세 ({VAT_PERCENT}% 별도)</dt>
+                  <dd className="font-medium tabular-nums text-zinc-950">
+                    {formatWon(holdQuote.advertiserVat)}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3 font-semibold text-zinc-950">
+                  <dt>총 차감액</dt>
+                  <dd className="tabular-nums">{formatWon(holdQuote.advertiserCharge)}</dd>
+                </div>
+              </dl>
+            ) : null}
+          </ConfirmModal>
         </div>
       )}
     </div>

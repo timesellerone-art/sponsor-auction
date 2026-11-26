@@ -52,9 +52,9 @@ export function CreateTimeslotModal({
   const [expectedViews, setExpectedViews] = useState('100000');
   const [startingPrice, setStartingPrice] = useState('300000');
   const [description, setDescription] = useState('');
-  const [slotStart, setSlotStart] = useState(() => localDateTime(3, 14));
-  const [slotEnd, setSlotEnd] = useState(() => localDateTime(3, 16));
-  const [deadline, setDeadline] = useState(() => defaultDeadline());
+  const [slotStart, setSlotStart] = useState('');
+  const [slotEnd, setSlotEnd] = useState('');
+  const [deadline, setDeadline] = useState('');
   const [errors, setErrors] = useState<TimeSlotFieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { isBusy: isSubmitting, run } = useActionLock();

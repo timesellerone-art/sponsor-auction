@@ -12,6 +12,7 @@ import { useAwardCheckout } from '@/hooks/useAwardCheckout';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { isOpenForBid } from '@/lib/auction-browse';
 import { getAdvertiserDashboard } from '@/lib/dashboard';
+import { dealDetailHref } from '@/lib/timeslot-deal';
 import { auctionStatusLabel } from '@/lib/status-labels';
 import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import { cn, formatDateTime, formatWon } from '@/lib/utils';
@@ -84,9 +85,11 @@ export function AdvertiserDashboard() {
       void load(true);
     };
     window.addEventListener('auctions:changed', onChanged);
+    window.addEventListener('timeslots:changed', onChanged);
     return () => {
       cancelled = true;
       window.removeEventListener('auctions:changed', onChanged);
+      window.removeEventListener('timeslots:changed', onChanged);
     };
   }, [userId]);
 
@@ -130,9 +133,15 @@ export function AdvertiserDashboard() {
     setAwardBusyId(null);
   };
 
-  const paidDeals = deals.filter(
-    (deal) => isAwardedAuction(deal.auction) || deal.payment?.status === 'confirmed',
-  );
+  const paidDeals = deals.filter((deal) => {
+    if (deal.kind === 'timeslot') {
+      return (
+        deal.payment?.status === 'confirmed' ||
+        Boolean(deal.bid && isBidSelected(deal.bid, deal.auction.winnerBidId))
+      );
+    }
+    return isAwardedAuction(deal.auction) || deal.payment?.status === 'confirmed';
+  });
   const paidIds = new Set(paidDeals.map((deal) => deal.auction.id));
   const openDeals = deals.filter(
     (deal) =>
@@ -288,22 +297,46 @@ function OpenCampaignsPanel({
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {deals.map((deal) => (
-        <AuctionCard
-          key={`open-${deal.auction.id}`}
-          auction={deal.auction}
-          hideBidAction
-          footerAction={
-            <button
-              type="button"
-              onClick={() => onOpenProposals(deal.auction.id)}
-              className="inline-flex h-10 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
+      {deals.map((deal) =>
+        deal.kind === 'timeslot' ? (
+          <article
+            key={`open-${deal.auction.id}`}
+            className="flex flex-col rounded-2xl border border-zinc-200 bg-white px-4 py-4"
+          >
+            <p className="text-xs font-semibold tracking-wide text-clink-accent">크리에이터 상품</p>
+            <Link
+              href={dealDetailHref('timeslot', deal.auction.id)}
+              className="mt-1 font-semibold text-zinc-950 hover:underline"
             >
-              제안 현황 보기
-            </button>
-          }
-        />
-      ))}
+              {deal.auction.title}
+            </Link>
+            <p className="mt-1 text-sm text-zinc-500">
+              {deal.bid ? `내 제안 ${formatWon(deal.bid.bidAmount)}` : '제안 대기'}
+            </p>
+            <Link
+              href={dealDetailHref('timeslot', deal.auction.id)}
+              className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
+            >
+              상세 페이지로 이동
+            </Link>
+          </article>
+        ) : (
+          <AuctionCard
+            key={`open-${deal.auction.id}`}
+            auction={deal.auction}
+            hideBidAction
+            footerAction={
+              <button
+                type="button"
+                onClick={() => onOpenProposals(deal.auction.id)}
+                className="inline-flex h-10 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
+              >
+                제안 현황 보기
+              </button>
+            }
+          />
+        ),
+      )}
     </div>
   );
 }
@@ -323,10 +356,10 @@ function PaidCampaignsPanel({ deals }: { deals: AdvertiserDeal[] }) {
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <Link
-                href={`/auctions/${deal.auction.id}`}
+                href={dealDetailHref(deal.kind, deal.auction.id)}
                 className="font-semibold text-zinc-950 hover:underline"
               >
-                {deal.auction.title}
+                {deal.kind === 'timeslot' ? `[상품] ${deal.auction.title}` : deal.auction.title}
               </Link>
               <p className="mt-1 text-sm text-zinc-500">
                 {deal.bid?.creatorName || '선택된 크리에이터 없음'}
@@ -382,10 +415,10 @@ function EndedCampaignsPanel({ deals }: { deals: AdvertiserDeal[] }) {
         >
           <div className="min-w-0">
             <Link
-              href={`/auctions/${deal.auction.id}`}
+              href={dealDetailHref(deal.kind, deal.auction.id)}
               className="truncate font-semibold text-zinc-950 hover:underline"
             >
-              {deal.auction.title}
+              {deal.kind === 'timeslot' ? `[상품] ${deal.auction.title}` : deal.auction.title}
             </Link>
             <p className="mt-1 truncate text-sm text-zinc-500">
               {deal.bid?.creatorName || '선정된 크리에이터 없음'}
@@ -393,7 +426,12 @@ function EndedCampaignsPanel({ deals }: { deals: AdvertiserDeal[] }) {
             </p>
           </div>
           <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-600">
-            {auctionStatusLabel(deal.auction.status)}
+            {deal.kind === 'timeslot' &&
+            deal.auction.winnerBidId &&
+            deal.bid &&
+            deal.bid.id !== deal.auction.winnerBidId
+              ? '미선정'
+              : auctionStatusLabel(deal.auction.status)}
           </span>
         </li>
       ))}
@@ -464,7 +502,11 @@ function ProposalStatusPanel({
               </p>
             </div>
             <Link
-              href={`/auctions/${selectedDeal.auction.id}#proposals`}
+              href={
+                selectedDeal.kind === 'timeslot'
+                  ? dealDetailHref('timeslot', selectedDeal.auction.id)
+                  : `/auctions/${selectedDeal.auction.id}#proposals`
+              }
               className="inline-flex h-9 items-center rounded-full border border-zinc-200 bg-white px-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50"
             >
               상세 페이지로 이동
@@ -476,7 +518,7 @@ function ProposalStatusPanel({
             loading={false}
             error={null}
             busyId={awardBusyId}
-            allowAward
+            allowAward={selectedDeal.kind !== 'timeslot'}
             onAward={(bid) => onAward(selectedDeal.auction, bid)}
           />
         </div>

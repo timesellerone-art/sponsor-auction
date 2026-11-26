@@ -19,6 +19,7 @@ import {
   settlementAccountFromParts,
   type SettlementType,
 } from '@/lib/settlement-account';
+import { dealDetailHref } from '@/lib/timeslot-deal';
 import { auctionStatusLabel, creatorPayoutStatusLabel } from '@/lib/status-labels';
 import { cn, formatDateTime, formatWon } from '@/lib/utils';
 import type { TimeSlotItem } from '@/types/timeslot';
@@ -201,7 +202,23 @@ export function CreatorDashboard() {
                       마감
                     </button>
                   ) : (
-                    <span className="text-xs text-zinc-400">{slot.status === 'awarded' ? '낙찰' : '마감'}</span>
+                    <span
+                      className={
+                        slot.status === 'awarded'
+                          ? 'rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800'
+                          : 'text-xs text-zinc-400'
+                      }
+                    >
+                      {slot.status === 'awarded'
+                        ? creatorPayoutStatusLabel(
+                            deals.find(
+                              (deal) =>
+                                deal.kind === 'timeslot' && deal.auction?.id === slot.id,
+                            )?.payoutStatus,
+                            true,
+                          )
+                        : '마감'}
+                    </span>
                   )}
                 </div>
               </li>
@@ -325,7 +342,7 @@ function DealCard({
   const payoutHold = deal.payoutStatus === 'hold';
   const resolvedTaxKind =
     deal.payout?.taxKind === 'business' || taxKind === 'business' ? 'business' : taxKind;
-  const href = deal.auction?.id ? `/auctions/${deal.auction.id}` : '/';
+  const href = deal.auction?.id ? dealDetailHref(deal.kind, deal.auction.id) : '/';
   const amounts = describeSettlementAmounts(deal.bid.bidAmount, resolvedTaxKind);
   const dueAt =
     deal.payout?.settlementDueAt ||
@@ -390,7 +407,11 @@ function DealCard({
             <p className="text-sm leading-6 text-zinc-600">{deal.bid.proposalText}</p>
           ) : null}
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">
-            {deal.auction?.status ? <span>캠페인 {auctionStatusLabel(deal.auction.status)}</span> : null}
+            {deal.auction?.status ? (
+              <span>
+                {deal.kind === 'timeslot' ? '상품' : '캠페인'} {auctionStatusLabel(deal.auction.status)}
+              </span>
+            ) : null}
             <span>제출 {formatDateTime(deal.bid.createdAt)}</span>
             {deal.payment?.orderId ? <span>주문 {deal.payment.orderId}</span> : null}
           </div>

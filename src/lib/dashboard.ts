@@ -1,4 +1,14 @@
 import { getAuctionsByAuthor, getAuctionsByIds, getBidsByAuctionIds, getBidsByCreator } from '@/lib/auctions';
+import {
+  timeSlotBidToBidItem,
+  timeSlotToAuctionItem,
+} from '@/lib/timeslot-deal';
+import {
+  listTimeSlotBidsBySlotIds,
+  listTimeSlotBidsForAdvertiser,
+  listTimeSlots,
+  listTimeSlotsByIds,
+} from '@/lib/timeslots';
 import { authRequestInit } from '@/lib/auth-request';
 import { payoutLinkedToBid } from '@/lib/admin-bid-status';
 import { applyAdminPayoutIntegrity } from '@/lib/admin-integrity';
@@ -231,6 +241,89 @@ async function loadCreatorPayouts(
   return filterCreatorPayouts(Array.isArray(mock.data) ? mock.data : [], userId, bidIds, auctionIds);
 }
 
+async function loadAdvertiserTimeslotDeals(
+  userId: string,
+  client?: SponsorAuctionClient | null,
+): Promise<AdvertiserDeal[]> {
+  const bidResult = await listTimeSlotBidsForAdvertiser(userId, client);
+  const slotBids = Array.isArray(bidResult.data) ? bidResult.data : [];
+  if (slotBids.length === 0) {
+    return [];
+  }
+  const slotIds = [...new Set(slotBids.map((item) => item.timeSlotId).filter(Boolean))];
+  const [slotResult, livePayments] = await Promise.all([
+    listTimeSlotsByIds(slotIds, client),
+    loadAdvertiserPayments(slotIds, client),
+  ]);
+  const slots = Array.isArray(slotResult.data) ? slotResult.data : [];
+  const slotById = new Map(slots.map((item) => [item.id, item]));
+  const auctions = slots.map((slot) =>
+    timeSlotToAuctionItem(slot, { authorId: userId, authorName: slot.creatorName }),
+  );
+  const mappedBids = slotBids.flatMap((bid) => {
+    const slot = slotById.get(bid.timeSlotId);
+    if (!slot) {
+      return [];
+    }
+    return [timeSlotBidToBidItem(bid, slot)];
+  });
+  return assembleAdvertiserDeals(auctions, mappedBids, livePayments).map((deal) => ({
+    ...deal,
+    kind: 'timeslot' as const,
+  }));
+}
+
+function toCreatorDeal(
+  bid: BidItem,
+  auction: AuctionItem | null,
+  payouts: PayoutItem[],
+  kind?: AdvertiserDeal['kind'],
+): CreatorDeal {
+  const won =
+    bid.status === 'selected' || Boolean(auction && isBidSelected(bid, auction.winnerBidId));
+  const payout = payoutForCreatorBid(payouts, bid, auction);
+  const payoutStatus = payoutStatusForCreator(payout, won);
+  return {
+    bid: won ? { ...bid, status: 'selected' as const } : { ...bid, status: 'pending' as const },
+    auction,
+    payment: payout?.paymentOrderId
+      ? {
+          orderId: payout.paymentOrderId,
+          auctionId: payout.auctionId || bid.auctionId,
+          bidId: payout.bidId || bid.id,
+          amount: payout.amount,
+          status: payout.status === 'paid' ? 'confirmed' : payout.status,
+          orderName: payout.auctionTitle,
+          confirmedAt: payout.paidAt || payout.requestedAt || null,
+        }
+      : null,
+    payout,
+    payoutStatus,
+    kind,
+  };
+}
+
+function assembleCreatorTimeslotDeals(
+  slots: Awaited<ReturnType<typeof listTimeSlots>>['data'],
+  slotBids: Awaited<ReturnType<typeof listTimeSlotBidsBySlotIds>>['data'],
+  payouts: PayoutItem[],
+): CreatorDeal[] {
+  const awarded = (Array.isArray(slots) ? slots : []).filter((slot) => Boolean(slot.winnerBidId));
+  const bids = Array.isArray(slotBids) ? slotBids : [];
+  return awarded.flatMap((slot) => {
+    const winner = bids.find((bid) => bid.id === slot.winnerBidId);
+    if (!winner) {
+      return [];
+    }
+    const auction = timeSlotToAuctionItem(slot, {
+      authorId: winner.advertiserId,
+      authorName: winner.advertiserName,
+    });
+    const bid = timeSlotBidToBidItem(winner, slot);
+    return [toCreatorDeal(bid, auction, payouts, 'timeslot')];
+  });
+}
+
 export function assembleAdvertiserDeals(
   auctions: AuctionItem[],
   bids: BidItem[],
@@ -290,10 +383,12 @@ export async function loadAdvertiserDashboardFromClient(
     Array.isArray(bidResult.data) ? bidResult.data : [],
     livePayments,
   );
-  if (auctions.length === 0 && auctionResult.error) {
+  const timeslotDeals = await loadAdvertiserTimeslotDeals(userId, client);
+  const merged = [...deals, ...timeslotDeals];
+  if (auctions.length === 0 && timeslotDeals.length === 0 && auctionResult.error) {
     return fail([], auctionResult.error);
   }
-  return ok(deals);
+  return ok(merged);
 }
 
 /**
@@ -351,12 +446,14 @@ export async function getAdvertiserDashboard(
       Array.isArray(bidResult.data) ? bidResult.data : [],
       livePayments,
     );
+    const timeslotDeals = await loadAdvertiserTimeslotDeals(user.id);
+    const merged = [...deals, ...timeslotDeals];
 
-    if (auctions.length === 0 && auctionResult.error) {
+    if (auctions.length === 0 && timeslotDeals.length === 0 && auctionResult.error) {
       return fail([], auctionResult.error);
     }
 
-    return ok(deals);
+    return ok(merged);
   } catch (error) {
     console.error('[SponsorAuction] 광고주 대시보드 조회 예외', error);
     return fail([], '캠페인 목록을 불러오지 못했습니다.');
@@ -380,45 +477,39 @@ export async function getCreatorDashboard(
       bidIds: storedBidIds,
     });
     const bids = pickCreatorBids(Array.isArray(bidResult.data) ? bidResult.data : [], user);
-    const auctionIds = [...new Set(bids.map((item) => item.auctionId).filter(Boolean))];
+    const slotResult = await listTimeSlots({ creatorId: user.id });
+    const slots = Array.isArray(slotResult.data) ? slotResult.data : [];
+    const slotBidResult = await listTimeSlotBidsBySlotIds(slots.map((item) => item.id));
+    const slotBids = Array.isArray(slotBidResult.data) ? slotBidResult.data : [];
+    const auctionIds = [
+      ...new Set([
+        ...bids.map((item) => item.auctionId),
+        ...slots.map((item) => item.id),
+      ].filter(Boolean)),
+    ];
     const [auctionResult, rawPayouts] = await Promise.all([
       getAuctionsByIds(auctionIds),
       loadCreatorPayouts(
         user.id,
-        bids.map((item) => item.id),
+        [...bids.map((item) => item.id), ...slotBids.map((item) => item.id)],
         auctionIds,
       ),
     ]);
 
     const auctions = Array.isArray(auctionResult.data) ? auctionResult.data : [];
     const auctionById = new Map(auctions.map((item) => [item.id, item]));
-    const payouts = applyAdminPayoutIntegrity(rawPayouts, auctions, bids);
+    const payouts = applyAdminPayoutIntegrity(rawPayouts, auctions, [
+      ...bids,
+      ...slotBids.flatMap((bid) => {
+        const slot = slots.find((item) => item.id === bid.timeSlotId);
+        return slot ? [timeSlotBidToBidItem(bid, slot)] : [];
+      }),
+    ]);
 
-    const deals: CreatorDeal[] = bids.map((bid) => {
-      const auction = auctionById.get(bid.auctionId) ?? null;
-      const won =
-        bid.status === 'selected' ||
-        Boolean(auction && isBidSelected(bid, auction.winnerBidId));
-      const payout = payoutForCreatorBid(payouts, bid, auction);
-      const payoutStatus = payoutStatusForCreator(payout, won);
-      return {
-        bid: won ? { ...bid, status: 'selected' as const } : { ...bid, status: 'pending' as const },
-        auction,
-        payment: payout?.paymentOrderId
-          ? {
-              orderId: payout.paymentOrderId,
-              auctionId: payout.auctionId || bid.auctionId,
-              bidId: payout.bidId || bid.id,
-              amount: payout.amount,
-              status: payout.status === 'paid' ? 'confirmed' : payout.status,
-              orderName: payout.auctionTitle,
-              confirmedAt: payout.paidAt || payout.requestedAt || null,
-            }
-          : null,
-        payout,
-        payoutStatus,
-      };
-    });
+    const deals: CreatorDeal[] = bids.map((bid) =>
+      toCreatorDeal(bid, auctionById.get(bid.auctionId) ?? null, payouts),
+    );
+    deals.push(...assembleCreatorTimeslotDeals(slots, slotBids, payouts));
 
     deals.sort((left, right) => {
       const rank = (deal: CreatorDeal) =>

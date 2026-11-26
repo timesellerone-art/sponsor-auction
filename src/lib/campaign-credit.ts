@@ -368,6 +368,15 @@ export async function holdCampaignPayment(
       message: auctionResult.error?.message || bidResult.error?.message || '캠페인 금액을 확인하지 못했습니다.',
     };
   }
+  if (!auctionResult.data) {
+    return holdTimeslotPayment(client, {
+      orderId,
+      slotId: auctionId,
+      bidId,
+      actorUserId: input.actorUserId,
+      actorIsAdmin: input.actorIsAdmin,
+    });
+  }
   const winnerId = auctionResult.data?.winner_bid_id ?? null;
   if (winnerId && winnerId !== bidId) {
     return { ok: false, code: 'ALREADY_AWARDED', message: '이미 다른 제안이 채택된 캠페인입니다.' };
@@ -388,6 +397,66 @@ export async function holdCampaignPayment(
     referenceId: campaignPayReference(orderId),
     bidAmount,
     title: auctionResult.data?.title,
+  });
+}
+
+async function holdTimeslotPayment(
+  client: CreditLedgerClient,
+  input: {
+    orderId: string;
+    slotId: string;
+    bidId: string;
+    actorUserId?: string | null;
+    actorIsAdmin?: boolean;
+  },
+): Promise<CampaignHoldResult> {
+  const [slotResult, bidResult] = await Promise.all([
+    client
+      .from('time_slots')
+      .select('id, title, winner_bid_id, creator_id')
+      .eq('id', input.slotId)
+      .maybeSingle(),
+    client
+      .from('time_slot_bids')
+      .select('bid_amount, advertiser_id')
+      .eq('id', input.bidId)
+      .eq('time_slot_id', input.slotId)
+      .maybeSingle(),
+  ]);
+  if (slotResult.error || bidResult.error) {
+    return {
+      ok: false,
+      code: 'RPC_ERROR',
+      message:
+        slotResult.error?.message ||
+        bidResult.error?.message ||
+        '크리에이터 상품 금액을 확인하지 못했습니다.',
+    };
+  }
+  if (!slotResult.data || !bidResult.data) {
+    return { ok: false, code: 'AWARD_TARGET_NOT_FOUND', message: '채택할 제안 또는 광고주를 찾지 못했습니다.' };
+  }
+  const winnerId = slotResult.data.winner_bid_id ?? null;
+  if (winnerId && winnerId !== input.bidId) {
+    return { ok: false, code: 'ALREADY_AWARDED', message: '이미 다른 제안이 채택된 상품입니다.' };
+  }
+  const payerUserId = bidResult.data.advertiser_id?.trim() ?? '';
+  const bidAmount = bidResult.data.bid_amount ?? 0;
+  if (!payerUserId || bidAmount <= 0) {
+    return { ok: false, code: 'AWARD_TARGET_NOT_FOUND', message: '채택할 제안 또는 광고주를 찾지 못했습니다.' };
+  }
+  const actorUserId = input.actorUserId?.trim() ?? '';
+  const ownerId = slotResult.data.creator_id?.trim() ?? '';
+  if (actorUserId && ownerId && actorUserId !== ownerId && !input.actorIsAdmin) {
+    return { ok: false, code: 'FORBIDDEN', message: '본인 상품만 채택할 수 있습니다.' };
+  }
+
+  await releaseOtherPendingHolds(client, input.slotId, input.bidId, input.orderId);
+  return holdCampaignCredit(client, {
+    userId: payerUserId,
+    referenceId: campaignPayReference(input.orderId),
+    bidAmount,
+    title: slotResult.data.title,
   });
 }
 
@@ -417,13 +486,27 @@ export async function releaseCampaignPaymentIfOpen(
     if (auction.error) {
       return { ok: false, code: 'RPC_ERROR', message: auction.error.message };
     }
-    const status = auction.data?.status;
-    const winnerId = auction.data?.winner_bid_id ?? null;
-    if (
-      winnerId === bidId &&
-      (status === 'completed' || status === 'closed' || status === 'matched')
-    ) {
-      return { ok: true, restored: false, amount: 0, balanceAfter: null, reason: 'awarded' };
+    if (auction.data) {
+      const status = auction.data.status;
+      const winnerId = auction.data.winner_bid_id ?? null;
+      if (
+        winnerId === bidId &&
+        (status === 'completed' || status === 'closed' || status === 'matched')
+      ) {
+        return { ok: true, restored: false, amount: 0, balanceAfter: null, reason: 'awarded' };
+      }
+    } else {
+      const slot = await client
+        .from('time_slots')
+        .select('status, winner_bid_id')
+        .eq('id', auctionId)
+        .maybeSingle();
+      if (slot.error) {
+        return { ok: false, code: 'RPC_ERROR', message: slot.error.message };
+      }
+      if (slot.data?.winner_bid_id === bidId && slot.data.status === 'awarded') {
+        return { ok: true, restored: false, amount: 0, balanceAfter: null, reason: 'awarded' };
+      }
     }
   }
 

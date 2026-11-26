@@ -10,7 +10,7 @@ import { isPlatformType } from '@/lib/platforms';
 import { getSupabaseClient, type SponsorAuctionClient } from '@/lib/supabase';
 import { getDataClient } from '@/lib/supabase/data-client';
 import { isSchemaMismatch } from '@/lib/supabase/errors';
-import { isUuid } from '@/lib/uuid';
+import { isUuid, uuidIds } from '@/lib/uuid';
 import { VALIDATION, validateTimeSlotPayload } from '@/lib/validation';
 import { maskOffPlatformContact, sanitizeUserText } from '@/utils/filter';
 import type { DataResult } from '@/types/auction';
@@ -312,11 +312,14 @@ export async function listTimeSlots(options?: {
   }
 }
 
-export async function getTimeSlotById(id: string): Promise<DataResult<TimeSlotItem | null>> {
+export async function getTimeSlotById(
+  id: string,
+  client?: SponsorAuctionClient | null,
+): Promise<DataResult<TimeSlotItem | null>> {
   if (!id.trim()) {
     return fail(null, '크리에이터 상품 ID가 필요합니다.');
   }
-  const supabase = await getDataClient();
+  const supabase = client ?? (await getDataClient());
   if (!supabase || !isUuid(id)) {
     const found = slotsStore.find((item) => item.id === id) ?? null;
     if (!found) {
@@ -347,11 +350,14 @@ export async function getTimeSlotById(id: string): Promise<DataResult<TimeSlotIt
   }
 }
 
-export async function listTimeSlotBids(slotId: string): Promise<DataResult<TimeSlotBidItem[]>> {
+export async function listTimeSlotBids(
+  slotId: string,
+  client?: SponsorAuctionClient | null,
+): Promise<DataResult<TimeSlotBidItem[]>> {
   if (!slotId.trim()) {
     return fail([], '크리에이터 상품 ID가 필요합니다.');
   }
-  const supabase = await getDataClient();
+  const supabase = client ?? (await getDataClient());
   if (!supabase || !isUuid(slotId)) {
     const bids = slotBidsStore
       .filter((item) => item.timeSlotId === slotId)
@@ -560,12 +566,105 @@ export async function placeTimeSlotBid(
   });
 }
 
+export async function listTimeSlotsByIds(
+  ids: string[],
+  client?: SponsorAuctionClient | null,
+): Promise<DataResult<TimeSlotItem[]>> {
+  const unique = uuidIds(ids);
+  const mockMatches = slotsStore.filter((item) => ids.includes(item.id)).map((item) => applySlotExpiry(item));
+  if (unique.length === 0) {
+    return ok(await withScores(mockMatches));
+  }
+  const supabase = await getTimeslotReadClient(client);
+  if (!supabase) {
+    return ok(await withScores(mockMatches));
+  }
+  try {
+    const { data, error } = await supabase
+      .from('time_slots')
+      .select(SLOT_COLUMNS)
+      .in('id', unique)
+      .order('created_at', { ascending: false });
+    if (error) {
+      if (isSchemaMismatch(error)) {
+        return ok(await withScores(mockMatches));
+      }
+      return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');
+    }
+    return ok(await withScores((data ?? []).map((row) => mapSlot(row))));
+  } catch {
+    return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');
+  }
+}
+
+export async function listTimeSlotBidsForAdvertiser(
+  advertiserId: string,
+  client?: SponsorAuctionClient | null,
+): Promise<DataResult<TimeSlotBidItem[]>> {
+  if (!advertiserId.trim()) {
+    return ok([]);
+  }
+  const supabase = await getTimeslotReadClient(client);
+  if (!supabase || !isUuid(advertiserId)) {
+    const bids = slotBidsStore.filter((item) => item.advertiserId === advertiserId);
+    return ok(bids);
+  }
+  try {
+    const { data, error } = await supabase
+      .from('time_slot_bids')
+      .select(SLOT_BID_COLUMNS)
+      .eq('advertiser_id', advertiserId)
+      .order('created_at', { ascending: false });
+    if (error) {
+      if (isSchemaMismatch(error)) {
+        return ok(slotBidsStore.filter((item) => item.advertiserId === advertiserId));
+      }
+      return fail([], '제안 목록을 불러오지 못했습니다.');
+    }
+    return ok((data ?? []).map((row) => mapSlotBid(row)));
+  } catch {
+    return fail([], '제안 목록을 불러오지 못했습니다.');
+  }
+}
+
+export async function listTimeSlotBidsBySlotIds(
+  slotIds: string[],
+  client?: SponsorAuctionClient | null,
+): Promise<DataResult<TimeSlotBidItem[]>> {
+  const unique = uuidIds(slotIds);
+  const mockMatches = slotBidsStore.filter((item) => slotIds.includes(item.timeSlotId));
+  if (unique.length === 0) {
+    return ok(mockMatches);
+  }
+  const supabase = await getTimeslotReadClient(client);
+  if (!supabase) {
+    return ok(mockMatches);
+  }
+  try {
+    const { data, error } = await supabase
+      .from('time_slot_bids')
+      .select(SLOT_BID_COLUMNS)
+      .in('time_slot_id', unique)
+      .order('created_at', { ascending: false });
+    if (error) {
+      if (isSchemaMismatch(error)) {
+        return ok(mockMatches);
+      }
+      return fail([], '제안 목록을 불러오지 못했습니다.');
+    }
+    return ok((data ?? []).map((row) => mapSlotBid(row)));
+  } catch {
+    return fail([], '제안 목록을 불러오지 못했습니다.');
+  }
+}
+
 export async function awardTimeSlotBid(
   slotId: string,
   bidId: string,
   creatorId?: string | null,
+  client?: SponsorAuctionClient | null,
 ): Promise<DataResult<TimeSlotItem | null>> {
-  const slotResult = await getTimeSlotById(slotId);
+  const slotResult = await getTimeSlotById(slotId, client);
   const slot = slotResult.data;
   if (!slot) {
     return fail(null, slotResult.error ?? '크리에이터 상품을 찾을 수 없습니다.');
@@ -577,13 +676,13 @@ export async function awardTimeSlotBid(
     return fail(null, '이미 마감된 상품입니다.');
   }
 
-  const bids = await listTimeSlotBids(slotId);
+  const bids = await listTimeSlotBids(slotId, client);
   const winner = bids.data.find((item) => item.id === bidId);
   if (!winner) {
     return fail(null, '선정할 제안을 찾을 수 없습니다.');
   }
 
-  const supabase = await getDataClient();
+  const supabase = client ?? (await getDataClient());
   if (!supabase || !isUuid(slotId)) {
     slotsStore = slotsStore.map((item) =>
       item.id === slotId

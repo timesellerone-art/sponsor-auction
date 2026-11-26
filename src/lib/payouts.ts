@@ -464,6 +464,52 @@ async function loadBidsForPayout(client: SponsorAuctionClient, ids: string[]) {
   return loadByIds<BidLookup>(client, 'bids', BID_LOOKUP_CORE, ids);
 }
 
+async function loadTimeslotPayoutLookup(
+  client: SponsorAuctionClient,
+  slotId: string,
+  bidId: string,
+): Promise<{ bid?: BidLookup; auction?: AuctionLookup }> {
+  if (!isUuid(slotId) || !isUuid(bidId)) {
+    return {};
+  }
+  const [slotResult, bidResult] = await Promise.all([
+    client
+      .from('time_slots')
+      .select('id, title, status, winner_bid_id, created_at, creator_id, creator_name')
+      .eq('id', slotId)
+      .maybeSingle(),
+    client
+      .from('time_slot_bids')
+      .select('id, time_slot_id, advertiser_id, advertiser_name, bid_amount')
+      .eq('id', bidId)
+      .eq('time_slot_id', slotId)
+      .maybeSingle(),
+  ]);
+  const slot = slotResult.data;
+  const slotBid = bidResult.data;
+  if (!slot || !slotBid) {
+    return {};
+  }
+  return {
+    auction: {
+      id: slot.id,
+      title: slot.title ?? '',
+      status: slot.status === 'awarded' ? 'closed' : (slot.status ?? 'open'),
+      winner_bid_id: slot.winner_bid_id,
+      updated_at: slot.created_at,
+      created_at: slot.created_at,
+    },
+    bid: {
+      id: slotBid.id,
+      auction_id: slot.id,
+      creator_id: slot.creator_id,
+      creator_name: slot.creator_name ?? '',
+      bid_amount: slotBid.bid_amount ?? 0,
+      status: slot.winner_bid_id === slotBid.id ? 'selected' : 'pending',
+    },
+  };
+}
+
 type CreatorPayoutProfile = {
   id: string;
   name: string;
@@ -673,8 +719,13 @@ export async function upsertPaidPayout(
         [input.auctionId],
       ),
     ]);
-    const bid = bids[0];
-    const auction = auctions[0];
+    let bid = bids[0];
+    let auction = auctions[0];
+    if (!bid || !auction) {
+      const timeslot = await loadTimeslotPayoutLookup(client, input.auctionId, input.bidId);
+      bid = bid ?? timeslot.bid;
+      auction = auction ?? timeslot.auction;
+    }
     const profiles = bid?.creator_id
       ? await loadCreatorPayoutProfiles(client, [bid.creator_id])
       : [];

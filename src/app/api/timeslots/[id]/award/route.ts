@@ -1,14 +1,14 @@
 import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
-import { holdCampaignCredit, releaseCampaignCredit, timeslotAwardReference } from '@/lib/campaign-credit';
 import {
   forbiddenJson,
   getPaymentActor,
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { awardTimeSlotBid, getTimeSlotById, listTimeSlotBids } from '@/lib/timeslots';
+import { awardTimeslotWithCredit } from '@/lib/timeslot-award';
+import { awardTimeSlotBid, getTimeSlotById } from '@/lib/timeslots';
 import { isUuid } from '@/lib/uuid';
 import { hasAuthRole } from '@/types/auth';
 
@@ -30,8 +30,8 @@ export async function POST(
     } catch {
       // 낙찰은 계속합니다.
     }
-    const actor = await getPaymentActor();
-    if (!actor) {
+    const actor = await getPaymentActor(request);
+    if (!actor?.userId) {
       return unauthorizedJson('낙찰하려면 로그인해 주세요.');
     }
     if (!hasAuthRole(actor, 'creator') && !hasAuthRole(actor, 'admin')) {
@@ -48,9 +48,9 @@ export async function POST(
     }
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const bidId = asText(body?.bidId);
-    let creditReference: string | null = null;
-    const admin = createAdminClient();
+
     if (isUuid(id) && isUuid(bidId)) {
+      const admin = createAdminClient();
       if (!admin) {
         return NextResponse.json(
           {
@@ -60,41 +60,31 @@ export async function POST(
           { status: 503, headers: NO_STORE },
         );
       }
-      const bids = await listTimeSlotBids(id);
-      const winner = bids.data.find((item) => item.id === bidId);
-      const payerId = winner?.advertiserId ?? '';
-      if (!winner || winner.bidAmount <= 0 || !isUuid(payerId)) {
+      const awarded = await awardTimeslotWithCredit(admin, {
+        slotId: id,
+        bidId,
+        actorUserId: actor.userId,
+        actorIsAdmin: hasAuthRole(actor, 'admin'),
+      });
+      if (!awarded.ok) {
         return NextResponse.json(
           {
-            error: '광고주 크레딧을 차감할 제안을 찾지 못했습니다.',
-            errorCode: 'AWARD_TARGET_NOT_FOUND',
+            error: awarded.error,
+            errorMessage: awarded.error,
+            errorCode: awarded.errorCode,
+            neededAmount: awarded.neededAmount,
           },
-          { status: 400, headers: NO_STORE },
+          { status: awarded.status, headers: NO_STORE },
         );
       }
-      creditReference = timeslotAwardReference(id, bidId, crypto.randomUUID());
-      const held = await holdCampaignCredit(admin, {
-        userId: payerId,
-        referenceId: creditReference,
-        bidAmount: winner.bidAmount,
-        title: slot.data?.title ?? '크리에이터 상품',
-      });
-      if (!held.ok) {
-        const status = held.code === 'INSUFFICIENT_CREDIT' ? 402 : 400;
-        return NextResponse.json(
-          { error: held.message, errorCode: held.code },
-          { status, headers: NO_STORE },
-        );
-      }
+      return NextResponse.json(
+        { data: awarded.data, amount: awarded.amount, orderId: awarded.orderId },
+        { headers: NO_STORE },
+      );
     }
+
     const result = await awardTimeSlotBid(id, bidId, actor.userId);
     if (result.error || !result.data) {
-      if (admin && creditReference) {
-        await releaseCampaignCredit(admin, {
-          referenceId: creditReference,
-          reason: '크리에이터 상품 채택 실패로 크레딧 복구',
-        });
-      }
       const message = result.error ?? '낙찰하지 못했습니다.';
       return NextResponse.json(
         { error: message, errorMessage: message },

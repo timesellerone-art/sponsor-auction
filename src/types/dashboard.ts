@@ -1,6 +1,8 @@
 import type { PayoutItem } from '@/types/admin';
 import type { AuctionItem, BidItem } from '@/types/auction';
 
+export type DealKind = 'campaign' | 'timeslot';
+
 export type PaymentRecord = {
   orderId: string;
   auctionId: string;
@@ -16,6 +18,7 @@ export type AdvertiserDeal = {
   bid: BidItem | null;
   bids: BidItem[];
   payment: PaymentRecord | null;
+  kind?: DealKind;
 };
 
 export type CreatorPayoutStatus = 'none' | 'pending' | 'hold' | 'paid';
@@ -26,4 +29,5 @@ export type CreatorDeal = {
   payment: PaymentRecord | null;
   payout: PayoutItem | null;
   payoutStatus: CreatorPayoutStatus;
+  kind?: DealKind;
 };
