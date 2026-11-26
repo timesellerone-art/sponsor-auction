@@ -1249,6 +1249,10 @@ alter table if exists public.profiles
 alter table if exists public.profiles
   add column if not exists business_checked_at timestamptz;
 alter table if exists public.profiles
+  add column if not exists business_representative_name text not null default '';
+alter table if exists public.profiles
+  add column if not exists business_opened_on text not null default '';
+alter table if exists public.profiles
   add column if not exists bank_name text not null default '';
 alter table if exists public.profiles
   add column if not exists account_number text not null default '';

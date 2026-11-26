@@ -4,9 +4,14 @@ import {
   businessActionBlock,
   businessNumberError,
   formatBusinessNumber,
+  formatOpeningDateInput,
   isValidBusinessRegistrationNumber,
   normalizeBusinessNumber,
+  normalizeOpeningDate,
+  openingDateError,
   profileStatusFromNts,
+  profileStatusFromNtsAndValidate,
+  representativeNameError,
 } from '../../src/lib/business-registration';
 
 function withCheckDigit(firstNine: string) {
@@ -36,6 +41,27 @@ describe('business registration number', () => {
     assert.equal(profileStatusFromNts('02', '휴업자').status, 'closed');
     assert.equal(profileStatusFromNts('03', '폐업자').status, 'closed');
     assert.equal(profileStatusFromNts('UNREGISTERED', '미등록').status, 'unregistered');
+  });
+
+  it('대표자 성명과 개업일자 형식을 검사한다', () => {
+    assert.equal(representativeNameError(''), '대표자 성명을 입력해 주세요.');
+    assert.equal(representativeNameError('홍'), '대표자 성명을 2자 이상 입력해 주세요.');
+    assert.equal(representativeNameError('홍길동'), null);
+    assert.equal(normalizeOpeningDate('2024-01-15'), '20240115');
+    assert.equal(formatOpeningDateInput('20240115'), '2024-01-15');
+    assert.equal(openingDateError('20241399'), '개업일자가 올바른 날짜가 아닙니다.');
+    assert.equal(openingDateError('20240115'), null);
+  });
+
+  it('진위확인 불일치는 검수필요로 올리지 않고, 일치하면 기존 status 매핑을 유지한다', () => {
+    const mismatched = profileStatusFromNtsAndValidate('01', '계속사업자', '02');
+    assert.equal(mismatched.status, 'unregistered');
+    assert.equal(mismatched.mismatch, true);
+    const matchedActive = profileStatusFromNtsAndValidate('01', '계속사업자', '01');
+    assert.equal(matchedActive.status, 'review_required');
+    assert.equal(matchedActive.mismatch, false);
+    const matchedClosed = profileStatusFromNtsAndValidate('03', '폐업자', '01');
+    assert.equal(matchedClosed.status, 'closed');
   });
 
   it('휴폐업과 반려만 충전과 캠페인 등록을 막는다', () => {

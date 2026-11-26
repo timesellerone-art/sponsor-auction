@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { ACTIVE_ROLE_COOKIE_NAME, ACTIVE_ROLE_HEADER, lastCookieValue, ROLE_COOKIE_NAME } from '@/lib/access';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getSupabaseEnv } from '@/lib/supabase/env';
 import { createClient } from '@/lib/supabase/server';
 import {
   allowsCreditCharge,
@@ -42,12 +43,74 @@ function requestActiveRole(
   return null;
 }
 
+const AUTH_JSON_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate',
+} as const;
+
 function cookieOnlyActor(roles: AuthProfileRole[], activeRole: MemberRole | null): PaymentActor | null {
   const role = primaryAuthRole(roles);
   if (!role || process.env.NODE_ENV === 'production') {
     return null;
   }
   return { role, roles, activeRole };
+}
+
+async function userFromBearerToken(token: string) {
+  if (!token) {
+    return null;
+  }
+
+  const admin = createAdminClient();
+  if (admin) {
+    try {
+      const { data, error } = await admin.auth.getUser(token);
+      if (!error && data.user) {
+        return data.user;
+      }
+    } catch {
+      // 쿠키 세션으로 이어갑니다.
+    }
+  }
+
+  const env = getSupabaseEnv();
+  if (!env) {
+    return null;
+  }
+  try {
+    const response = await fetch(`${env.url}/auth/v1/user`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        apikey: env.anonKey,
+      },
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const payload = (await response.json().catch(() => null)) as {
+      id?: string;
+      user_metadata?: Record<string, unknown>;
+    } | null;
+    return payload?.id ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+async function userFromCookieSession() {
+  try {
+    const supabase = await createClient();
+    if (!supabase) {
+      return null;
+    }
+    const { data, error } = await supabase.auth.getUser();
+    if (!error && data.user) {
+      return data.user;
+    }
+  } catch {
+    // Bearer 검증과 분리합니다.
+  }
+  return null;
 }
 
 export async function getPaymentActor(request?: Request): Promise<PaymentActor | null> {
@@ -62,35 +125,16 @@ export async function getPaymentActor(request?: Request): Promise<PaymentActor |
     '';
 
   try {
-    const supabase = await createClient();
-    if (!supabase) {
+    const user =
+      (await userFromBearerToken(bearerToken(request))) ?? (await userFromCookieSession());
+    if (!user?.id) {
       return cookieOnlyActor(cookieRoles, requestActiveRole(request, undefined, activeCookie));
     }
 
-    const token = bearerToken(request);
-    let user: { id: string; user_metadata?: Record<string, unknown> } | null = null;
-    if (token) {
-      const byToken = await supabase.auth.getUser(token);
-      if (!byToken.error && byToken.data.user) {
-        user = byToken.data.user;
-      }
-    }
-    if (!user) {
-      const byCookie = await supabase.auth.getUser();
-      if (!byCookie.error && byCookie.data.user) {
-        user = byCookie.data.user;
-      }
-    }
-    if (!user) {
-      return cookieOnlyActor(cookieRoles, requestActiveRole(request, undefined, activeCookie));
-    }
-
-    const reader = createAdminClient() ?? supabase;
-    const { data: profile } = await reader
-      .from('profiles')
-      .select('role, roles')
-      .eq('id', user.id)
-      .maybeSingle();
+    const reader = createAdminClient() ?? (await createClient());
+    const { data: profile } = reader
+      ? await reader.from('profiles').select('role, roles').eq('id', user.id).maybeSingle()
+      : { data: null };
     const roles = parseAuthRoles(
       profile?.roles,
       profile?.role,
@@ -116,7 +160,7 @@ export function unauthorizedJson(message = '로그인이 필요합니다.') {
       errorCode: 'UNAUTHORIZED',
       errorMessage: message,
     },
-    { status: 401 },
+    { status: 401, headers: AUTH_JSON_HEADERS },
   );
 }
 
@@ -127,7 +171,7 @@ export function forbiddenJson(message = '이 요청을 수행할 권한이 없�
       errorCode: 'FORBIDDEN',
       errorMessage: message,
     },
-    { status: 403 },
+    { status: 403, headers: AUTH_JSON_HEADERS },
   );
 }
 

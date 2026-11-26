@@ -50,6 +50,92 @@ const PERIODS: { id: PayoutPeriodFilter; label: string }[] = [
   { id: 'range', label: '날짜 범위' },
 ];
 
+function payoutStatusClass(status: PayoutStatus) {
+  if (status === 'cancelled') {
+    return 'bg-zinc-100 text-zinc-600';
+  }
+  if (status === 'hold') {
+    return 'bg-rose-50 text-rose-700';
+  }
+  if (status === 'pending') {
+    return 'bg-amber-50 text-amber-800';
+  }
+  return 'bg-clink-peach text-clink-accent';
+}
+
+function PayoutManageButtons({
+  payout,
+  pending,
+  held,
+  cancelled,
+  busy,
+  anyBusy,
+  compact,
+  onApprove,
+  onHold,
+  onTax,
+}: {
+  payout: PayoutItem;
+  pending: boolean;
+  held: boolean;
+  cancelled: boolean;
+  busy: boolean;
+  anyBusy: boolean;
+  compact?: boolean;
+  onApprove: () => void;
+  onHold?: (payout: PayoutItem, hold: boolean) => void | Promise<void>;
+  onTax: () => void;
+}) {
+  const base = compact
+    ? 'inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-50'
+    : 'inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50';
+  return (
+    <div className={compact ? 'flex min-w-0 flex-col gap-1' : 'flex flex-wrap gap-2'}>
+      {pending ? (
+        <button
+          type="button"
+          disabled={anyBusy}
+          onClick={onApprove}
+          className={`${base} border border-clink-peach-strong text-clink-accent hover:bg-clink-peach`}
+        >
+          {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+          {busy ? '처리 중...' : '지급 처리'}
+        </button>
+      ) : null}
+      {pending ? (
+        <button
+          type="button"
+          disabled={anyBusy}
+          onClick={() => void onHold?.(payout, true)}
+          className={`${base} border border-zinc-200 text-zinc-700 hover:bg-zinc-50`}
+        >
+          보류
+        </button>
+      ) : held ? (
+        <button
+          type="button"
+          disabled={anyBusy}
+          onClick={() => void onHold?.(payout, false)}
+          className={`${base} border border-zinc-200 text-zinc-700 hover:bg-zinc-50`}
+        >
+          보류 해제
+        </button>
+      ) : cancelled ? (
+        <span className="text-xs font-semibold text-zinc-400">지급 불가</span>
+      ) : (
+        <span className="text-xs font-semibold text-zinc-400">지급 완료</span>
+      )}
+      <button
+        type="button"
+        onClick={onTax}
+        className={`${base} border border-zinc-200 text-zinc-700 hover:bg-zinc-50`}
+      >
+        세무 상세
+      </button>
+    </div>
+  );
+}
+
 type AdminPayoutTableProps = {
   payouts: PayoutItem[];
   busyId: string | null;
@@ -343,7 +429,157 @@ export function AdminPayoutTable({
           <AdminEmptyState message="선택한 기간의 정산 내역이 없습니다." />
         </div>
       ) : (
-        <div className="max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto">
+        <>
+        <ul className="flex flex-col gap-3 p-3 md:hidden">
+          {filtered.map((payout) => {
+            const row = enrichPayout(payout);
+            const pending = row.status === 'pending';
+            const held = row.status === 'hold';
+            const cancelled = row.status === 'cancelled';
+            const busy = busyId === payout.id || busyId === 'bulk';
+            const anyBusy = Boolean(busyId);
+            const payoutAmount = row.transferAmount ?? 0;
+            return (
+              <li key={payout.id} className="rounded-2xl border border-zinc-200 bg-white p-3">
+                <div className="flex items-start gap-2">
+                  {pending ? (
+                    <input
+                      type="checkbox"
+                      className="mt-1 size-4 shrink-0"
+                      aria-label={`${row.creatorName} 정산 선택`}
+                      checked={selectedIds.includes(payout.id)}
+                      onChange={(event) => {
+                        setSelectedIds((prev) =>
+                          event.target.checked
+                            ? [...prev, payout.id]
+                            : prev.filter((id) => id !== payout.id),
+                        );
+                      }}
+                    />
+                  ) : (
+                    <span className="mt-1 size-4 shrink-0" aria-hidden />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-sm font-semibold leading-5 text-zinc-950">
+                      {row.creatorName || '이름 없음'}
+                    </p>
+                    <AdminCopyText
+                      value={row.creatorEmail || ''}
+                      emptyLabel="이메일 없음"
+                      className="mt-0.5 whitespace-normal break-all"
+                    />
+                    <AdminCopyText
+                      value={
+                        formatSettlementAccount({
+                          bankName: row.bankName || '',
+                          accountNumber: row.accountNumber || '',
+                          accountHolder: row.accountHolder || '',
+                        }) ||
+                        row.bankAccount ||
+                        ''
+                      }
+                      emptyLabel="계좌 미등록"
+                      className="mt-0.5 whitespace-normal break-all"
+                    />
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${payoutStatusClass(row.status)}`}
+                  >
+                    {STATUS_LABEL[row.status] ?? row.status}
+                  </span>
+                </div>
+                <p className="mt-2 break-words text-sm text-zinc-700">
+                  {row.auctionTitle || '(삭제된 캠페인)'}
+                </p>
+                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">처리 일시</dt>
+                    <dd className="mt-0.5 break-words tabular-nums text-zinc-800">
+                      {formatAdminTimestamp(row.paidAt || row.requestedAt)}
+                      {row.settlementDueAt ? (
+                        <span className="mt-0.5 block text-[11px] text-zinc-500">
+                          정산 예정 {formatSeoulDateLabel(row.settlementDueAt)}
+                        </span>
+                      ) : null}
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">낙찰 금액</dt>
+                    <dd className="mt-0.5 break-all tabular-nums text-zinc-800">
+                      {formatWon(row.supplyAmount ?? 0)}
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">부가세</dt>
+                    <dd className="mt-0.5 break-all tabular-nums text-zinc-800">
+                      {formatWon(row.vatAmount ?? 0)}
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">{WITHHOLDING_PERCENT}% 공제액</dt>
+                    <dd className="mt-0.5 break-all tabular-nums text-zinc-800">
+                      {formatWon(row.withholdingAmount ?? 0)}
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">최종 정산액</dt>
+                    <dd className="mt-0.5 break-all font-medium tabular-nums text-zinc-950">
+                      {formatWon(row.netPayoutAmount ?? row.amount)}
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-[11px] font-medium text-zinc-500">수수료(공제액)</dt>
+                    <dd className="mt-0.5 break-all tabular-nums text-zinc-800">
+                      {formatWon(row.platformFee ?? 0)}
+                    </dd>
+                  </div>
+                  <div className="min-w-0 col-span-2">
+                    <dt className="text-[11px] font-medium text-zinc-500">실지급액</dt>
+                    <dd className="mt-0.5 break-all font-medium tabular-nums text-zinc-950">
+                      {formatWon(payoutAmount)}
+                    </dd>
+                  </div>
+                </dl>
+                <div className="mt-3">
+                  <PayoutManageButtons
+                    payout={payout}
+                    pending={pending}
+                    held={held}
+                    cancelled={cancelled}
+                    busy={busy}
+                    anyBusy={anyBusy}
+                    onApprove={() => {
+                      void handleApprove(payout);
+                    }}
+                    onHold={onHold}
+                    onTax={() => setTaxPayout(row)}
+                  />
+                </div>
+                <div className="mt-3 flex flex-col gap-2">
+                  <input
+                    value={memoDrafts[payout.id] ?? row.adminMemo ?? ''}
+                    onChange={(event) =>
+                      setMemoDrafts((prev) => ({ ...prev, [payout.id]: event.target.value }))
+                    }
+                    placeholder="내부 메모"
+                    className="h-10 w-full min-w-0 rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-clink-accent"
+                  />
+                  <button
+                    type="button"
+                    disabled={memoBusyId === payout.id}
+                    onClick={() => {
+                      void handleSaveMemo(payout);
+                    }}
+                    className="h-10 w-full rounded-xl border border-zinc-200 px-3 text-xs font-semibold text-zinc-600 hover:bg-zinc-50 disabled:opacity-50"
+                  >
+                    {memoBusyId === payout.id ? '저장 중...' : '메모 저장'}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="hidden max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto md:block">
             <table className="w-full min-w-0 table-fixed text-left text-xs leading-tight">
               <colgroup>
                 <col className="w-[3%]" />
@@ -486,65 +722,26 @@ export function AdminPayoutTable({
                       </td>
                       <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top">
                         <span
-                          className={
-                            cancelled
-                              ? 'inline-block max-w-full truncate rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-600'
-                              : held
-                                ? 'inline-block max-w-full truncate rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-700'
-                              : pending
-                                ? 'inline-block max-w-full truncate rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800'
-                                : 'inline-block max-w-full truncate rounded-full bg-clink-peach px-2 py-0.5 text-xs font-semibold text-clink-accent'
-                          }
+                          className={`inline-block max-w-full truncate rounded-full px-2 py-0.5 text-xs font-semibold ${payoutStatusClass(row.status)}`}
                         >
                           {STATUS_LABEL[row.status] ?? row.status}
                         </span>
                       </td>
                       <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top">
-                        <div className="flex min-w-0 flex-col gap-1">
-                          {pending ? (
-                            <button
-                              type="button"
-                              disabled={anyBusy}
-                              onClick={() => {
-                                void handleApprove(payout);
-                              }}
-                              className="inline-flex w-full min-w-0 items-center justify-center gap-1 rounded-md border border-clink-peach-strong px-1.5 py-0.5 text-[10px] font-semibold text-clink-accent hover:bg-clink-peach disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-                              {busy ? '처리 중...' : '지급 처리'}
-                            </button>
-                          ) : null}
-                          {pending ? (
-                            <button
-                              type="button"
-                              disabled={anyBusy}
-                              onClick={() => void onHold?.(payout, true)}
-                              className="inline-flex w-full min-w-0 items-center justify-center rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
-                            >
-                              보류
-                            </button>
-                          ) : held ? (
-                            <button
-                              type="button"
-                              disabled={anyBusy}
-                              onClick={() => void onHold?.(payout, false)}
-                              className="inline-flex w-full min-w-0 items-center justify-center rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
-                            >
-                              보류 해제
-                            </button>
-                          ) : cancelled ? (
-                            <span className="text-xs font-semibold text-zinc-400">지급 불가</span>
-                          ) : (
-                            <span className="text-xs font-semibold text-zinc-400">지급 완료</span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => setTaxPayout(row)}
-                            className="inline-flex w-full min-w-0 items-center justify-center rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50"
-                          >
-                            세무 상세
-                          </button>
-                        </div>
+                        <PayoutManageButtons
+                          payout={payout}
+                          pending={pending}
+                          held={held}
+                          cancelled={cancelled}
+                          busy={busy}
+                          anyBusy={anyBusy}
+                          compact
+                          onApprove={() => {
+                            void handleApprove(payout);
+                          }}
+                          onHold={onHold}
+                          onTax={() => setTaxPayout(row)}
+                        />
                       </td>
                       <td className="min-w-0 overflow-hidden px-1 py-1.5 sm:px-2 align-top">
                         <div className="flex min-w-0 flex-col gap-1">
@@ -574,6 +771,7 @@ export function AdminPayoutTable({
               </tbody>
             </table>
           </div>
+        </>
       )}
       </div>
       {taxPayout ? (

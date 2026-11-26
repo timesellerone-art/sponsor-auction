@@ -50,6 +50,64 @@ function matchesFilter(auction: AuctionItem, filter: AuctionAdminFilter) {
   return true;
 }
 
+function AuctionManageButtons({
+  auction,
+  blinded,
+  busy,
+  anyBusy,
+  compact,
+  onBlind,
+  onUnblind,
+  onDelete,
+}: {
+  auction: AuctionItem;
+  blinded: boolean;
+  busy: boolean;
+  anyBusy: boolean;
+  compact?: boolean;
+  onBlind: (auction: AuctionItem) => void;
+  onUnblind: (auction: AuctionItem) => void;
+  onDelete: (auction: AuctionItem) => void;
+}) {
+  const base = compact
+    ? 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-50'
+    : 'inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50';
+  return (
+    <div className="flex flex-wrap gap-2">
+      {blinded ? (
+        <button
+          type="button"
+          disabled={anyBusy}
+          onClick={() => onUnblind(auction)}
+          className={`${base} border border-clink-peach-strong text-clink-accent hover:bg-clink-peach`}
+        >
+          {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+          {busy ? '처리 중...' : '블라인드 해제'}
+        </button>
+      ) : (
+        <button
+          type="button"
+          disabled={anyBusy}
+          onClick={() => onBlind(auction)}
+          className={`${base} border border-zinc-200 text-zinc-700 hover:bg-zinc-50`}
+        >
+          {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+          {busy ? '처리 중...' : '블라인드 처리'}
+        </button>
+      )}
+      <button
+        type="button"
+        disabled={anyBusy}
+        onClick={() => onDelete(auction)}
+        className={`${base} border border-rose-200 text-rose-700 hover:bg-rose-50`}
+      >
+        {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
+        {busy ? '처리 중...' : '삭제'}
+      </button>
+    </div>
+  );
+}
+
 export function AdminAuctionTable({
   auctions,
   profiles = [],
@@ -148,7 +206,63 @@ export function AdminAuctionTable({
           <AdminEmptyState message="조건에 맞는 캠페인이 없습니다." />
         </div>
       ) : (
-        <div className="max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto">
+        <>
+          <ul className="flex flex-col gap-3 p-3 md:hidden">
+            {filtered.map((auction) => {
+              const title = auction.title || '제목 없음';
+              const blinded = isBlinded(auction);
+              const status = auction.status ?? 'active';
+              const busy = busyId === auction.id;
+              const anyBusy = Boolean(busyId);
+              return (
+                <li key={auction.id} className="rounded-2xl border border-zinc-200 bg-white p-3">
+                  <Link
+                    href={`/auctions/${auction.id}`}
+                    title={title}
+                    className="block break-words text-sm font-semibold leading-5 text-zinc-950 hover:underline"
+                  >
+                    {title}
+                  </Link>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                    <div className="min-w-0">
+                      <dt className="text-[11px] font-medium text-zinc-500">작성자</dt>
+                      <dd className="mt-0.5 break-words text-zinc-800">{auction.authorName || '미상'}</dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-[11px] font-medium text-zinc-500">예산</dt>
+                      <dd className="mt-0.5 break-all font-medium tabular-nums text-zinc-950">
+                        {formatWon(auction.budget)}
+                      </dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-[11px] font-medium text-zinc-500">상태</dt>
+                      <dd className="mt-0.5 break-words text-zinc-800">
+                        {blinded ? '블라인드' : (STATUS_LABEL[status] ?? status)}
+                      </dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-[11px] font-medium text-zinc-500">생성일자</dt>
+                      <dd className="mt-0.5 break-words text-zinc-800">
+                        {formatAdminTimestamp(auction.createdAt)}
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="mt-3">
+                    <AuctionManageButtons
+                      auction={auction}
+                      blinded={blinded}
+                      busy={busy}
+                      anyBusy={anyBusy}
+                      onBlind={onBlind}
+                      onUnblind={onUnblind}
+                      onDelete={onDelete}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="hidden max-h-[70vh] w-full min-w-0 overflow-x-hidden overflow-y-auto md:block">
           <table className="w-full min-w-0 table-fixed text-left text-xs">
             <colgroup>
               <col className="w-[28%]" />
@@ -205,45 +319,24 @@ export function AdminAuctionTable({
                       {formatAdminTimestamp(auction.createdAt)}
                     </td>
                     <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top">
-                      <div className="flex flex-wrap gap-2">
-                        {blinded ? (
-                          <button
-                            type="button"
-                            disabled={anyBusy}
-                            onClick={() => onUnblind(auction)}
-                            className="inline-flex items-center gap-1 rounded-md border border-clink-peach-strong px-1.5 py-0.5 text-[10px] font-semibold text-clink-accent hover:bg-clink-peach disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-                            {busy ? '처리 중...' : '블라인드 해제'}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={anyBusy}
-                            onClick={() => onBlind(auction)}
-                            className="inline-flex items-center gap-1 rounded-md border border-zinc-200 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-                            {busy ? '처리 중...' : '블라인드 처리'}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          disabled={anyBusy}
-                          onClick={() => onDelete(auction)}
-                          className="inline-flex items-center gap-1 rounded-md border border-rose-200 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-                          {busy ? '처리 중...' : '삭제'}
-                        </button>
-                      </div>
+                      <AuctionManageButtons
+                        auction={auction}
+                        blinded={blinded}
+                        busy={busy}
+                        anyBusy={anyBusy}
+                        compact
+                        onBlind={onBlind}
+                        onUnblind={onUnblind}
+                        onDelete={onDelete}
+                      />
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

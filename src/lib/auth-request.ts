@@ -6,19 +6,30 @@ export function readBearerToken(authorization: string | null | undefined) {
   return match?.[1] ?? '';
 }
 
+async function accessTokenFromBrowserSession() {
+  const supabase = createClient();
+  if (!supabase) {
+    return '';
+  }
+  try {
+    const first = await supabase.auth.getSession();
+    const existing = first.data.session?.access_token?.trim() ?? '';
+    if (existing) {
+      return existing;
+    }
+    await supabase.auth.getUser().catch(() => null);
+    const retry = await supabase.auth.getSession();
+    return retry.data.session?.access_token?.trim() ?? '';
+  } catch {
+    return '';
+  }
+}
+
 export async function authRequestInit(init: RequestInit = {}): Promise<RequestInit> {
   const headers = new Headers(init.headers);
-  const supabase = createClient();
-  if (supabase) {
-    try {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token?.trim();
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-      }
-    } catch {
-      // 쿠키 세션만으로도 호출할 수 있습니다.
-    }
+  const token = await accessTokenFromBrowserSession();
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
   }
   if (!headers.has(ACTIVE_ROLE_HEADER)) {
     const mode = readActiveRoleCookie();

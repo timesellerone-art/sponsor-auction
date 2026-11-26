@@ -67,6 +67,56 @@ export function businessNumberError(value: string | null | undefined) {
   return null;
 }
 
+export function normalizeRepresentativeName(value: string | null | undefined) {
+  return (value ?? '').trim().replace(/\s+/g, ' ').slice(0, 50);
+}
+
+export function representativeNameError(value: string | null | undefined) {
+  const name = normalizeRepresentativeName(value);
+  if (!name) {
+    return '대표자 성명을 입력해 주세요.';
+  }
+  if (name.length < 2) {
+    return '대표자 성명을 2자 이상 입력해 주세요.';
+  }
+  return null;
+}
+
+export function normalizeOpeningDate(value: string | null | undefined) {
+  return (value ?? '').replace(/\D/g, '').slice(0, 8);
+}
+
+export function formatOpeningDateInput(value: string | null | undefined) {
+  const digits = normalizeOpeningDate(value);
+  if (digits.length !== 8) {
+    return digits;
+  }
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}
+
+export function openingDateError(value: string | null | undefined) {
+  const digits = normalizeOpeningDate(value);
+  if (!digits) {
+    return '개업일자를 입력해 주세요.';
+  }
+  if (digits.length !== 8) {
+    return '개업일자는 YYYYMMDD 형식으로 입력해 주세요.';
+  }
+  const year = Number(digits.slice(0, 4));
+  const month = Number(digits.slice(4, 6));
+  const day = Number(digits.slice(6, 8));
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+    return '개업일자가 올바른 날짜가 아닙니다.';
+  }
+  const today = new Date();
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (digits < '19000101' || date.getTime() > end.getTime()) {
+    return '개업일자를 다시 확인해 주세요.';
+  }
+  return null;
+}
+
 export type CreatorTaxKind = 'individual' | 'business';
 
 /**
@@ -120,6 +170,9 @@ export function ntsBusinessLabelFromText(value: string | null | undefined) {
   if (/미등록|등록되지 않은/.test(text)) {
     return '미등록';
   }
+  if (/일치하지/.test(text)) {
+    return '불일치';
+  }
   return '';
 }
 
@@ -148,6 +201,26 @@ export function profileStatusFromNts(
   };
 }
 
+/** 진위확인이 일치(valid=01)일 때만 기존 status 매핑(검수필요/휴폐업)을 적용한다. */
+export function profileStatusFromNtsAndValidate(
+  statusCode: '01' | '02' | '03' | 'UNREGISTERED',
+  statusLabel: string,
+  valid: '01' | '02',
+  mismatchMessage = '',
+) {
+  if (valid !== '01') {
+    return {
+      status: 'unregistered' as const,
+      detail:
+        mismatchMessage ||
+        '대표자 성명 또는 개업일자가 국세청 등록 정보와 일치하지 않습니다. 상호명이 아닌 대표자 성명과 개업일자(YYYYMMDD)를 확인해 주세요.',
+      ntsLabel: '불일치',
+      mismatch: true as const,
+    };
+  }
+  return { ...profileStatusFromNts(statusCode, statusLabel), mismatch: false as const };
+}
+
 export function businessStatusNotice(status: BusinessVerificationStatus, detail = '') {
   if (status === 'verified') {
     return '사업자 인증이 완료되었습니다.';
@@ -161,5 +234,8 @@ export function businessStatusNotice(status: BusinessVerificationStatus, detail 
   if (status === 'rejected') {
     return detail || '사업자 검수가 반려되었습니다. 번호를 다시 확인한 뒤 저장해 주세요.';
   }
-  return '광고주 충전과 캠페인 등록 전에 계정 설정에서 사업자등록번호를 등록해 주세요.';
+  return (
+    detail ||
+    '광고주 충전과 캠페인 등록 전에 계정 설정에서 사업자등록번호를 등록해 주세요.'
+  );
 }
