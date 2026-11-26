@@ -43,7 +43,7 @@ function asOrder(row: {
   return {
     orderId: row.order_id,
     userId: row.user_id,
-    amount: row.amount,
+    amount: Number(row.amount),
     status: row.status,
     paymentKey: row.payment_key,
   };

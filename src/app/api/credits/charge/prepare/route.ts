@@ -100,7 +100,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         orderId: created.order.orderId,
-        amount: created.order.amount,
+        amount: Number(created.order.amount),
         orderName: CREDIT_CHARGE_ORDER_NAME,
         customerKey: sanitizeCustomerKey(actor.userId),
         clientKey: getTossClientKey() || null,

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { BusinessStatusNotice } from '@/components/BusinessStatusNotice';
@@ -10,9 +11,12 @@ import { authRequestInit } from '@/lib/auth-request';
 import {
   CREDIT_CHARGE_AMOUNTS,
   CREDIT_CHARGE_ORDER_NAME,
+  demoCreditPaymentKey,
+  isCreditChargeAmount,
   type CreditChargeAmount,
 } from '@/lib/credit-charge-shared';
 import { describeTossKeyKind, getTossClientKey } from '@/lib/payments/env';
+import { formatPaymentError, parsePaymentError } from '@/lib/payments/errors';
 import { REFUND_REQUIRED } from '@/lib/legal';
 import { isProductionClinkHost } from '@/lib/site-origin';
 import { cn, formatWon } from '@/lib/utils';
@@ -37,7 +41,13 @@ type Checkout = {
   demo: boolean;
 };
 
+function asChargeAmount(value: unknown) {
+  const amount = typeof value === 'number' ? value : Number(value);
+  return Number.isInteger(amount) && amount > 0 ? amount : 0;
+}
+
 export function CreditWallet({ canCharge }: { canCharge: boolean }) {
+  const router = useRouter();
   const titleId = useId();
   const widgetsRef = useRef<TossPaymentsWidgets | null>(null);
   const loadRef = useRef<() => Promise<void>>(async () => {});
@@ -124,7 +134,7 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
     const boot = async () => {
       setReady(false);
       setPayError(null);
-      const clientKey = checkout.clientKey?.trim() || getTossClientKey();
+      const clientKey = checkout.clientKey?.trim() || getTossClientKey() || '';
       const liveHost = isProductionClinkHost(window.location.hostname);
       if (liveHost && (!clientKey || describeTossKeyKind(clientKey).kind === 'test')) {
         setPayError('운영 환경에서는 토스페이먼츠 라이브 키가 필요합니다.');
@@ -132,7 +142,6 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
         return;
       }
       if (!clientKey) {
-        setPayError('토스페이먼츠 클라이언트 키가 없어 결제창을 열 수 없습니다.');
         setReady(true);
         return;
       }
@@ -182,9 +191,13 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
       if (!response.ok || !body?.orderId) {
         throw new Error(body?.error || '충전 주문을 만들지 못했습니다.');
       }
+      const amount = asChargeAmount(body.amount);
+      if (!body.orderId.trim() || !isCreditChargeAmount(amount)) {
+        throw new Error('충전 주문 금액 또는 주문번호가 올바르지 않습니다.');
+      }
       setCheckout({
-        orderId: body.orderId,
-        amount: body.amount,
+        orderId: body.orderId.trim(),
+        amount,
         orderName: body.orderName || CREDIT_CHARGE_ORDER_NAME,
         customerKey: body.customerKey,
         clientKey: body.clientKey,
@@ -216,22 +229,31 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
     }
     setPaying(true);
     setPayError(null);
-    const origin = window.location.origin;
-    const successUrl = `${origin}/my/credits/success`;
-    const failUrl = `${origin}/my/credits/fail?orderId=${encodeURIComponent(checkout.orderId)}`;
+    const successUrl = `${window.location.origin}/my/credits/success`;
+    const failUrl = `${window.location.origin}/my/credits/fail`;
     try {
-      if (!widgetsRef.current) {
+      if (widgetsRef.current) {
+        await widgetsRef.current.requestPayment({
+          orderId: checkout.orderId,
+          orderName: checkout.orderName,
+          successUrl,
+          failUrl,
+        });
+        return;
+      }
+      if (isProductionClinkHost(window.location.hostname) || !checkout.demo) {
         setPayError('토스페이먼츠 결제창을 열 수 없습니다. 클라이언트 키를 확인해 주세요.');
         return;
       }
-      await widgetsRef.current.requestPayment({
+      const params = new URLSearchParams({
+        paymentKey: demoCreditPaymentKey(checkout.orderId),
         orderId: checkout.orderId,
-        orderName: checkout.orderName,
-        successUrl,
-        failUrl,
+        amount: String(checkout.amount),
       });
+      router.push(`/my/credits/success?${params.toString()}`);
     } catch (reason) {
-      setPayError(reason instanceof Error ? reason.message : '결제를 시작하지 못했습니다.');
+      const info = parsePaymentError(reason);
+      setPayError(formatPaymentError(info));
     } finally {
       setPaying(false);
     }
