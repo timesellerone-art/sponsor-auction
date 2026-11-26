@@ -11,6 +11,7 @@ import {
   updateIntent,
 } from '@/lib/payments/intent';
 import { getBidsByAuctionId } from '@/lib/auctions';
+import { listTimeSlotBids } from '@/lib/timeslots';
 import { holdCampaignPayment, releaseCampaignPaymentIfOpen } from '@/lib/campaign-credit';
 import { advertiserTotalCharge } from '@/lib/fees';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -79,6 +80,17 @@ async function resolveAwardBidAmount(auctionId: string, bidId: string): Promise<
   } catch (error) {
     rethrowPrerenderError(error);
     console.warn('[SponsorAuction] 낙찰가 조회에 실패했습니다.', error);
+  }
+
+  try {
+    const slotBids = await listTimeSlotBids(auctionId);
+    const slotBid = (slotBids.data ?? []).find((item) => item.id === bidId);
+    if (slotBid && slotBid.bidAmount > 0) {
+      return Math.round(slotBid.bidAmount);
+    }
+  } catch (error) {
+    rethrowPrerenderError(error);
+    console.warn('[SponsorAuction] 크리에이터 상품 낙찰가 조회에 실패했습니다.', error);
   }
 
   return null;

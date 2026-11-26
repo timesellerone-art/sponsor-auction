@@ -12,12 +12,14 @@ import { useAwardCheckout } from '@/hooks/useAwardCheckout';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { isOpenForBid } from '@/lib/auction-browse';
 import { getAdvertiserDashboard } from '@/lib/dashboard';
+import { TimeslotPaymentPanel } from '@/components/TimeslotPaymentPanel';
 import { dealDetailHref } from '@/lib/timeslot-deal';
 import { auctionStatusLabel } from '@/lib/status-labels';
 import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import { cn, formatDateTime, formatWon } from '@/lib/utils';
 import type { AdvertiserDeal } from '@/types/dashboard';
 import { isAwardedAuction, isBidSelected, type AuctionItem, type BidItem } from '@/types/auction';
+import type { TimeSlotBidItem, TimeSlotItem } from '@/types/timeslot';
 
 type AdvertiserView = 'open' | 'paid' | 'proposals' | 'ended';
 
@@ -135,23 +137,25 @@ export function AdvertiserDashboard() {
 
   const paidDeals = deals.filter((deal) => {
     if (deal.kind === 'timeslot') {
-      return (
-        deal.payment?.status === 'confirmed' ||
-        Boolean(deal.bid && isBidSelected(deal.bid, deal.auction.winnerBidId))
-      );
+      return deal.payment?.status === 'confirmed' || Boolean(deal.fulfillment?.paidAt);
     }
     return isAwardedAuction(deal.auction) || deal.payment?.status === 'confirmed';
   });
+  const awaitingPayDeals = deals.filter(isTimeslotAwaitingAdvertiserPay);
   const paidIds = new Set(paidDeals.map((deal) => deal.auction.id));
+  const awaitingPayIds = new Set(awaitingPayDeals.map((deal) => deal.auction.id));
   const openDeals = deals.filter(
     (deal) =>
       isOpenForBid(deal.auction) &&
       !paidIds.has(deal.auction.id) &&
+      !awaitingPayIds.has(deal.auction.id) &&
       deal.payment?.status !== 'confirmed' &&
       !deal.bids.some((bid) => isBidSelected(bid, deal.auction.winnerBidId)),
   );
   const openIds = new Set(openDeals.map((deal) => deal.auction.id));
-  const endedDeals = deals.filter((deal) => !openIds.has(deal.auction.id));
+  const endedDeals = deals.filter(
+    (deal) => !openIds.has(deal.auction.id) && !awaitingPayIds.has(deal.auction.id),
+  );
   const counts: Record<AdvertiserView, number> = {
     open: openDeals.length,
     paid: paidDeals.length,
@@ -254,22 +258,53 @@ export function AdvertiserDashboard() {
           </Link>
         </div>
       ) : (
-        <div className="mt-6 min-w-0">
-          {view === 'open' ? (
-            <OpenCampaignsPanel deals={openDeals} onOpenProposals={openProposals} />
+        <>
+          {awaitingPayDeals.length > 0 ? (
+            <section className="mt-6 min-w-0">
+              <h2 className="text-base font-bold text-zinc-950">결제 대기 크리에이터 상품</h2>
+              <p className="mt-1 text-sm text-zinc-500">
+                선정된 제안에 대해 최종 결제(제안가 + 수수료 15% + 부가세 10%)를 완료하면 거래가
+                진행됩니다.
+              </p>
+              <ul className="mt-3 flex flex-col gap-3">
+                {awaitingPayDeals.map((deal) => {
+                  const target = timeslotPayTargetFromDeal(deal);
+                  if (!target) {
+                    return null;
+                  }
+                  return (
+                    <li key={`pay-${deal.auction.id}`}>
+                      <TimeslotPaymentPanel
+                        slot={target.slot}
+                        bid={target.bid}
+                        onPaid={() => {
+                          window.dispatchEvent(new Event('timeslots:changed'));
+                          window.dispatchEvent(new Event('auctions:changed'));
+                        }}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           ) : null}
-          {view === 'paid' ? <PaidCampaignsPanel deals={paidDeals} /> : null}
-          {view === 'proposals' ? (
-            <ProposalStatusPanel
-              deals={deals}
-              selectedDeal={selectedDeal}
-              awardBusyId={awardBusyId}
-              onSelect={setSelectedCampaignId}
-              onAward={handleAward}
-            />
-          ) : null}
-          {view === 'ended' ? <EndedCampaignsPanel deals={endedDeals} /> : null}
-        </div>
+          <div className="mt-6 min-w-0">
+            {view === 'open' ? (
+              <OpenCampaignsPanel deals={openDeals} onOpenProposals={openProposals} />
+            ) : null}
+            {view === 'paid' ? <PaidCampaignsPanel deals={paidDeals} /> : null}
+            {view === 'proposals' ? (
+              <ProposalStatusPanel
+                deals={deals}
+                selectedDeal={selectedDeal}
+                awardBusyId={awardBusyId}
+                onSelect={setSelectedCampaignId}
+                onAward={handleAward}
+              />
+            ) : null}
+            {view === 'ended' ? <EndedCampaignsPanel deals={endedDeals} /> : null}
+          </div>
+        </>
       )}
       <CreditChargeModal
         open={chargeNeeded != null}
@@ -278,6 +313,62 @@ export function AdvertiserDashboard() {
       />
     </PageContainer>
   );
+}
+
+function isTimeslotAwaitingAdvertiserPay(deal: AdvertiserDeal) {
+  if (deal.kind !== 'timeslot' || !deal.bid) {
+    return false;
+  }
+  const selected =
+    deal.auction.winnerBidId === deal.bid.id || isBidSelected(deal.bid, deal.auction.winnerBidId);
+  if (!selected) {
+    return false;
+  }
+  return deal.payment?.status !== 'confirmed' && !deal.fulfillment?.paidAt;
+}
+
+function timeslotPayTargetFromDeal(deal: AdvertiserDeal): {
+  slot: TimeSlotItem;
+  bid: TimeSlotBidItem;
+} | null {
+  if (deal.kind !== 'timeslot' || !deal.bid) {
+    return null;
+  }
+  const auction = deal.auction;
+  const bid = deal.bid;
+  return {
+    slot: {
+      id: auction.id,
+      creatorId: auction.authorId ?? null,
+      creatorName: auction.authorName,
+      title: auction.title,
+      platform: auction.platform,
+      description: auction.description,
+      expectedViews: 0,
+      startingPrice: auction.budget,
+      currentHighestBid: auction.highestBidAmount || bid.bidAmount,
+      bidsCount: auction.bidsCount || 1,
+      slotStart: '',
+      slotEnd: '',
+      deadline: auction.deadline,
+      status: 'awarded',
+      winnerBidId: auction.winnerBidId,
+      paidAt: deal.fulfillment?.paidAt ?? null,
+      deliveryUrl: deal.fulfillment?.deliveryUrl ?? null,
+      deliveredAt: deal.fulfillment?.deliveredAt ?? null,
+      purchaseConfirmedAt: deal.fulfillment?.purchaseConfirmedAt ?? null,
+      createdAt: auction.createdAt,
+    },
+    bid: {
+      id: bid.id,
+      timeSlotId: auction.id,
+      advertiserId: bid.bidderId ?? null,
+      advertiserName: bid.bidderName || '',
+      bidAmount: bid.bidAmount,
+      message: bid.proposalText || '',
+      createdAt: bid.createdAt,
+    },
+  };
 }
 
 function EmptyLine({ children }: { children: string }) {
@@ -376,7 +467,7 @@ function PaidCampaignsPanel({ deals }: { deals: AdvertiserDeal[] }) {
                 ? '구매 확정 · 정산 생성됨'
                 : deal.fulfillment?.deliveredAt || deal.fulfillment?.deliveryUrl
                   ? '결과물 납품됨 · 구매 확정 필요'
-                  : '낙찰됨 · 크리에이터 납품 대기'}
+                  : '진행 중 · 에스크로 예치 · 크리에이터 납품 대기'}
             </p>
           ) : null}
           {deal.kind === 'timeslot' &&
@@ -450,7 +541,9 @@ function EndedCampaignsPanel({ deals }: { deals: AdvertiserDeal[] }) {
             deal.bid &&
             deal.bid.id !== deal.auction.winnerBidId
               ? '미선정'
-              : auctionStatusLabel(deal.auction.status)}
+              : isTimeslotAwaitingAdvertiserPay(deal)
+                ? '결제 대기'
+                : auctionStatusLabel(deal.auction.status)}
           </span>
         </li>
       ))}

@@ -38,6 +38,7 @@ export type PreparePaymentResult = {
   demo: boolean;
   auctionId: string;
   bidId: string;
+  kind?: 'campaign' | 'timeslot';
 };
 
 export type ConfirmPaymentInput = {

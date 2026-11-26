@@ -438,7 +438,7 @@ async function holdTimeslotPayment(
   const [slotResult, bidResult] = await Promise.all([
     client
       .from('time_slots')
-      .select('id, title, winner_bid_id, creator_id')
+      .select('id, title, winner_bid_id')
       .eq('id', input.slotId)
       .maybeSingle(),
     client
@@ -462,7 +462,10 @@ async function holdTimeslotPayment(
     return { ok: false, code: 'AWARD_TARGET_NOT_FOUND', message: '채택할 제안 또는 광고주를 찾지 못했습니다.' };
   }
   const winnerId = slotResult.data.winner_bid_id ?? null;
-  if (winnerId && winnerId !== input.bidId) {
+  if (!winnerId) {
+    return { ok: false, code: 'NOT_AWARDED', message: '낙찰된 제안만 결제할 수 있습니다.' };
+  }
+  if (winnerId !== input.bidId) {
     return { ok: false, code: 'ALREADY_AWARDED', message: '이미 다른 제안이 채택된 상품입니다.' };
   }
   const payerUserId = bidResult.data.advertiser_id?.trim() ?? '';
@@ -471,9 +474,8 @@ async function holdTimeslotPayment(
     return { ok: false, code: 'AWARD_TARGET_NOT_FOUND', message: '채택할 제안 또는 광고주를 찾지 못했습니다.' };
   }
   const actorUserId = input.actorUserId?.trim() ?? '';
-  const ownerId = slotResult.data.creator_id?.trim() ?? '';
-  if (actorUserId && ownerId && actorUserId !== ownerId && !input.actorIsAdmin) {
-    return { ok: false, code: 'FORBIDDEN', message: '본인 상품만 채택할 수 있습니다.' };
+  if (actorUserId && actorUserId !== payerUserId && !input.actorIsAdmin) {
+    return { ok: false, code: 'FORBIDDEN', message: '선정된 광고주만 결제할 수 있습니다.' };
   }
 
   await releaseOtherPendingHolds(client, input.slotId, input.bidId, input.orderId);
@@ -524,14 +526,11 @@ export async function releaseCampaignPaymentIfOpen(
     } else {
       const slot = await client
         .from('time_slots')
-        .select('status, winner_bid_id')
+        .select('id')
         .eq('id', auctionId)
         .maybeSingle();
       if (slot.error) {
         return { ok: false, code: 'RPC_ERROR', message: slot.error.message };
-      }
-      if (slot.data?.winner_bid_id === bidId && slot.data.status === 'awarded') {
-        return { ok: true, restored: false, amount: 0, balanceAfter: null, reason: 'awarded' };
       }
     }
   }

@@ -3,7 +3,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
-import { CreditChargeModal } from '@/components/CreditChargeModal';
 import { EscrowNotice } from '@/components/EscrowNotice';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { showToast } from '@/components/Toast';
@@ -11,7 +10,6 @@ import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { nextInventoryMinBid } from '@/lib/auction-engine';
 import { authRequestInit } from '@/lib/auth-request';
-import { campaignHoldQuote } from '@/lib/campaign-credit';
 import { placeTimeSlotBid } from '@/lib/timeslots';
 import { formatWon } from '@/lib/utils';
 import { MIN_PROPOSAL_LENGTH, VALIDATION } from '@/lib/validation';
@@ -22,11 +20,9 @@ import { hasOffPlatformContact } from '@/utils/filter';
 export function TimeslotBidForm({
   slot,
   onSubmitted,
-  onPrepaid,
 }: {
   slot: TimeSlotItem;
   onSubmitted?: (bid?: TimeSlotBidItem | null) => void;
-  onPrepaid?: (neededAmount: number) => void;
 }) {
   const { user, activeRole } = useAuth();
   const { requireUser } = useRequireAuth();
@@ -34,13 +30,11 @@ export function TimeslotBidForm({
   const [amount, setAmount] = useState(String(minBid));
   const [message, setMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [chargeOpen, setChargeOpen] = useState(false);
   const { isBusy, run } = useActionLock();
 
   const bidAmount = Number(amount);
-  const quoteAmount = useMemo(() => {
-    const value = Number.isFinite(bidAmount) && bidAmount > 0 ? bidAmount : minBid;
-    return campaignHoldQuote(value).amount;
+  const previewAmount = useMemo(() => {
+    return Number.isFinite(bidAmount) && bidAmount > 0 ? bidAmount : minBid;
   }, [bidAmount, minBid]);
 
   const canSubmitBid = Boolean(
@@ -172,53 +166,26 @@ export function TimeslotBidForm({
         className="mt-1 w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm"
       />
       <div className="mt-4">
-        <FeeBreakdownCard role="advertiser" amount={Number.isFinite(bidAmount) ? bidAmount : 0} />
+        <FeeBreakdownCard role="advertiser" amount={previewAmount} />
       </div>
       <p className="mt-3 text-xs leading-5 text-zinc-500">
-        선정되면 보유 크레딧에서 선결제됩니다. 잔액이 부족하면 먼저 충전한 뒤 제안을 제출해 주세요.
+        크리에이터가 제안을 선택(낙찰)하면 결제를 진행합니다.
       </p>
       {error ? (
         <p className="mt-2 text-sm text-rose-600" role="alert">
           {error}
         </p>
       ) : null}
-      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <button
-          type="button"
-          disabled={isBusy}
-          onClick={(event) => {
-            event.preventDefault();
-            if (!ensureAdvertiser()) {
-              return;
-            }
-            if (onPrepaid) {
-              onPrepaid(quoteAmount);
-            } else {
-              setChargeOpen(true);
-            }
-            void run('slot-bid', async () => {
-              await submitProposal();
-            });
-          }}
-          className="inline-flex h-11 items-center justify-center rounded-full border border-zinc-300 bg-white text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
-        >
-          선결제
-        </button>
+      <div className="mt-4">
         <button
           type="submit"
           disabled={isBusy}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
+          className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
         >
           {isBusy ? <Loader2 className="size-4 animate-spin" /> : null}
           제안 제출
         </button>
       </div>
-      <CreditChargeModal
-        open={chargeOpen}
-        neededAmount={quoteAmount}
-        hint={`크리에이터 상품 선정 시 차감액(공급가액 + 부가세 10%)은 ${formatWon(quoteAmount)}입니다. 충전 후 다시 제안해 주세요.`}
-        onClose={() => setChargeOpen(false)}
-      />
     </form>
   );
 }

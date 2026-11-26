@@ -3,13 +3,16 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AuctionCardSkeleton } from '@/components/AuctionCard';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { CreateTimeslotModal } from '@/components/CreateTimeslotModal';
 import { PageContainer } from '@/components/PageContainer';
 import { useAuth } from '@/components/AuthProvider';
 import { SettlementAccountSummary } from '@/components/SettlementAccountSummary';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
+import { showToast } from '@/components/Toast';
 import { authRequestInit } from '@/lib/auth-request';
 import { getCreatorDashboard } from '@/lib/dashboard';
+import { listTimeSlotBidsBySlotIds } from '@/lib/timeslots';
 import { addBusinessDays, formatSeoulDateLabel } from '@/lib/business-days';
 import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import {
@@ -21,7 +24,12 @@ import {
 import { dealDetailHref } from '@/lib/timeslot-deal';
 import { auctionStatusLabel, creatorPayoutStatusLabel } from '@/lib/status-labels';
 import { cn, formatDateTime, formatWon } from '@/lib/utils';
-import type { TimeSlotItem } from '@/types/timeslot';
+import {
+  isTimeSlotOpen,
+  isTimeslotAwaitingPayment,
+  type TimeSlotBidItem,
+  type TimeSlotItem,
+} from '@/types/timeslot';
 import { isBidSelected } from '@/types/auction';
 import type { CreatorDeal } from '@/types/dashboard';
 
@@ -31,6 +39,12 @@ export function CreatorDashboard() {
   const userRef = useRef(user);
   const [deals, setDeals] = useState<CreatorDeal[]>([]);
   const [slots, setSlots] = useState<TimeSlotItem[]>([]);
+  const [slotBids, setSlotBids] = useState<TimeSlotBidItem[]>([]);
+  const [pendingAward, setPendingAward] = useState<{
+    slot: TimeSlotItem;
+    bid: TimeSlotBidItem;
+  } | null>(null);
+  const [awardBusyId, setAwardBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createSlotOpen, setCreateSlotOpen] = useState(false);
@@ -96,8 +110,13 @@ export function CreatorDashboard() {
         setSettlementAccountNumber(account.accountNumber);
         setAccountMissing(Boolean(settlementAccountError(account)));
         const list = Array.isArray(result.data) ? result.data : [];
+        const bidResult = await listTimeSlotBidsBySlotIds(slotRows.map((item) => item.id));
+        if (cancelled) {
+          return;
+        }
         setDeals(list);
         setSlots(slotRows);
+        setSlotBids(Array.isArray(bidResult.data) ? bidResult.data : []);
         setError(
           list.length === 0 && slotRows.length === 0
             ? '제출한 제안이 없습니다.'
@@ -144,6 +163,35 @@ export function CreatorDashboard() {
   );
   const pendingDeals = deals.filter((deal) => !awardedDeals.includes(deal));
 
+  const awardBid = async (slot: TimeSlotItem, bid: TimeSlotBidItem) => {
+    if (awardBusyId) {
+      return;
+    }
+    setAwardBusyId(bid.id);
+    try {
+      const response = await fetch(
+        `/api/timeslots/${encodeURIComponent(slot.id)}/award`,
+        await authRequestInit({
+          method: 'POST',
+          body: JSON.stringify({ bidId: bid.id }),
+        }),
+      );
+      const payload = (await response.json().catch(() => null)) as {
+        error?: string;
+        errorMessage?: string;
+      } | null;
+      if (!response.ok) {
+        showToast(payload?.errorMessage || payload?.error || '낙찰하지 못했습니다.');
+        return;
+      }
+      showToast('제안을 선정했습니다. 광고주 결제를 기다립니다.', 'success');
+      window.dispatchEvent(new Event('timeslots:changed'));
+      window.dispatchEvent(new Event('auctions:changed'));
+    } finally {
+      setAwardBusyId(null);
+    }
+  };
+
   return (
     <PageContainer className="flex min-w-0 flex-1 flex-col pt-4 pb-6 sm:pt-5 sm:pb-10">
       <p className="text-sm font-semibold tracking-wide text-clink-accent">크리에이터</p>
@@ -185,6 +233,9 @@ export function CreatorDashboard() {
                       최고가 {slot.currentHighestBid > 0 ? formatWon(slot.currentHighestBid) : '없음'} · 제안{' '}
                       {slot.bidsCount}
                     </p>
+                    {isTimeslotAwaitingPayment(slot) ? (
+                      <p className="mt-1 text-xs text-amber-800">광고주 최종 결제를 기다리고 있습니다.</p>
+                    ) : null}
                   </div>
                   {slot.status === 'open' ? (
                     <button
@@ -214,18 +265,49 @@ export function CreatorDashboard() {
                           : 'text-xs text-zinc-400'
                       }
                     >
-                      {slot.status === 'awarded'
-                        ? creatorPayoutStatusLabel(
-                            deals.find(
-                              (deal) =>
-                                deal.kind === 'timeslot' && deal.auction?.id === slot.id,
-                            )?.payoutStatus,
-                            true,
-                          )
-                        : '마감'}
+                      {isTimeslotAwaitingPayment(slot)
+                        ? '결제 대기'
+                        : slot.status === 'awarded'
+                          ? creatorPayoutStatusLabel(
+                              deals.find(
+                                (deal) =>
+                                  deal.kind === 'timeslot' && deal.auction?.id === slot.id,
+                              )?.payoutStatus,
+                              true,
+                            )
+                          : '마감'}
                     </span>
                   )}
                 </div>
+                {isTimeSlotOpen(slot) ? (
+                  <ul className="mt-3 flex flex-col gap-2 border-t border-zinc-100 pt-3">
+                    {slotBids.filter((bid) => bid.timeSlotId === slot.id).length === 0 ? (
+                      <li className="text-xs text-zinc-400">아직 제안이 없습니다.</li>
+                    ) : (
+                      slotBids
+                        .filter((bid) => bid.timeSlotId === slot.id)
+                        .sort((left, right) => right.bidAmount - left.bidAmount)
+                        .map((bid) => (
+                          <li
+                            key={bid.id}
+                            className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                          >
+                            <span className="min-w-0 truncate text-zinc-700">
+                              {bid.advertiserName || '광고주'} · {formatWon(bid.bidAmount)}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={Boolean(awardBusyId)}
+                              onClick={() => setPendingAward({ slot, bid })}
+                              className="inline-flex h-8 items-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:bg-zinc-300"
+                            >
+                              {awardBusyId === bid.id ? '선정 중...' : '낙찰하기 (선택)'}
+                            </button>
+                          </li>
+                        ))
+                    )}
+                  </ul>
+                ) : null}
               </li>
             ))}
           </ul>
@@ -298,6 +380,29 @@ export function CreatorDashboard() {
         </div>
       )}
       <CreateTimeslotModal open={createSlotOpen} onClose={() => setCreateSlotOpen(false)} />
+      <ConfirmModal
+        open={Boolean(pendingAward)}
+        title="이 제안을 낙찰할까요?"
+        description={`"${pendingAward?.bid.advertiserName || '광고주'}"의 제안을 선정하면 즉시 낙찰되고, 나머지 제안은 미선정으로 마감됩니다. 선정된 광고주가 결제를 완료한 뒤 거래가 진행됩니다.`}
+        confirmLabel="낙찰하기 (선택)"
+        busyLabel="선정 중..."
+        cancelLabel="취소"
+        busy={Boolean(pendingAward && awardBusyId === pendingAward.bid.id)}
+        onClose={() => {
+          if (!awardBusyId) {
+            setPendingAward(null);
+          }
+        }}
+        onConfirm={() => {
+          if (!pendingAward || awardBusyId) {
+            return;
+          }
+          const selected = pendingAward;
+          void awardBid(selected.slot, selected.bid).finally(() => {
+            setPendingAward(null);
+          });
+        }}
+      />
     </PageContainer>
   );
 }
@@ -393,7 +498,14 @@ function DealCard({
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-zinc-600">
         <span>제안 {formatWon(deal.bid.bidAmount)}</span>
         {awarded ? <span>실지급액 {formatWon(amounts.transferAmount)}</span> : null}
-        {deal.kind === 'timeslot' && awarded && !deal.fulfillment?.deliveredAt && !deal.fulfillment?.deliveryUrl ? (
+        {deal.kind === 'timeslot' && awarded && !deal.fulfillment?.paidAt ? (
+          <span>결제 대기</span>
+        ) : null}
+        {deal.kind === 'timeslot' &&
+        awarded &&
+        deal.fulfillment?.paidAt &&
+        !deal.fulfillment?.deliveredAt &&
+        !deal.fulfillment?.deliveryUrl ? (
           <span>납품 필요</span>
         ) : null}
         {deal.kind === 'timeslot' && awarded && (deal.fulfillment?.deliveredAt || deal.fulfillment?.deliveryUrl) && !deal.fulfillment?.purchaseConfirmedAt ? (

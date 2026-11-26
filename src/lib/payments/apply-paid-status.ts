@@ -183,6 +183,58 @@ async function writeWinner(
   return null;
 }
 
+async function applyPaidTimeslotStatus(
+  client: SponsorAuctionClient,
+  slotId: string,
+  bidId: string,
+  payment?: { orderId: string; amount: number; orderName: string },
+) {
+  const slot = await client
+    .from('time_slots')
+    .select('id, winner_bid_id, status, title')
+    .eq('id', slotId)
+    .maybeSingle();
+  if (!slot.data) {
+    console.error('[SponsorAuction] 결제 후 크리에이터 상품을 찾지 못했습니다.', {
+      slotId,
+      bidId,
+    });
+    return false;
+  }
+  if (slot.data.winner_bid_id && slot.data.winner_bid_id !== bidId) {
+    console.error('[SponsorAuction] 결제 후 상태 업데이트 생략: 다른 낙찰이 이미 있습니다.', {
+      slotId,
+      bidId,
+      existingWinner: slot.data.winner_bid_id,
+    });
+    return false;
+  }
+  if (slot.data.winner_bid_id !== bidId) {
+    console.error('[SponsorAuction] 결제 후 크리에이터 상품 낙찰이 아직 없습니다.', {
+      slotId,
+      bidId,
+    });
+    return false;
+  }
+
+  let payoutOk = true;
+  if (payment?.orderId) {
+    payoutOk = await upsertPaidPayout(client, {
+      orderId: payment.orderId,
+      auctionId: slotId,
+      bidId,
+      chargeAmount: payment.amount,
+      orderName: payment.orderName || slot.data.title || '크리에이터 상품',
+    });
+  }
+  console.info('[SponsorAuction] 결제 후 크리에이터 상품 정산 반영', {
+    slotId,
+    bidId,
+    payoutOk,
+  });
+  return payoutOk;
+}
+
 /** 결제 승인 이후 경매/입찰/정산을 한 번에 맞춥니다. 실캠페인 반영에 실패하면 false입니다. */
 export async function applyPaidAuctionStatus(
   auctionId: string,
@@ -224,6 +276,9 @@ export async function applyPaidAuctionStatus(
       .select('winner_bid_id, status')
       .eq('id', auctionId)
       .maybeSingle();
+    if (!currentAuction.data) {
+      return applyPaidTimeslotStatus(supabaseAdmin, auctionId, bidId, payment);
+    }
     const existingWinner = currentAuction.data?.winner_bid_id ?? null;
     if (existingWinner && existingWinner !== bidId) {
       console.error('[SponsorAuction] 결제 후 상태 업데이트 생략: 다른 낙찰이 이미 있습니다.', {

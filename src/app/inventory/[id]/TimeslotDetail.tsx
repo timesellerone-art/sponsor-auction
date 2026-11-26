@@ -7,21 +7,25 @@ import { ArrowLeft } from 'lucide-react';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { useAuth } from '@/components/AuthProvider';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { CreditChargeModal } from '@/components/CreditChargeModal';
 import { CreatorRatingBadge } from '@/components/CreatorRatingBadge';
 import { TimeslotBidForm } from '@/components/TimeslotBidForm';
+import { TimeslotPaymentPanel } from '@/components/TimeslotPaymentPanel';
 import { showToast } from '@/components/Toast';
 import { ACCESS_REASON } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
-import { ADVERTISER_FEE_PERCENT, VAT_PERCENT } from '@/lib/fee-policy';
 import { PLATFORM_LABELS } from '@/lib/platforms';
 import { authRequestInit } from '@/lib/auth-request';
-import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import { BID_STATUS_LABEL } from '@/lib/status-labels';
 import { getTimeSlotById, listTimeSlotBids } from '@/lib/timeslots';
 import { formatDateTime, formatViews, formatWon } from '@/lib/utils';
 import { hasAuthRole, type SessionUser } from '@/types/auth';
-import { isTimeSlotOpen, type TimeSlotBidItem, type TimeSlotItem } from '@/types/timeslot';
+import {
+  isTimeSlotOpen,
+  isTimeslotAwaitingPayment,
+  isTimeslotEscrowed,
+  type TimeSlotBidItem,
+  type TimeSlotItem,
+} from '@/types/timeslot';
 
 function mergeTimeslotBids(current: TimeSlotBidItem[], incoming: TimeSlotBidItem[]) {
   const byId = new Map<string, TimeSlotBidItem>();
@@ -64,7 +68,6 @@ export function TimeslotDetail({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [pendingBid, setPendingBid] = useState<TimeSlotBidItem | null>(null);
-  const [chargeNeeded, setChargeNeeded] = useState<number | null>(null);
   const [deliveryUrl, setDeliveryUrl] = useState('');
   const [fulfillBusy, setFulfillBusy] = useState(false);
 
@@ -174,7 +177,8 @@ export function TimeslotDetail({ id }: { id: string }) {
   );
   const delivered = Boolean(slot?.deliveredAt || slot?.deliveryUrl);
   const purchaseConfirmed = Boolean(slot?.purchaseConfirmedAt);
-  const holdQuote = pendingBid ? describeSettlementAmounts(pendingBid.bidAmount) : null;
+  const awaitingPayment = Boolean(slot && isTimeslotAwaitingPayment(slot));
+  const escrowed = Boolean(slot && isTimeslotEscrowed(slot));
   const awardedClosed = Boolean(slot && !slotOpen);
 
   const handleBidSubmitted = (bid?: TimeSlotBidItem | null) => {
@@ -214,15 +218,11 @@ export function TimeslotDetail({ id }: { id: string }) {
         errorMessage?: string;
         errorCode?: string;
       } | null;
-      if (response.status === 402 || payload?.errorCode === 'INSUFFICIENT_CREDIT') {
-        showToast(payload?.errorMessage || payload?.error || '광고주 크레딧이 부족해 선정할 수 없습니다.');
-        return;
-      }
       if (!response.ok) {
         showToast(payload?.errorMessage || payload?.error || '낙찰하지 못했습니다.');
         return;
       }
-      showToast('크레딧에서 예치하고 낙찰했습니다.', 'success');
+      showToast('제안을 선정했습니다. 광고주 결제를 기다립니다.', 'success');
       window.dispatchEvent(new Event('timeslots:changed'));
       window.dispatchEvent(new Event('auctions:changed'));
       window.dispatchEvent(new Event('payouts:changed'));
@@ -368,7 +368,11 @@ export function TimeslotDetail({ id }: { id: string }) {
             </div>
             {!slotOpen ? (
               <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                {slot.winnerBidId ? '낙찰된 상품입니다.' : '이 상품은 마감되었거나 낙찰되었습니다.'}
+                {awaitingPayment
+                  ? '낙찰 선정됨 · 광고주 결제 대기'
+                  : slot.winnerBidId
+                    ? '낙찰된 상품입니다.'
+                    : '이 상품은 마감되었거나 낙찰되었습니다.'}
               </p>
             ) : !authSettled ? (
               <div className="mt-6 h-24 animate-pulse rounded-xl bg-zinc-100" aria-hidden />
@@ -420,7 +424,6 @@ export function TimeslotDetail({ id }: { id: string }) {
               <TimeslotBidForm
                 slot={slot}
                 onSubmitted={handleBidSubmitted}
-                onPrepaid={setChargeNeeded}
               />
             )
           ) : null}
@@ -433,7 +436,7 @@ export function TimeslotDetail({ id }: { id: string }) {
               </div>
               {awardedClosed && winnerBid ? (
                 <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
-                  낙찰된 상품입니다
+                  {awaitingPayment ? '결제 대기' : '낙찰된 상품입니다'}
                 </span>
               ) : null}
             </div>
@@ -507,7 +510,21 @@ export function TimeslotDetail({ id }: { id: string }) {
               </ul>
             )}
           </section>
-          {awardedClosed && winnerBid ? (
+          {awaitingPayment && winnerBid && isWinningAdvertiser ? (
+            <TimeslotPaymentPanel
+              slot={slot}
+              bid={winnerBid}
+              onPaid={() => {
+                void load(true);
+              }}
+            />
+          ) : null}
+          {awaitingPayment && winnerBid && isOwner ? (
+            <p className="rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-sm text-zinc-600">
+              광고주 결제가 완료되면 제작·납품을 진행할 수 있습니다.
+            </p>
+          ) : null}
+          {escrowed && winnerBid ? (
             <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
               <h2 className="text-lg font-bold text-zinc-950">납품 · 구매 확정</h2>
               <p className="mt-1 text-sm text-zinc-500">
@@ -589,9 +606,9 @@ export function TimeslotDetail({ id }: { id: string }) {
           <ConfirmModal
             open={Boolean(pendingBid) && slotOpen}
             title="이 제안을 낙찰할까요?"
-            description={`"${pendingBid?.advertiserName || '광고주'}"의 제안을 선택하면 해당 광고주 크레딧에서 공급가액과 부가세가 즉시 예치 차감됩니다. 잔액이 부족하면 선정은 진행되지 않습니다.`}
-            confirmLabel="크레딧으로 낙찰하기"
-            busyLabel="낙찰 중..."
+            description={`"${pendingBid?.advertiserName || '광고주'}"의 제안을 선정하면 즉시 낙찰되고, 나머지 제안은 미선정으로 마감됩니다. 선정된 광고주가 결제를 완료한 뒤 거래가 진행됩니다.`}
+            confirmLabel="낙찰하기 (선택)"
+            busyLabel="선정 중..."
             cancelLabel="취소"
             busy={Boolean(pendingBid && busyId === pendingBid.id)}
             onClose={() => {
@@ -608,43 +625,6 @@ export function TimeslotDetail({ id }: { id: string }) {
                 setPendingBid(null);
               });
             }}
-          >
-            {holdQuote ? (
-              <dl className="mt-3 space-y-1.5 rounded-xl bg-zinc-50 px-3 py-3 text-sm text-zinc-700">
-                <div className="flex items-center justify-between gap-3">
-                  <dt>낙찰 금액</dt>
-                  <dd className="font-medium tabular-nums text-zinc-950">
-                    {formatWon(holdQuote.bidAmount)}
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt>공급가액 (낙찰 + 수수료 {ADVERTISER_FEE_PERCENT}%)</dt>
-                  <dd className="font-medium tabular-nums text-zinc-950">
-                    {formatWon(holdQuote.advertiserSupply)}
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt>부가세 ({VAT_PERCENT}% 별도)</dt>
-                  <dd className="font-medium tabular-nums text-zinc-950">
-                    {formatWon(holdQuote.advertiserVat)}
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-3 font-semibold text-zinc-950">
-                  <dt>총 차감액</dt>
-                  <dd className="tabular-nums">{formatWon(holdQuote.advertiserCharge)}</dd>
-                </div>
-              </dl>
-            ) : null}
-          </ConfirmModal>
-          <CreditChargeModal
-            open={chargeNeeded != null}
-            neededAmount={chargeNeeded ?? 0}
-            hint={
-              chargeNeeded
-                ? `크리에이터 상품 선정 시 차감액(공급가액 + 부가세 10%)은 ${formatWon(chargeNeeded)}입니다. 충전 후 낙찰 때 예치됩니다.`
-                : undefined
-            }
-            onClose={() => setChargeNeeded(null)}
           />
         </div>
       )}

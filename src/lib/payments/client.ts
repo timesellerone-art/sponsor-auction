@@ -1,8 +1,10 @@
 import { advertiserTotalCharge } from '@/lib/fees';
+import { authRequestInit } from '@/lib/auth-request';
 import { getTossClientKey } from '@/lib/payments/env';
 import { publicSupabasePayload } from '@/lib/supabase/env';
 import type { PreparePaymentResult } from '@/types/payment';
 import type { AuctionItem, BidItem } from '@/types/auction';
+import type { DealKind } from '@/types/dashboard';
 
 const CHECKOUT_STORAGE_KEY = 'sa-pay-checkout';
 
@@ -11,6 +13,7 @@ export type CheckoutContext = {
   auctionId: string;
   bidId: string;
   amount: number;
+  kind?: DealKind;
 };
 
 export function rememberCheckoutContext(context: CheckoutContext) {
@@ -55,21 +58,26 @@ export function readCheckoutContext(orderId?: string): CheckoutContext | null {
       auctionId: parsed.auctionId,
       bidId: parsed.bidId,
       amount: parsed.amount,
+      kind: parsed.kind === 'timeslot' ? 'timeslot' : parsed.kind === 'campaign' ? 'campaign' : undefined,
     };
   } catch {
     return null;
   }
 }
 
-export function recoverAuctionHref(auctionId?: string | null) {
+export function recoverAuctionHref(auctionId?: string | null, kind?: DealKind | null) {
   const id = auctionId?.trim();
-  return id ? `/auctions/${id}` : '/my';
+  if (!id) {
+    return '/my';
+  }
+  return kind === 'timeslot' ? `/timeslots/${id}` : `/auctions/${id}`;
 }
 
 export async function prepareAwardPayment(input: {
   auction: AuctionItem;
   bid: BidItem;
   customerKey?: string;
+  kind?: DealKind;
 }): Promise<{ data: PreparePaymentResult | null; error: string | null }> {
   try {
     const amount = advertiserTotalCharge(input.bid.bidAmount);
@@ -77,19 +85,23 @@ export async function prepareAwardPayment(input: {
       return { data: null, error: '결제 금액이 올바르지 않습니다.' };
     }
 
-    const response = await fetch('/api/payments/prepare', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        auctionId: input.auction.id,
-        bidId: input.bid.id,
-        amount,
-        bidAmount: input.bid.bidAmount,
-        orderName: input.auction.title.trim() || '캠페인 매칭',
-        customerKey: input.customerKey,
-        ...publicSupabasePayload(),
+    const response = await fetch(
+      '/api/payments/prepare',
+      await authRequestInit({
+        method: 'POST',
+        body: JSON.stringify({
+          auctionId: input.auction.id,
+          bidId: input.bid.id,
+          amount,
+          bidAmount: input.bid.bidAmount,
+          orderName:
+            input.auction.title.trim() ||
+            (input.kind === 'timeslot' ? '크리에이터 상품 결제' : '캠페인 매칭'),
+          customerKey: input.customerKey,
+          ...publicSupabasePayload(),
+        }),
       }),
-    });
+    );
 
     const payload = (await response.json().catch(() => null)) as
       | (PreparePaymentResult & { error?: string })
@@ -111,6 +123,7 @@ export async function prepareAwardPayment(input: {
         bidAmount: payload.bidAmount || input.bid.bidAmount,
         clientKey,
         demo: !clientKey,
+        kind: input.kind,
       },
       error: null,
     };

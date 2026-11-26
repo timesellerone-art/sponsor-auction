@@ -189,6 +189,7 @@ export function PaymentCheckoutModal({
       auctionId: checkout.auctionId,
       bidId: checkout.bidId,
       amount: checkout.amount,
+      kind: checkout.kind,
     });
     try {
       if (useToss && widgetsRef.current) {

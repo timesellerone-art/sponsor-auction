@@ -36,6 +36,7 @@ import type { TimeSlotItem } from '@/types/timeslot';
 
 function fulfillmentFromSlot(slot: TimeSlotItem): TimeslotFulfillment {
   return {
+    paidAt: slot.paidAt ?? null,
     deliveryUrl: slot.deliveryUrl ?? null,
     deliveredAt: slot.deliveredAt ?? null,
     purchaseConfirmedAt: slot.purchaseConfirmedAt ?? null,
@@ -92,7 +93,7 @@ function mapPayment(row: {
 
 function mockPaymentsFromDeals(auctions: AuctionItem[], bids: BidItem[]): PaymentRecord[] {
   return auctions
-    .filter((auction) => isAuctionClosed(auction.status))
+    .filter((auction) => isAuctionClosed(auction.status) && auction.category !== 'creator_product')
     .map((auction) => {
       const bid =
         bids.find((item) => isBidSelected(item, auction.winnerBidId) && item.auctionId === auction.id) ??

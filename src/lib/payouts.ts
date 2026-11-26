@@ -952,8 +952,15 @@ export async function listPayoutsFromDatabase(
     [...auctions, ...completedAuctions, ...timeslotLookups.auctions].map((item) => [item.id, item]),
   );
   const timeslotIds = new Set(timeslotLookups.auctions.map((item) => item.id));
+  const paidTimeslotIds = new Set(
+    [
+      ...payments.map((item) => item.auctionId),
+      ...existing.map((item) => item.auctionId).filter((id): id is string => Boolean(id)),
+    ].filter((id) => timeslotIds.has(id)),
+  );
   const completedTimeslots = timeslotLookups.auctions.filter(
-    (item) => item.dealKind === 'timeslot' && item.winner_bid_id,
+    (item) =>
+      item.dealKind === 'timeslot' && item.winner_bid_id && paidTimeslotIds.has(item.id),
   );
   const creatorIds = [
     ...[...bidMap.values()].map((item) => item.creator_id),

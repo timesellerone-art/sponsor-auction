@@ -14,6 +14,7 @@ export type PaymentRecord = {
 };
 
 export type TimeslotFulfillment = {
+  paidAt: string | null;
   deliveryUrl: string | null;
   deliveredAt: string | null;
   purchaseConfirmedAt: string | null;

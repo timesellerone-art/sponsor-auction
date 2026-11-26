@@ -79,6 +79,7 @@ export type BidAdminFilter = 'all' | 'pending' | 'awarded' | 'paid' | 'rejected'
 export type TimeslotAdminFilter =
   | 'all'
   | 'open'
+  | 'awaiting_payment'
   | 'awarded'
   | 'delivered'
   | 'confirmed'

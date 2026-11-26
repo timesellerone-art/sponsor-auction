@@ -11,16 +11,20 @@ import { awardTimeSlotBid, getTimeSlotById, listTimeSlotBids } from '@/lib/times
 import { isUuid } from '@/lib/uuid';
 import type { TimeSlotItem } from '@/types/timeslot';
 
-const ORDER_NAME = '크리에이터 상품 크레딧 예치 낙찰';
+const ORDER_NAME = '크리에이터 상품 크레딧 예치';
 
-export type TimeslotCreditAwardResult =
+export type TimeslotSelectionResult =
+  | { ok: true; data: TimeSlotItem }
+  | { ok: false; status: number; error: string; errorCode: string };
+
+export type TimeslotCreditPayResult =
   | { ok: true; data: TimeSlotItem; amount: number; orderId: string }
   | { ok: false; status: number; error: string; errorCode: string; neededAmount?: number };
 
 function holdFailure(
   held: { code: string; message: string },
   neededAmount: number,
-): TimeslotCreditAwardResult {
+): TimeslotCreditPayResult {
   const status =
     held.code === 'INSUFFICIENT_CREDIT'
       ? 402
@@ -28,7 +32,9 @@ function holdFailure(
         ? 409
         : held.code === 'FORBIDDEN'
           ? 403
-          : 400;
+          : held.code === 'NOT_AWARDED'
+            ? 409
+            : 400;
   return {
     ok: false,
     status,
@@ -38,7 +44,60 @@ function holdFailure(
   };
 }
 
-export async function awardTimeslotWithCredit(
+export async function awardTimeslotSelection(
+  client: SponsorAuctionClient | null,
+  input: {
+    slotId: string;
+    bidId: string;
+    actorUserId: string;
+  },
+): Promise<TimeslotSelectionResult> {
+  const slotId = input.slotId.trim();
+  const bidId = input.bidId.trim();
+  if (!slotId || !bidId) {
+    return {
+      ok: false,
+      status: 400,
+      error: '상품 또는 제안 ID가 올바르지 않습니다.',
+      errorCode: 'INVALID_AWARD',
+    };
+  }
+
+  const slotResult = await getTimeSlotById(slotId, client);
+  const slot = slotResult.data;
+  if (!slot) {
+    return {
+      ok: false,
+      status: 400,
+      error: slotResult.error ?? '크리에이터 상품을 찾을 수 없습니다.',
+      errorCode: 'AWARD_TARGET_NOT_FOUND',
+    };
+  }
+  if (slot.winnerBidId && slot.winnerBidId !== bidId) {
+    return {
+      ok: false,
+      status: 409,
+      error: '이미 다른 제안이 채택된 상품입니다.',
+      errorCode: 'ALREADY_AWARDED',
+    };
+  }
+  if (slot.winnerBidId === bidId) {
+    return { ok: true, data: slot };
+  }
+
+  const applied = await awardTimeSlotBid(slotId, bidId, input.actorUserId, client);
+  if (applied.error || !applied.data) {
+    return {
+      ok: false,
+      status: 400,
+      error: applied.error ?? '크리에이터 상품 낙찰 상태를 저장하지 못했습니다.',
+      errorCode: 'AWARD_FAILED',
+    };
+  }
+  return { ok: true, data: applied.data };
+}
+
+export async function payTimeslotWithCredit(
   admin: SponsorAuctionClient,
   input: {
     slotId: string;
@@ -46,7 +105,7 @@ export async function awardTimeslotWithCredit(
     actorUserId: string;
     actorIsAdmin?: boolean;
   },
-): Promise<TimeslotCreditAwardResult> {
+): Promise<TimeslotCreditPayResult> {
   const slotId = input.slotId.trim();
   const bidId = input.bidId.trim();
   if (!isUuid(slotId) || !isUuid(bidId)) {
@@ -54,7 +113,7 @@ export async function awardTimeslotWithCredit(
       ok: false,
       status: 400,
       error: '상품 또는 제안 ID가 올바르지 않습니다.',
-      errorCode: 'INVALID_AWARD',
+      errorCode: 'INVALID_PAY',
     };
   }
 
@@ -65,7 +124,15 @@ export async function awardTimeslotWithCredit(
       ok: false,
       status: 400,
       error: slotResult.error ?? '크리에이터 상품을 찾을 수 없습니다.',
-      errorCode: 'AWARD_TARGET_NOT_FOUND',
+      errorCode: 'PAY_TARGET_NOT_FOUND',
+    };
+  }
+  if (!slot.winnerBidId || slot.winnerBidId !== bidId) {
+    return {
+      ok: false,
+      status: 409,
+      error: '낙찰된 제안만 결제할 수 있습니다.',
+      errorCode: 'NOT_AWARDED',
     };
   }
 
@@ -76,19 +143,25 @@ export async function awardTimeslotWithCredit(
       ok: false,
       status: 400,
       error: '해당 제안을 찾을 수 없습니다.',
-      errorCode: 'AWARD_TARGET_NOT_FOUND',
+      errorCode: 'PAY_TARGET_NOT_FOUND',
+    };
+  }
+  if (
+    winner.advertiserId &&
+    winner.advertiserId !== input.actorUserId &&
+    !input.actorIsAdmin
+  ) {
+    return {
+      ok: false,
+      status: 403,
+      error: '선정된 광고주만 결제할 수 있습니다.',
+      errorCode: 'FORBIDDEN',
     };
   }
 
   const holdQuote = campaignHoldQuote(winner.bidAmount);
-  if (slot.winnerBidId && slot.winnerBidId !== bidId) {
-    return {
-      ok: false,
-      status: 409,
-      error: '이미 다른 제안이 채택된 상품입니다.',
-      errorCode: 'ALREADY_AWARDED',
-      neededAmount: holdQuote.amount,
-    };
+  if (slot.paidAt) {
+    return { ok: true, data: slot, amount: holdQuote.amount, orderId: campaignAwardOrderId(slotId, bidId) };
   }
 
   const orderId = campaignAwardOrderId(slotId, bidId);
@@ -122,7 +195,7 @@ export async function awardTimeslotWithCredit(
       orderId,
       auctionId: slotId,
       bidId,
-      reason: '결제 기록 저장 실패로 크레딧 복구',
+      reason: '크리에이터 상품 결제 기록 저장 실패로 크레딧 복구',
     });
     return {
       ok: false,
@@ -132,33 +205,6 @@ export async function awardTimeslotWithCredit(
     };
   }
 
-  let awarded = slot;
-  if (slot.winnerBidId !== bidId) {
-    const applied = await awardTimeSlotBid(slotId, bidId, input.actorUserId, admin);
-    if (applied.error || !applied.data) {
-      return {
-        ok: false,
-        status: 500,
-        error: '크리에이터 상품 낙찰 상태를 저장하지 못했습니다. 예치는 유지됩니다.',
-        errorCode: 'AWARD_FAILED',
-      };
-    }
-    awarded = applied.data;
-  }
-
-  await Promise.all(
-    bids.data
-      .filter((item) => item.id !== bidId)
-      .map((item) =>
-        releaseCampaignPaymentIfOpen(admin, {
-          orderId: campaignAwardOrderId(slotId, item.id),
-          auctionId: slotId,
-          bidId: item.id,
-          reason: '크리에이터 상품 미선정 제안 크레딧 복구',
-        }),
-      ),
-  );
-
   await upsertPaidPayout(admin, {
     orderId,
     auctionId: slotId,
@@ -167,5 +213,10 @@ export async function awardTimeslotWithCredit(
     orderName: slot.title,
   });
 
-  return { ok: true, data: awarded, amount, orderId };
+  return {
+    ok: true,
+    data: { ...slot, paidAt: new Date().toISOString() },
+    amount,
+    orderId,
+  };
 }

@@ -80,6 +80,7 @@ function mapSlot(row: Partial<SlotRow> & Pick<SlotRow, 'id'>): TimeSlotItem {
     status: (row.status ?? 'open') as TimeSlotStatus,
     winnerBidId: row.winner_bid_id ?? null,
     isBlind: Boolean(row.is_blind),
+    paidAt: null,
     deliveryUrl: row.delivery_url ?? null,
     deliveredAt: row.delivered_at ?? null,
     purchaseConfirmedAt: row.purchase_confirmed_at ?? null,
@@ -283,10 +284,10 @@ async function attachFulfillment(
             .in('id', ids)
         : full;
     if (result.error || !result.data) {
-      return slots;
+      return attachPaidStatus(supabase, slots);
     }
     const extra = new Map(result.data.map((row) => [row.id, row]));
-    return slots.map((item) => {
+    const fulfilled = slots.map((item) => {
       const row = extra.get(item.id);
       if (!row) {
         return item;
@@ -299,6 +300,42 @@ async function attachFulfillment(
         purchaseConfirmedAt: row.purchase_confirmed_at ?? null,
       };
     });
+    return attachPaidStatus(supabase, fulfilled);
+  } catch {
+    return slots;
+  }
+}
+
+async function attachPaidStatus(
+  supabase: SponsorAuctionClient,
+  slots: TimeSlotItem[],
+): Promise<TimeSlotItem[]> {
+  const ids = uuidIds(slots.map((item) => item.id));
+  if (ids.length === 0) {
+    return slots;
+  }
+  try {
+    const { data, error } = await supabase
+      .from('payments')
+      .select('auction_id, status, confirmed_at')
+      .eq('status', 'confirmed')
+      .in('auction_id', ids);
+    if (error || !data) {
+      return slots;
+    }
+    const paidAtById = new Map<string, string>();
+    for (const row of data) {
+      const id = typeof row.auction_id === 'string' ? row.auction_id : '';
+      const confirmedAt =
+        (typeof row.confirmed_at === 'string' && row.confirmed_at) || new Date().toISOString();
+      if (id && !paidAtById.has(id)) {
+        paidAtById.set(id, confirmedAt);
+      }
+    }
+    return slots.map((item) => ({
+      ...item,
+      paidAt: paidAtById.get(item.id) ?? item.paidAt ?? null,
+    }));
   } catch {
     return slots;
   }
@@ -920,6 +957,9 @@ export async function deliverTimeSlot(
   if (!slot.winnerBidId || slot.status !== 'awarded') {
     return fail(null, '낙찰된 상품만 납품할 수 있습니다.');
   }
+  if (!slot.paidAt) {
+    return fail(null, '광고주 결제가 완료된 뒤에 납품할 수 있습니다.');
+  }
   if (slot.purchaseConfirmedAt) {
     return fail(null, '이미 구매 확정된 상품입니다.');
   }
@@ -967,6 +1007,9 @@ export async function confirmTimeSlotPurchase(
   }
   if (!slot.winnerBidId || slot.status !== 'awarded') {
     return fail(null, '낙찰된 상품만 구매 확정할 수 있습니다.');
+  }
+  if (!slot.paidAt) {
+    return fail(null, '광고주 결제가 완료된 뒤에 구매 확정할 수 있습니다.');
   }
   if (!slot.deliveredAt && !slot.deliveryUrl) {
     return fail(null, '결과물이 납품된 뒤에 구매 확정할 수 있습니다.');

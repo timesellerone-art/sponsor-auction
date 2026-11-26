@@ -6,7 +6,7 @@ import { CreatorRatingBadge } from '@/components/CreatorRatingBadge';
 import { PLATFORM_LABELS } from '@/lib/platforms';
 import { useEffect, useState } from 'react';
 import { isDeadlinePassed } from '@/lib/auction-engine';
-import type { TimeSlotItem } from '@/types/timeslot';
+import { isTimeslotAwaitingPayment, type TimeSlotItem } from '@/types/timeslot';
 import { cn, formatViews, formatWon } from '@/lib/utils';
 
 export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
@@ -39,14 +39,22 @@ export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
         <span
           className={cn(
             'rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-inset',
-            slot.status === 'awarded'
-              ? 'bg-clink-peach text-clink ring-clink-peach-strong'
-              : open
-                ? 'bg-clink-peach text-clink-accent ring-clink-peach-strong'
-                : 'bg-zinc-100 text-zinc-700 ring-zinc-200',
+            isTimeslotAwaitingPayment(slot)
+              ? 'bg-amber-50 text-amber-800 ring-amber-200'
+              : slot.status === 'awarded'
+                ? 'bg-clink-peach text-clink ring-clink-peach-strong'
+                : open
+                  ? 'bg-clink-peach text-clink-accent ring-clink-peach-strong'
+                  : 'bg-zinc-100 text-zinc-700 ring-zinc-200',
           )}
         >
-          {slot.status === 'awarded' ? '선정' : open ? '제안 가능' : '마감'}
+          {isTimeslotAwaitingPayment(slot)
+            ? '결제 대기'
+            : slot.status === 'awarded'
+              ? '진행 중'
+              : open
+                ? '제안 가능'
+                : '마감'}
         </span>
       </div>
       <h3 className="mt-3 line-clamp-2 text-base font-semibold text-zinc-950">

@@ -44,7 +44,7 @@ function PaymentSuccessContent() {
   const { user, ready } = useAuth();
   const params = useSearchParams();
   const started = useRef(false);
-  const [message, setMessage] = useState('결제를 승인하고 낙찰을 확정하는 중입니다...');
+  const [message, setMessage] = useState('결제를 승인하고 거래 상태를 반영하는 중입니다...');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [orderId, setOrderId] = useState('');
@@ -78,7 +78,7 @@ function PaymentSuccessContent() {
       if (Number.isInteger(amount) && amount > 0) {
         setAmountLabel(formatWon(amount));
       }
-      setAuctionHref(recoverAuctionHref(auctionId));
+      setAuctionHref(recoverAuctionHref(auctionId, stored?.kind));
 
       if (!paymentKey || !confirmedOrderId || !Number.isInteger(amount) || amount <= 0) {
         const info = parsePaymentError({

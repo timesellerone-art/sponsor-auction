@@ -19,6 +19,7 @@ export type TimeSlotItem = {
   status: TimeSlotStatus;
   winnerBidId: string | null;
   isBlind?: boolean;
+  paidAt?: string | null;
   deliveryUrl?: string | null;
   deliveredAt?: string | null;
   purchaseConfirmedAt?: string | null;
@@ -65,4 +66,14 @@ export function isTimeSlotOpen(slot: Pick<TimeSlotItem, 'status' | 'deadline' | 
   }
   const end = Date.parse(slot.deadline);
   return Number.isFinite(end) ? end > Date.now() : true;
+}
+
+export function isTimeslotAwaitingPayment(
+  slot: Pick<TimeSlotItem, 'winnerBidId' | 'paidAt' | 'status'>,
+) {
+  return Boolean(slot.winnerBidId) && !slot.paidAt && slot.status === 'awarded';
+}
+
+export function isTimeslotEscrowed(slot: Pick<TimeSlotItem, 'winnerBidId' | 'paidAt'>) {
+  return Boolean(slot.winnerBidId && slot.paidAt);
 }

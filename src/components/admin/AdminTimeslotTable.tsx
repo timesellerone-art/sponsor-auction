@@ -22,7 +22,8 @@ import type { TimeSlotItem } from '@/types/timeslot';
 const FILTERS: { id: TimeslotAdminFilter; label: string }[] = [
   { id: 'all', label: '전체' },
   { id: 'open', label: '진행 중' },
-  { id: 'awarded', label: '낙찰' },
+  { id: 'awaiting_payment', label: '결제 대기' },
+  { id: 'awarded', label: '진행 중(예치)' },
   { id: 'delivered', label: '납품' },
   { id: 'confirmed', label: '구매확정' },
   { id: 'closed', label: '취소' },
