@@ -834,7 +834,9 @@ async function applySessionSwitch(tokenHash: string): Promise<DataResult<User | 
   return ok(verified.data.user);
 }
 
-export async function sendPhoneOtp(phone: string): Promise<DataResult<{ sent: boolean }>> {
+export async function sendPhoneOtp(
+  phone: string,
+): Promise<DataResult<{ sent: boolean; testMode: boolean }>> {
   try {
     const response = await fetch(
       '/api/auth/phone/send-otp',
@@ -843,13 +845,16 @@ export async function sendPhoneOtp(phone: string): Promise<DataResult<{ sent: bo
         body: JSON.stringify({ phone }),
       }),
     );
-    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    const payload = (await response.json().catch(() => null)) as {
+      data?: { sent?: boolean; testMode?: boolean };
+      error?: string;
+    } | null;
     if (!response.ok) {
-      return fail({ sent: false }, payload?.error || '인증번호를 보내지 못했습니다.');
+      return fail({ sent: false, testMode: false }, payload?.error || '인증번호를 보내지 못했습니다.');
     }
-    return ok({ sent: true });
+    return ok({ sent: true, testMode: Boolean(payload?.data?.testMode) });
   } catch {
-    return fail({ sent: false }, AUTH_FAIL_MESSAGE);
+    return fail({ sent: false, testMode: false }, AUTH_FAIL_MESSAGE);
   }
 }
 

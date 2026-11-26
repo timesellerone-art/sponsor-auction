@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { SupabaseClient, User } from '@supabase/supabase-js';
+import { PHONE_OTP_TEST_CODE } from '@/lib/phone-otp-constants';
 import {
   PHONE_OTP_TTL_MS,
   assertPhoneOtpCode,
@@ -10,7 +11,7 @@ import {
   hashPhoneOtp,
   readPhoneOtpMeta,
 } from '@/lib/phone-otp';
-import { sendSolapiSms } from '@/lib/notification';
+import { hasSolapiSmsConfig, sendSolapiSms } from '@/lib/notification';
 
 type AdminClient = SupabaseClient;
 
@@ -20,7 +21,9 @@ export async function issuePhoneOtp(admin: AdminClient, user: User, rawPhone: st
     throw new Error('인증번호는 30초 후에 다시 받을 수 있습니다.');
   }
 
-  const code = generatePhoneOtpCode();
+  const smsConfigured = hasSolapiSmsConfig();
+  const testMode = !smsConfigured;
+  const code = testMode ? PHONE_OTP_TEST_CODE : generatePhoneOtpCode();
   const now = Date.now();
   const updated = await admin.auth.admin.updateUserById(user.id, {
     user_metadata: {
@@ -36,18 +39,16 @@ export async function issuePhoneOtp(admin: AdminClient, user: User, rawPhone: st
     throw new Error(updated.error.message || '인증번호를 저장하지 못했습니다.');
   }
 
-  const sent = await sendSolapiSms(
-    phone,
-    `[Clink] 인증번호 ${code}\n5분 안에 입력해 주세요.`,
-  );
-  if (sent.mocked) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('문자 발송 설정이 없어 인증번호를 보낼 수 없습니다.');
-    }
-    console.info('[SponsorAuction] 휴대폰 OTP Mock 발송', { phone, userId: user.id, code });
+  if (!testMode) {
+    await sendSolapiSms(
+      phone,
+      `[Clink] 인증번호 ${code}\n5분 안에 입력해 주세요.`,
+    );
+  } else {
+    console.info('[SponsorAuction] 휴대폰 OTP 테스트 모드', { phone, userId: user.id });
   }
 
-  return { phone, mocked: sent.mocked };
+  return { phone, testMode };
 }
 
 export async function confirmPhoneOtp(admin: AdminClient, user: User, rawPhone: string, rawCode: string) {

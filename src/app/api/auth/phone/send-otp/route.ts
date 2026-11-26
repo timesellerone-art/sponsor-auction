@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     const issued = await issuePhoneOtp(admin, user, phone);
     return NextResponse.json(
-      { data: { phone: issued.phone, sent: true } },
+      { data: { phone: issued.phone, sent: true, testMode: issued.testMode } },
       { headers: NO_STORE },
     );
   } catch (error) {

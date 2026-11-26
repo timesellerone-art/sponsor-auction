@@ -2,6 +2,8 @@ import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import type { User } from '@supabase/supabase-js';
 import { isValidPhone, normalizePhone, sameKrPhone } from '@/lib/contact';
 
+export { PHONE_OTP_TEST_CODE, PHONE_OTP_TEST_MODE_MESSAGE } from '@/lib/phone-otp-constants';
+
 export const PHONE_OTP_TTL_MS = 5 * 60 * 1000;
 export const PHONE_OTP_RESEND_MS = 30_000;
 export const PHONE_OTP_MAX_ATTEMPTS = 5;

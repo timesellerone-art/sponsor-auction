@@ -50,6 +50,12 @@ function solapiKey() {
   return (process.env.SOLAPI_API_KEY || process.env.SOLAPI_KEY || '').trim();
 }
 
+export function hasSolapiSmsConfig(env: Record<string, string | undefined> = process.env) {
+  const apiKey = (env.SOLAPI_API_KEY || env.SOLAPI_KEY || '').trim();
+  const apiSecret = (env.SOLAPI_API_SECRET || env.SOLAPI_SECRET || '').trim();
+  return Boolean(apiKey && apiSecret);
+}
+
 function digitsPhone(value: string | null | undefined) {
   return (value || '').replace(/\D/g, '');
 }

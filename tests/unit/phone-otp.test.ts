@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { User } from '@supabase/supabase-js';
 import { ACCOUNT_UNIFIED_MESSAGE } from '../../src/lib/account-unify';
+import { hasSolapiSmsConfig } from '../../src/lib/notification';
+import { PHONE_OTP_TEST_CODE, PHONE_OTP_TEST_MODE_MESSAGE } from '../../src/lib/phone-otp-constants';
 import {
   assertPhoneOtpCode,
   canResendPhoneOtp,
@@ -68,5 +70,29 @@ describe('phone otp', () => {
       ACCOUNT_UNIFIED_MESSAGE,
       '이미 가입된 계정이 확인되어 기존 계정으로 통합 연결되었습니다.',
     );
+  });
+
+  it('테스트 모드 고정 인증번호 123456을 검증한다', () => {
+    assert.equal(PHONE_OTP_TEST_CODE, '123456');
+    assert.equal(
+      PHONE_OTP_TEST_MODE_MESSAGE,
+      '문자 발송 설정 전 테스트 모드입니다. 인증번호 123456을 입력해 주세요.',
+    );
+    const phone = '01012345678';
+    const user = userWithMeta({
+      phone_otp_hash: hashPhoneOtp(PHONE_OTP_TEST_CODE, phone),
+      phone_otp_phone: phone,
+      phone_otp_exp: Date.now() + 60_000,
+      phone_otp_attempts: 0,
+    });
+    assert.equal(assertPhoneOtpCode(user, phone, '123456'), phone);
+  });
+
+  it('Solapi 키/시크릿이 있을 때만 실제 SMS 설정으로 본다', () => {
+    assert.equal(hasSolapiSmsConfig({}), false);
+    assert.equal(hasSolapiSmsConfig({ ALIGO_API_KEY: 'aligo-only' }), false);
+    assert.equal(hasSolapiSmsConfig({ SOLAPI_API_KEY: 'key' }), false);
+    assert.equal(hasSolapiSmsConfig({ SOLAPI_API_KEY: 'key', SOLAPI_API_SECRET: 'secret' }), true);
+    assert.equal(hasSolapiSmsConfig({ SOLAPI_KEY: 'key', SOLAPI_SECRET: 'secret' }), true);
   });
 });

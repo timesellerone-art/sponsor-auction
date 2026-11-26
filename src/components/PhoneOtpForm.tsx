@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { showToast } from '@/components/Toast';
 import { AUTH_FAIL_MESSAGE, sendPhoneOtp, verifyPhoneOtp, type PhoneVerifyResult } from '@/lib/auth';
 import { isValidPhone } from '@/lib/contact';
+import { PHONE_OTP_TEST_MODE_MESSAGE } from '@/lib/phone-otp-constants';
 import { cn } from '@/lib/utils';
 
 type PhoneOtpFormProps = {
@@ -29,6 +30,7 @@ export function PhoneOtpForm({
   const [busy, setBusy] = useState<'send' | 'verify' | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [done, setDone] = useState(false);
+  const [testMode, setTestMode] = useState(false);
   const isVerified = verified || done;
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export function PhoneOtpForm({
     setSent(false);
     setCode('');
     setDone(false);
+    setTestMode(false);
   };
 
   const handleSend = async () => {
@@ -62,8 +65,12 @@ export function PhoneOtpForm({
         return;
       }
       setSent(true);
+      setTestMode(Boolean(result.data?.testMode));
       setCooldown(30);
-      showToast('인증번호를 보냈습니다.', 'success');
+      showToast(
+        result.data?.testMode ? PHONE_OTP_TEST_MODE_MESSAGE : '인증번호를 보냈습니다.',
+        'success',
+      );
     } catch {
       showToast(AUTH_FAIL_MESSAGE);
     } finally {
@@ -151,6 +158,11 @@ export function PhoneOtpForm({
         <p className="text-sm font-medium text-clink-accent">휴대전화 인증이 완료되었습니다.</p>
       ) : (
         <label className="block">
+          {testMode ? (
+            <p className="mb-2 rounded-xl bg-clink-peach px-3 py-2 text-xs leading-5 text-clink-accent">
+              {PHONE_OTP_TEST_MODE_MESSAGE}
+            </p>
+          ) : null}
           <span className="mb-1.5 block text-sm font-medium text-zinc-800">인증번호</span>
           <div className="flex gap-2">
             <input
