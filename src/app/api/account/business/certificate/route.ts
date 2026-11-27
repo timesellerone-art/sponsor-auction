@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import {
   BUSINESS_CERTIFICATE_BUCKET,
   businessCertificateUploadBlockReason,
+  certificateContentType,
   certificateStoragePath,
   validateBusinessCertificateFile,
 } from '@/lib/business-certificate';
@@ -101,6 +102,7 @@ export async function POST(request: Request) {
     if (!actor?.userId) {
       return unauthorizedJson('사업자등록증을 올리려면 로그인해 주세요.');
     }
+    const userId = actor.userId;
     if (!canManageBusiness(actor)) {
       return forbiddenJson('사업자등록증은 광고주 또는 크리에이터 계정에서 관리합니다.');
     }
@@ -126,7 +128,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const current = await admin.from('profiles').select(CERT_COLUMNS).eq('id', actor.userId).maybeSingle();
+    const current = await admin.from('profiles').select(CERT_COLUMNS).eq('id', userId).maybeSingle();
     if (current.error && isSchemaMismatch(current.error)) {
       return NextResponse.json(
         { error: '사업자등록증 컬럼이 아직 없습니다. 마이그레이션을 적용해 주세요.', errorCode: 'SCHEMA_MISSING' },
@@ -151,22 +153,31 @@ export async function POST(request: Request) {
     if (bucketError) {
       console.warn('[SponsorAuction] business-certificates 버킷 확인 실패', bucketError);
       return NextResponse.json(
-        { error: '저장소를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.', errorCode: 'BUCKET_UNAVAILABLE' },
+        {
+          error: `저장소를 준비하지 못했습니다: ${bucketError}`,
+          errorCode: 'BUCKET_UNAVAILABLE',
+          errorMessage: bucketError,
+        },
         { status: 503, headers: NO_STORE },
       );
     }
 
-    const path = certificateStoragePath(actor.userId, file.name);
-    const bytes = Buffer.from(await file.arrayBuffer());
+    const path = certificateStoragePath(userId, file.name, file.type);
+    const bytes = new Uint8Array(await file.arrayBuffer());
     const uploaded = await admin.storage.from(BUSINESS_CERTIFICATE_BUCKET).upload(path, bytes, {
       cacheControl: '60',
       upsert: false,
-      contentType: file.type || 'application/octet-stream',
+      contentType: certificateContentType(file.name, file.type),
     });
     if (uploaded.error) {
-      console.warn('[SponsorAuction] 사업자등록증 업로드 실패', uploaded.error.message);
+      const storageMessage = uploaded.error.message || '알 수 없는 저장소 오류';
+      console.warn('[SponsorAuction] 사업자등록증 업로드 실패', storageMessage);
       return NextResponse.json(
-        { error: '사업자등록증을 올리지 못했습니다.', errorCode: 'UPLOAD_FAILED' },
+        {
+          error: `사업자등록증을 올리지 못했습니다: ${storageMessage}`,
+          errorCode: 'UPLOAD_FAILED',
+          errorMessage: storageMessage,
+        },
         { status: 500, headers: NO_STORE },
       );
     }
@@ -181,7 +192,7 @@ export async function POST(request: Request) {
         business_certificate_path: path,
         business_certificate_name: file.name.slice(0, 120),
       })
-      .eq('id', actor.userId)
+      .eq('id', userId)
       .select('business_certificate_path, business_certificate_name')
       .maybeSingle();
     if (saved.error || !saved.data) {
@@ -204,8 +215,13 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     rethrowPrerenderError(error);
+    const message = error instanceof Error ? error.message : '알 수 없는 오류';
     return NextResponse.json(
-      { error: '사업자등록증을 올리지 못했습니다.', errorCode: 'UPLOAD_FAILED' },
+      {
+        error: `사업자등록증을 올리지 못했습니다: ${message}`,
+        errorCode: 'UPLOAD_FAILED',
+        errorMessage: message,
+      },
       { status: 500, headers: NO_STORE },
     );
   }

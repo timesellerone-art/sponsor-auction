@@ -22,17 +22,47 @@ export function validateBusinessCertificateFile(file: File) {
   return null;
 }
 
-export function sanitizeCertificateFileName(name: string) {
-  const base = name.replace(/[/\\]/g, '').replace(/[^\w.\-가-힣]+/g, '_').slice(0, 80);
-  return base || 'certificate';
+export function certificateExtension(fileName: string, mimeType = '') {
+  const fromName = (fileName || '').match(/(\.(jpe?g|png|webp|pdf))$/i);
+  if (fromName) {
+    const ext = fromName[1].slice(1).toLowerCase();
+    return ext === 'jpeg' ? 'jpg' : ext;
+  }
+  if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+    return 'jpg';
+  }
+  if (mimeType === 'image/png') {
+    return 'png';
+  }
+  if (mimeType === 'image/webp') {
+    return 'webp';
+  }
+  if (mimeType === 'application/pdf') {
+    return 'pdf';
+  }
+  return 'bin';
 }
 
-export function certificateStoragePath(userId: string, fileName: string) {
-  const sanitized = sanitizeCertificateFileName(fileName);
-  const extMatch = sanitized.match(/(\.(jpe?g|png|webp|pdf))$/i);
-  const ext = extMatch?.[1]?.toLowerCase().replace('jpeg', 'jpg') ?? '';
-  const stem = sanitized.replace(/(\.(jpe?g|png|webp|pdf))$/i, '') || 'certificate';
-  return `${userId}/${Date.now()}-${stem}${ext}`;
+export function certificateContentType(fileName: string, mimeType = '') {
+  const ext = certificateExtension(fileName, mimeType);
+  if (ext === 'jpg') {
+    return 'image/jpeg';
+  }
+  if (ext === 'png') {
+    return 'image/png';
+  }
+  if (ext === 'webp') {
+    return 'image/webp';
+  }
+  if (ext === 'pdf') {
+    return 'application/pdf';
+  }
+  return mimeType || 'application/octet-stream';
+}
+
+export function certificateStoragePath(userId: string, fileName: string, mimeType = '') {
+  const ext = certificateExtension(fileName, mimeType);
+  return `${userId}/${Date.now()}.${ext}`;
 }
 
 export function allowsBusinessCertificateUpload(input: {
