@@ -12,7 +12,7 @@ import {
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isUuid } from '@/lib/uuid';
 import type { AuctionStatus } from '@/types/auction';
-import type { TimeSlotItem, TimeSlotStatus } from '@/types/timeslot';
+import type { TimeSlotStatus } from '@/types/timeslot';
 
 type DeleteActor = {
   userId?: string;
@@ -158,9 +158,7 @@ export async function deleteTimeslotListing(
 
   const loaded = await client
     .from('time_slots')
-    .select(
-      'id, creator_id, status, winner_bid_id, deadline, delivered_at, purchase_confirmed_at',
-    )
+    .select('id, creator_id, status, winner_bid_id, deadline')
     .eq('id', id)
     .maybeSingle();
   if (loaded.error) {
@@ -176,28 +174,14 @@ export async function deleteTimeslotListing(
       return fail(403, LISTING_DELETE_FORBIDDEN, 'FORBIDDEN');
     }
     const paid = await hasConfirmedPayment(client, id);
-    const slot: TimeSlotItem = {
-      id,
-      creatorId: ownerId,
-      creatorName: '',
-      title: '',
-      platform: 'other',
-      description: '',
-      expectedViews: 0,
-      startingPrice: 0,
-      currentHighestBid: 0,
-      bidsCount: 0,
-      slotStart: '',
-      slotEnd: '',
-      deadline: loaded.data.deadline ?? '',
-      status: (loaded.data.status as TimeSlotStatus) ?? 'open',
-      winnerBidId: loaded.data.winner_bid_id,
-      paidAt: paid ? new Date().toISOString() : null,
-      deliveredAt: loaded.data.delivered_at,
-      purchaseConfirmedAt: loaded.data.purchase_confirmed_at,
-      createdAt: '',
-    };
-    if (!canOwnerDeleteTimeslot(slot)) {
+    if (
+      !canOwnerDeleteTimeslot({
+        status: (loaded.data.status as TimeSlotStatus) ?? 'open',
+        winnerBidId: loaded.data.winner_bid_id,
+        deadline: loaded.data.deadline ?? '',
+        paidAt: paid ? new Date().toISOString() : null,
+      })
+    ) {
       return fail(409, LISTING_DELETE_OWNER_BLOCKED, 'DELETE_BLOCKED');
     }
   }

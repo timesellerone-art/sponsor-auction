@@ -20,7 +20,13 @@ export function canOwnerDeleteCampaign(
   return auction.status === 'active' && !auction.winnerBidId;
 }
 
-export function canOwnerDeleteTimeslot(slot: TimeSlotItem | null | undefined) {
+export function canOwnerDeleteTimeslot(
+  slot:
+    | (Pick<TimeSlotItem, 'status' | 'winnerBidId' | 'deadline'> &
+        Partial<Pick<TimeSlotItem, 'paidAt' | 'deliveredAt' | 'purchaseConfirmedAt'>>)
+    | null
+    | undefined,
+) {
   if (!slot) {
     return false;
   }
