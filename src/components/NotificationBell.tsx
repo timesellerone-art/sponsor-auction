@@ -2,11 +2,12 @@
 
 import { useEffect, useId, useState } from 'react';
 import Link from 'next/link';
-import { Bell } from 'lucide-react';
+import { Bell, Trash2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { authRequestInit } from '@/lib/auth-request';
 import {
   applyInboxReadState,
+  dismissInboxIds,
   listNotifications,
   markInboxIdsRead,
   markNotificationRead,
@@ -36,8 +37,8 @@ function mergeInbox(userId: string, remote: AppNotification[]) {
   );
 }
 
-async function persistRead(ids: string[], all = false) {
-  if (ids.length === 0 && !all) {
+async function persistInbox(payload: { ids: string[]; all?: boolean; dismiss?: boolean }) {
+  if (payload.ids.length === 0 && !payload.all) {
     return;
   }
   try {
@@ -45,11 +46,11 @@ async function persistRead(ids: string[], all = false) {
       '/api/notifications',
       await authRequestInit({
         method: 'POST',
-        body: JSON.stringify(all ? { all: true, ids } : { ids }),
+        body: JSON.stringify(payload),
       }),
     );
   } catch {
-    // 서버 읽음 저장 실패 시에도 로컬 읽음 상태는 유지합니다.
+    // 서버 저장 실패 시에도 로컬 상태는 유지합니다.
   }
 }
 
@@ -124,7 +125,7 @@ export function NotificationBell() {
     markInboxIdsRead(user.id, ids);
     setItems((current) => current.map((item) => ({ ...item, read: true })));
     setUnread(0);
-    void persistRead(ids, true);
+    void persistInbox({ ids, all: true });
   };
 
   const markOneRead = (id: string) => {
@@ -132,7 +133,25 @@ export function NotificationBell() {
     markInboxIdsRead(user.id, [id]);
     setItems((current) => current.map((item) => (item.id === id ? { ...item, read: true } : item)));
     setUnread((count) => Math.max(0, count - 1));
-    void persistRead([id]);
+    void persistInbox({ ids: [id] });
+  };
+
+  const dismissOne = (id: string) => {
+    const target = items.find((item) => item.id === id);
+    dismissInboxIds(user.id, [id]);
+    setItems((current) => current.filter((item) => item.id !== id));
+    if (target && !target.read) {
+      setUnread((count) => Math.max(0, count - 1));
+    }
+    void persistInbox({ ids: [id], dismiss: true });
+  };
+
+  const dismissAll = () => {
+    const ids = items.map((item) => item.id);
+    dismissInboxIds(user.id, ids);
+    setItems([]);
+    setUnread(0);
+    void persistInbox({ ids, all: true, dismiss: true });
   };
 
   return (
@@ -160,19 +179,28 @@ export function NotificationBell() {
           id={panelId}
           role="region"
           aria-label="알림 목록"
-          className="absolute top-full right-0 z-[70] mt-2 w-[min(20rem,calc(100vw-2rem))] max-h-[70vh] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl"
+          className="absolute top-full right-0 z-[70] mt-2 w-[min(22rem,calc(100vw-2rem))] max-h-[70vh] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl"
         >
-          <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2">
+          <div className="flex items-center justify-between gap-2 border-b border-zinc-200 px-3 py-2">
             <p className="text-sm font-semibold text-zinc-950">알림</p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
               {items.length > 0 ? (
-                <button
-                  type="button"
-                  className="text-xs font-medium text-zinc-500 hover:text-zinc-800"
-                  onClick={markAllRead}
-                >
-                  모두 읽음
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-zinc-500 hover:text-zinc-800"
+                    onClick={markAllRead}
+                  >
+                    모두 읽음
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-zinc-500 hover:text-rose-700"
+                    onClick={dismissAll}
+                  >
+                    전체 삭제
+                  </button>
+                </>
               ) : null}
               <button
                 type="button"
@@ -189,24 +217,77 @@ export function NotificationBell() {
             ) : (
               items.map((item) => (
                 <li key={item.id} className="border-b border-zinc-100 last:border-0">
-                  <Link
-                    href={item.href}
+                  <div
                     className={cn(
-                      'block px-3 py-3 hover:bg-zinc-50',
-                      item.read ? 'opacity-70' : 'bg-clink-peach/60',
+                      'flex items-stretch',
+                      item.read
+                        ? 'border-l-4 border-transparent bg-zinc-50'
+                        : 'border-l-4 border-emerald-600 bg-emerald-50',
                     )}
-                    onClick={() => {
-                      markOneRead(item.id);
-                      setOpen(false);
-                    }}
                   >
-                    <p className="text-xs font-semibold text-clink-accent">
-                      {TYPE_LABEL[item.type] ?? item.title}
-                    </p>
-                    <p className="mt-0.5 text-sm font-medium text-zinc-950">{item.title}</p>
-                    <p className="mt-0.5 text-xs leading-5 text-zinc-600">{item.body}</p>
-                    <p className="mt-1 text-[11px] text-zinc-400">{formatDateTime(item.createdAt)}</p>
-                  </Link>
+                    <Link
+                      href={item.href}
+                      className="min-w-0 flex-1 px-3 py-3 hover:bg-black/5"
+                      onClick={() => {
+                        markOneRead(item.id);
+                        setOpen(false);
+                      }}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        {item.read ? null : (
+                          <span
+                            className="size-1.5 shrink-0 rounded-full bg-emerald-600"
+                            aria-hidden
+                          />
+                        )}
+                        <p
+                          className={cn(
+                            'text-xs font-semibold',
+                            item.read ? 'text-zinc-400' : 'text-emerald-800',
+                          )}
+                        >
+                          {TYPE_LABEL[item.type] ?? item.title}
+                        </p>
+                        {item.read ? (
+                          <span className="rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium leading-none text-zinc-500">
+                            읽음
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
+                            안 읽음
+                          </span>
+                        )}
+                      </div>
+                      <p
+                        className={cn(
+                          'mt-0.5 text-sm',
+                          item.read ? 'font-medium text-zinc-500' : 'font-semibold text-zinc-950',
+                        )}
+                      >
+                        {item.title}
+                      </p>
+                      <p
+                        className={cn(
+                          'mt-0.5 text-xs leading-5',
+                          item.read ? 'text-zinc-400' : 'text-zinc-700',
+                        )}
+                      >
+                        {item.body}
+                      </p>
+                      <p className="mt-1 text-[11px] text-zinc-400">{formatDateTime(item.createdAt)}</p>
+                    </Link>
+                    <button
+                      type="button"
+                      className="inline-flex shrink-0 items-start px-2.5 py-3 text-zinc-400 hover:text-rose-700"
+                      aria-label="알림 삭제"
+                      title="삭제"
+                      onClick={() => {
+                        dismissOne(item.id);
+                      }}
+                    >
+                      <Trash2 className="size-4" aria-hidden />
+                    </button>
+                  </div>
                 </li>
               ))
             )}

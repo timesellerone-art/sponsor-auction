@@ -3,6 +3,7 @@ import type { AppNotification, NotificationType } from '@/types/notification';
 const STORAGE_KEY = 'sponsor-auction-notifications';
 const OWNERS_KEY = 'sponsor-auction-owners';
 const READ_KEY_PREFIX = 'sponsor-auction-inbox-read:';
+const DISMISS_KEY_PREFIX = 'sponsor-auction-inbox-dismissed:';
 const CHANGED_EVENT = 'notifications:changed';
 const SESSION_KEY = 'sponsor-auction-auth-session';
 const DEMO_ADVERTISER_ID = 'usr-demo-advertiser';
@@ -162,12 +163,16 @@ function readKey(userId: string) {
   return `${READ_KEY_PREFIX}${userId}`;
 }
 
-export function listInboxReadIds(userId: string | null | undefined) {
-  if (!userId || typeof window === 'undefined') {
+function dismissKey(userId: string) {
+  return `${DISMISS_KEY_PREFIX}${userId}`;
+}
+
+function readIdList(key: string) {
+  if (typeof window === 'undefined') {
     return [] as string[];
   }
   try {
-    const raw = window.localStorage.getItem(readKey(userId));
+    const raw = window.localStorage.getItem(key);
     if (!raw) {
       return [];
     }
@@ -181,22 +186,66 @@ export function listInboxReadIds(userId: string | null | undefined) {
   }
 }
 
+function writeIdList(key: string, ids: string[]) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(key, JSON.stringify([...new Set(ids)].slice(0, 200)));
+  } catch {
+    // 저장 실패 시에도 이번 세션 표시는 유지합니다.
+  }
+}
+
+export function listInboxReadIds(userId: string | null | undefined) {
+  if (!userId) {
+    return [] as string[];
+  }
+  return readIdList(readKey(userId));
+}
+
+export function listInboxDismissedIds(userId: string | null | undefined) {
+  if (!userId) {
+    return [] as string[];
+  }
+  return readIdList(dismissKey(userId));
+}
+
 export function markInboxIdsRead(userId: string, ids: string[]) {
   if (typeof window === 'undefined' || !userId || ids.length === 0) {
     return;
   }
-  const next = [...new Set([...ids, ...listInboxReadIds(userId)])].slice(0, 200);
-  try {
-    window.localStorage.setItem(readKey(userId), JSON.stringify(next));
-  } catch {
-    // 읽음 저장 실패 시에도 이번 세션 표시는 유지합니다.
+  writeIdList(readKey(userId), [...ids, ...listInboxReadIds(userId)]);
+  window.dispatchEvent(new Event(CHANGED_EVENT));
+}
+
+export function dismissInboxIds(userId: string, ids: string[]) {
+  if (typeof window === 'undefined' || !userId || ids.length === 0) {
+    return;
   }
+  const idSet = new Set(ids);
+  try {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(
+        readAll()
+          .filter((item) => item.userId !== userId || !idSet.has(item.id))
+          .slice(0, 200),
+      ),
+    );
+  } catch {
+    // 로컬 목록 삭제 실패 시에도 숨김 ID는 저장합니다.
+  }
+  writeIdList(dismissKey(userId), [...ids, ...listInboxDismissedIds(userId)]);
   window.dispatchEvent(new Event(CHANGED_EVENT));
 }
 
 export function applyInboxReadState(userId: string | null | undefined, items: AppNotification[]) {
   const readIds = new Set(listInboxReadIds(userId));
-  return items.map((item) => (item.read || readIds.has(item.id) ? { ...item, read: true } : item));
+  const dismissedIds = new Set(listInboxDismissedIds(userId));
+  return items
+    .filter((item) => !dismissedIds.has(item.id))
+    .map((item) => (item.read || readIds.has(item.id) ? { ...item, read: true } : item));
 }
 
 export function onNotificationsChanged(listener: () => void) {

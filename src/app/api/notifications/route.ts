@@ -7,6 +7,7 @@ import { getPaymentActor, unauthorizedJson } from '@/lib/payments/guard';
 
 const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate' } as const;
 const READ_COOKIE = 'sa-inbox-read';
+const DISMISS_COOKIE = 'sa-inbox-dismissed';
 const READ_MAX = 200;
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
@@ -39,14 +40,14 @@ function parseReadMap(raw: string | undefined) {
   }
 }
 
-async function readMapFromCookie() {
+async function idMapFromCookie(name: string) {
   const store = await cookies();
-  return parseReadMap(store.get(READ_COOKIE)?.value);
+  return parseReadMap(store.get(name)?.value);
 }
 
-async function writeReadMap(map: Record<string, string[]>) {
+async function writeIdMap(name: string, map: Record<string, string[]>) {
   const store = await cookies();
-  store.set(READ_COOKIE, JSON.stringify(map), {
+  store.set(name, JSON.stringify(map), {
     httpOnly: true,
     sameSite: 'lax',
     path: '/',
@@ -76,15 +77,19 @@ export async function GET(request: Request) {
       return unauthorizedJson('알림을 보려면 로그인해 주세요.');
     }
 
-    const [items, readMap] = await Promise.all([
+    const [items, readMap, dismissedMap] = await Promise.all([
       listInboxNotifications(actor.userId),
-      readMapFromCookie(),
+      idMapFromCookie(READ_COOKIE),
+      idMapFromCookie(DISMISS_COOKIE),
     ]);
     const readIds = new Set(readMap[actor.userId] ?? []);
-    const data = items.map((item) => ({
-      ...item,
-      read: readIds.has(item.id),
-    }));
+    const dismissedIds = new Set(dismissedMap[actor.userId] ?? []);
+    const data = items
+      .filter((item) => !dismissedIds.has(item.id))
+      .map((item) => ({
+        ...item,
+        read: readIds.has(item.id),
+      }));
     const unreadCount = data.filter((item) => !item.read).length;
 
     return NextResponse.json({ data, unreadCount }, { headers: NO_STORE });
@@ -114,6 +119,7 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => null)) as {
       ids?: unknown;
       all?: unknown;
+      dismiss?: unknown;
     } | null;
     const requestedIds = Array.isArray(body?.ids)
       ? body.ids.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
@@ -125,11 +131,17 @@ export async function POST(request: Request) {
       ids = items.map((item) => item.id);
     }
 
-    const readMap = applyRead(actor.userId, ids, await readMapFromCookie());
-    await writeReadMap(readMap);
+    const dismiss = body?.dismiss === true;
+    const cookieName = dismiss ? DISMISS_COOKIE : READ_COOKIE;
+    const nextMap = applyRead(actor.userId, ids, await idMapFromCookie(cookieName));
+    await writeIdMap(cookieName, nextMap);
 
     return NextResponse.json(
-      { data: { ok: true, readIds: readMap[actor.userId] ?? [] } },
+      {
+        data: dismiss
+          ? { ok: true, dismissedIds: nextMap[actor.userId] ?? [] }
+          : { ok: true, readIds: nextMap[actor.userId] ?? [] },
+      },
       { headers: NO_STORE },
     );
   } catch (error) {
