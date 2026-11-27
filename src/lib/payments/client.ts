@@ -124,6 +124,11 @@ export async function prepareAwardPayment(input: {
         clientKey,
         demo: !clientKey,
         kind: input.kind,
+        dealTitle: input.auction.title.trim(),
+        counterpartyName:
+          input.kind === 'timeslot'
+            ? (input.auction.authorName || input.bid.creatorName || '').trim()
+            : (input.bid.creatorName || '').trim(),
       },
       error: null,
     };

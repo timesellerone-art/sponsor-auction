@@ -2,6 +2,7 @@ import type { AppNotification, NotificationType } from '@/types/notification';
 
 const STORAGE_KEY = 'sponsor-auction-notifications';
 const OWNERS_KEY = 'sponsor-auction-owners';
+const READ_KEY_PREFIX = 'sponsor-auction-inbox-read:';
 const CHANGED_EVENT = 'notifications:changed';
 const SESSION_KEY = 'sponsor-auction-auth-session';
 const DEMO_ADVERTISER_ID = 'usr-demo-advertiser';
@@ -27,16 +28,21 @@ function asNotification(value: unknown): AppNotification | null {
   ) {
     return null;
   }
+  const type: NotificationType =
+    item.type === 'award_complete' ||
+    item.type === 'payment_complete' ||
+    item.type === 'chat_message' ||
+    item.type === 'timeslot_bid' ||
+    item.type === 'delivery_complete' ||
+    item.type === 'purchase_confirmed' ||
+    item.type === 'business_review' ||
+    item.type === 'bid_received'
+      ? item.type
+      : 'bid_received';
   return {
     id: item.id,
     userId: item.userId,
-    type:
-      item.type === 'award_complete' ||
-      item.type === 'payment_complete' ||
-      item.type === 'chat_message' ||
-      item.type === 'timeslot_bid'
-        ? item.type
-        : 'bid_received',
+    type,
     title: item.title,
     body: item.body,
     href: item.href,
@@ -150,6 +156,47 @@ export function markNotificationsRead(userId: string) {
 export function markNotificationRead(id: string) {
   const next = readAll().map((item) => (item.id === id ? { ...item, read: true } : item));
   writeAll(next);
+}
+
+function readKey(userId: string) {
+  return `${READ_KEY_PREFIX}${userId}`;
+}
+
+export function listInboxReadIds(userId: string | null | undefined) {
+  if (!userId || typeof window === 'undefined') {
+    return [] as string[];
+  }
+  try {
+    const raw = window.localStorage.getItem(readKey(userId));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+export function markInboxIdsRead(userId: string, ids: string[]) {
+  if (typeof window === 'undefined' || !userId || ids.length === 0) {
+    return;
+  }
+  const next = [...new Set([...ids, ...listInboxReadIds(userId)])].slice(0, 200);
+  try {
+    window.localStorage.setItem(readKey(userId), JSON.stringify(next));
+  } catch {
+    // 읽음 저장 실패 시에도 이번 세션 표시는 유지합니다.
+  }
+  window.dispatchEvent(new Event(CHANGED_EVENT));
+}
+
+export function applyInboxReadState(userId: string | null | undefined, items: AppNotification[]) {
+  const readIds = new Set(listInboxReadIds(userId));
+  return items.map((item) => (item.read || readIds.has(item.id) ? { ...item, read: true } : item));
 }
 
 export function onNotificationsChanged(listener: () => void) {

@@ -14,12 +14,48 @@ export type FeeBreakdownCardProps = {
   role: FeeBreakdownRole;
   amount: number;
   taxKind?: CreatorTaxKind;
+  dealKind?: 'campaign' | 'timeslot';
+  dealTitle?: string;
+  counterpartyName?: string;
 };
+
+function PaymentDealIdentity({
+  dealKind,
+  dealTitle,
+  counterpartyName,
+}: {
+  dealKind?: 'campaign' | 'timeslot';
+  dealTitle?: string;
+  counterpartyName?: string;
+}) {
+  const title = dealTitle?.trim() ?? '';
+  const counterpart = counterpartyName?.trim() ?? '';
+  if (!dealKind && !title && !counterpart) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {dealKind ? (
+        <span className="inline-flex rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold text-clink-peach">
+          {dealKind === 'timeslot' ? '크리에이터 상품 결제' : '오픈 캠페인 결제'}
+        </span>
+      ) : null}
+      {title ? <p className="text-sm font-semibold leading-5 text-white">{title}</p> : null}
+      {counterpart ? (
+        <p className="text-xs leading-5 text-white/70">크리에이터: {counterpart}</p>
+      ) : null}
+    </div>
+  );
+}
 
 export function FeeBreakdownCard({
   role,
   amount,
   taxKind = 'individual',
+  dealKind,
+  dealTitle,
+  counterpartyName,
 }: FeeBreakdownCardProps) {
   const amounts = describeSettlementAmounts(amount, taxKind);
   if (amounts.bidAmount <= 0) {
@@ -32,7 +68,18 @@ export function FeeBreakdownCard({
         className="rounded-2xl border border-clink bg-clink px-4 py-4 text-white"
         aria-label="광고주 수수료 비교"
       >
-        <p className="text-[11px] font-semibold tracking-wide text-clink-peach">
+        <PaymentDealIdentity
+          dealKind={dealKind}
+          dealTitle={dealTitle}
+          counterpartyName={counterpartyName}
+        />
+        <p
+          className={
+            dealKind || dealTitle?.trim() || counterpartyName?.trim()
+              ? 'mt-3 text-[11px] font-semibold tracking-wide text-clink-peach'
+              : 'text-[11px] font-semibold tracking-wide text-clink-peach'
+          }
+        >
           플랫폼 안전 직거래
         </p>
         <dl className="mt-3 space-y-2 text-sm">

@@ -286,7 +286,13 @@ export function PaymentCheckoutModal({
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
-          <FeeBreakdownCard role="advertiser" amount={bidAmount} />
+          <FeeBreakdownCard
+            role="advertiser"
+            amount={bidAmount}
+            dealKind={checkout.kind}
+            dealTitle={checkout.dealTitle || checkout.orderName}
+            counterpartyName={checkout.counterpartyName}
+          />
           <p className="text-xs text-zinc-500">
             사전 확정된 단건 용역 대금(공급가액 + 수수료 + 부가세)을 토스페이먼츠 에스크로로
             예치합니다. 결제 완료 후에만 계약이 확정됩니다.

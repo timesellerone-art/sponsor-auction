@@ -462,7 +462,13 @@ function PaidCampaignsPanel({ deals }: { deals: AdvertiserDeal[] }) {
           ) : null}
           {deal.bid ? (
             <div className="mt-3">
-              <FeeBreakdownCard role="advertiser" amount={deal.bid.bidAmount} />
+              <FeeBreakdownCard
+                role="advertiser"
+                amount={deal.bid.bidAmount}
+                dealKind={deal.kind}
+                dealTitle={deal.auction.title}
+                counterpartyName={deal.bid.creatorName}
+              />
             </div>
           ) : null}
           <dl className="mt-3 grid grid-cols-1 gap-2 text-sm text-zinc-600 sm:grid-cols-3">

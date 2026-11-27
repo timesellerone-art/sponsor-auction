@@ -231,8 +231,7 @@ export function CreatorDashboard() {
                       {slot.title}
                     </Link>
                     <p className="mt-1 text-sm text-zinc-500">
-                      최고가 {slot.currentHighestBid > 0 ? formatWon(slot.currentHighestBid) : '없음'} · 제안{' '}
-                      {slot.bidsCount}
+                      단가 {formatWon(slot.startingPrice)} · 신청 {slot.bidsCount}건
                     </p>
                     {isTimeslotAwaitingPayment(slot) ? (
                       <p className="mt-1 text-xs text-amber-800">광고주 최종 결제를 기다리고 있습니다.</p>

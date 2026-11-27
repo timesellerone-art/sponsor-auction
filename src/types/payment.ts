@@ -39,6 +39,8 @@ export type PreparePaymentResult = {
   auctionId: string;
   bidId: string;
   kind?: 'campaign' | 'timeslot';
+  dealTitle?: string;
+  counterpartyName?: string;
 };
 
 export type ConfirmPaymentInput = {

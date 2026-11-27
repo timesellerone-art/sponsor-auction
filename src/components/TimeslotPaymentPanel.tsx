@@ -49,7 +49,13 @@ export function TimeslotPaymentPanel({
         1건을 토스페이먼츠 에스크로로 예치합니다.
       </p>
       <div className="mt-4">
-        <FeeBreakdownCard role="advertiser" amount={bid.bidAmount} />
+        <FeeBreakdownCard
+          role="advertiser"
+          amount={bid.bidAmount}
+          dealKind="timeslot"
+          dealTitle={slot.title}
+          counterpartyName={slot.creatorName}
+        />
       </div>
       <p className="mt-3 text-sm font-semibold text-zinc-950">
         최종 단건 결제 금액 {formatWon(quote.amount)}
