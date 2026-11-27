@@ -6,7 +6,7 @@ export default function PrivacyPage() {
     <LegalDocument kicker="Legal" title="개인정보 처리방침" updated="2026년 11월 27일">
       <LegalSection title="운영 주체">
         <p>
-          개인정보 처리자는 {COMPANY_OPERATOR_LINE}입니다. 사업장 소재지는 {COMPANY.address}입니다.
+          개인정보 처리자는 {COMPANY_OPERATOR_LINE}입니다.
         </p>
       </LegalSection>
       <LegalSection title="1. 개인정보 처리 목적">

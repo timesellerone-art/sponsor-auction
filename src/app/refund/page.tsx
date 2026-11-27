@@ -7,9 +7,8 @@ export default function RefundPage() {
     <LegalDocument kicker="Legal" title={REFUND_POLICY_TITLE} updated="2026년 11월 27일">
       <LegalSection title="운영 주체">
         <p>
-          본 정책의 운영 주체는 {COMPANY_OPERATOR_LINE}입니다. 사업장 소재지는{' '}
-          {COMPANY.address}입니다. 대금은 토스페이먼츠 단건 에스크로로 예치되며, 환불은 결제 수단
-          정책과 관련 법령을 따릅니다.
+          본 정책의 운영 주체는 {COMPANY_OPERATOR_LINE}입니다. 대금은 토스페이먼츠 단건 에스크로로
+          예치되며, 환불은 결제 수단 정책과 관련 법령을 따릅니다.
         </p>
       </LegalSection>
       <LegalSection title="제1조 (목적)">

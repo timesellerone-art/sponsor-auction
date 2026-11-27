@@ -12,8 +12,8 @@ export default function TermsPage() {
     <LegalDocument kicker="Legal" title="서비스 이용약관" updated="2026년 11월 27일">
       <LegalSection title="운영 주체">
         <p>
-          본 서비스 {COMPANY.brand}의 운영 주체는 {COMPANY_OPERATOR_LINE}입니다. 사업장 소재지는{' '}
-          {COMPANY.address}입니다. 고객센터 운영시간은 {COMPANY.phoneHours}입니다.
+          본 서비스 {COMPANY.brand}의 운영 주체는 {COMPANY_OPERATOR_LINE}입니다. 고객센터 운영시간은{' '}
+          {COMPANY.phoneHours}입니다.
         </p>
       </LegalSection>
       <LegalSection title="제1조 (목적)">
