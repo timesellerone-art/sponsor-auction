@@ -261,26 +261,8 @@ export async function POST(request: Request) {
       }
     }
 
-    const cert = await admin
-      .from('profiles')
-      .select('business_certificate_path, business_certificate_name')
-      .eq('id', userId)
-      .maybeSingle();
-    const certPath =
-      !cert.error && typeof cert.data?.business_certificate_path === 'string'
-        ? cert.data.business_certificate_path.trim()
-        : '';
-    if (!clearing && businessNumber && !mismatch && status !== 'closed') {
-      if (details.error) {
-        return failJson(details.error, details.errorCode ?? 'INVALID_INPUT', 400);
-      }
-      if (!cert.error && !certPath) {
-        return failJson(
-          '사업자등록증 사본을 첨부한 뒤 저장해 주세요.',
-          'CERTIFICATE_REQUIRED',
-          400,
-        );
-      }
+    if (!clearing && businessNumber && !mismatch && status !== 'closed' && details.error) {
+      return failJson(details.error, details.errorCode ?? 'INVALID_INPUT', 400);
     }
 
     type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];

@@ -171,69 +171,80 @@ export function BusinessRegistrationForm() {
     }
   };
 
+  const detailsError = () =>
+    identityError() ||
+    companyNameError(companyName) ||
+    businessAddressError(address) ||
+    businessContactError(contact);
+
+  const savePayload = () => {
+    const opened = normalizeOpeningDate(openedOn);
+    return {
+      businessNumber: number,
+      representativeName,
+      openedOn: opened,
+      companyName,
+      address,
+      contact,
+      business_registration_number: number,
+      business_representative_name: representativeName,
+      business_opened_on: opened,
+      business_company_name: companyName,
+      business_address: address,
+      business_contact: contact,
+    };
+  };
+
+  const persistFields = async () => {
+    const invalid = detailsError();
+    if (invalid) {
+      return { ok: false as const, error: invalid };
+    }
+    const response = await fetch(
+      '/api/account/business',
+      await authRequestInit({
+        method: 'POST',
+        body: JSON.stringify(savePayload()),
+      }),
+    );
+    const body = (await response.json().catch(() => null)) as BusinessPayload | null;
+    if (!response.ok) {
+      applyPayload(body);
+      const detail =
+        body?.errorMessage?.trim() ||
+        body?.error?.replace(/^\[[A-Z_]+\]\s*/, '').trim() ||
+        body?.lookupError?.message ||
+        '알 수 없는 오류';
+      return { ok: false as const, error: `저장에 실패했습니다: [${response.status}] ${detail}` };
+    }
+    applyPayload(body);
+    const refreshed = await fetch('/api/account/business', await authRequestInit({ cache: 'no-store' }));
+    const latest = (await refreshed.json().catch(() => null)) as BusinessPayload | null;
+    if (refreshed.ok && latest) {
+      applyPayload(latest);
+    }
+    return { ok: true as const };
+  };
+
   const persist = async () => {
-    const invalid =
-      identityError() ||
-      companyNameError(companyName) ||
-      businessAddressError(address) ||
-      businessContactError(contact);
+    const invalid = detailsError();
     if (invalid) {
       setSaveMessage(null);
       setError(invalid);
-      return;
-    }
-    if (
-      allowsBusinessCertificateUpload({ status, ntsLabel, mismatch }) &&
-      !certificateName.trim()
-    ) {
-      setSaveMessage(null);
-      setError('사업자등록증 사본을 첨부한 뒤 저장해 주세요.');
       return;
     }
     setBusy(true);
     setError(null);
     setSaveMessage(null);
     try {
-      const response = await fetch(
-        '/api/account/business',
-        await authRequestInit({
-          method: 'POST',
-          body: JSON.stringify({
-            businessNumber: number,
-            representativeName,
-            openedOn: normalizeOpeningDate(openedOn),
-            companyName,
-            address,
-            contact,
-            business_registration_number: number,
-            business_representative_name: representativeName,
-            business_opened_on: normalizeOpeningDate(openedOn),
-            business_company_name: companyName,
-            business_address: address,
-            business_contact: contact,
-          }),
-        }),
-      );
-      const body = (await response.json().catch(() => null)) as BusinessPayload | null;
-      if (!response.ok) {
-        const detail =
-          body?.errorMessage?.trim() ||
-          body?.error?.replace(/^\[[A-Z_]+\]\s*/, '').trim() ||
-          body?.lookupError?.message ||
-          '알 수 없는 오류';
-        applyPayload(body);
+      const saved = await persistFields();
+      if (!saved.ok) {
         setSaveMessage(null);
-        setError(`저장에 실패했습니다: [${response.status}] ${detail}`);
+        setError(saved.error);
         return;
       }
-      applyPayload(body);
-      const refreshed = await fetch('/api/account/business', await authRequestInit({ cache: 'no-store' }));
-      const latest = (await refreshed.json().catch(() => null)) as BusinessPayload | null;
-      if (refreshed.ok && latest) {
-        applyPayload(latest);
-      }
       setError(null);
-      setSaveMessage('사업자 정보가 저장되었습니다. 관리자 검수 후 인증이 완료됩니다.');
+      setSaveMessage('사업자 정보가 저장되었습니다.');
     } catch (reason) {
       setSaveMessage(null);
       setError(
@@ -247,12 +258,7 @@ export function BusinessRegistrationForm() {
   };
 
   const uploadAllowed = allowsBusinessCertificateUpload({ status, ntsLabel, mismatch });
-  const detailsReady =
-    !identityError() &&
-    !companyNameError(companyName) &&
-    !businessAddressError(address) &&
-    !businessContactError(contact);
-  const canPersist = uploadAllowed && detailsReady && Boolean(certificateName.trim());
+  const canPersist = !detailsError();
 
   return (
     <section className="mt-8 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
@@ -465,7 +471,16 @@ export function BusinessRegistrationForm() {
                       throw new Error(body?.error || '사업자등록증을 올리지 못했습니다.');
                     }
                     setCertificateName(body?.name || file.name);
+                    const saved = await persistFields();
+                    if (!saved.ok) {
+                      setSaveMessage(null);
+                      setError(saved.error);
+                      return;
+                    }
+                    setError(null);
+                    setSaveMessage('사업자 정보가 저장되었습니다.');
                   } catch (reason) {
+                    setSaveMessage(null);
                     setError(
                       reason instanceof Error ? reason.message : '사업자등록증을 올리지 못했습니다.',
                     );
