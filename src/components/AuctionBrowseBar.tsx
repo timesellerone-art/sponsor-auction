@@ -16,7 +16,7 @@ const PLATFORMS: { id: BrowsePlatformFilter; label: string }[] = [
 
 const SORTS: { id: BrowseSort; label: string }[] = [
   { id: 'newest', label: '최신순' },
-  { id: 'budget_desc', label: '높은 예산순' },
+  { id: 'budget_desc', label: '높은 확정 지급액순' },
   { id: 'deadline_asc', label: '마감 임박순' },
 ];
 

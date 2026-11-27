@@ -83,7 +83,7 @@ function PaymentSuccessContent() {
       if (!paymentKey || !confirmedOrderId || !Number.isInteger(amount) || amount <= 0) {
         const info = parsePaymentError({
           code: 'INVALID_SUCCESS_PARAMS',
-          message: '결제 결과 파라미터가 올바르지 않습니다. 낙찰은 진행되지 않았습니다.',
+          message: '결제 결과 파라미터가 올바르지 않습니다. 선정은 진행되지 않았습니다.',
         });
         const feedback = formatPaymentToast(info);
         console.error('[SponsorAuction] 결제 성공 URL 파라미터 오류', {
@@ -131,7 +131,7 @@ function PaymentSuccessContent() {
                 ? RATE_LIMIT_MESSAGE
                 : confirmPayload?.errorMessage ||
                   confirmPayload?.error ||
-                  '결제 승인에 실패했습니다. 낙찰은 진행되지 않았습니다.',
+                  '결제 승인에 실패했습니다. 선정은 진행되지 않았습니다.',
           });
           const feedback = formatPaymentToast(info);
           console.error('[SponsorAuction] 결제 승인 실패', {
@@ -167,7 +167,7 @@ function PaymentSuccessContent() {
         if (!auction || !bid) {
           const info = parsePaymentError({
             code: 'AWARD_TARGET_NOT_FOUND',
-            message: '결제된 캠페인 정보를 찾지 못했습니다. 낙찰은 자동으로 반영되지 않았습니다.',
+            message: '결제된 캠페인 정보를 찾지 못했습니다. 선정은 자동으로 반영되지 않았습니다.',
           });
           const feedback = formatPaymentToast(info);
           showToast(feedback.text, 'error', 9000);
@@ -178,7 +178,7 @@ function PaymentSuccessContent() {
         if (advertiserTotalCharge(bid.bidAmount) !== confirmPayload.amount) {
           const info = parsePaymentError({
             code: 'AMOUNT_MISMATCH',
-            message: '결제 금액이 제안 금액과 일치하지 않아 낙찰을 중단했습니다.',
+            message: '결제 금액이 확정 지급액과 일치하지 않아 선정을 중단했습니다.',
           });
           const feedback = formatPaymentToast(info);
           showToast(feedback.text, 'error', 9000);
@@ -225,14 +225,14 @@ function PaymentSuccessContent() {
           userId: user?.id,
           type: 'payment_complete',
           title: '결제 완료',
-          body: `"${auction.title}" 낙찰 결제가 승인되었습니다. ${formatWon(confirmPayload.amount)}`,
+          body: `"${auction.title}" 단건 에스크로 결제가 승인되었습니다. ${formatWon(confirmPayload.amount)}`,
           href: '/my',
           toast: false,
         });
         pushNotification({
           userId: user?.id,
           type: 'award_complete',
-          title: '낙찰 완료',
+          title: '크리에이터 선정 완료',
           body: `"${auction.title}" 매칭이 확정되었습니다.`,
           href: '/my',
           toast: false,
@@ -241,8 +241,8 @@ function PaymentSuccessContent() {
           pushNotification({
             userId: bid.creatorId,
             type: 'award_complete',
-            title: '낙찰 완료',
-            body: `"${auction.title}" 제안이 낙찰되었습니다.`,
+            title: '캠페인 선정 완료',
+            body: `"${auction.title}" 지원이 선정되었습니다.`,
             href,
             toast: false,
           });
@@ -280,7 +280,7 @@ function PaymentSuccessContent() {
         {error ? (
           <>
             <p className="text-sm font-semibold text-rose-700">결제 승인 실패</p>
-            <h1 className="mt-2 text-xl font-bold text-zinc-950">낙찰이 확정되지 않았습니다</h1>
+            <h1 className="mt-2 text-xl font-bold text-zinc-950">선정이 확정되지 않았습니다</h1>
             <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-600" role="alert">
               {error}
             </p>

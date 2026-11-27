@@ -10,8 +10,8 @@ export const LANDING_ROLE_TABS = [
 export const LANDING_INTRO = {
   advertiser: {
     eyebrow: '브랜드를 위한 1:1 크리에이터(개인 또는 팀) 매칭',
-    headline: '예산과 제품만 올리면, 핏이 맞는 크리에이터가 기획안을 제안합니다',
-    sub: '제품 정보와 예산을 등록하면 AI가 촬영 가이드를 정리하고, 여러 크리에이터가 경쟁력 있는 맞춤 기획안과 제안 금액을 올립니다.',
+    headline: '확정 지급액과 제품만 올리면, 핏이 맞는 크리에이터가 기획안을 지원합니다',
+    sub: '제품 정보와 확정 캠페인 단가를 등록하면 AI가 촬영 가이드를 정리하고, 여러 크리에이터가 콘셉트·포트폴리오로 지원합니다.',
     cta: '캠페인 등록하기',
     secondaryCta: '크리에이터 상품 보기',
   },
@@ -31,7 +31,7 @@ export const LANDING_GUIDE = {
       {
         step: 'STEP 01',
         title: '캠페인 등록 & AI 가이드',
-        body: '제품 정보와 예산을 입력하면 AI가 크리에이터용 핵심 촬영 가이드를 정리합니다.',
+        body: '제품 정보와 확정 지급액(캠페인 모집 단가)을 입력하면 AI가 크리에이터용 핵심 촬영 가이드를 정리합니다.',
       },
       {
         step: 'STEP 02',
@@ -41,7 +41,7 @@ export const LANDING_GUIDE = {
       {
         step: 'STEP 03',
         title: '토스페이먼츠 결제 & 콘텐츠 발행',
-        body: `매칭 확정 후 낙찰 금액에 광고주 수수료 ${ADVERTISER_FEE_PERCENT}%를 합산해 토스페이먼츠로 결제하고 콘텐츠 제작 결과를 확인합니다.`,
+        body: `크리에이터 선정 후 확정 용역비에 광고주 수수료 ${ADVERTISER_FEE_PERCENT}%와 부가세 10%를 더한 금액을 토스페이먼츠 단건 에스크로로 결제하고 콘텐츠 제작 결과를 확인합니다.`,
       },
     ],
     cta: '캠페인 등록하기',
@@ -62,7 +62,7 @@ export const LANDING_GUIDE = {
       {
         step: 'STEP 03',
         title: '콘텐츠 업로드 & 수익 정산',
-        body: `콘텐츠 업로드 및 검수 완료 후, 제안 금액에서 구간별 수수료(${creatorFeePolicyCopy(' / ')})를 공제한 금액을 정산받습니다.`,
+        body: `콘텐츠 업로드 및 광고주 구매 확정 후, 확정 지급액에서 구간별 수수료(${creatorFeePolicyCopy(' / ')})를 공제한 금액을 정산받습니다.`,
       },
     ],
     cta: '진행 중인 캠페인 보기',

@@ -111,7 +111,7 @@ export async function POST(request: Request) {
       !advertiserChargeMatchesBid(parsed.bidAmount, parsed.amount)
     ) {
       return NextResponse.json(
-        { error: '결제 금액이 낙찰가와 수수료 정책에 맞지 않습니다.' },
+        { error: '결제 금액이 확정 지급액과 수수료 정책에 맞지 않습니다.' },
         { status: 400 },
       );
     }
@@ -153,18 +153,20 @@ export async function POST(request: Request) {
         actorIsAdmin: hasAuthRole(actor, 'admin'),
       });
       if (!held.ok) {
-        const status =
-          held.code === 'INSUFFICIENT_CREDIT' ? 402 : held.code === 'ALREADY_AWARDED' ? 409 : held.code === 'FORBIDDEN' ? 403 : 400;
-        return NextResponse.json({ error: held.message, errorCode: held.code }, { status });
+        if (held.code !== 'INSUFFICIENT_CREDIT') {
+          const status =
+            held.code === 'ALREADY_AWARDED' ? 409 : held.code === 'FORBIDDEN' ? 403 : 400;
+          return NextResponse.json({ error: held.message, errorCode: held.code }, { status });
+        }
       }
-      if (!held.skipped && held.amount !== intent.amount) {
+      if (held.ok && !held.skipped && held.amount !== intent.amount) {
         await releaseCampaignCredit(admin, {
           referenceId: campaignPayReference(intent.orderId),
           reason: '결제 금액이 차감 금액과 달라 채택을 취소',
         });
         return NextResponse.json(
           {
-            error: '결제 금액이 제안 금액과 수수료에 맞지 않습니다. 채택은 진행되지 않았습니다.',
+            error: '결제 금액이 확정 지급액과 수수료에 맞지 않습니다. 선정은 진행되지 않았습니다.',
             errorCode: 'AMOUNT_MISMATCH',
           },
           { status: 400 },

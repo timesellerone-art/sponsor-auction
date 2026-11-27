@@ -268,7 +268,7 @@ export function PaymentCheckoutModal({
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-200 px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <h2 id={titleId} className="text-base font-semibold text-zinc-950">
-              안전결제
+              단건 에스크로 결제
             </h2>
             <p className="mt-0.5 truncate text-xs text-zinc-500">
               {checkout.orderName} · 주문 {checkout.orderId}
@@ -287,7 +287,10 @@ export function PaymentCheckoutModal({
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
           <FeeBreakdownCard role="advertiser" amount={bidAmount} />
-          <p className="text-xs text-zinc-500">결제 완료 후에만 계약이 확정됩니다.</p>
+          <p className="text-xs text-zinc-500">
+            사전 확정된 단건 용역 대금(공급가액 + 수수료 + 부가세)을 토스페이먼츠 에스크로로
+            예치합니다. 결제 완료 후에만 계약이 확정됩니다.
+          </p>
           <EscrowNotice />
 
           {payError ? (

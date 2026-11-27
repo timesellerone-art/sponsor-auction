@@ -8,7 +8,6 @@ import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
-import { nextInventoryMinBid } from '@/lib/auction-engine';
 import { authRequestInit } from '@/lib/auth-request';
 import { placeTimeSlotBid } from '@/lib/timeslots';
 import { formatWon } from '@/lib/utils';
@@ -26,16 +25,13 @@ export function TimeslotBidForm({
 }) {
   const { user, activeRole } = useAuth();
   const { requireUser } = useRequireAuth();
-  const minBid = nextInventoryMinBid(slot.startingPrice, slot.currentHighestBid);
-  const [amount, setAmount] = useState(String(minBid));
   const [message, setMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const { isBusy, run } = useActionLock();
 
-  const bidAmount = Number(amount);
-  const previewAmount = useMemo(() => {
-    return Number.isFinite(bidAmount) && bidAmount > 0 ? bidAmount : minBid;
-  }, [bidAmount, minBid]);
+  const bidAmount = useMemo(() => {
+    return Number.isFinite(slot.startingPrice) && slot.startingPrice > 0 ? slot.startingPrice : 0;
+  }, [slot.startingPrice]);
 
   const canSubmitBid = Boolean(
     user &&
@@ -49,11 +45,11 @@ export function TimeslotBidForm({
       return false;
     }
     if (slot.creatorId && user.id === slot.creatorId) {
-      setError('본인 상품에는 제안할 수 없습니다.');
+      setError('본인 상품에는 신청할 수 없습니다.');
       return false;
     }
     if (!canSubmitBid) {
-      setError('크리에이터 상품 제안은 광고주 계정에서만 가능합니다.');
+      setError('크리에이터 상품 신청은 광고주 계정에서만 가능합니다.');
       return false;
     }
     return true;
@@ -66,8 +62,8 @@ export function TimeslotBidForm({
     if (!ensureAdvertiser()) {
       return false;
     }
-    if (!Number.isFinite(bidAmount) || bidAmount < minBid) {
-      setError(`제안가는 ${formatWon(minBid)} 이상이어야 합니다.`);
+    if (!Number.isFinite(bidAmount) || bidAmount <= 0) {
+      setError(VALIDATION.startingPriceRequired);
       return false;
     }
     if (message.trim().length < MIN_PROPOSAL_LENGTH) {
@@ -106,7 +102,7 @@ export function TimeslotBidForm({
       } else {
         result = {
           data: null,
-          error: json?.errorMessage ?? json?.error ?? '제안을 등록하지 못했습니다.',
+          error: json?.errorMessage ?? json?.error ?? '신청을 등록하지 못했습니다.',
         };
       }
     } catch {
@@ -118,7 +114,7 @@ export function TimeslotBidForm({
       showToast(result.error);
       return false;
     }
-    showToast('제안을 등록했습니다.', 'success');
+    showToast('제작 신청을 등록했습니다.', 'success');
     window.dispatchEvent(new Event('timeslots:changed'));
     setMessage('');
     setError(null);
@@ -135,25 +131,20 @@ export function TimeslotBidForm({
 
   return (
     <form onSubmit={handleSubmit} className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
-      <h2 className="text-base font-bold text-zinc-950">크리에이터 상품 제안</h2>
+      <h2 className="text-base font-bold text-zinc-950">크리에이터 상품 신청</h2>
       <p className="mt-1 text-sm text-zinc-500">
-        시작가 {formatWon(slot.startingPrice)} · 현재 최고가{' '}
-        {formatWon(slot.currentHighestBid || slot.startingPrice)} · 최소 {formatWon(minBid)}
+        확정 캠페인 단가 {formatWon(bidAmount)}에 동의한 뒤 콘셉트·제작 방향으로 신청합니다.
       </p>
       <div className="mt-3">
         <EscrowNotice compact />
       </div>
-      <label className="mt-4 block text-sm font-medium text-zinc-800" htmlFor="slot-bid-amount">
-        제안 금액
-      </label>
-      <input
-        id="slot-bid-amount"
-        inputMode="numeric"
-        value={amount}
-        onChange={(event) => setAmount(event.target.value)}
-        className="mt-1 h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm"
-      />
-      <p className="mt-1 text-xs text-zinc-500">시작가 이상으로 입력해 주세요.</p>
+      <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3">
+        <p className="text-xs font-semibold tracking-wide text-zinc-500">확정 캠페인 단가</p>
+        <p className="mt-1 text-lg font-bold tabular-nums text-zinc-950">{formatWon(bidAmount)}</p>
+        <p className="mt-1 text-xs leading-5 text-zinc-500">
+          크리에이터가 사전에 책정한 확정 금액입니다. 금액은 수정할 수 없습니다.
+        </p>
+      </div>
       <label className="mt-3 block text-sm font-medium text-zinc-800" htmlFor="slot-bid-message">
         콘텐츠/협찬 메시지
       </label>
@@ -162,14 +153,14 @@ export function TimeslotBidForm({
         rows={4}
         value={message}
         onChange={(event) => setMessage(event.target.value)}
-        placeholder="진행할 콘텐츠와 협찬 조건을 구체적으로 적어 주세요."
+        placeholder="진행할 콘텐츠와 제작 방향을 구체적으로 적어 주세요."
         className="mt-1 w-full resize-y rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm"
       />
       <div className="mt-4">
-        <FeeBreakdownCard role="advertiser" amount={previewAmount} />
+        <FeeBreakdownCard role="advertiser" amount={bidAmount} />
       </div>
       <p className="mt-3 text-xs leading-5 text-zinc-500">
-        크리에이터가 제안을 선택(낙찰)하면 결제를 진행합니다.
+        크리에이터가 신청을 선정하면 확정 단가 1건을 토스페이먼츠 에스크로로 결제합니다.
       </p>
       {error ? (
         <p className="mt-2 text-sm text-rose-600" role="alert">
@@ -183,7 +174,7 @@ export function TimeslotBidForm({
           className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
         >
           {isBusy ? <Loader2 className="size-4 animate-spin" /> : null}
-          제안 제출
+          제작 신청
         </button>
       </div>
     </form>

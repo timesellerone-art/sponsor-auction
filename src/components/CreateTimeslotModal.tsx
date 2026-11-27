@@ -9,7 +9,6 @@ import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { authRequestInit } from '@/lib/auth-request';
 import { SELECTABLE_PLATFORMS } from '@/lib/platforms';
-import { createTimeSlot } from '@/lib/timeslots';
 import { cn } from '@/lib/utils';
 import { validateTimeSlotForm, type TimeSlotFieldErrors } from '@/lib/validation';
 import type { PlatformType } from '@/types/auction';
@@ -59,7 +58,10 @@ export function CreateTimeslotModal({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { isBusy: isSubmitting, run } = useActionLock();
 
-  const resetForm = () => {
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
     setTitle('');
     setPlatform('youtube_shorts');
     setExpectedViews('100000');
@@ -70,12 +72,6 @@ export function CreateTimeslotModal({
     setDeadline(defaultDeadline());
     setErrors({});
     setSubmitError(null);
-  };
-
-  useEffect(() => {
-    if (open) {
-      resetForm();
-    }
   }, [open]);
 
   useEffect(() => {
@@ -158,6 +154,7 @@ export function CreateTimeslotModal({
           result = { error: json?.errorMessage ?? json?.error ?? '크리에이터 상품을 등록하지 못했습니다.' };
         }
       } catch {
+        const { createTimeSlot } = await import('@/lib/timeslots');
         result = await createTimeSlot(payload);
       }
 
@@ -167,7 +164,6 @@ export function CreateTimeslotModal({
         return;
       }
       showToast('크리에이터 상품을 등록했습니다.', 'success');
-      resetForm();
       window.dispatchEvent(new Event('timeslots:changed'));
       onClose();
     });
@@ -220,7 +216,7 @@ export function CreateTimeslotModal({
                 className={inputClass(Boolean(errors.expectedViews))}
               />
             </Field>
-            <Field label="시작가" htmlFor="slot-price" error={errors.startingPrice} hint="최소 10,000원">
+            <Field label="확정 캠페인 단가" htmlFor="slot-price" error={errors.startingPrice} hint="최소 10,000원">
               <input
                 id="slot-price"
                 inputMode="numeric"

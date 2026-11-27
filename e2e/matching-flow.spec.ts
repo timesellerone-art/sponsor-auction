@@ -32,31 +32,30 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
     await expect(page.getByRole('link', { name: title })).toBeVisible();
   });
 
-  await test.step('크리에이터가 제안에 입찰한다', async () => {
+  await test.step('크리에이터가 캠페인에 지원한다', async () => {
     await signOut(page);
     await signIn(page, CREATOR);
     await page.goto('/');
     await page.getByRole('link', { name: title }).click();
     await expect(page).toHaveURL(/\/auctions\//);
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();
-    await page.getByRole('button', { name: '콘텐츠 제안하기' }).click();
+    await page.getByRole('button', { name: '캠페인 지원' }).click();
 
-    const bidDialog = page.getByRole('dialog', { name: '콘텐츠 제안하기' });
+    const bidDialog = page.getByRole('dialog', { name: '캠페인 지원' });
     await expect(bidDialog).toBeVisible();
-    await bidDialog.getByLabel('제안 금액(단가)').fill('120000');
-    await expect(bidDialog.getByText('타 플랫폼/MCN(평균 50% 공제) 대비 추가 정산')).toBeVisible();
-    await bidDialog.getByLabel('제안 내용/소개글').fill(proposal);
+    await expect(bidDialog.getByText('확정 지급액 (캠페인 모집 단가)')).toBeVisible();
+    await bidDialog.getByLabel('제작 콘셉트·방향').fill(proposal);
     await bidDialog
       .getByLabel('채널 URL 또는 포트폴리오 링크')
       .fill(VALID_CHANNEL_URL);
     await acceptAgreements(bidDialog);
-    await bidDialog.getByRole('button', { name: '제안 제출' }).click();
+    await bidDialog.getByRole('button', { name: '캠페인 지원 제출' }).click();
 
     await expect(bidDialog).toBeHidden();
     await expect(
-      page.getByRole('alert').filter({ hasText: '제안을 제출했습니다.' }),
+      page.getByRole('alert').filter({ hasText: '캠페인 지원을 제출했습니다.' }),
     ).toBeVisible();
-    await expect(page.getByRole('heading', { name: '제출된 크리에이터 제안 목록' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '제출된 크리에이터 지원 목록' })).toBeVisible();
     await expect(page.getByText(proposal)).toBeVisible();
 
     await page.getByLabel('메시지').fill('E2E 매칭 채팅 확인');
@@ -78,12 +77,12 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
     ).toBeVisible();
     await expect(page.getByText(proposal)).toBeVisible();
 
-    await page.getByRole('button', { name: '낙찰하기 (선택)' }).click();
+    await page.getByRole('button', { name: '크리에이터 선정' }).click();
     const confirmDialog = page.getByRole('dialog', {
       name: '이 제안을 낙찰할까요?',
     });
     await expect(confirmDialog).toBeVisible();
-    await confirmDialog.getByRole('button', { name: '결제하고 낙찰하기' }).click();
+    await confirmDialog.getByRole('button', { name: '선정하고 단건 에스크로 결제' }).click();
 
     const paymentDialog = page.getByRole('dialog', { name: '안전결제' });
     await expect(paymentDialog).toBeVisible();
@@ -107,12 +106,12 @@ test('광고주 등록 → 크리에이터 제안 → 광고주 낙찰까지 매
         hasText: '선정이 확정되었고 모집이 마감되었습니다.',
       }),
     ).toBeVisible();
-    await expect(page.getByText('매칭 완료된 캠페인입니다').first()).toBeVisible();
-    await expect(page.getByText('선택된 크리에이터').first()).toBeVisible();
-    await expect(page.getByText('낙찰됨')).toBeVisible();
+    await expect(page.getByText('선정된 캠페인입니다').first()).toBeVisible();
+    await expect(page.getByText('선정된 크리에이터').first()).toBeVisible();
+    await expect(page.getByText('선정 완료').first()).toBeVisible();
     await expect(
-      page.getByRole('button', { name: '낙찰하기 (선택)' }),
+      page.getByRole('button', { name: '크리에이터 선정' }),
     ).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '콘텐츠 제안하기' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '캠페인 지원' })).toHaveCount(0);
   });
 });

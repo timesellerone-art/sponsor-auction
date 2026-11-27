@@ -19,7 +19,7 @@ const CATEGORIES = [
 ] as const;
 
 const PUBLIC_PAGES = [
-  { path: '/', heading: /예산과 제품만 올리면|내 채널에 어울리는 캠페인/ },
+  { path: '/', heading: /확정 지급액과 제품만 올리면|내 채널에 어울리는 캠페인/ },
   { path: '/login', heading: '로그인' },
   { path: '/terms', heading: '서비스 이용약관' },
   { path: '/privacy', heading: '개인정보 처리방침' },
@@ -107,7 +107,7 @@ test.describe('전수 검증 A · 공통 랜딩·약관·인증', () => {
       'aria-selected',
       'true',
     );
-    await expect(page.getByRole('heading', { name: /예산과 제품만 올리면/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /확정 지급액과 제품만 올리면/ })).toBeVisible();
     await page.getByRole('tab', { name: '크리에이터' }).first().click();
     await expect(page.getByRole('heading', { name: /내 채널에 어울리는 캠페인/ })).toBeVisible();
     await expect(page.getByRole('link', { name: '진행 중인 캠페인 보기' }).first()).toBeVisible();
@@ -154,9 +154,9 @@ test.describe('전수 검증 A · 공통 랜딩·약관·인증', () => {
     await expect(page.getByRole('link', { name: /여름 무알콜 맥주/ })).toBeVisible();
     await page.getByRole('searchbox', { name: '캠페인 제목 또는 설명 검색' }).first().fill('');
     await expect(page.getByRole('button', { name: '최신순' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '높은 예산순' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '높은 확정 지급액순' })).toBeVisible();
     await expect(page.getByRole('button', { name: '마감 임박순' })).toBeVisible();
-    await page.getByRole('button', { name: '높은 예산순' }).click();
+    await page.getByRole('button', { name: '높은 확정 지급액순' }).click();
     await expect(page.getByRole('link', { name: /여름 무알콜 맥주/ })).toBeVisible();
   });
 
@@ -226,7 +226,7 @@ test.describe('전수 검증 B · 광고주', () => {
     ]);
     await dialog.locator('#auction-category').selectOption({ label: '육아·라이프' });
     await dialog.getByLabel('제목').fill(`전수검증 육아 캠페인 ${Date.now()}`);
-    await dialog.getByLabel('예산').fill('120000');
+    await dialog.getByLabel('확정 지급액 (캠페인 모집 단가)').fill('120000');
     await dialog.getByLabel('상세설명').fill('육아템 리뷰 숏폼 1편. 기저귀 교체 루틴을 포함합니다.');
     await expect(dialog.getByLabel('마감일')).toBeVisible();
     await expect(dialog.getByLabel(/대표 사진/)).toBeVisible();
@@ -297,17 +297,17 @@ test.describe('전수 검증 C · 크리에이터', () => {
     await expect(page.getByText('캠페인 핵심 전략', { exact: true }).first()).toBeVisible();
     await expect(page.getByRole('heading', { name: '실시간 채팅' })).toBeVisible();
 
-    await page.getByRole('button', { name: '콘텐츠 제안하기' }).click();
-    const bidDialog = page.getByRole('dialog', { name: '콘텐츠 제안하기' });
+    await page.getByRole('button', { name: '캠페인 지원' }).click();
+    const bidDialog = page.getByRole('dialog', { name: '캠페인 지원' });
     await expect(bidDialog).toBeVisible();
-    await bidDialog.getByLabel('제안 금액(단가)').fill('110000');
+    await expect(bidDialog.getByText('확정 지급액 (캠페인 모집 단가)')).toBeVisible();
     await bidDialog.getByLabel('내 채널 스타일').fill('20대 직장인 일상 브이로그, 솔직 리뷰');
     await bidDialog.getByRole('button', { name: 'AI로 맞춤 제안서 초안 쓰기' }).click();
-    await expect(bidDialog.getByLabel('제안 내용/소개글')).not.toHaveValue('', { timeout: 25_000 });
+    await expect(bidDialog.getByLabel('제작 콘셉트·방향')).not.toHaveValue('', { timeout: 25_000 });
     await bidDialog.getByRole('button', { name: '닫기' }).click();
 
     await page.goto('/my');
-    await expect(page.getByRole('heading', { name: '내 제안' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '내 지원' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '진행 중인 제안' })).toBeVisible();
     await expect(page.getByText('아직 선정되지 않아 광고주 확인을 기다리는 제안입니다.')).toBeVisible();
 

@@ -14,9 +14,6 @@ export function MyWorkspaceNav({ current }: { current: MyWorkspaceTab }) {
       href: '/my',
       label: activeRole === 'creator' ? '내 제안' : '내 캠페인',
     },
-    ...(activeRole === 'advertiser'
-      ? [{ id: 'credits' as const, href: '/my/credits', label: '크레딧' }]
-      : []),
     { id: 'settings', href: '/my/settings', label: '계정 설정' },
   ];
 

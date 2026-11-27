@@ -643,8 +643,13 @@ export async function createBid(
       return fail(null, VALIDATION.selfCampaignBid);
     }
 
+    const bidAmount =
+      typeof auction.budget === 'number' && Number.isFinite(auction.budget) && auction.budget > 0
+        ? auction.budget
+        : input.bidAmount;
+
     const bidError = validateBidPayload({
-      bidAmount: input.bidAmount,
+      bidAmount,
       proposalText: input.proposalText,
       creatorChannelUrl: input.creatorChannelUrl,
       auctionBudget: auction.budget,
@@ -663,7 +668,7 @@ export async function createBid(
     }
 
     if (!supabase || !isUuid(auctionId)) {
-      const mocked = await createMockBid({ ...input, auctionId });
+      const mocked = await createMockBid({ ...input, auctionId, bidAmount });
       if (mocked.data) {
         void notifyLifecycleEvent({
           event: 'bid_received',
@@ -716,7 +721,7 @@ export async function createBid(
           creator_id: creatorId,
           creator_name: input.creatorName.trim(),
           creator_channel_url: input.creatorChannelUrl.trim(),
-          bid_amount: input.bidAmount,
+          bid_amount: bidAmount,
           proposal_text: sanitizeUserText(input.proposalText, 'reject'),
           status: 'pending',
           bank_name: (input.bankName ?? '').trim(),
@@ -735,7 +740,7 @@ export async function createBid(
             creator_id: creatorId,
             creator_name: input.creatorName.trim(),
             creator_channel_url: input.creatorChannelUrl.trim(),
-            bid_amount: input.bidAmount,
+            bid_amount: bidAmount,
             proposal_text: sanitizeUserText(input.proposalText, 'reject'),
             status: 'pending',
           })
@@ -750,7 +755,7 @@ export async function createBid(
               auction_id: auctionId,
               creator_name: input.creatorName.trim(),
               creator_channel_url: input.creatorChannelUrl.trim(),
-              bid_amount: input.bidAmount,
+              bid_amount: bidAmount,
               proposal_text: sanitizeUserText(input.proposalText, 'reject'),
               status: 'pending',
             })

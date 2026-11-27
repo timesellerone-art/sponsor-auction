@@ -181,7 +181,7 @@ export function CreatorDashboard() {
         errorMessage?: string;
       } | null;
       if (!response.ok) {
-        showToast(payload?.errorMessage || payload?.error || '낙찰하지 못했습니다.');
+        showToast(payload?.errorMessage || payload?.error || '선정하지 못했습니다.');
         return;
       }
       showToast('제안을 선정했습니다. 광고주 결제를 기다립니다.', 'success');
@@ -195,9 +195,9 @@ export function CreatorDashboard() {
   return (
     <PageContainer className="flex min-w-0 flex-1 flex-col pt-4 pb-6 sm:pt-5 sm:pb-10">
       <p className="text-sm font-semibold tracking-wide text-clink-accent">크리에이터</p>
-      <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">내 제안</h1>
+      <h1 className="mt-1 text-2xl font-bold text-zinc-950 sm:text-3xl">내 지원</h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
-        제출한 제안과 낙찰 건의 정산 예정·지급 완료 상태, 정산 금액과 계좌·세무 정보를 확인할 수
+        제출한 지원과 선정 건의 정산 예정·지급 완료 상태, 정산 금액과 계좌·세무 정보를 확인할 수
         있습니다.
       </p>
       <div className="mt-4">
@@ -301,7 +301,7 @@ export function CreatorDashboard() {
                               onClick={() => setPendingAward({ slot, bid })}
                               className="inline-flex h-8 items-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:bg-zinc-300"
                             >
-                              {awardBusyId === bid.id ? '선정 중...' : '낙찰하기 (선택)'}
+                              {awardBusyId === bid.id ? '선정 중...' : '크리에이터 선정'}
                             </button>
                           </li>
                         ))
@@ -357,9 +357,9 @@ export function CreatorDashboard() {
           </DealSection>
 
           <DealSection
-            title="낙찰·정산 예정"
+            title="선정·정산 예정"
             count={settlingDeals.length}
-            emptyText="낙찰·정산 예정 0건"
+            emptyText="선정·정산 예정 0건"
             countClassName="bg-amber-50 text-amber-800"
           >
             {settlingDeals.map((deal) => (
@@ -382,9 +382,9 @@ export function CreatorDashboard() {
       <CreateTimeslotModal open={createSlotOpen} onClose={() => setCreateSlotOpen(false)} />
       <ConfirmModal
         open={Boolean(pendingAward)}
-        title="이 제안을 낙찰할까요?"
-        description={`"${pendingAward?.bid.advertiserName || '광고주'}"의 제안을 선정하면 즉시 낙찰되고, 나머지 제안은 미선정으로 마감됩니다. 선정된 광고주가 결제를 완료한 뒤 거래가 진행됩니다.`}
-        confirmLabel="낙찰하기 (선택)"
+        title="이 신청을 선정할까요?"
+        description={`"${pendingAward?.bid.advertiserName || '광고주'}"의 신청을 선정하면 나머지 신청은 미선정으로 마감됩니다. 선정된 광고주가 확정 금액 1건을 토스페이먼츠 에스크로로 결제한 뒤 거래가 진행됩니다.`}
+        confirmLabel="크리에이터 선정"
         busyLabel="선정 중..."
         cancelLabel="취소"
         busy={Boolean(pendingAward && awardBusyId === pendingAward.bid.id)}
@@ -496,7 +496,7 @@ function DealCard({
         </span>
       </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-zinc-600">
-        <span>제안 {formatWon(deal.bid.bidAmount)}</span>
+        <span>확정 지급액 {formatWon(deal.bid.bidAmount)}</span>
         {awarded ? <span>실지급액 {formatWon(amounts.transferAmount)}</span> : null}
         {deal.kind === 'timeslot' && awarded && !deal.fulfillment?.paidAt ? (
           <span>결제 대기</span>

@@ -99,7 +99,13 @@ export async function POST(request: Request) {
         creatorId: (actor.userId ?? asText(body?.creatorId)) || null,
         creatorName: asText(body?.creatorName) || '크리에이터',
         creatorChannelUrl,
-        bidAmount: asNumber(body?.bidAmount),
+        bidAmount:
+          auctionResult.data &&
+          typeof auctionResult.data.budget === 'number' &&
+          Number.isFinite(auctionResult.data.budget) &&
+          auctionResult.data.budget > 0
+            ? auctionResult.data.budget
+            : asNumber(body?.bidAmount),
         proposalText,
         creatorEmail: asText(body?.creatorEmail),
         bankAccount: asText(body?.bankAccount),

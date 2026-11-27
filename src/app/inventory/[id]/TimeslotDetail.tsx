@@ -219,7 +219,7 @@ export function TimeslotDetail({ id }: { id: string }) {
         errorCode?: string;
       } | null;
       if (!response.ok) {
-        showToast(payload?.errorMessage || payload?.error || '낙찰하지 못했습니다.');
+        showToast(payload?.errorMessage || payload?.error || '선정하지 못했습니다.');
         return;
       }
       showToast('제안을 선정했습니다. 광고주 결제를 기다립니다.', 'success');
@@ -336,14 +336,12 @@ export function TimeslotDetail({ id }: { id: string }) {
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-xs text-zinc-400">시작가</p>
+                <p className="text-xs text-zinc-400">확정 캠페인 단가</p>
                 <p className="font-semibold">{formatWon(slot.startingPrice)}</p>
               </div>
               <div>
-                <p className="text-xs text-zinc-400">현재 최고가</p>
-                <p className="font-semibold">
-                  {slot.currentHighestBid > 0 ? formatWon(slot.currentHighestBid) : '제안 없음'}
-                </p>
+                <p className="text-xs text-zinc-400">지원 수</p>
+                <p className="font-semibold">{slot.bidsCount ?? 0}건</p>
               </div>
               <div>
                 <p className="text-xs text-zinc-400">예상 조회수</p>
@@ -369,10 +367,10 @@ export function TimeslotDetail({ id }: { id: string }) {
             {!slotOpen ? (
               <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 {awaitingPayment
-                  ? '낙찰 선정됨 · 광고주 결제 대기'
+                  ? '선정됨 · 광고주 결제 대기'
                   : slot.winnerBidId
-                    ? '낙찰된 상품입니다.'
-                    : '이 상품은 마감되었거나 낙찰되었습니다.'}
+                    ? '선정된 상품입니다.'
+                    : '이 상품은 마감되었거나 선정되었습니다.'}
               </p>
             ) : !authSettled ? (
               <div className="mt-6 h-24 animate-pulse rounded-xl bg-zinc-100" aria-hidden />
@@ -382,11 +380,11 @@ export function TimeslotDetail({ id }: { id: string }) {
               </p>
             ) : isAdvertiserActing ? null : user ? (
               <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                크리에이터 상품 제안은 광고주 계정에서만 가능합니다.
+                크리에이터 상품 신청은 광고주 계정에서만 가능합니다.
               </p>
             ) : (
               <div className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                <p>로그인 후 제안할 수 있습니다.</p>
+                <p>로그인 후 신청할 수 있습니다.</p>
                 <button
                   type="button"
                   onClick={() => {
@@ -403,13 +401,13 @@ export function TimeslotDetail({ id }: { id: string }) {
           {slotOpen && authSettled && isAdvertiserActing && !isOwner ? (
             alreadyBid ? (
               <div className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
-                <h2 className="text-base font-bold text-zinc-950">크리에이터 상품 제안</h2>
+                <h2 className="text-base font-bold text-zinc-950">크리에이터 상품 신청</h2>
                 <p className="mt-1 text-sm text-zinc-500">
-                  이미 이 상품에 제안을 제출했습니다. 아래 현황에서 확인할 수 있습니다.
+                  이미 이 상품에 신청했습니다. 아래 현황에서 확인할 수 있습니다.
                 </p>
                 {myBid ? (
                   <p className="mt-2 text-sm font-semibold text-zinc-950">
-                    내 제안 {formatWon(myBid.bidAmount)}
+                    확정 지급액 {formatWon(myBid.bidAmount)}
                   </p>
                 ) : null}
                 <button
@@ -417,7 +415,7 @@ export function TimeslotDetail({ id }: { id: string }) {
                   disabled
                   className="mt-4 inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-full bg-zinc-300 text-sm font-semibold text-zinc-500"
                 >
-                  제안 완료
+                  신청 완료
                 </button>
               </div>
             ) : (
@@ -431,12 +429,12 @@ export function TimeslotDetail({ id }: { id: string }) {
           <section className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h2 className="text-lg font-bold text-zinc-950">제안 현황</h2>
-                <p className="mt-1 text-sm text-zinc-500">최고가가 위에 표시됩니다.</p>
+                <h2 className="text-lg font-bold text-zinc-950">신청 현황</h2>
+                <p className="mt-1 text-sm text-zinc-500">확정 단가 조건으로 접수된 신청입니다.</p>
               </div>
               {awardedClosed && winnerBid ? (
                 <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
-                  {awaitingPayment ? '결제 대기' : '낙찰된 상품입니다'}
+                  {awaitingPayment ? '결제 대기' : '선정된 상품입니다'}
                 </span>
               ) : null}
             </div>
@@ -449,7 +447,7 @@ export function TimeslotDetail({ id }: { id: string }) {
               </div>
             ) : null}
             {bids.length === 0 ? (
-              <p className="mt-4 text-sm text-zinc-500">아직 제안이 없습니다.</p>
+              <p className="mt-4 text-sm text-zinc-500">아직 신청이 없습니다.</p>
             ) : (
               <ul className="mt-4 flex max-h-[70vh] flex-col gap-3 overflow-y-auto pr-1">
                 {bids.map((bid) => {
@@ -469,7 +467,7 @@ export function TimeslotDetail({ id }: { id: string }) {
                           <p className="font-semibold text-zinc-950">
                             {bid.advertiserName}
                             {mine ? (
-                              <span className="ml-2 text-xs font-semibold text-clink-accent">내 제안</span>
+                              <span className="ml-2 text-xs font-semibold text-clink-accent">내 신청</span>
                             ) : null}
                           </p>
                           <p className="mt-1 text-lg font-bold">{formatWon(bid.bidAmount)}</p>
@@ -482,13 +480,9 @@ export function TimeslotDetail({ id }: { id: string }) {
                           <span className="shrink-0 rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">
                             미선정
                           </span>
-                        ) : bid.isLeading ? (
-                          <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
-                            최고 제안가
-                          </span>
                         ) : mine ? (
                           <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-semibold text-clink-accent">
-                            제안 완료
+                            신청 완료
                           </span>
                         ) : null}
                       </div>
@@ -501,7 +495,7 @@ export function TimeslotDetail({ id }: { id: string }) {
                           onClick={() => setPendingBid(bid)}
                           className="mt-3 inline-flex h-9 items-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:bg-zinc-300"
                         >
-                          {busyId === bid.id ? '선정 중...' : '낙찰하기 (선택)'}
+                          {busyId === bid.id ? '선정 중...' : '크리에이터 선정'}
                         </button>
                       ) : null}
                     </li>
@@ -605,9 +599,9 @@ export function TimeslotDetail({ id }: { id: string }) {
           ) : null}
           <ConfirmModal
             open={Boolean(pendingBid) && slotOpen}
-            title="이 제안을 낙찰할까요?"
-            description={`"${pendingBid?.advertiserName || '광고주'}"의 제안을 선정하면 즉시 낙찰되고, 나머지 제안은 미선정으로 마감됩니다. 선정된 광고주가 결제를 완료한 뒤 거래가 진행됩니다.`}
-            confirmLabel="낙찰하기 (선택)"
+            title="이 신청을 선정할까요?"
+            description={`"${pendingBid?.advertiserName || '광고주'}"의 신청을 선정하면 나머지 신청은 미선정으로 마감됩니다. 선정된 광고주가 확정 금액 1건을 토스페이먼츠 에스크로로 결제한 뒤 거래가 진행됩니다.`}
+            confirmLabel="크리에이터 선정"
             busyLabel="선정 중..."
             cancelLabel="취소"
             busy={Boolean(pendingBid && busyId === pendingBid.id)}

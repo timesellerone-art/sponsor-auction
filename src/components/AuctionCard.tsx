@@ -22,7 +22,6 @@ import { loadMyProposedAuctionIds } from '@/lib/my-bids';
 import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { VALIDATION } from '@/lib/validation';
 import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
-import { formatWon } from '@/lib/utils';
 import type { AuctionItem, AuctionStatus } from '@/types/auction';
 
 type AuctionCardData = Partial<AuctionItem> & {
@@ -177,20 +176,13 @@ export function AuctionCard({
 
       <div className="mt-1 flex items-end justify-between gap-3 border-t border-stone-200/80 pt-4">
         <div className="min-w-0">
-          <p className="text-[11px] text-clink-muted">예산</p>
+          <p className="text-[11px] text-clink-muted">확정 지급액</p>
           <p className="mt-0.5 truncate text-xl font-bold tracking-tight text-[#1C1917]">
             {formatBudget(auction.budget)}
           </p>
         </div>
-        <p className="shrink-0 text-xs text-clink-muted">제안 {auction.bidsCount ?? 0}건</p>
+        <p className="shrink-0 text-xs text-clink-muted">지원 {auction.bidsCount ?? 0}건</p>
       </div>
-      {auction.highestBidAmount && auction.highestBidAmount > 0 ? (
-        <p className="mt-2 text-xs text-clink-muted">
-          최저 {formatWon(auction.leadingBidAmount ?? auction.highestBidAmount)}
-          {' · '}
-          최고 {formatWon(auction.highestBidAmount)}
-        </p>
-      ) : null}
 
       {hideBidAction ? null : owned && auctionOpen ? (
         <div className="mt-auto pt-4">
@@ -201,7 +193,7 @@ export function AuctionCard({
             aria-label={VALIDATION.selfCampaignHint}
             className="inline-flex h-10 min-h-10 w-full min-w-0 cursor-not-allowed items-center justify-center rounded-full bg-stone-100 px-3 text-sm font-semibold text-stone-400"
           >
-            콘텐츠 제안하기
+            캠페인 지원
           </button>
           <p className="mt-1.5 text-center text-xs text-zinc-500">{VALIDATION.selfCampaignHint}</p>
         </div>
@@ -211,11 +203,11 @@ export function AuctionCard({
           disabled
           className="mt-auto inline-flex h-10 min-h-10 w-full min-w-0 cursor-not-allowed items-center justify-center rounded-full bg-stone-100 px-3 text-sm font-semibold text-stone-400"
         >
-          제안 완료
+          지원 완료
         </button>
       ) : canAttemptBid ? (
         <button type="button" onClick={openBid} className={CARD_CTA}>
-          콘텐츠 제안하기
+          캠페인 지원
         </button>
       ) : auctionOpen && ready && !user ? (
         <button
@@ -226,7 +218,7 @@ export function AuctionCard({
           }}
           className={`${CARD_CTA} py-2 text-center break-keep`}
         >
-          로그인하고 콘텐츠 제안하기
+          로그인하고 캠페인 지원
         </button>
       ) : owned && auction.id ? (
         <Link href={`${href}#proposals`} className={CARD_CTA}>
@@ -234,7 +226,7 @@ export function AuctionCard({
         </Link>
       ) : (
         <p className="mt-auto rounded-xl bg-zinc-50 px-3 py-2 text-center text-xs text-zinc-500">
-          {!auctionOpen ? '모집 마감' : '로그인 후 콘텐츠를 제안할 수 있습니다.'}
+          {!auctionOpen ? '모집 마감' : '로그인 후 캠페인에 지원할 수 있습니다.'}
         </p>
       )}
       {footerAction ? (

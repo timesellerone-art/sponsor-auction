@@ -37,37 +37,37 @@ export function FeeBreakdownCard({
         </p>
         <dl className="mt-3 space-y-2 text-sm">
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-white/60">낙찰 금액</dt>
+            <dt className="text-white/60">캠페인 확정 용역비</dt>
             <dd className="font-medium tabular-nums text-white">{formatWon(amounts.bidAmount)}</dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-white/60">광고주 수수료({ADVERTISER_FEE_PERCENT}%)</dt>
+            <dt className="text-white/60">플랫폼 이용 수수료({ADVERTISER_FEE_PERCENT}%)</dt>
             <dd className="font-medium tabular-nums text-clink-peach">
               +{formatWon(amounts.advertiserFee)}
             </dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-white/60">공급가액 (낙찰 + 수수료)</dt>
+            <dt className="text-white/60">공급가액 (용역비 + 수수료)</dt>
             <dd className="font-medium tabular-nums text-white">
               {formatWon(amounts.advertiserSupply)}
             </dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-white/60">부가세({VAT_PERCENT}% 별도)</dt>
+            <dt className="text-white/60">부가가치세(VAT {VAT_PERCENT}%)</dt>
             <dd className="font-medium tabular-nums text-clink-peach">
               +{formatWon(amounts.advertiserVat)}
             </dd>
           </div>
           <div className="flex items-center justify-between gap-3 border-t border-white/15 pt-2">
-            <dt className="font-semibold text-white">최종 결제 금액</dt>
+            <dt className="font-semibold text-white">최종 단건 결제 금액</dt>
             <dd className="text-base font-bold tabular-nums text-clink-peach">
               {formatWon(amounts.advertiserCharge)}
             </dd>
           </div>
         </dl>
         <p className="mt-3 rounded-xl bg-white/10 px-3 py-2 text-xs leading-5 text-clink-peach">
-          낙찰 금액에 광고주 수수료 {ADVERTISER_FEE_PERCENT}%를 더한 공급가액에 부가세{' '}
-          {VAT_PERCENT}%를 별도 가산합니다. 기존 대행사 마크업(25%)보다 낮은 고정 요율입니다.
+          사전 확정된 용역비에 광고주 수수료 {ADVERTISER_FEE_PERCENT}%와 부가세 {VAT_PERCENT}%를
+          더한 금액을 토스페이먼츠 단건 에스크로로 예치 결제합니다.
         </p>
       </section>
     );
@@ -83,7 +83,7 @@ export function FeeBreakdownCard({
       <p className="text-[11px] font-semibold tracking-wide text-clink-peach">구간별 정산 안내</p>
       <dl className="mt-3 space-y-2 text-sm">
         <div className="flex items-center justify-between gap-3">
-          <dt className="text-white/60">과업 낙찰 금액</dt>
+          <dt className="text-white/60">확정 지급액</dt>
           <dd className="font-medium tabular-nums text-white">{formatWon(amounts.bidAmount)}</dd>
         </div>
         <div className="flex items-center justify-between gap-3">

@@ -16,7 +16,7 @@ import type { AppNotification } from '@/types/notification';
 
 const TYPE_LABEL: Record<AppNotification['type'], string> = {
   bid_received: '제안서 접수',
-  award_complete: '낙찰 완료',
+  award_complete: '선정 완료',
   payment_complete: '결제 완료',
   chat_message: '새 메시지',
   timeslot_bid: '크리에이터 상품 제안',

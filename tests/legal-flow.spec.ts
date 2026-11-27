@@ -74,8 +74,8 @@ test.describe('전자상거래 약관 및 동의 UI', () => {
     await signIn(page, ADVERTISER);
     await page.goto('/');
     await page.getByRole('link', { name: '여름 무알콜 맥주 숏폼 캠페인' }).click();
-    await page.getByRole('button', { name: '낙찰하기 (선택)' }).first().click();
-    await page.getByRole('button', { name: '결제하고 낙찰하기' }).click();
+    await page.getByRole('button', { name: '크리에이터 선정' }).first().click();
+    await page.getByRole('button', { name: '선정하고 단건 에스크로 결제' }).click();
 
     const paymentDialog = page.getByRole('dialog', { name: '안전결제' });
     await expect(paymentDialog).toBeVisible();

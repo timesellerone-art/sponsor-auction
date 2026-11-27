@@ -6,16 +6,16 @@ export const AUCTION_STATUS_LABEL: Record<AuctionStatus, string> = {
   matched: '매칭됨',
   completed: '결제 완료',
   cancelled: '취소',
-  closed: '낙찰 완료',
+  closed: '선정 완료',
 };
 
 export const BID_STATUS_LABEL: Record<BidStatus, string> = {
-  pending: '제안 대기',
-  selected: '낙찰 완료',
+  pending: '지원 대기',
+  selected: '선정 완료',
 };
 
 export const CREATOR_PAYOUT_STATUS_LABEL: Record<CreatorPayoutStatus, string> = {
-  none: '제안 대기',
+  none: '지원 대기',
   pending: '정산 예정',
   hold: '정산 보류',
   paid: '지급 완료',

@@ -11,12 +11,12 @@ import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
 import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { BidProposalList } from '@/components/BidProposalList';
-import { CreditChargeModal } from '@/components/CreditChargeModal';
+import { PaymentCheckoutModal } from '@/components/PaymentCheckoutModal';
 import { TaxInvoiceStatus } from '@/components/TaxInvoiceStatus';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
-import { useAwardCheckout } from '@/hooks/useAwardCheckout';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { prepareAwardPayment } from '@/lib/payments/client';
 import { ACCESS_REASON } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
 import {
@@ -41,6 +41,7 @@ import { platformLabel } from '@/lib/platforms';
 import { formatWon } from '@/lib/utils';
 import type { AiAnalyzeResponse, AiGuideResponse, AiReport } from '@/types/ai';
 import { isAuctionClosed, type AuctionItem, type BidItem } from '@/types/auction';
+import type { PreparePaymentResult } from '@/types/payment';
 
 export function AuctionDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -55,7 +56,7 @@ export function AuctionDetail({ id }: { id: string }) {
   const [bidsError, setBidsError] = useState<string | null>(null);
   const [awardBusyId, setAwardBusyId] = useState<string | null>(null);
   const { run: runAward } = useActionLock();
-  const { awardWithCredit, chargeNeeded, closeCharge } = useAwardCheckout();
+  const [checkout, setCheckout] = useState<PreparePaymentResult | null>(null);
   const [bidOpen, setBidOpen] = useState(false);
   const [alreadyBidRemote, setAlreadyBidRemote] = useState(false);
   const [report, setReport] = useState<AiReport | null>(null);
@@ -260,18 +261,12 @@ export function AuctionDetail({ id }: { id: string }) {
     }
     setAwardBusyId(bid.id);
     await runAward(bid.id, async () => {
-      const awarded = await awardWithCredit(auction, bid);
-      if (!awarded) {
+      const prepared = await prepareAwardPayment({ auction, bid, kind: 'campaign' });
+      if (prepared.error || !prepared.data) {
+        showToast(prepared.error || '토스페이먼츠 단건 에스크로 결제를 준비하지 못했습니다.');
         return;
       }
-      setAuction(awarded);
-      setBids((current) =>
-        current.map((item) =>
-          item.id === awarded.winnerBidId || item.id === bid.id
-            ? { ...item, status: 'selected' as const }
-            : item,
-        ),
-      );
+      setCheckout(prepared.data);
     });
     setAwardBusyId(null);
   };
@@ -316,7 +311,7 @@ export function AuctionDetail({ id }: { id: string }) {
               {matched ? (
                 <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
                   {isAuctionClosed(auction.status) || auction.winnerBidId
-                    ? '낙찰된 캠페인입니다'
+                    ? '선정된 캠페인입니다'
                     : '매칭 완료된 캠페인입니다'}
                 </span>
               ) : null}
@@ -344,7 +339,8 @@ export function AuctionDetail({ id }: { id: string }) {
                 {formatWon(selectedBid.bidAmount)}
               </p>
             ) : null}
-            <p className="mt-4 text-2xl font-bold tracking-tight text-zinc-950">
+            <p className="mt-4 text-xs font-semibold tracking-wide text-zinc-500">확정 지급액</p>
+            <p className="mt-1 text-2xl font-bold tracking-tight text-zinc-950">
               {formatWon(auction.budget)}
             </p>
             <p className="mt-4 text-sm leading-6 whitespace-pre-wrap text-zinc-600">
@@ -354,14 +350,8 @@ export function AuctionDetail({ id }: { id: string }) {
               <AuctionCountdown deadline={auction.deadline} />
               <span className="inline-flex items-center gap-1">
                 <Users className="size-4" aria-hidden />
-                제안 {auction.bidsCount ?? 0}
+                지원 {auction.bidsCount ?? 0}
               </span>
-              {auction.highestBidAmount && auction.highestBidAmount > 0 ? (
-                <span>
-                  최저 {formatWon(auction.leadingBidAmount ?? 0)} · 최고{' '}
-                  {formatWon(auction.highestBidAmount)}
-                </span>
-              ) : null}
             </div>
             {ownCampaign && auctionOpen ? (
               <div className="mt-6">
@@ -372,7 +362,7 @@ export function AuctionDetail({ id }: { id: string }) {
                   aria-label={VALIDATION.selfCampaignHint}
                   className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-full bg-zinc-300 text-sm font-semibold text-zinc-500"
                 >
-                  콘텐츠 제안하기
+                  캠페인 지원
                 </button>
                 <p className="mt-2 text-center text-xs text-zinc-500">{VALIDATION.selfCampaignHint}</p>
               </div>
@@ -382,7 +372,7 @@ export function AuctionDetail({ id }: { id: string }) {
                 disabled
                 className="mt-6 inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-full bg-zinc-300 text-sm font-semibold text-zinc-500"
               >
-                제안 완료
+                지원 완료
               </button>
             ) : canAttemptBid ? (
               <button
@@ -390,13 +380,13 @@ export function AuctionDetail({ id }: { id: string }) {
                 onClick={() => requestCreator(() => setBidOpen(true))}
                 className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
               >
-                콘텐츠 제안하기
+                캠페인 지원
               </button>
             ) : (
               <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 {!auctionOpen
-                  ? '이 캠페인은 모집이 마감되었거나 제안을 받지 않습니다.'
-                  : '로그인 후 콘텐츠를 제안할 수 있습니다.'}
+                  ? '이 캠페인은 모집이 마감되었거나 지원을 받지 않습니다.'
+                  : '로그인 후 캠페인에 지원할 수 있습니다.'}
                 {!user && auctionOpen ? (
                   <button
                     type="button"
@@ -433,10 +423,10 @@ export function AuctionDetail({ id }: { id: string }) {
         </div>
       )}
 
-      <CreditChargeModal
-        open={chargeNeeded != null}
-        neededAmount={chargeNeeded ?? 0}
-        onClose={closeCharge}
+      <PaymentCheckoutModal
+        open={Boolean(checkout)}
+        checkout={checkout}
+        onClose={() => setCheckout(null)}
       />
 
       {auction ? (

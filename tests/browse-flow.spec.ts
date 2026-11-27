@@ -40,10 +40,10 @@ test.describe('역경매 검색·필터와 광고주 메인 노출', () => {
     await expect(page.getByRole('heading', { name: '모집 마감·완료된 캠페인' })).toBeVisible();
 
     await page.getByRole('button', { name: '전체', exact: true }).click();
-    await page.getByRole('button', { name: '높은 예산순' }).click();
+    await page.getByRole('button', { name: '높은 확정 지급액순' }).click();
     await expect(page.getByRole('link', { name: ACTIVE_SHORTS })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_REELS })).toBeVisible();
-    await expect(page.getByRole('button', { name: '콘텐츠 제안하기' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: '캠페인 지원' }).first()).toBeVisible();
   });
 
   test('광고주는 메인에서 진행 중인 오픈 캠페인을 바로 확인한다', async ({ page }) => {

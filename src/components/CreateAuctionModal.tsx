@@ -263,10 +263,10 @@ export function CreateAuctionModal({
             </Field>
 
             <Field
-              label="예산"
+              label="확정 지급액 (캠페인 모집 단가)"
               htmlFor="auction-budget"
               error={errors.budget}
-              hint="최소 10,000원"
+              hint="최소 10,000원 · 선정 후 이 금액으로 단건 결제"
             >
               <input
                 id="auction-budget"
@@ -276,10 +276,14 @@ export function CreateAuctionModal({
                 onChange={(event) => setBudget(event.target.value)}
                 className={inputClass(Boolean(errors.budget))}
                 placeholder="10000"
-                aria-label="예산"
+                aria-label="확정 지급액 (캠페인 모집 단가)"
                 autoComplete="off"
               />
             </Field>
+            <p className="-mt-2 text-xs leading-5 text-zinc-500">
+              크리에이터는 이 확정 금액 조건에 동의한 뒤 콘셉트·포트폴리오로만 지원합니다. 금액은
+              등록 후 변경되지 않습니다.
+            </p>
 
             <Field
               label="상세설명"

@@ -242,14 +242,14 @@ export function creatorFeePolicyCopy(separator = ' · ') {
 
 export function formatFeeQuoteKorean(quote: FeeQuote) {
   if (quote.amount <= 0) {
-    return '제안 금액을 숫자로 알려주시면 구간 수수료와 세무 분기를 계산해 드립니다.';
+    return '확정 지급액을 숫자로 알려주시면 구간 수수료와 세무 분기를 계산해 드립니다.';
   }
   return [
-    `제안 금액 ${formatWonAmount(quote.amount)}은 ${quote.bracketLabel}이라 크리에이터 수수료 ${quote.creatorRatePercent}%가 단일 구간으로 적용됩니다.`,
+    `확정 지급액 ${formatWonAmount(quote.amount)}은 ${quote.bracketLabel}이라 크리에이터 수수료 ${quote.creatorRatePercent}%가 단일 구간으로 적용됩니다.`,
     `플랫폼 수수료 ${formatWonAmount(quote.creatorFee)}를 공제하면 ${formatWonAmount(quote.creatorPayout)}입니다.`,
     `개인 크리에이터는 사업소득 ${WITHHOLDING_PERCENT}% 원천징수 ${formatWonAmount(quote.individualWithholding)}를 추가로 떼면 실수령 ${formatWonAmount(quote.individualNet)}입니다.`,
     `사업자등록번호 검증 크리에이터는 최종 정산액(공급가) ${formatWonAmount(quote.businessSupply)}에 VAT ${VAT_PERCENT}% ${formatWonAmount(quote.businessVat)}를 별도 세금계산서로 발행하고 원천징수는 없습니다.`,
-    `광고주는 같은 낙찰액에 수수료 ${quote.advertiserRatePercent}% ${formatWonAmount(quote.advertiserFee)}를 합산한 공급가액 ${formatWonAmount(quote.advertiserPayable)}에 부가세 ${VAT_PERCENT}% ${formatWonAmount(quote.advertiserVat)}를 별도 가산해 ${formatWonAmount(quote.advertiserTotal)}를 결제합니다.`,
+    `광고주는 같은 확정 지급액에 수수료 ${quote.advertiserRatePercent}% ${formatWonAmount(quote.advertiserFee)}를 합산한 공급가액 ${formatWonAmount(quote.advertiserPayable)}에 부가세 ${VAT_PERCENT}% ${formatWonAmount(quote.advertiserVat)}를 별도 가산해 ${formatWonAmount(quote.advertiserTotal)}를 토스페이먼츠 단건 에스크로로 결제합니다.`,
   ].join(' ');
 }
 

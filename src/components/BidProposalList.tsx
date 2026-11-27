@@ -45,18 +45,15 @@ export function BidProposalList({
     !auction.isBlind &&
     !auction.winnerBidId;
   const safeBids = Array.isArray(bids) ? [...bids] : [];
-  const leadingAmount =
-    auction.leadingBidAmount && auction.leadingBidAmount > 0
-      ? auction.leadingBidAmount
-      : Math.min(...safeBids.map((item) => item.bidAmount), Number.POSITIVE_INFINITY);
-  const highestAmount =
-    auction.highestBidAmount && auction.highestBidAmount > 0
-      ? auction.highestBidAmount
-      : Math.max(...safeBids.map((item) => item.bidAmount), 0);
   const selectedBid =
     safeBids.find((bid) => isBidSelected(bid, auction.winnerBidId)) ?? null;
-
-  const holdQuote = pendingBid ? describeSettlementAmounts(pendingBid.bidAmount) : null;
+  const confirmedAmount =
+    auction.budget > 0
+      ? auction.budget
+      : pendingBid?.bidAmount && pendingBid.bidAmount > 0
+        ? pendingBid.bidAmount
+        : 0;
+  const holdQuote = confirmedAmount > 0 ? describeSettlementAmounts(confirmedAmount) : null;
 
   return (
     <section
@@ -69,23 +66,22 @@ export function BidProposalList({
             광고주 확인
           </p>
           <h2 className="mt-1 text-lg font-bold text-zinc-950">
-            제출된 크리에이터 제안 목록
+            제출된 크리에이터 지원 목록
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
-            채널, 평판 점수, 제안 금액, 제안 메시지를 비교한 뒤 낙찰할 수 있습니다.
+            채널, 평판, 콘셉트·포트폴리오를 비교한 뒤 크리에이터를 선정합니다. 지급액은 등록 시
+            고지한 확정 캠페인 단가입니다.
           </p>
-          {safeBids.length > 0 ? (
+          {auction.budget > 0 ? (
             <p className="mt-2 text-xs text-zinc-500">
-              최저 제안 {Number.isFinite(leadingAmount) ? formatWon(leadingAmount) : '-'}
-              {' · '}
-              최고 제안가 {highestAmount > 0 ? formatWon(highestAmount) : '-'}
+              확정 지급액 {formatWon(auction.budget)}
             </p>
           ) : null}
         </div>
         {closed || Boolean(selectedBid) ? (
           <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
             {isAuctionClosed(auction.status) || selectedBid
-              ? '낙찰된 캠페인입니다'
+              ? '선정된 캠페인입니다'
               : '매칭 완료된 캠페인입니다'}
           </span>
         ) : null}
@@ -93,9 +89,9 @@ export function BidProposalList({
 
       {closed && selectedBid ? (
         <div className="mt-4 rounded-xl border border-clink-peach-strong bg-clink-peach px-4 py-3 text-sm text-clink">
-          <p className="font-semibold">선택된 크리에이터</p>
+          <p className="font-semibold">선정된 크리에이터</p>
           <p className="mt-1">
-            {selectedBid.creatorName || '이름 없음'} · {formatWon(selectedBid.bidAmount)}
+            {selectedBid.creatorName || '이름 없음'} · 확정 지급액 {formatWon(selectedBid.bidAmount)}
           </p>
           {selectedBid.creatorChannelUrl ? (
             <a
@@ -117,7 +113,7 @@ export function BidProposalList({
         </div>
       ) : safeBids.length === 0 ? (
         <div className="mt-4 rounded-xl border border-dashed border-zinc-200 px-4 py-10 text-center">
-          <p className="text-sm font-medium text-zinc-800">아직 들어온 제안이 없습니다</p>
+          <p className="text-sm font-medium text-zinc-800">아직 들어온 지원이 없습니다</p>
           {error ? <p className="mt-1 text-xs text-zinc-500">{error}</p> : null}
         </div>
       ) : (
@@ -172,7 +168,7 @@ export function BidProposalList({
                       {busy ? (
                         <Loader2 className="size-3.5 animate-spin" aria-hidden />
                       ) : null}
-                      {busy ? '낙찰 중...' : '낙찰하기 (선택)'}
+                      {busy ? '선정 중...' : '크리에이터 선정'}
                     </button>
                   ) : winner ? (
                     <span className="shrink-0 rounded-full bg-clink-peach px-3 py-1 text-xs font-semibold text-clink-accent">
@@ -186,16 +182,10 @@ export function BidProposalList({
                 </div>
 
                 <p className="mt-3 text-lg font-bold tracking-tight text-zinc-950">
-                  {formatWon(bid.bidAmount)}
-                  {bid.bidAmount === leadingAmount ? (
-                    <span className="ml-2 text-xs font-semibold text-clink-accent">최저 제안</span>
-                  ) : null}
-                  {bid.bidAmount === highestAmount && highestAmount !== leadingAmount ? (
-                    <span className="ml-2 text-xs font-semibold text-amber-700">최고 제안가</span>
-                  ) : null}
+                  확정 지급액 {formatWon(bid.bidAmount)}
                 </p>
                 <p className="mt-2 text-sm leading-6 whitespace-pre-wrap text-zinc-600">
-                  {bid.proposalText || '제안 내용 없음'}
+                  {bid.proposalText || '제작 방향 없음'}
                 </p>
                 <p className="mt-3 text-xs text-zinc-400">
                   제출 일자 {formatDateTime(bid.createdAt)}
@@ -208,10 +198,10 @@ export function BidProposalList({
 
       <ConfirmModal
         open={Boolean(pendingBid) && !closed}
-        title="이 제안을 낙찰할까요?"
-        description={`"${pendingBid?.creatorName || '크리에이터'}"의 제안을 선택하면 보유 크레딧에서 공급가액과 부가세가 즉시 예치 차감됩니다. 잔액이 부족하면 충전 후 다시 낙찰할 수 있습니다.`}
-        confirmLabel="크레딧으로 낙찰하기"
-        busyLabel="낙찰 중..."
+        title="이 크리에이터를 선정할까요?"
+        description={`"${pendingBid?.creatorName || '크리에이터'}"를 선정하면 사전에 고지된 확정 용역 대금 1건을 토스페이먼츠 에스크로로 예치 결제합니다. 분할·후불·변동 금액 결제가 아닙니다.`}
+        confirmLabel="선정하고 단건 에스크로 결제"
+        busyLabel="결제 준비 중..."
         cancelLabel="취소"
         busy={Boolean(pendingBid && busyId === pendingBid.id)}
         onClose={() => {
@@ -237,27 +227,30 @@ export function BidProposalList({
         {holdQuote ? (
           <dl className="mt-3 space-y-1.5 rounded-xl bg-zinc-50 px-3 py-3 text-sm text-zinc-700">
             <div className="flex items-center justify-between gap-3">
-              <dt>낙찰 금액</dt>
+              <dt>캠페인 확정 용역비 (공급가액)</dt>
               <dd className="font-medium tabular-nums text-zinc-950">
                 {formatWon(holdQuote.bidAmount)}
               </dd>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <dt>공급가액 (낙찰 + 수수료 {ADVERTISER_FEE_PERCENT}%)</dt>
+              <dt>플랫폼 이용 수수료 (광고주 {ADVERTISER_FEE_PERCENT}%)</dt>
               <dd className="font-medium tabular-nums text-zinc-950">
-                {formatWon(holdQuote.advertiserSupply)}
+                {formatWon(holdQuote.advertiserFee)}
               </dd>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <dt>부가세 ({VAT_PERCENT}% 별도)</dt>
+              <dt>부가가치세 (VAT {VAT_PERCENT}%)</dt>
               <dd className="font-medium tabular-nums text-zinc-950">
                 {formatWon(holdQuote.advertiserVat)}
               </dd>
             </div>
             <div className="flex items-center justify-between gap-3 font-semibold text-zinc-950">
-              <dt>총 차감액</dt>
+              <dt>최종 단건 결제 금액</dt>
               <dd className="tabular-nums">{formatWon(holdQuote.advertiserCharge)}</dd>
             </div>
+            <p className="pt-1 text-xs leading-5 text-zinc-500">
+              사전 확정 금액 1건에 대한 토스페이먼츠 에스크로 예치 결제입니다.
+            </p>
           </dl>
         ) : null}
       </ConfirmModal>

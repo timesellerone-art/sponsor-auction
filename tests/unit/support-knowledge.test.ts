@@ -20,7 +20,7 @@ describe('클링크 상담 지식', () => {
     assert.equal(SUPPORT_QUICK_PROMPTS.length, 4);
     assert.match(SUPPORT_QUICK_PROMPTS[0], /광고 등록/);
     const prompt = buildSupportSystemPrompt();
-    assert.match(prompt, /광고주: 낙찰 금액의 15%|광고주 15%/);
+    assert.match(prompt, /광고주: 확정 지급액의 15%|광고주 15%/);
     assert.match(prompt, /12%/);
     assert.match(prompt, /10%/);
     assert.match(prompt, /8%/);
@@ -29,8 +29,8 @@ describe('클링크 상담 지식', () => {
     assert.match(prompt, /\+ 캠페인 등록/);
     assert.match(prompt, /마이페이지/);
     assert.match(prompt, /계정 설정/);
-    assert.match(prompt, /콘텐츠 제안하기/);
-    assert.equal(prompt.includes('타임 경매'), true);
+    assert.match(prompt, /캠페인 지원/);
+    assert.equal(prompt.includes('타임 경매'), false);
     assert.match(prompt, /개인 또는 팀/);
     assert.match(prompt, /대표 계정/);
     assert.equal(prompt.includes('캠페인당 1명'), false);
@@ -46,8 +46,8 @@ describe('클링크 상담 지식', () => {
     assert.equal(isOperatorSupportCase('광고등록방법은?'), false);
     assert.equal(answerSupportLocally('광고등록방법은?')?.escalate, false);
 
-    const bid = matchSupportKnowledge('콘텐츠 제안하는 방법');
-    assert.match(bid, /콘텐츠 제안하기/);
+    const bid = matchSupportKnowledge('캠페인 지원하는 방법');
+    assert.match(bid, /캠페인 지원/);
 
     const fee = matchSupportKnowledge('수수료가 궁금해요');
     assert.match(fee, /15%/);

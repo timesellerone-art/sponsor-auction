@@ -127,7 +127,10 @@ export async function POST(
         timeSlotId: slot.data.id,
         advertiserId: (actor.userId ?? asText(body?.advertiserId)) || null,
         advertiserName: asText(body?.advertiserName) || '광고주',
-        bidAmount: asNumber(body?.bidAmount),
+        bidAmount:
+          Number.isFinite(slot.data.startingPrice) && slot.data.startingPrice > 0
+            ? slot.data.startingPrice
+            : asNumber(body?.bidAmount),
         message,
       },
       writer,

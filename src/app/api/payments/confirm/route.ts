@@ -229,7 +229,7 @@ export async function POST(request: Request) {
       return jsonError(
         409,
         'INTENT_NOT_FOUND',
-        '결제 요청이 만료되었거나 찾을 수 없습니다. 낙찰은 진행되지 않았습니다.',
+        '결제 요청이 만료되었거나 찾을 수 없습니다. 선정은 진행되지 않았습니다.',
       );
     }
 
@@ -311,7 +311,7 @@ export async function POST(request: Request) {
       return jsonError(
         409,
         'INTENT_NOT_PENDING',
-        '이미 취소되었거나 만료된 결제입니다. 낙찰은 진행되지 않았습니다.',
+        '이미 취소되었거나 만료된 결제입니다. 선정은 진행되지 않았습니다.',
       );
     }
 
@@ -336,7 +336,7 @@ export async function POST(request: Request) {
         return jsonError(
           400,
           'AMOUNT_MISMATCH',
-          '결제 금액이 낙찰가와 수수료 정책에 맞지 않습니다. 낙찰은 진행되지 않았습니다.',
+          '결제 금액이 확정 지급액과 수수료 정책에 맞지 않습니다. 선정은 진행되지 않았습니다.',
         );
       }
     }
@@ -353,7 +353,7 @@ export async function POST(request: Request) {
       return jsonError(
         400,
         'AMOUNT_MISMATCH',
-        '결제 금액이 주문 정보와 일치하지 않습니다. 낙찰은 진행되지 않았습니다.',
+        '결제 금액이 주문 정보와 일치하지 않습니다. 선정은 진행되지 않았습니다.',
       );
     }
 
@@ -364,7 +364,7 @@ export async function POST(request: Request) {
         return jsonError(
           503,
           'CREDIT_LEDGER_UNAVAILABLE',
-          '크레딧 원장을 확인하지 못했습니다. 낙찰은 진행되지 않았습니다.',
+          '결제 원장을 확인하지 못했습니다. 선정은 진행되지 않았습니다.',
         );
       }
       const held = await holdCampaignPayment(admin, {
@@ -375,16 +375,18 @@ export async function POST(request: Request) {
         actorIsAdmin: hasAuthRole(actor, 'admin'),
       });
       if (!held.ok) {
-        const status =
-          held.code === 'INSUFFICIENT_CREDIT' ? 402 : held.code === 'FORBIDDEN' ? 403 : held.code === 'ALREADY_AWARDED' ? 409 : 400;
-        return jsonError(status, held.code, held.message);
+        if (held.code !== 'INSUFFICIENT_CREDIT') {
+          const status =
+            held.code === 'FORBIDDEN' ? 403 : held.code === 'ALREADY_AWARDED' ? 409 : 400;
+          return jsonError(status, held.code, held.message);
+        }
       }
-      if (!held.skipped && held.amount !== parsed.amount) {
+      if (held.ok && !held.skipped && held.amount !== parsed.amount) {
         await unwindCampaignCredit(creditOrder, '승인 금액이 차감 금액과 달라 크레딧 복구');
         return jsonError(
           400,
           'AMOUNT_MISMATCH',
-          '결제 금액이 제안 금액과 수수료에 맞지 않습니다. 낙찰은 진행되지 않았습니다.',
+          '결제 금액이 확정 지급액과 수수료에 맞지 않습니다. 선정은 진행되지 않았습니다.',
         );
       }
     }
@@ -413,7 +415,7 @@ export async function POST(request: Request) {
         await persistPayment(intent, 'failed', parsed.paymentKey, dbConfig);
         const errorCode = toss.errorCode || 'TOSS_CONFIRM_FAILED';
         const errorMessage =
-          toss.errorMessage || toss.error || '결제 승인에 실패했습니다. 낙찰은 진행되지 않았습니다.';
+          toss.errorMessage || toss.error || '결제 승인에 실패했습니다. 선정은 진행되지 않았습니다.';
         console.error('[SponsorAuction] Toss confirm API 거절', {
           orderId: parsed.orderId,
           amount: parsed.amount,
@@ -472,7 +474,7 @@ export async function POST(request: Request) {
     console.error('[SponsorAuction] 결제 승인 중 예외가 발생했습니다.', error);
     captureException(error, { area: 'payment_confirm' });
     const errorMessage =
-      error instanceof Error ? error.message : '결제 승인에 실패했습니다. 낙찰은 진행되지 않았습니다.';
+      error instanceof Error ? error.message : '결제 승인에 실패했습니다. 선정은 진행되지 않았습니다.';
     await unwindCampaignCredit(creditOrder, '결제 승인 예외로 크레딧 복구');
     return jsonError(500, 'CONFIRM_EXCEPTION', errorMessage);
   }

@@ -16,11 +16,11 @@ describe('랜딩 역할별 소개 카피', () => {
   it('광고주/크리에이터 헤드라인과 다수 제안·선정 기준을 고정한다', () => {
     assert.equal(
       LANDING_INTRO.advertiser.headline,
-      '예산과 제품만 올리면, 핏이 맞는 크리에이터가 기획안을 제안합니다',
+      '확정 지급액과 제품만 올리면, 핏이 맞는 크리에이터가 기획안을 지원합니다',
     );
     assert.equal(
       LANDING_INTRO.advertiser.sub,
-      '제품 정보와 예산을 등록하면 AI가 촬영 가이드를 정리하고, 여러 크리에이터가 경쟁력 있는 맞춤 기획안과 제안 금액을 올립니다.',
+      '제품 정보와 확정 캠페인 단가를 등록하면 AI가 촬영 가이드를 정리하고, 여러 크리에이터가 콘셉트·포트폴리오로 지원합니다.',
     );
     assert.equal(LANDING_INTRO.advertiser.sub.includes('1명'), false);
     assert.equal(

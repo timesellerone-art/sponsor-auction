@@ -93,7 +93,7 @@ export default function Home() {
             진행 중인 오픈 캠페인
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-clink-muted">
-            플랫폼, 예산, 남은 모집 기간, 제안 수, AI 가이드를 한눈에 비교하고 콘텐츠를 제안하세요.
+            플랫폼, 확정 지급액, 남은 모집 기간, 지원 수, AI 가이드를 한눈에 비교하고 캠페인에 지원하세요.
           </p>
         </div>
 

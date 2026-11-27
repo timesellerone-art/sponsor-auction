@@ -28,7 +28,6 @@ export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
     };
   }, [slot.status, slot.winnerBidId, slot.deadline]);
   const href = `/timeslots/${slot.id}`;
-  const price = slot.currentHighestBid > 0 ? slot.currentHighestBid : slot.startingPrice;
 
   return (
     <article className="flex h-full min-w-0 flex-col rounded-2xl border border-stone-200/80 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5">
@@ -53,7 +52,7 @@ export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
             : slot.status === 'awarded'
               ? '진행 중'
               : open
-                ? '제안 가능'
+                ? '신청 가능'
                 : '마감'}
         </span>
       </div>
@@ -70,13 +69,12 @@ export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
       />
       <p className="mt-2 line-clamp-2 text-sm text-zinc-500">{slot.description}</p>
       <p className="mt-4 text-lg font-bold text-zinc-950">
-        {slot.currentHighestBid > 0 ? '현재 최고가 ' : '시작가 '}
-        {formatWon(price)}
+        확정 단가 {formatWon(slot.startingPrice)}
       </p>
       <p className="mt-1 text-xs text-zinc-500">예상 조회수 {formatViews(slot.expectedViews)}</p>
       <div className="mt-auto flex items-center justify-between gap-2 pt-4 text-xs">
         <AuctionCountdown deadline={slot.deadline} />
-        <span className="text-zinc-500">제안 {slot.bidsCount}</span>
+        <span className="text-zinc-500">지원 {slot.bidsCount}</span>
       </div>
       <Link
         href={href}

@@ -54,7 +54,6 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
   const { requireCreator } = useRequireAuth();
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const [creatorChannelUrl, setCreatorChannelUrl] = useState('');
-  const [bidAmount, setBidAmount] = useState('');
   const [proposalText, setProposalText] = useState('');
   const [creatorStyle, setCreatorStyle] = useState('');
   const [proposalBusy, setProposalBusy] = useState(false);
@@ -70,16 +69,15 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
   const { isBusy: isSubmitting, run } = useActionLock();
 
   const bidValue = useMemo(() => {
-    const parsed = Number(bidAmount);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      return 0;
+    const budget = auction?.budget;
+    if (typeof budget === 'number' && Number.isFinite(budget) && budget > 0) {
+      return budget;
     }
-    return parsed;
-  }, [bidAmount]);
+    return 0;
+  }, [auction?.budget]);
 
   const resetForm = () => {
     setCreatorChannelUrl('');
-    setBidAmount('');
     setProposalText('');
     setCreatorStyle('');
     setProposalBusy(false);
@@ -259,7 +257,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         const account = settlementAccountFromParts({ bankName, accountNumber, accountHolder });
         const nextErrors = validateBidForm({
           creatorChannelUrl,
-          bidAmount,
+          bidAmount: String(bidValue),
           proposalText,
           auctionBudget: currentAuction.budget,
           creatorEmail: settlementEmail,
@@ -278,12 +276,10 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
             showToast(bypassMessage);
           }
           const focusId =
-            nextErrors.bidAmount
-              ? 'bid-amount'
-              : nextErrors.proposalText
-                ? 'bid-proposal'
-                : nextErrors.creatorChannelUrl
-                  ? 'bid-url'
+            nextErrors.proposalText
+              ? 'bid-proposal'
+              : nextErrors.creatorChannelUrl
+                ? 'bid-url'
                   : nextErrors.settlementEmail
                     ? 'bid-settlement-email'
                     : nextErrors.bankName
@@ -304,7 +300,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
           creatorId: user.id,
           creatorName: user.name.trim() || '크리에이터',
           creatorChannelUrl: creatorChannelUrl.trim(),
-          bidAmount: Number(bidAmount),
+          bidAmount: bidValue,
           proposalText: proposalText.trim(),
           creatorEmail: settlementEmail,
           bankName: account.bankName,
@@ -352,7 +348,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
 
         rememberMyBid(result.data.id);
         resetForm();
-        showToast('제안을 제출했습니다.', 'success');
+        showToast('캠페인 지원을 제출했습니다.', 'success');
         const ownerId = getAuctionOwnerId(auction.id, latest.data?.authorId);
         if (ownerId && ownerId !== user.id) {
           pushNotification({
@@ -389,10 +385,10 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-zinc-200 bg-white px-4 py-3 sm:px-5">
           <div className="min-w-0">
             <h2 id={titleId} className="text-base font-semibold text-zinc-950">
-              콘텐츠 제안하기
+              캠페인 지원
             </h2>
             <p className="mt-0.5 truncate text-xs text-zinc-500">
-              {auction.title || '제목 없음'} · 예산 {formatWon(auction.budget ?? 0)}
+              {auction.title || '제목 없음'} · 확정 지급액 {formatWon(auction.budget ?? 0)}
             </p>
           </div>
           <button
@@ -412,33 +408,27 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
           noValidate
         >
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
-            <Field
-              label="제안 금액(단가)"
-              htmlFor="bid-amount"
-              error={errors.bidAmount}
-              hint="원 단위"
-            >
-              <input
-                id="bid-amount"
-                ref={firstFieldRef}
-                type="text"
-                inputMode="numeric"
-                value={bidAmount}
-                onChange={(event) => setBidAmount(event.target.value)}
-                className={inputClass(Boolean(errors.bidAmount))}
-                placeholder="예: 300000"
-                aria-label="제안 금액(단가)"
-                autoComplete="off"
-              />
-            </Field>
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3">
+              <p className="text-xs font-semibold tracking-wide text-zinc-500">확정 지급액 (캠페인 모집 단가)</p>
+              <p className="mt-1 text-lg font-bold tabular-nums text-zinc-950">{formatWon(bidValue)}</p>
+              <p className="mt-1 text-xs leading-5 text-zinc-500">
+                광고주가 사전에 책정한 확정 금액입니다. 금액은 수정할 수 없으며, 이 조건에 동의한 뒤
+                콘셉트·포트폴리오·제작 방향으로만 지원합니다.
+              </p>
+              {errors.bidAmount ? (
+                <p className="mt-1 text-xs text-rose-600" role="alert">
+                  {errors.bidAmount}
+                </p>
+              ) : null}
+            </div>
 
             {bidValue > 0 ? (
               <FeeBreakdownCard role="creator" amount={bidValue} taxKind={settlementType} />
             ) : (
               <div className="rounded-xl border border-clink-peach-strong bg-clink-peach px-3 py-3 text-sm text-clink">
                 <p className="text-xs text-clink-accent">
-                  제안 금액을 입력하면 구간별 수수료({creatorFeeShortRatesCopy()}) 공제 후
-                  예상 실수령액이 실시간으로 계산됩니다.
+                  캠페인 확정 지급액이 있어야 구간별 수수료({creatorFeeShortRatesCopy()}) 공제 후
+                  예상 실수령액을 계산할 수 있습니다.
                 </p>
               </div>
             )}
@@ -487,7 +477,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
             </div>
 
             <Field
-              label="제안 내용/소개글"
+              label="제작 콘셉트·방향"
               htmlFor="bid-proposal"
               error={errors.proposalText}
               hint={`최소 ${MIN_PROPOSAL_LENGTH}자`}
@@ -512,6 +502,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
             >
               <input
                 id="bid-url"
+                ref={firstFieldRef}
                 type="url"
                 value={creatorChannelUrl}
                 onChange={(event) => setCreatorChannelUrl(event.target.value)}
@@ -605,7 +596,7 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
                   제출 중...
                 </>
               ) : (
-                '제안 제출'
+                '캠페인 지원 제출'
               )}
             </button>
           </div>

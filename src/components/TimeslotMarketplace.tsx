@@ -68,8 +68,8 @@ export function TimeslotMarketplace() {
         크리에이터 상품 마켓플레이스
       </h1>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
-        크리에이터가 등록한 예상 조회수·시작가 광고 상품에 광고주가 콘텐츠를 제안합니다. 마감 전 최고가가 실시간으로
-        갱신됩니다.
+        크리에이터가 등록한 예상 조회수·확정 단가 광고 상품에 광고주가 제작 신청합니다. 선정 후 확정 금액 1건을
+        토스페이먼츠 에스크로로 결제합니다.
       </p>
 
       {loading ? (
@@ -100,7 +100,7 @@ export function TimeslotMarketplace() {
           </section>
           {closed.length > 0 ? (
             <section>
-              <h2 className="text-lg font-bold text-zinc-950">마감·낙찰</h2>
+              <h2 className="text-lg font-bold text-zinc-950">마감·선정</h2>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {closed.map((slot) => (
                   <TimeslotCard key={slot.id} slot={slot} />

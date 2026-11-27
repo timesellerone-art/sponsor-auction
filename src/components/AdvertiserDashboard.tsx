@@ -6,10 +6,11 @@ import { AuctionCard, AuctionCardSkeleton } from '@/components/AuctionCard';
 import { PageContainer } from '@/components/PageContainer';
 import { BidProposalList } from '@/components/BidProposalList';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
-import { CreditChargeModal } from '@/components/CreditChargeModal';
+import { PaymentCheckoutModal } from '@/components/PaymentCheckoutModal';
 import { useActionLock } from '@/hooks/useActionLock';
-import { useAwardCheckout } from '@/hooks/useAwardCheckout';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { prepareAwardPayment } from '@/lib/payments/client';
+import { showToast } from '@/components/Toast';
 import { isOpenForBid } from '@/lib/auction-browse';
 import { getAdvertiserDashboard } from '@/lib/dashboard';
 import { TimeslotPaymentPanel } from '@/components/TimeslotPaymentPanel';
@@ -18,6 +19,7 @@ import { auctionStatusLabel } from '@/lib/status-labels';
 import { describeSettlementAmounts } from '@/lib/settlement-amounts';
 import { cn, formatDateTime, formatWon } from '@/lib/utils';
 import type { AdvertiserDeal } from '@/types/dashboard';
+import type { PreparePaymentResult } from '@/types/payment';
 import { isAwardedAuction, isBidSelected, type AuctionItem, type BidItem } from '@/types/auction';
 import type { TimeSlotBidItem, TimeSlotItem } from '@/types/timeslot';
 
@@ -26,7 +28,7 @@ type AdvertiserView = 'open' | 'paid' | 'proposals' | 'ended';
 const VIEWS: { id: AdvertiserView; label: string }[] = [
   { id: 'open', label: '진행 중 캠페인' },
   { id: 'paid', label: '결제 완료 목록' },
-  { id: 'proposals', label: '캠페인별 제안 현황' },
+  { id: 'proposals', label: '캠페인별 지원 현황' },
   { id: 'ended', label: '종료된 캠페인' },
 ];
 
@@ -41,7 +43,7 @@ export function AdvertiserDashboard() {
   const [view, setView] = useState<AdvertiserView>('open');
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const { run: runAward } = useActionLock();
-  const { awardWithCredit, chargeNeeded, closeCharge } = useAwardCheckout();
+  const [checkout, setCheckout] = useState<PreparePaymentResult | null>(null);
 
   useEffect(() => {
     userRef.current = user;
@@ -108,29 +110,12 @@ export function AdvertiserDashboard() {
     }
     setAwardBusyId(bid.id);
     await runAward(bid.id, async () => {
-      const awarded = await awardWithCredit(auction, bid);
-      if (!awarded) {
+      const prepared = await prepareAwardPayment({ auction, bid, kind: 'campaign' });
+      if (prepared.error || !prepared.data) {
+        showToast(prepared.error || '토스페이먼츠 단건 에스크로 결제를 준비하지 못했습니다.');
         return;
       }
-      setDeals((current) =>
-        current.map((deal) =>
-          deal.auction.id === awarded.id
-            ? {
-                ...deal,
-                auction: awarded,
-                bid:
-                  deal.bid?.id === awarded.winnerBidId || deal.bid?.id === bid.id
-                    ? { ...deal.bid, status: 'selected' as const }
-                    : deal.bid,
-                bids: deal.bids.map((item) =>
-                  item.id === awarded.winnerBidId || item.id === bid.id
-                    ? { ...item, status: 'selected' as const }
-                    : item,
-                ),
-              }
-            : deal,
-        ),
-      );
+      setCheckout(prepared.data);
     });
     setAwardBusyId(null);
   };
@@ -193,15 +178,10 @@ export function AdvertiserDashboard() {
           <p className="text-sm font-semibold tracking-wide text-clink-accent">광고주</p>
           <h1 className="mt-1 text-2xl font-bold text-stone-900 sm:text-3xl">내 캠페인</h1>
         </div>
-        <Link
-          href="/my/credits"
-          className="inline-flex h-10 items-center rounded-full border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-900 hover:bg-zinc-50"
-        >
-          크레딧 충전
-        </Link>
       </div>
       <p className="mt-2 max-w-2xl text-sm text-zinc-500">
-        진행 중 캠페인, 결제 완료, 제안 현황, 종료된 내역을 나누어 확인할 수 있습니다.
+        진행 중 캠페인, 결제 완료, 지원 현황, 종료된 내역을 나누어 확인할 수 있습니다. 크리에이터
+        선정 후 확정 금액 1건을 토스페이먼츠 에스크로로 결제합니다.
       </p>
 
       <div
@@ -263,8 +243,8 @@ export function AdvertiserDashboard() {
             <section className="mt-6 min-w-0">
               <h2 className="text-base font-bold text-zinc-950">결제 대기 크리에이터 상품</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                선정된 제안에 대해 최종 결제(제안가 + 수수료 15% + 부가세 10%)를 완료하면 거래가
-                진행됩니다.
+                선정된 신청에 대해 사전 확정 용역비 + 수수료 15% + 부가세 10%를 토스페이먼츠 단건
+                에스크로로 결제하면 거래가 진행됩니다.
               </p>
               <ul className="mt-3 flex flex-col gap-3">
                 {awaitingPayDeals.map((deal) => {
@@ -306,10 +286,10 @@ export function AdvertiserDashboard() {
           </div>
         </>
       )}
-      <CreditChargeModal
-        open={chargeNeeded != null}
-        neededAmount={chargeNeeded ?? 0}
-        onClose={closeCharge}
+      <PaymentCheckoutModal
+        open={Boolean(checkout)}
+        checkout={checkout}
+        onClose={() => setCheckout(null)}
       />
     </PageContainer>
   );
@@ -402,7 +382,7 @@ function OpenCampaignsPanel({
               {deal.auction.title}
             </Link>
             <p className="mt-1 text-sm text-zinc-500">
-              {deal.bid ? `내 제안 ${formatWon(deal.bid.bidAmount)}` : '제안 대기'}
+              {deal.bid ? `확정 지급액 ${formatWon(deal.bid.bidAmount)}` : '신청 대기'}
             </p>
             <Link
               href={dealDetailHref('timeslot', deal.auction.id)}
@@ -422,7 +402,7 @@ function OpenCampaignsPanel({
                 onClick={() => onOpenProposals(deal.auction.id)}
                 className="inline-flex h-10 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
               >
-                제안 현황 보기
+                지원 현황 보기
               </button>
             }
           />

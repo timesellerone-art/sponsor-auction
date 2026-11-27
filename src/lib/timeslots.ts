@@ -2,7 +2,6 @@ import { withExclusiveAction } from '@/lib/action-lock';
 import {
   computeBidEngineStats,
   isDeadlinePassed,
-  nextInventoryMinBid,
 } from '@/lib/auction-engine';
 import { mockGetSession } from '@/lib/auth-mock';
 import { attachScore, getCreatorScoresByIds } from '@/lib/creator-metrics';
@@ -688,9 +687,12 @@ export async function placeTimeSlotBid(
         return fail(null, VALIDATION.duplicateTimeslotBid);
       }
     }
-    const minBid = nextInventoryMinBid(live.startingPrice, live.currentHighestBid);
-    if (!Number.isFinite(input.bidAmount) || input.bidAmount < minBid) {
-      return fail(null, `제안가는 ${minBid.toLocaleString('ko-KR')}원 이상이어야 합니다.`);
+    const bidAmount =
+      Number.isFinite(live.startingPrice) && live.startingPrice > 0
+        ? live.startingPrice
+        : input.bidAmount;
+    if (!Number.isFinite(bidAmount) || bidAmount <= 0) {
+      return fail(null, VALIDATION.startingPriceRequired);
     }
     let message = '';
     try {
@@ -723,7 +725,7 @@ export async function placeTimeSlotBid(
             advertiser_id:
               input.advertiserId && isUuid(input.advertiserId) ? input.advertiserId : null,
             advertiser_name: (input.advertiserName ?? '').trim() || '광고주',
-            bid_amount: input.bidAmount,
+            bid_amount: bidAmount,
             message,
           })
           .select(SLOT_BID_COLUMNS)
@@ -732,7 +734,7 @@ export async function placeTimeSlotBid(
           console.warn('[SponsorAuction] 크리에이터 상품 제안 등록 실패', error?.message);
           return fail(null, INSERT_FAIL_MESSAGE);
         }
-        return ok(mapSlotBid(data, input.bidAmount));
+        return ok(mapSlotBid(data, bidAmount));
       } catch {
         return fail(null, INSERT_FAIL_MESSAGE);
       }
@@ -743,7 +745,7 @@ export async function placeTimeSlotBid(
       timeSlotId: slotId,
       advertiserId: input.advertiserId ?? null,
       advertiserName: (input.advertiserName ?? '').trim() || '광고주',
-      bidAmount: input.bidAmount,
+      bidAmount,
       message,
       createdAt: new Date().toISOString(),
       isLeading: true,

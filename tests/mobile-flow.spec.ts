@@ -21,7 +21,7 @@ test.describe('모바일 반응형 UI', () => {
 
   test('모바일에서 역경매 목록과 메뉴가 잘리지 않고 터치된다', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: /예산과 제품만 올리면/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /확정 지급액과 제품만 올리면/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: '진행 중인 오픈 캠페인' })).toBeVisible();
     await expect(page.getByRole('link', { name: ACTIVE_AUCTION })).toBeVisible();
 
@@ -53,22 +53,22 @@ test.describe('모바일 반응형 UI', () => {
     await expectInViewportHorizontally(heading);
     await expectNoPageHorizontalOverflow(page);
 
-    const bidButton = page.getByRole('button', { name: '콘텐츠 제안하기' });
+    const bidButton = page.getByRole('button', { name: '캠페인 지원' });
     await expect(bidButton).toBeVisible();
     await expectInViewportHorizontally(bidButton);
     await bidButton.click();
 
-    const bidDialog = page.getByRole('dialog', { name: '콘텐츠 제안하기' });
+    const bidDialog = page.getByRole('dialog', { name: '캠페인 지원' });
     await expect(bidDialog).toBeVisible();
     await expectDialogFitsViewport(page, bidDialog);
 
-    await bidDialog.getByLabel('제안 금액(단가)').fill('120000');
+    await expect(bidDialog.getByText('확정 지급액 (캠페인 모집 단가)')).toBeVisible();
     await bidDialog
-      .getByLabel('제안 내용/소개글')
-      .fill('모바일 뷰포트에서 제안 모달 입력과 스크롤이 동작하는지 확인합니다.');
+      .getByLabel('제작 콘셉트·방향')
+      .fill('모바일 뷰포트에서 지원 모달 입력과 스크롤이 동작하는지 확인합니다.');
     await bidDialog.getByLabel('채널 URL 또는 포트폴리오 링크').fill(VALID_CHANNEL_URL);
-    await expect(bidDialog.getByRole('button', { name: '제안 제출' })).toBeVisible();
-    await expectInViewportHorizontally(bidDialog.getByRole('button', { name: '제안 제출' }));
+    await expect(bidDialog.getByRole('button', { name: '캠페인 지원 제출' })).toBeVisible();
+    await expectInViewportHorizontally(bidDialog.getByRole('button', { name: '캠페인 지원 제출' }));
 
     await bidDialog.getByRole('button', { name: '닫기' }).click();
     await expect(bidDialog).toBeHidden();
@@ -84,7 +84,7 @@ test.describe('모바일 반응형 UI', () => {
     const createDialog = await openCreateAuction(page);
     await expectDialogFitsViewport(page, createDialog);
     await expect(createDialog.getByLabel('제목')).toBeVisible();
-    await expect(createDialog.getByLabel('예산')).toBeVisible();
+    await expect(createDialog.getByLabel('확정 지급액 (캠페인 모집 단가)')).toBeVisible();
     await expect(createDialog.getByRole('button', { name: '캠페인 등록' })).toBeVisible();
     await createDialog.getByRole('button', { name: '닫기' }).click();
     await expect(createDialog).toBeHidden();
