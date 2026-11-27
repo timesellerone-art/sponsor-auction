@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
 import { CreateAuctionModal } from '@/components/CreateAuctionModal';
+import { NotificationBell } from '@/components/NotificationBell';
 import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { signOut } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -106,6 +107,7 @@ export function Navbar() {
           <div className="ml-auto flex shrink-0 items-center gap-1.5 lg:gap-2">
             {signedIn ? (
               <>
+                <NotificationBell />
                 <button
                   type="button"
                   onClick={() => {
@@ -130,6 +132,7 @@ export function Navbar() {
         <div className="flex shrink-0 items-center gap-1.5 md:hidden">
           {signedIn ? (
             <>
+              <NotificationBell />
               <button
                 type="button"
                 onClick={() => {

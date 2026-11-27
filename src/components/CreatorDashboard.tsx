@@ -313,7 +313,7 @@ export function CreatorDashboard() {
                               onClick={() => setPendingAward({ slot, bid })}
                               className="inline-flex h-8 items-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:bg-zinc-300"
                             >
-                              {awardBusyId === bid.id ? '선정 중...' : '크리에이터 선정'}
+                              {awardBusyId === bid.id ? '선정 중...' : '광고주 선정'}
                             </button>
                           </li>
                         ))
@@ -396,7 +396,7 @@ export function CreatorDashboard() {
         open={Boolean(pendingAward)}
         title="이 신청을 선정할까요?"
         description={`"${pendingAward?.bid.advertiserName || '광고주'}"의 신청을 선정하면 나머지 신청은 미선정으로 마감됩니다. 선정된 광고주가 확정 금액 1건을 토스페이먼츠 에스크로로 결제한 뒤 거래가 진행됩니다.`}
-        confirmLabel="크리에이터 선정"
+        confirmLabel="광고주 선정"
         busyLabel="선정 중..."
         cancelLabel="취소"
         busy={Boolean(pendingAward && awardBusyId === pendingAward.bid.id)}

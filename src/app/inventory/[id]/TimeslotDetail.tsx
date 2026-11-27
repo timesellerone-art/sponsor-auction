@@ -495,7 +495,7 @@ export function TimeslotDetail({ id }: { id: string }) {
                           onClick={() => setPendingBid(bid)}
                           className="mt-3 inline-flex h-9 items-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:bg-zinc-300"
                         >
-                          {busyId === bid.id ? '선정 중...' : '크리에이터 선정'}
+                          {busyId === bid.id ? '선정 중...' : '광고주 선정'}
                         </button>
                       ) : null}
                     </li>
@@ -601,7 +601,7 @@ export function TimeslotDetail({ id }: { id: string }) {
             open={Boolean(pendingBid) && slotOpen}
             title="이 신청을 선정할까요?"
             description={`"${pendingBid?.advertiserName || '광고주'}"의 신청을 선정하면 나머지 신청은 미선정으로 마감됩니다. 선정된 광고주가 확정 금액 1건을 토스페이먼츠 에스크로로 결제한 뒤 거래가 진행됩니다.`}
-            confirmLabel="크리에이터 선정"
+            confirmLabel="광고주 선정"
             busyLabel="선정 중..."
             cancelLabel="취소"
             busy={Boolean(pendingBid && busyId === pendingBid.id)}
