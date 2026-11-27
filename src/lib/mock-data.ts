@@ -200,6 +200,9 @@ export const mockProfiles: ProfileItem[] = [
     role: 'advertiser',
     status: 'active',
     createdAt: '2026-09-02T09:10:00+09:00',
+    businessRegistrationNumber: '110-11-12345',
+    businessVerificationStatus: 'verified',
+    businessRepresentativeName: '김한강',
   },
   {
     id: 'usr-002',
@@ -208,6 +211,9 @@ export const mockProfiles: ProfileItem[] = [
     role: 'advertiser',
     status: 'active',
     createdAt: '2026-09-08T14:22:00+09:00',
+    businessRegistrationNumber: '220-22-67890',
+    businessVerificationStatus: 'review_required',
+    businessRepresentativeName: '이우리',
   },
   {
     id: 'usr-003',
@@ -224,6 +230,8 @@ export const mockProfiles: ProfileItem[] = [
     role: 'advertiser',
     status: 'suspended',
     createdAt: '2026-08-21T16:05:00+09:00',
+    businessRegistrationNumber: '330-33-11111',
+    businessVerificationStatus: 'rejected',
   },
   {
     id: 'usr-005',

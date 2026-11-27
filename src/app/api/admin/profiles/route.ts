@@ -41,38 +41,59 @@ export async function GET() {
     }
 
     const { profiles, error } = await listAndBackfillProfiles(client);
-    let business = await client
+    type BusinessRow = {
+      id: string;
+      business_registration_number?: string | null;
+      business_verification_status?: string | null;
+      business_status_detail?: string | null;
+      business_review_note?: string | null;
+      settlement_type?: string | null;
+      business_representative_name?: string | null;
+    };
+    let businessRows: BusinessRow[] = [];
+    const full = await client
       .from('profiles')
       .select(
-        'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type',
+        'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type, business_representative_name',
       );
-    if (business.error) {
-      business = await client
+    if (!full.error) {
+      businessRows = (full.data ?? []) as BusinessRow[];
+    } else {
+      const withSettlement = await client
         .from('profiles')
         .select(
-          'id, business_registration_number, business_verification_status, business_status_detail, business_review_note',
+          'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type',
         );
+      if (!withSettlement.error) {
+        businessRows = (withSettlement.data ?? []) as BusinessRow[];
+      } else {
+        const basic = await client
+          .from('profiles')
+          .select(
+            'id, business_registration_number, business_verification_status, business_status_detail, business_review_note',
+          );
+        if (!basic.error) {
+          businessRows = (basic.data ?? []) as BusinessRow[];
+        }
+      }
     }
-    const businessById = new Map(
-      (business.error ? [] : business.data ?? []).map((row) => [row.id, row]),
-    );
+    const businessById = new Map(businessRows.map((row) => [row.id, row]));
     const withBusiness = profiles.map((profile) => {
       const extra = businessById.get(profile.id);
       const status = isBusinessVerificationStatus(extra?.business_verification_status ?? '')
         ? extra?.business_verification_status
         : 'unregistered';
       const settlementType =
-        extra && 'settlement_type' in extra && extra.settlement_type === 'business'
-          ? 'business'
-          : extra && 'settlement_type' in extra && extra.settlement_type === 'individual'
-            ? 'individual'
-            : undefined;
+        extra?.settlement_type === 'business' || extra?.settlement_type === 'individual'
+          ? extra.settlement_type
+          : undefined;
       return {
         ...profile,
         businessRegistrationNumber: formatBusinessNumber(extra?.business_registration_number ?? ''),
         businessVerificationStatus: status,
         businessStatusDetail: extra?.business_status_detail ?? '',
         businessReviewNote: extra?.business_review_note ?? '',
+        businessRepresentativeName: extra?.business_representative_name?.trim() ?? '',
         settlementType,
       };
     });

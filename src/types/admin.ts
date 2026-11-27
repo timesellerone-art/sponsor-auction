@@ -27,6 +27,7 @@ export interface ProfileItem {
   businessVerificationStatus?: BusinessVerificationStatus;
   businessStatusDetail?: string;
   businessReviewNote?: string;
+  businessRepresentativeName?: string;
   settlementType?: 'individual' | 'business';
 }
 
@@ -70,7 +71,13 @@ export type PayoutPeriodFilter = 'all' | 'today' | '7d' | 'month' | 'range';
 
 export type AuctionAdminFilter = 'all' | 'active' | 'awarded' | 'ended';
 
-export type ProfileAdminFilter = 'all' | 'active' | 'suspended';
+export type ProfileAdminFilter =
+  | 'all'
+  | 'active'
+  | 'suspended'
+  | 'verified'
+  | 'unverified'
+  | 'creator';
 
 export type PayoutAdminFilter = 'all' | 'pending' | 'paid' | 'cancelled' | 'hold';
 
