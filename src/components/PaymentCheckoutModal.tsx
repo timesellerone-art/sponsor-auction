@@ -386,7 +386,7 @@ export function PaymentCheckoutModal({
                 rel="noreferrer"
                 className="font-semibold text-clink-accent hover:underline"
               >
-                환불 규정
+                환불·취소·에스크로 정책
               </Link>
               에 동의합니다 (필수)
             </span>

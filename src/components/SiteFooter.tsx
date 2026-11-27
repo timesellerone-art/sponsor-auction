@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { COMPANY } from '@/lib/company';
+import { REFUND_POLICY_TITLE } from '@/lib/legal';
 
 export function SiteFooter() {
   const [year, setYear] = useState<number | null>(null);
@@ -58,7 +59,7 @@ export function SiteFooter() {
               개인정보처리방침
             </Link>
             <Link href="/refund" className="hover:text-zinc-800 hover:underline">
-              환불 및 취소 규정
+              {REFUND_POLICY_TITLE}
             </Link>
           </nav>
         </div>

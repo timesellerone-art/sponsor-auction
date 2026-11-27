@@ -1,5 +1,6 @@
 export const TERMS_REQUIRED = '서비스 이용약관에 동의해 주세요.';
 export const PRIVACY_REQUIRED = '개인정보처리방침에 동의해 주세요.';
+export const REFUND_POLICY_TITLE = '환불·취소·에스크로 정책';
 export const REFUND_REQUIRED = '구매 조건 확인 및 환불 규정에 동의해 주세요.';
 export const SIGNUP_AGREEMENT_REQUIRED =
   '서비스 이용약관 및 개인정보 처리방침에 동의해 주세요.';

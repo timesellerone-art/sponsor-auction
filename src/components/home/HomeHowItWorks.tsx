@@ -188,7 +188,7 @@ function AdvertiserSteps() {
             Toss Payments 연동
           </span>
           <ol className="mt-3 space-y-2">
-            {['1. 크리에이터(개인 또는 팀) 채택', '2. 토스 간편 결제', '3. 콘텐츠 발행 확인'].map(
+            {['1. 크리에이터(개인 또는 팀) 선정', '2. 단건 에스크로 결제', '3. 납품 확인·구매 확정'].map(
               (step, index) => (
                 <li key={step} className="flex items-center gap-2 text-xs font-medium text-[#1C1917]">
                   <Check
@@ -266,7 +266,7 @@ function CreatorSteps() {
             캠페인 보상금 정산
           </span>
           <ol className="mt-3 space-y-2">
-            {['1. 콘텐츠 업로드', '2. 검수 완료', '3. 확정 보상금 정산'].map((step, index) => (
+            {['1. 콘텐츠 납품', '2. 광고주 구매 확정', '3. 구간별 수수료 공제 후 정산'].map((step, index) => (
               <li key={step} className="flex items-center gap-2 text-xs font-medium text-[#1C1917]">
                 <Check
                   className={index === 2 ? 'size-3.5 text-[#EA580C]' : 'size-3.5 text-[#78716C]'}

@@ -29,7 +29,7 @@ test.describe('전자상거래 약관 및 동의 UI', () => {
     await expect(footer.getByText(/개인정보보호책임자:\s*권경환/)).toBeVisible();
     await expect(footer.getByRole('link', { name: '이용약관' })).toBeVisible();
     await expect(footer.getByRole('link', { name: '개인정보처리방침' })).toBeVisible();
-    await expect(footer.getByRole('link', { name: '환불 및 취소 규정' })).toBeVisible();
+    await expect(footer.getByRole('link', { name: '환불·취소·에스크로 정책' })).toBeVisible();
 
     await footer.getByRole('link', { name: '이용약관' }).click();
     await expect(page).toHaveURL(/\/terms/);
@@ -41,9 +41,9 @@ test.describe('전자상거래 약관 및 동의 UI', () => {
     await expect(page.getByRole('heading', { name: '개인정보 처리방침' })).toBeVisible();
     await expect(page.getByRole('heading', { name: /제3자 제공/ })).toBeVisible();
 
-    await page.getByRole('contentinfo').getByRole('link', { name: '환불 및 취소 규정' }).click();
+    await page.getByRole('contentinfo').getByRole('link', { name: '환불·취소·에스크로 정책' }).click();
     await expect(page).toHaveURL(/\/refund/);
-    await expect(page.getByRole('heading', { name: '환불 및 취소 규정' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '환불·취소·에스크로 정책' })).toBeVisible();
     await expect(page.getByRole('heading', { name: /100% 전액 환불/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: /크리에이터 제재/ })).toBeVisible();
   });

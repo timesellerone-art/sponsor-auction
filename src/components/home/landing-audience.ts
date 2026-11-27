@@ -70,8 +70,8 @@ export const LANDING_GUIDE = {
       },
       {
         step: 'STEP 03',
-        title: '토스페이먼츠 결제 & 콘텐츠 발행',
-        body: `크리에이터 선정 후 확정 용역비에 광고주 수수료 ${ADVERTISER_FEE_PERCENT}%와 부가세 10%를 더한 금액을 토스페이먼츠 단건 에스크로로 결제하고 콘텐츠 제작 결과를 확인합니다.`,
+        title: '단건 에스크로 결제 & 구매 확정',
+        body: `크리에이터 선정 후 확정 용역비에 광고주 수수료 ${ADVERTISER_FEE_PERCENT}%와 부가세 10%를 더한 금액을 토스페이먼츠 단건 에스크로로 결제합니다. 납품을 확인한 뒤 구매 확정하면 정산이 진행됩니다.`,
       },
     ],
     cta: '캠페인 등록하기',
@@ -91,8 +91,8 @@ export const LANDING_GUIDE = {
       },
       {
         step: 'STEP 03',
-        title: '콘텐츠 업로드 & 수익 정산',
-        body: `콘텐츠 업로드 및 광고주 구매 확정 후, 확정 지급액에서 구간별 수수료(${creatorFeePolicyCopy(' / ')})를 공제한 금액을 정산받습니다.`,
+        title: '납품 & 구매 확정 후 정산',
+        body: `콘텐츠 납품 및 광고주 구매 확정 후, 확정 지급액에서 구간별 수수료(${creatorFeePolicyCopy(' / ')})를 공제한 금액을 정산받습니다.`,
       },
     ],
     cta: '진행 중인 캠페인 보기',

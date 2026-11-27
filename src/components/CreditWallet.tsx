@@ -304,7 +304,8 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
           </>
         ) : (
           <p className="mt-5 text-sm leading-6 text-zinc-500">
-            1만·5만·10만·50만·100만·500만 원 선불 충전은 광고주 모드에서 할 수 있습니다.
+            선불 크레딧 충전은 제공하지 않습니다. 캠페인·상품 대금은 토스페이먼츠 단건 에스크로로
+            결제됩니다.
           </p>
         )}
         {error ? (
@@ -364,7 +365,7 @@ export function CreditWallet({ canCharge }: { canCharge: boolean }) {
               />
               <span>
                 <Link href="/refund" className="underline">
-                  환불 규정
+                  환불·취소·에스크로 정책
                 </Link>
                 과 구매 조건을 확인했습니다.
               </span>

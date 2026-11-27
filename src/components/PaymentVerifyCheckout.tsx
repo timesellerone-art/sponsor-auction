@@ -156,11 +156,12 @@ export function PaymentVerifyCheckout() {
             <span className="font-semibold">서비스 제공 기간:</span> {PAYMENT_VERIFY_SERVICE_PERIOD}
           </p>
           <p className="mt-2">
-            <span className="font-semibold">환불 규정:</span> 매칭 확정 및 작업 시작 전에는 결제
-            금액 100% 전액 환불, 용역 제공 개시 후에는 진행률·합의 기준에 따른 부분 환불 또는
-            환불 불가. 환불 승인일로부터 영업일 3~5일 이내 결제 수단 원복.{' '}
+            <span className="font-semibold">환불·취소·에스크로:</span> 결제 완료 후 납품 전에는
+            결제 금액 100% 전액 환불을 원칙으로 합니다. 납품 후 구매 확정 전은 검수·하자 여부에
+            따라 제한되며, 구매 확정 이후는 원칙적으로 환불 대상이 아닙니다. 환불 승인일로부터
+            영업일 3~5일 이내 결제 수단 원복.{' '}
             <Link href="/refund" className="font-semibold text-clink-accent hover:underline">
-              환불 및 취소 규정
+              환불·취소·에스크로 정책
             </Link>
           </p>
         </div>
@@ -187,7 +188,7 @@ export function PaymentVerifyCheckout() {
           <span>
             구매 조건 확인 및{' '}
             <Link href="/refund" className="font-semibold text-clink-accent hover:underline">
-              환불 규정
+              환불·취소·에스크로 정책
             </Link>
             에 동의합니다 (필수)
           </span>
