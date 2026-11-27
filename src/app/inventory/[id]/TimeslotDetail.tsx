@@ -13,6 +13,13 @@ import { TimeslotPaymentPanel } from '@/components/TimeslotPaymentPanel';
 import { showToast } from '@/components/Toast';
 import { ACCESS_REASON } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
+import {
+  campaignCategoryLabel,
+  campaignCoverUrl,
+  displayCampaignDescription,
+  platformBadgeLabel,
+  resolveCampaignCategory,
+} from '@/lib/campaign-presentation';
 import { PLATFORM_LABELS } from '@/lib/platforms';
 import { authRequestInit } from '@/lib/auth-request';
 import { BID_STATUS_LABEL } from '@/lib/status-labels';
@@ -178,6 +185,27 @@ export function TimeslotDetail({ id }: { id: string }) {
   const delivered = Boolean(slot?.deliveredAt || slot?.deliveryUrl);
   const purchaseConfirmed = Boolean(slot?.purchaseConfirmedAt);
   const awaitingPayment = Boolean(slot && isTimeslotAwaitingPayment(slot));
+  const slotCategoryId = slot
+    ? resolveCampaignCategory({
+        title: slot.title,
+        description: slot.description,
+        category: slot.category,
+      })
+    : null;
+  const slotCover = slot
+    ? campaignCoverUrl({
+        id: slot.id,
+        title: slot.title,
+        description: slot.description,
+        imageUrl: slot.imageUrl,
+        category: slot.category,
+      })
+    : '';
+  const slotCategoryBadge = slot
+    ? slotCategoryId
+      ? `${campaignCategoryLabel(slotCategoryId)} · ${platformBadgeLabel(slot.platform)}`
+      : PLATFORM_LABELS[slot.platform]
+    : '';
   const escrowed = Boolean(slot && isTimeslotEscrowed(slot));
   const awardedClosed = Boolean(slot && !slotOpen);
 
@@ -320,11 +348,22 @@ export function TimeslotDetail({ id }: { id: string }) {
         </div>
       ) : (
         <div className="mt-6 flex flex-col gap-5">
-          <article className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6">
-            <p className="text-xs font-semibold tracking-wide text-clink-accent">
-              {PLATFORM_LABELS[slot.platform]}
-            </p>
-            <h1 className="mt-2 text-2xl font-bold text-zinc-950">{slot.title}</h1>
+          <article className="overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+            <div className="relative h-52 overflow-hidden bg-stone-200 sm:h-64">
+              <img
+                src={slotCover}
+                alt=""
+                className="absolute inset-0 size-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+              <div className="absolute inset-x-4 top-4 flex flex-wrap gap-1.5">
+                <span className="rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+                  {slotCategoryBadge}
+                </span>
+              </div>
+            </div>
+            <div className="p-4 sm:p-6">
+            <h1 className="text-2xl font-bold text-zinc-950">{slot.title}</h1>
             <p className="mt-2 text-sm text-zinc-600">{slot.creatorName}</p>
             <CreatorRatingBadge
               className="mt-1"
@@ -332,7 +371,7 @@ export function TimeslotDetail({ id }: { id: string }) {
               completionRate={slot.creatorCompletionRate}
             />
             <p className="mt-4 text-sm leading-6 whitespace-pre-wrap text-zinc-600">
-              {slot.description}
+              {displayCampaignDescription(slot.description)}
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
               <div>
@@ -397,6 +436,7 @@ export function TimeslotDetail({ id }: { id: string }) {
                 </button>
               </div>
             )}
+            </div>
           </article>
           {slotOpen && authSettled && isAdvertiserActing && !isOwner ? (
             alreadyBid ? (

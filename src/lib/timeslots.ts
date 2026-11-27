@@ -5,6 +5,13 @@ import {
 } from '@/lib/auction-engine';
 import { mockGetSession } from '@/lib/auth-mock';
 import { attachScore, getCreatorScoresByIds } from '@/lib/creator-metrics';
+import {
+  isCampaignCategoryId,
+  parseCategoryFromDescription,
+  parseImageFromDescription,
+  withCategoryMarker,
+  withImageMarker,
+} from '@/lib/campaign-presentation';
 import { isPlatformType } from '@/lib/platforms';
 import { getSupabaseClient, type SponsorAuctionClient } from '@/lib/supabase';
 import { getDataClient } from '@/lib/supabase/data-client';
@@ -62,13 +69,24 @@ function applySlotExpiry(slot: TimeSlotItem, now = Date.now()): TimeSlotItem {
 
 function mapSlot(row: Partial<SlotRow> & Pick<SlotRow, 'id'>): TimeSlotItem {
   const platformRaw = String(row.platform ?? '');
+  const extra = row as Partial<SlotRow> & {
+    category?: string | null;
+    image_url?: string | null;
+    thumbnail_url?: string | null;
+  };
+  const description = extra.description ?? '';
+  const categoryRaw = extra.category ?? parseCategoryFromDescription(description);
+  const imageUrl =
+    extra.image_url?.trim() ||
+    extra.thumbnail_url?.trim() ||
+    parseImageFromDescription(description);
   return applySlotExpiry({
     id: row.id,
     creatorId: row.creator_id ?? null,
     creatorName: row.creator_name ?? '크리에이터',
     title: row.title ?? '제목 없음',
     platform: isPlatformType(platformRaw) ? platformRaw : 'other',
-    description: row.description ?? '',
+    description,
     expectedViews: row.expected_views ?? 0,
     startingPrice: row.starting_price ?? 0,
     currentHighestBid: row.current_highest_bid ?? 0,
@@ -84,6 +102,8 @@ function mapSlot(row: Partial<SlotRow> & Pick<SlotRow, 'id'>): TimeSlotItem {
     deliveredAt: row.delivered_at ?? null,
     purchaseConfirmedAt: row.purchase_confirmed_at ?? null,
     createdAt: row.created_at ?? '',
+    category: isCampaignCategoryId(categoryRaw) ? categoryRaw : null,
+    imageUrl: imageUrl || null,
   });
 }
 
@@ -513,12 +533,22 @@ export async function createTimeSlot(
     return fail(null, invalid);
   }
 
+  const category = isCampaignCategoryId(input.category) ? input.category : null;
+  const imageUrl = input.imageUrl?.trim() || null;
+  let description = input.description.trim();
+  if (category) {
+    description = withCategoryMarker(description, category);
+  }
+  if (imageUrl) {
+    description = withImageMarker(description, imageUrl);
+  }
+
   const payload = {
     creator_id: input.creatorId && isUuid(input.creatorId) ? input.creatorId : null,
     creator_name: (input.creatorName ?? '').trim() || '크리에이터',
     title: input.title.trim(),
     platform: input.platform,
-    description: input.description.trim(),
+    description,
     expected_views: input.expectedViews,
     starting_price: input.startingPrice,
     slot_start: input.slotStart,
@@ -549,23 +579,34 @@ export async function createTimeSlot(
       status: 'open',
       winnerBidId: null,
       createdAt: new Date().toISOString(),
+      category,
+      imageUrl,
     };
     rememberMockSlot(created);
     const [withScore] = await withScores([created]);
     return ok(withScore ?? created);
   }
 
+  const withPresentation = {
+    ...payload,
+    ...(category ? { category } : {}),
+    ...(imageUrl ? { image_url: imageUrl, thumbnail_url: imageUrl } : {}),
+  };
+
   try {
-    const { data, error } = await supabase
+    let inserted = await supabase
       .from('time_slots')
-      .insert(payload)
+      .insert(withPresentation as typeof payload)
       .select(SLOT_COLUMNS)
       .single();
-    if (error || !data) {
-      console.warn('[SponsorAuction] 크리에이터 상품 등록 실패', error?.message);
+    if (inserted.error && isSchemaMismatch(inserted.error)) {
+      inserted = await supabase.from('time_slots').insert(payload).select(SLOT_COLUMNS).single();
+    }
+    if (inserted.error || !inserted.data) {
+      console.warn('[SponsorAuction] 크리에이터 상품 등록 실패', inserted.error?.message);
       return fail(null, INSERT_FAIL_MESSAGE);
     }
-    const mapped = mapSlot(data);
+    const mapped = mapSlot(inserted.data);
     rememberMockSlot(mapped);
     const [withScore] = await withScores([mapped]);
     return ok(withScore ?? mapped);

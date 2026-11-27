@@ -1,4 +1,5 @@
 import type { PlatformType } from '@/types/auction';
+import type { CampaignCategoryId } from '@/lib/campaign-presentation';
 
 export type TimeSlotStatus = 'open' | 'closed' | 'awarded';
 
@@ -26,6 +27,8 @@ export type TimeSlotItem = {
   createdAt: string;
   creatorRating?: number;
   creatorCompletionRate?: number;
+  category?: CampaignCategoryId | null;
+  imageUrl?: string | null;
 };
 
 export type TimeSlotBidItem = {
@@ -50,6 +53,8 @@ export type CreateTimeSlotInput = {
   slotStart: string;
   slotEnd: string;
   deadline: string;
+  category?: CampaignCategoryId | null;
+  imageUrl?: string | null;
 };
 
 export type PlaceTimeSlotBidInput = {

@@ -10,6 +10,11 @@ import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { authRequestInit } from '@/lib/auth-request';
 import { TIMESLOT_BUSINESS_REQUIRED_NOTICE } from '@/lib/business-registration';
+import { uploadCampaignCover, validateCampaignCoverFile } from '@/lib/campaign-image';
+import {
+  SELECTABLE_CAMPAIGN_CATEGORIES,
+  type CampaignCategoryId,
+} from '@/lib/campaign-presentation';
 import { SELECTABLE_PLATFORMS } from '@/lib/platforms';
 import { cn } from '@/lib/utils';
 import { validateTimeSlotForm, type TimeSlotFieldErrors } from '@/lib/validation';
@@ -68,12 +73,15 @@ export function CreateTimeslotModal({
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [platform, setPlatform] = useState<PlatformType>('youtube_shorts');
+  const [category, setCategory] = useState<CampaignCategoryId>('beauty');
   const [expectedViews, setExpectedViews] = useState('100000');
   const [startingPrice, setStartingPrice] = useState('300000');
   const [description, setDescription] = useState('');
   const [slotStart, setSlotStart] = useState('');
   const [slotEnd, setSlotEnd] = useState('');
   const [deadline, setDeadline] = useState('');
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<TimeSlotFieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [businessBlocked, setBusinessBlocked] = useState(true);
@@ -92,6 +100,7 @@ export function CreateTimeslotModal({
     }
     setTitle('');
     setPlatform('youtube_shorts');
+    setCategory('beauty');
     setExpectedViews('100000');
     setStartingPrice('300000');
     setDescription('');
@@ -99,6 +108,13 @@ export function CreateTimeslotModal({
     setSlotStart(schedule.slotStart);
     setSlotEnd(schedule.slotEnd);
     setDeadline(schedule.deadline);
+    setCoverFile(null);
+    setCoverPreview((current) => {
+      if (current?.startsWith('blob:')) {
+        URL.revokeObjectURL(current);
+      }
+      return null;
+    });
     setErrors({});
     setSubmitError(null);
   }, [open]);
@@ -154,17 +170,29 @@ export function CreateTimeslotModal({
         return;
       }
 
+      let imageUrl: string | null = null;
+      if (coverFile) {
+        const uploaded = await uploadCampaignCover(coverFile, user.id);
+        if (uploaded.url) {
+          imageUrl = uploaded.url;
+        } else if (uploaded.error) {
+          showToast(uploaded.error);
+        }
+      }
+
       const payload = {
         creatorId: user.id,
         creatorName: user.name,
         title: title.trim(),
         platform,
+        category,
         description: description.trim(),
         expectedViews: Number(expectedViews),
         startingPrice: Number(startingPrice),
         slotStart: toIso(slotStart),
         slotEnd: toIso(slotEnd),
         deadline: new Date(`${deadline}T23:59:59+09:00`).toISOString(),
+        imageUrl,
       };
 
       let result: { error: string | null };
@@ -249,6 +277,20 @@ export function CreateTimeslotModal({
                 ))}
               </select>
             </Field>
+            <Field label="콘텐츠 분야" htmlFor="slot-category">
+              <select
+                id="slot-category"
+                value={category}
+                onChange={(event) => setCategory(event.target.value as CampaignCategoryId)}
+                className={inputClass(false)}
+              >
+                {SELECTABLE_CAMPAIGN_CATEGORIES.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="예상 조회수" htmlFor="slot-views" error={errors.expectedViews} hint="최소 1,000회">
               <input
                 id="slot-views"
@@ -302,6 +344,64 @@ export function CreateTimeslotModal({
                 onChange={(event) => setDescription(event.target.value)}
                 className={cn(inputClass(Boolean(errors.description)), 'h-auto min-h-24 resize-y py-2')}
               />
+            </Field>
+            <Field
+              label="상품 대표 사진 업로드(선택)"
+              htmlFor="slot-cover"
+              hint="JPG, PNG, WEBP · 5MB 이하"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <input
+                  id="slot-cover"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null;
+                    if (!file) {
+                      setCoverFile(null);
+                      setCoverPreview((current) => {
+                        if (current?.startsWith('blob:')) {
+                          URL.revokeObjectURL(current);
+                        }
+                        return null;
+                      });
+                      return;
+                    }
+                    const invalid = validateCampaignCoverFile(file);
+                    if (invalid) {
+                      setSubmitError(invalid);
+                      showToast(invalid);
+                      event.target.value = '';
+                      return;
+                    }
+                    setSubmitError(null);
+                    setCoverFile(file);
+                    setCoverPreview((current) => {
+                      if (current?.startsWith('blob:')) {
+                        URL.revokeObjectURL(current);
+                      }
+                      return URL.createObjectURL(file);
+                    });
+                  }}
+                />
+                <label
+                  htmlFor="slot-cover"
+                  className="inline-flex h-9 shrink-0 cursor-pointer items-center rounded-full bg-[#FFF7ED] px-3 text-xs font-semibold text-[#1C1917] hover:bg-[#FFEDD5]"
+                >
+                  파일 선택
+                </label>
+                {coverFile?.name ? (
+                  <span className="min-w-0 flex-1 truncate text-sm text-zinc-500">{coverFile.name}</span>
+                ) : null}
+              </div>
+              {coverPreview ? (
+                <img
+                  src={coverPreview}
+                  alt="대표 사진 미리보기"
+                  className="mt-3 h-32 w-full rounded-xl object-cover ring-1 ring-stone-900/10"
+                />
+              ) : null}
             </Field>
             {submitError ? (
               <p className="text-sm text-rose-600" role="alert">

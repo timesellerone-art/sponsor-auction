@@ -10,6 +10,7 @@ import {
   getPaymentActor,
   unauthorizedJson,
 } from '@/lib/payments/guard';
+import { isCampaignCategoryId } from '@/lib/campaign-presentation';
 import { isPlatformType } from '@/lib/platforms';
 import { timeslotWriter } from '@/lib/timeslot-http';
 import { createTimeSlot, listTimeSlots } from '@/lib/timeslots';
@@ -126,6 +127,7 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const platformRaw = asText(body?.platform);
     const platform: PlatformType = isPlatformType(platformRaw) ? platformRaw : 'other';
+    const categoryRaw = asText(body?.category);
     const result = await createTimeSlot(
       {
         creatorId: (actor.userId ?? asText(body?.creatorId)) || null,
@@ -138,6 +140,8 @@ export async function POST(request: Request) {
         slotStart: asText(body?.slotStart),
         slotEnd: asText(body?.slotEnd),
         deadline: asText(body?.deadline),
+        category: isCampaignCategoryId(categoryRaw) ? categoryRaw : null,
+        imageUrl: asText(body?.imageUrl) || null,
       },
       writer,
     );
