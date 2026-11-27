@@ -2,6 +2,36 @@ import { ADVERTISER_FEE_PERCENT, creatorFeePolicyCopy } from '@/lib/fee-policy';
 
 export type LandingAudience = 'advertiser' | 'creator';
 
+export const LANDING_AUDIENCE_STORAGE_KEY = 'clink-landing-audience';
+export const LANDING_AUDIENCE_CHANGED_EVENT = 'landing-audience:changed';
+
+export function readLandingAudience(): LandingAudience {
+  if (typeof window === 'undefined') {
+    return 'advertiser';
+  }
+  try {
+    const raw = window.sessionStorage.getItem(LANDING_AUDIENCE_STORAGE_KEY);
+    if (raw === 'creator' || raw === 'advertiser') {
+      return raw;
+    }
+  } catch {
+    // 저장소를 쓸 수 없으면 기본 광고주 소개를 사용합니다.
+  }
+  return 'advertiser';
+}
+
+export function writeLandingAudience(next: LandingAudience) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.sessionStorage.setItem(LANDING_AUDIENCE_STORAGE_KEY, next);
+  } catch {
+    // 저장 실패해도 이번 화면 선택은 유지합니다.
+  }
+  window.dispatchEvent(new Event(LANDING_AUDIENCE_CHANGED_EVENT));
+}
+
 export const LANDING_ROLE_TABS = [
   { id: 'advertiser' as const, label: '광고주 (브랜드)' },
   { id: 'creator' as const, label: '크리에이터 (개인·팀)' },

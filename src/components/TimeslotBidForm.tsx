@@ -12,6 +12,7 @@ import { authRequestInit } from '@/lib/auth-request';
 import { placeTimeSlotBid } from '@/lib/timeslots';
 import { formatWon } from '@/lib/utils';
 import { MIN_PROPOSAL_LENGTH, VALIDATION } from '@/lib/validation';
+import { TIMESLOT_APPLY_ADVERTISER_ONLY } from '@/lib/access';
 import { hasAuthRole } from '@/types/auth';
 import type { TimeSlotBidItem, TimeSlotItem } from '@/types/timeslot';
 import { hasOffPlatformContact } from '@/utils/filter';
@@ -49,7 +50,8 @@ export function TimeslotBidForm({
       return false;
     }
     if (!canSubmitBid) {
-      setError('크리에이터 상품 신청은 광고주 계정에서만 가능합니다.');
+      setError(TIMESLOT_APPLY_ADVERTISER_ONLY);
+      showToast(TIMESLOT_APPLY_ADVERTISER_ONLY);
       return false;
     }
     return true;

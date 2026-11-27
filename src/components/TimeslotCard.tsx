@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { CreatorRatingBadge } from '@/components/CreatorRatingBadge';
+import { showToast } from '@/components/Toast';
+import { useActingMemberRole } from '@/hooks/useActingMemberRole';
+import { TIMESLOT_APPLY_ADVERTISER_ONLY } from '@/lib/access';
 import { useEffect, useState } from 'react';
 import { isDeadlinePassed } from '@/lib/auction-engine';
 import {
@@ -16,6 +19,8 @@ import { isTimeslotAwaitingPayment, type TimeSlotItem } from '@/types/timeslot';
 import { cn, formatViews, formatWon } from '@/lib/utils';
 
 export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
+  const actingRole = useActingMemberRole();
+  const isCreatorActing = actingRole === 'creator';
   const [open, setOpen] = useState(slot.status === 'open' && !slot.winnerBidId);
 
   useEffect(() => {
@@ -102,12 +107,22 @@ export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
           <AuctionCountdown deadline={slot.deadline} />
           <span className="text-zinc-500">지원 {slot.bidsCount}</span>
         </div>
-        <Link
-          href={href}
-          className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-clink px-3 text-sm font-semibold text-white hover:bg-stone-800"
-        >
-          {open ? '제안하기' : '상세 보기'}
-        </Link>
+        {open && isCreatorActing ? (
+          <button
+            type="button"
+            onClick={() => showToast(TIMESLOT_APPLY_ADVERTISER_ONLY)}
+            className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-clink px-3 text-sm font-semibold text-white hover:bg-stone-800"
+          >
+            광고주 전용 신청
+          </button>
+        ) : (
+          <Link
+            href={href}
+            className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-clink px-3 text-sm font-semibold text-white hover:bg-stone-800"
+          >
+            {open ? '제안하기' : '상세 보기'}
+          </Link>
+        )}
       </div>
     </article>
   );

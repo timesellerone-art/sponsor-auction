@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
-import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { showToast } from '@/components/Toast';
-import { ACCESS_REASON } from '@/lib/access';
+import { ACCESS_REASON, CAMPAIGN_APPLY_CREATOR_ONLY } from '@/lib/access';
+import { useActingMemberRole } from '@/hooks/useActingMemberRole';
 import { isOpenForBid } from '@/lib/auction-browse';
 import { loginPath } from '@/lib/auth-guard';
 import {
@@ -74,7 +74,7 @@ export function AuctionCard({
 }) {
   const router = useRouter();
   const { user, ready } = useAuth();
-  const { requestCreator } = useRoleIntent();
+  const actingRole = useActingMemberRole();
   const [bidOpen, setBidOpen] = useState(false);
   const [alreadyBid, setAlreadyBid] = useState(false);
   const title = auction.title || '제목 없음';
@@ -111,12 +111,21 @@ export function AuctionCard({
         user.id,
       ),
   );
-  const canAttemptBid = auctionOpen && !owned && !alreadyBid && Boolean(ready && user);
+  const isCreatorActing = actingRole === 'creator';
+  const isAdvertiserActing = actingRole === 'advertiser';
+  const canAttemptBid =
+    auctionOpen && !owned && !alreadyBid && Boolean(ready && user && isCreatorActing);
   const openBid = () => {
     if (alreadyBid) {
       return;
     }
-    requestCreator(() => setBidOpen(true));
+    if (isAdvertiserActing) {
+      showToast(CAMPAIGN_APPLY_CREATOR_ONLY);
+      return;
+    }
+    if (user && isCreatorActing) {
+      setBidOpen(true);
+    }
   };
 
   useEffect(() => {
@@ -209,7 +218,11 @@ export function AuctionCard({
         <button type="button" onClick={openBid} className={CARD_CTA}>
           캠페인 지원
         </button>
-      ) : auctionOpen && ready && !user ? (
+      ) : auctionOpen && ready && isAdvertiserActing && !owned ? (
+        <button type="button" onClick={openBid} className={CARD_CTA}>
+          크리에이터 전용 지원
+        </button>
+      ) : auctionOpen && ready && !user && isCreatorActing ? (
         <button
           type="button"
           onClick={() => {

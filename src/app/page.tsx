@@ -83,7 +83,6 @@ export default function Home() {
       <LandingAudienceProvider>
         <HomeHero />
         <HomeHowItWorks />
-      </LandingAudienceProvider>
       <HomeAiPreview />
 
       <PageContainer id="auctions" className="scroll-mt-24 flex-1 py-16 sm:py-20">
@@ -159,6 +158,7 @@ export default function Home() {
           </div>
         )}
       </PageContainer>
+      </LandingAudienceProvider>
     </div>
   );
 }

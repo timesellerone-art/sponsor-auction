@@ -9,7 +9,6 @@ import { AuctionChat } from '@/components/AuctionChat';
 import { AiAgentGuide } from '@/components/AiAgentGuide';
 import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
-import { useRoleIntent } from '@/components/RoleIntentProvider';
 import { BidProposalList } from '@/components/BidProposalList';
 import { PaymentCheckoutModal } from '@/components/PaymentCheckoutModal';
 import { TaxInvoiceStatus } from '@/components/TaxInvoiceStatus';
@@ -17,8 +16,9 @@ import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { prepareAwardPayment } from '@/lib/payments/client';
-import { ACCESS_REASON } from '@/lib/access';
+import { ACCESS_REASON, CAMPAIGN_APPLY_CREATOR_ONLY } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
+import { useActingMemberRole } from '@/hooks/useActingMemberRole';
 import {
   guideFingerprint,
   guideToAiReport,
@@ -47,7 +47,7 @@ export function AuctionDetail({ id }: { id: string }) {
   const router = useRouter();
   const { user, ready, canCreateAuction } = useAuth();
   const { requireAdvertiser } = useRequireAuth();
-  const { requestCreator } = useRoleIntent();
+  const actingRole = useActingMemberRole();
   const [auction, setAuction] = useState<AuctionItem | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -204,7 +204,11 @@ export function AuctionDetail({ id }: { id: string }) {
   const alreadyBid = Boolean(
     (auction && user && hasActiveCreatorBid(bids, user.id, auction.id)) || alreadyBidRemote,
   );
-  const canAttemptBid = Boolean(auctionOpen && ready && user && !ownCampaign && !alreadyBid);
+  const isCreatorActing = actingRole === 'creator';
+  const isAdvertiserActing = actingRole === 'advertiser';
+  const canAttemptBid = Boolean(
+    auctionOpen && ready && user && isCreatorActing && !ownCampaign && !alreadyBid,
+  );
 
   useEffect(() => {
     if (!user?.id || !auction?.id || ownCampaign) {
@@ -377,17 +381,25 @@ export function AuctionDetail({ id }: { id: string }) {
             ) : canAttemptBid ? (
               <button
                 type="button"
-                onClick={() => requestCreator(() => setBidOpen(true))}
+                onClick={() => setBidOpen(true)}
                 className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
               >
                 캠페인 지원
+              </button>
+            ) : auctionOpen && ready && isAdvertiserActing && !ownCampaign ? (
+              <button
+                type="button"
+                onClick={() => showToast(CAMPAIGN_APPLY_CREATOR_ONLY)}
+                className="mt-6 inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
+              >
+                크리에이터 전용 지원
               </button>
             ) : (
               <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 {!auctionOpen
                   ? '이 캠페인은 모집이 마감되었거나 지원을 받지 않습니다.'
                   : '로그인 후 캠페인에 지원할 수 있습니다.'}
-                {!user && auctionOpen ? (
+                {!user && auctionOpen && isCreatorActing ? (
                   <button
                     type="button"
                     onClick={() => {

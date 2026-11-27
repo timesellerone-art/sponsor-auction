@@ -9,7 +9,7 @@ import { EscrowNotice } from '@/components/EscrowNotice';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
-import { useRequireAuth } from '@/hooks/useRequireAuth';
+import { CAMPAIGN_APPLY_CREATOR_ONLY } from '@/lib/access';
 import { isDemoAccountEmail } from '@/lib/auth-mock';
 import { authRequestInit } from '@/lib/auth-request';
 import { canonicalBankName } from '@/lib/banks';
@@ -50,8 +50,7 @@ type BidModalProps = {
 
 export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
   const titleId = useId();
-  const { user } = useAuth();
-  const { requireCreator } = useRequireAuth();
+  const { user, canPlaceBid } = useAuth();
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const [creatorChannelUrl, setCreatorChannelUrl] = useState('');
   const [proposalText, setProposalText] = useState('');
@@ -223,11 +222,9 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
     event.preventDefault();
     await run('bid', async () => {
       try {
-        if (!requireCreator(`/auctions/${auction.id}`) || !user) {
-          const message = !user
-            ? '제안은 로그인 후 크리에이터 계정으로 할 수 있습니다.'
-            : '크리에이터 전용 기능입니다. 크리에이터 계정으로 로그인해 주세요.';
-          setSubmitError(message);
+        if (!user || !canPlaceBid) {
+          setSubmitError(CAMPAIGN_APPLY_CREATOR_ONLY);
+          showToast(CAMPAIGN_APPLY_CREATOR_ONLY);
           onClose();
           return;
         }

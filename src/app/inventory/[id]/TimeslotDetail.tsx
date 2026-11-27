@@ -11,8 +11,9 @@ import { CreatorRatingBadge } from '@/components/CreatorRatingBadge';
 import { TimeslotBidForm } from '@/components/TimeslotBidForm';
 import { TimeslotPaymentPanel } from '@/components/TimeslotPaymentPanel';
 import { showToast } from '@/components/Toast';
-import { ACCESS_REASON } from '@/lib/access';
+import { ACCESS_REASON, TIMESLOT_APPLY_ADVERTISER_ONLY } from '@/lib/access';
 import { loginPath } from '@/lib/auth-guard';
+import { useActingMemberRole } from '@/hooks/useActingMemberRole';
 import {
   campaignCategoryLabel,
   campaignCoverUrl,
@@ -67,7 +68,8 @@ function isMyTimeslotBid(
 
 export function TimeslotDetail({ id }: { id: string }) {
   const router = useRouter();
-  const { user, profileReady, activeRole } = useAuth();
+  const { user, profileReady } = useAuth();
+  const actingRole = useActingMemberRole();
   const authSettled = Boolean(user) || profileReady;
   const [slot, setSlot] = useState<TimeSlotItem | null>(null);
   const [bids, setBids] = useState<TimeSlotBidItem[]>([]);
@@ -168,10 +170,11 @@ export function TimeslotDetail({ id }: { id: string }) {
   }, [load]);
 
   const isOwner = Boolean(slot?.creatorId && user?.id && slot.creatorId === user.id);
+  const isCreatorActing = actingRole === 'creator';
   const isAdvertiserActing = Boolean(
-    user &&
-      activeRole !== 'creator' &&
-      (activeRole === 'advertiser' || hasAuthRole(user, 'advertiser') || hasAuthRole(user, 'admin')),
+    actingRole === 'advertiser' &&
+      user &&
+      (hasAuthRole(user, 'advertiser') || hasAuthRole(user, 'admin')),
   );
   const slotOpen = Boolean(slot && isTimeSlotOpen(slot));
   const myBid = user ? bids.find((bid) => isMyTimeslotBid(bid, user)) ?? null : null;
@@ -417,10 +420,19 @@ export function TimeslotDetail({ id }: { id: string }) {
               <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 내가 등록한 크리에이터 상품입니다.
               </p>
-            ) : isAdvertiserActing ? null : user ? (
-              <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                크리에이터 상품 신청은 광고주 계정에서만 가능합니다.
-              </p>
+            ) : isAdvertiserActing ? null : isCreatorActing ? (
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={() => showToast(TIMESLOT_APPLY_ADVERTISER_ONLY)}
+                  className="inline-flex h-11 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
+                >
+                  광고주 전용 신청
+                </button>
+                <p className="mt-2 text-center text-xs text-zinc-500">
+                  {TIMESLOT_APPLY_ADVERTISER_ONLY}
+                </p>
+              </div>
             ) : (
               <div className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
                 <p>로그인 후 신청할 수 있습니다.</p>

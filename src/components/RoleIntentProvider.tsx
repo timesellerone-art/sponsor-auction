@@ -58,13 +58,12 @@ export function RoleIntentProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (hasAuthRole(user, intent)) {
-        setActiveRole(intent);
         then?.();
         return;
       }
       setPending({ intent, then });
     },
-    [ready, router, setActiveRole, user],
+    [ready, router, user],
   );
 
   const close = useCallback(() => {

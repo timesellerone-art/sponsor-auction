@@ -28,6 +28,11 @@ export const ACCESS_REASON = {
   'payment-auth': '결제는 로그인 후 이용할 수 있습니다.',
 } as const;
 
+export const CAMPAIGN_APPLY_CREATOR_ONLY =
+  '캠페인 지원은 크리에이터 계정으로 로그인 후 이용할 수 있습니다.';
+export const TIMESLOT_APPLY_ADVERTISER_ONLY =
+  '상품 신청은 광고주 계정으로 로그인 후 이용할 수 있습니다.';
+
 export type AccessReason = keyof typeof ACCESS_REASON;
 
 export function isAccessReason(value: string | null | undefined): value is AccessReason {
