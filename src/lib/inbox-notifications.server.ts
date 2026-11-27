@@ -1,36 +1,24 @@
 import 'server-only';
 
+import { getAuctionsByAuthor, getBidsByAuctionIds } from '@/lib/auctions';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
+import { isSchemaMismatch } from '@/lib/supabase/errors';
+import {
+  listTimeSlotBidsBySlotIds,
+  listTimeSlotBidsForAdvertiser,
+  listTimeSlots,
+  listTimeSlotsByIds,
+} from '@/lib/timeslots';
 import { uuidIds } from '@/lib/uuid';
 import type { AppNotification, NotificationType } from '@/types/notification';
-
-type SlotRow = {
-  id?: string | null;
-  creator_id?: string | null;
-  creator_name?: string | null;
-  title?: string | null;
-  status?: string | null;
-  winner_bid_id?: string | null;
-  delivery_url?: string | null;
-  delivered_at?: string | null;
-  purchase_confirmed_at?: string | null;
-  created_at?: string | null;
-};
-
-type SlotBidRow = {
-  id?: string | null;
-  time_slot_id?: string | null;
-  advertiser_id?: string | null;
-  advertiser_name?: string | null;
-  created_at?: string | null;
-};
+import type { TimeSlotBidItem, TimeSlotItem } from '@/types/timeslot';
 
 type AuctionRow = {
   id?: string | null;
   title?: string | null;
   author_id?: string | null;
   winner_bid_id?: string | null;
-  category?: string | null;
   created_at?: string | null;
 };
 
@@ -45,18 +33,19 @@ type CampaignBidRow = {
 
 type PaymentRow = {
   auction_id?: string | null;
-  bid_id?: string | null;
   status?: string | null;
   created_at?: string | null;
   confirmed_at?: string | null;
 };
 
-const SLOT_COLUMNS =
-  'id, creator_id, creator_name, title, status, winner_bid_id, delivery_url, delivered_at, purchase_confirmed_at, created_at';
-const SLOT_BID_COLUMNS = 'id, time_slot_id, advertiser_id, advertiser_name, created_at';
-const AUCTION_COLUMNS = 'id, title, author_id, winner_bid_id, category, created_at';
+type ProfileReviewRow = {
+  business_verification_status?: string | null;
+  business_status_detail?: string | null;
+  business_checked_at?: string | null;
+};
+
 const CAMPAIGN_BID_COLUMNS = 'id, auction_id, creator_id, creator_name, status, created_at';
-const PAYMENT_COLUMNS = 'auction_id, bid_id, status, created_at, confirmed_at';
+const PAYMENT_COLUMNS = 'auction_id, status, created_at, confirmed_at';
 
 function asText(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
@@ -66,11 +55,9 @@ function asIso(value: unknown, fallback: string) {
   return asText(value) || fallback;
 }
 
-type ProfileReviewRow = {
-  business_verification_status?: string | null;
-  business_status_detail?: string | null;
-  business_checked_at?: string | null;
-};
+async function inboxReader() {
+  return createAdminClient() ?? (await createClient());
+}
 
 async function selectRows<T>(query: PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
   try {
@@ -85,16 +72,19 @@ async function selectRows<T>(query: PromiseLike<{ data: T[] | null; error: unkno
 }
 
 async function selectProfileReview(
-  admin: NonNullable<ReturnType<typeof createAdminClient>>,
+  reader: NonNullable<Awaited<ReturnType<typeof inboxReader>>>,
   userId: string,
 ): Promise<ProfileReviewRow | null> {
   try {
-    const result = await admin
+    const result = await reader
       .from('profiles')
       .select('business_verification_status, business_status_detail, business_checked_at')
       .eq('id', userId)
       .maybeSingle();
-    return result.data ?? null;
+    if (result.error && isSchemaMismatch(result.error)) {
+      return null;
+    }
+    return (result.data as ProfileReviewRow | null) ?? null;
   } catch {
     return null;
   }
@@ -145,119 +135,114 @@ function paidAtByDeal(payments: PaymentRow[]) {
   return { paid, started };
 }
 
+function mergeSlots(groups: TimeSlotItem[][]) {
+  const map = new Map<string, TimeSlotItem>();
+  for (const group of groups) {
+    for (const slot of group) {
+      if (slot.id) {
+        map.set(slot.id, slot);
+      }
+    }
+  }
+  return map;
+}
+
+function mergeSlotBids(groups: TimeSlotBidItem[][]) {
+  const map = new Map<string, TimeSlotBidItem[]>();
+  for (const group of groups) {
+    for (const bid of group) {
+      const slotId = asText(bid.timeSlotId);
+      if (!slotId) {
+        continue;
+      }
+      const list = map.get(slotId) ?? [];
+      if (!list.some((item) => item.id === bid.id)) {
+        list.push(bid);
+        map.set(slotId, list);
+      }
+    }
+  }
+  return map;
+}
+
 export async function listInboxNotifications(userId: string): Promise<AppNotification[]> {
   const actorId = asText(userId);
   if (!actorId) {
     return [];
   }
 
-  const admin = createAdminClient();
-  if (!admin) {
+  const reader = await inboxReader();
+  if (!reader) {
     return [];
   }
 
   const items: AppNotification[] = [];
   const nowIso = new Date().toISOString();
 
-  const [ownedSlots, appliedSlotBids, ownedCampaigns, appliedCampaignBids, profile] = await Promise.all([
-    selectRows<SlotRow>(admin.from('time_slots').select(SLOT_COLUMNS).eq('creator_id', actorId)),
-    selectRows<SlotBidRow>(
-      admin.from('time_slot_bids').select(SLOT_BID_COLUMNS).eq('advertiser_id', actorId),
-    ),
-    selectRows<AuctionRow>(admin.from('auctions').select(AUCTION_COLUMNS).eq('author_id', actorId)),
-    selectRows<CampaignBidRow>(
-      admin.from('bids').select(CAMPAIGN_BID_COLUMNS).eq('creator_id', actorId),
-    ),
-    selectProfileReview(admin, actorId),
+  const [ownedSlotsResult, appliedSlotBidsResult, ownedCampaignsResult, appliedCampaignBids, profile] =
+    await Promise.all([
+      listTimeSlots({ creatorId: actorId, client: reader, includeHidden: true }),
+      listTimeSlotBidsForAdvertiser(actorId, reader),
+      getAuctionsByAuthor(actorId, { client: reader }),
+      selectRows<CampaignBidRow>(
+        reader.from('bids').select(CAMPAIGN_BID_COLUMNS).eq('creator_id', actorId),
+      ),
+      selectProfileReview(reader, actorId),
+    ]);
+
+  const ownedSlots = ownedSlotsResult.data ?? [];
+  const appliedSlotBids = appliedSlotBidsResult.data ?? [];
+  const ownedCampaigns = ownedCampaignsResult.data ?? [];
+  const appliedSlotIds = appliedSlotBids.map((bid) => bid.timeSlotId);
+  const appliedCampaignIds = uuidIds(appliedCampaignBids.map((row) => row.auction_id));
+  const ownedCampaignIds = uuidIds(ownedCampaigns.map((item) => item.id));
+
+  const [bidsOnOwnedSlotsResult, appliedSlotsResult, bidsOnOwnedCampaigns, appliedCampaigns] =
+    await Promise.all([
+      listTimeSlotBidsBySlotIds(
+        ownedSlots.map((slot) => slot.id),
+        reader,
+      ),
+      listTimeSlotsByIds(appliedSlotIds, reader),
+      ownedCampaignIds.length > 0
+        ? getBidsByAuctionIds(ownedCampaignIds, { client: reader })
+        : Promise.resolve({ data: [], error: null }),
+      appliedCampaignIds.length > 0
+        ? selectRows<AuctionRow>(
+            reader.from('auctions').select('id, title, author_id, winner_bid_id, created_at').in('id', appliedCampaignIds),
+          )
+        : Promise.resolve([] as AuctionRow[]),
+    ]);
+
+  const slotMap = mergeSlots([ownedSlots, appliedSlotsResult.data ?? []]);
+  const slotBidMap = mergeSlotBids([bidsOnOwnedSlotsResult.data ?? [], appliedSlotBids]);
+
+  const dealIds = uuidIds([
+    ...slotMap.keys(),
+    ...ownedCampaignIds,
+    ...appliedCampaignIds,
   ]);
-
-  const ownedSlotIds = uuidIds(ownedSlots.map((row: SlotRow) => row.id));
-  const appliedSlotIds = uuidIds(appliedSlotBids.map((row: SlotBidRow) => row.time_slot_id));
-  const ownedCampaignIds = uuidIds(ownedCampaigns.map((row: AuctionRow) => row.id));
-  const appliedCampaignIds = uuidIds(appliedCampaignBids.map((row: CampaignBidRow) => row.auction_id));
-
-  const [bidsOnOwnedSlots, appliedSlots, bidsOnOwnedCampaigns, appliedCampaigns] = await Promise.all([
-    ownedSlotIds.length > 0
-      ? selectRows<SlotBidRow>(
-          admin.from('time_slot_bids').select(SLOT_BID_COLUMNS).in('time_slot_id', ownedSlotIds),
-        )
-      : Promise.resolve([] as SlotBidRow[]),
-    appliedSlotIds.length > 0
-      ? selectRows<SlotRow>(admin.from('time_slots').select(SLOT_COLUMNS).in('id', appliedSlotIds))
-      : Promise.resolve([] as SlotRow[]),
-    ownedCampaignIds.length > 0
-      ? selectRows<CampaignBidRow>(
-          admin.from('bids').select(CAMPAIGN_BID_COLUMNS).in('auction_id', ownedCampaignIds),
-        )
-      : Promise.resolve([] as CampaignBidRow[]),
-    appliedCampaignIds.length > 0
-      ? selectRows<AuctionRow>(
-          admin.from('auctions').select(AUCTION_COLUMNS).in('id', appliedCampaignIds),
-        )
-      : Promise.resolve([] as AuctionRow[]),
-  ]);
-
-  const slotMap = new Map<string, SlotRow>();
-  for (const row of [...ownedSlots, ...appliedSlots]) {
-    const id = asText(row.id);
-    if (id) {
-      slotMap.set(id, row);
-    }
-  }
-  const slotBidMap = new Map<string, SlotBidRow[]>();
-  for (const row of [...bidsOnOwnedSlots, ...appliedSlotBids]) {
-    const slotId = asText(row.time_slot_id);
-    if (!slotId) {
-      continue;
-    }
-    const list = slotBidMap.get(slotId) ?? [];
-    if (!list.some((item) => item.id === row.id)) {
-      list.push(row);
-      slotBidMap.set(slotId, list);
-    }
-  }
-
-  const auctionMap = new Map<string, AuctionRow>();
-  for (const row of [...ownedCampaigns, ...appliedCampaigns]) {
-    const id = asText(row.id);
-    if (id) {
-      auctionMap.set(id, row);
-    }
-  }
-  const campaignBidMap = new Map<string, CampaignBidRow[]>();
-  for (const row of [...bidsOnOwnedCampaigns, ...appliedCampaignBids]) {
-    const auctionId = asText(row.auction_id);
-    if (!auctionId) {
-      continue;
-    }
-    const list = campaignBidMap.get(auctionId) ?? [];
-    if (!list.some((item) => item.id === row.id)) {
-      list.push(row);
-      campaignBidMap.set(auctionId, list);
-    }
-  }
-
-  const dealIds = uuidIds([...slotMap.keys(), ...auctionMap.keys()]);
   const payments =
     dealIds.length > 0
       ? await selectRows<PaymentRow>(
-          admin.from('payments').select(PAYMENT_COLUMNS).in('auction_id', dealIds),
+          reader.from('payments').select(PAYMENT_COLUMNS).in('auction_id', dealIds),
         )
       : [];
   const { paid, started } = paidAtByDeal(payments);
 
   for (const slot of slotMap.values()) {
-    const slotId = asText(slot.id);
+    const slotId = slot.id;
     const title = asText(slot.title) || '크리에이터 상품';
-    const creatorId = asText(slot.creator_id);
-    const winnerBidId = asText(slot.winner_bid_id);
+    const creatorId = asText(slot.creatorId);
+    const winnerBidId = asText(slot.winnerBidId);
     const bids = slotBidMap.get(slotId) ?? [];
-    const winner = winnerBidId ? bids.find((bid) => asText(bid.id) === winnerBidId) : undefined;
-    const winnerAdvertiserId = asText(winner?.advertiser_id);
-    const paidAt = paid.get(slotId) ?? '';
+    const winner = winnerBidId ? bids.find((bid) => bid.id === winnerBidId) : undefined;
+    const winnerAdvertiserId = asText(winner?.advertiserId);
+    const paidAt = asText(slot.paidAt) || paid.get(slotId) || '';
     const deliveredAt =
-      asText(slot.delivered_at) || (asText(slot.delivery_url) ? paidAt || nowIso : '');
-    const confirmedAt = asText(slot.purchase_confirmed_at);
+      asText(slot.deliveredAt) || (asText(slot.deliveryUrl) ? paidAt || nowIso : '');
+    const confirmedAt = asText(slot.purchaseConfirmedAt);
+    const awarded = Boolean(winnerBidId) || slot.status === 'awarded';
 
     if (creatorId === actorId) {
       for (const bid of bids) {
@@ -265,16 +250,16 @@ export async function listInboxNotifications(userId: string): Promise<AppNotific
         if (!bidId) {
           continue;
         }
-        const advertiserName = asText(bid.advertiser_name) || '광고주';
+        const advertiserName = asText(bid.advertiserName) || '광고주';
         items.push(
           makeItem({
             id: `slot-apply-${bidId}`,
             userId: actorId,
             type: 'timeslot_bid',
-            title: '제작 신청',
+            title: '새 광고주 신청 접수',
             body: `${advertiserName}님이 "${title}"에 제작 신청했습니다.`,
             href: slotHref(slotId),
-            createdAt: asIso(bid.created_at, nowIso),
+            createdAt: asIso(bid.createdAt, nowIso),
           }),
         );
       }
@@ -308,16 +293,16 @@ export async function listInboxNotifications(userId: string): Promise<AppNotific
       }
     }
 
-    if (winnerAdvertiserId === actorId && winnerBidId && !paidAt) {
+    if (winnerAdvertiserId === actorId && awarded && !paidAt) {
       items.push(
         makeItem({
           id: `slot-award-${slotId}`,
           userId: actorId,
           type: 'award_complete',
-          title: '결제 대기',
+          title: '광고주 선정 · 결제 대기',
           body: `"${title}" 광고주 선정이 완료되었습니다. 에스크로 결제를 진행해 주세요.`,
           href: slotHref(slotId),
-          createdAt: asIso(started.get(slotId) || winner?.created_at, nowIso),
+          createdAt: asIso(started.get(slotId) || winner?.createdAt, nowIso),
         }),
       );
     }
@@ -337,17 +322,59 @@ export async function listInboxNotifications(userId: string): Promise<AppNotific
     }
   }
 
-  for (const auction of auctionMap.values()) {
-    const auctionId = asText(auction.id);
-    const title = asText(auction.title) || '오픈 캠페인';
-    const authorId = asText(auction.author_id);
-    const winnerBidId = asText(auction.winner_bid_id);
-    const bids = campaignBidMap.get(auctionId) ?? [];
-    const winner = winnerBidId ? bids.find((bid) => asText(bid.id) === winnerBidId) : undefined;
-    const winnerCreatorId = asText(winner?.creator_id);
-    const paidAt = paid.get(auctionId) ?? '';
+  const campaignBidMap = new Map<string, CampaignBidRow[]>();
+  const ownedCampaignBidRows: CampaignBidRow[] = (bidsOnOwnedCampaigns.data ?? []).map((bid) => ({
+    id: bid.id,
+    auction_id: bid.auctionId,
+    creator_id: bid.creatorId,
+    creator_name: bid.creatorName,
+    status: bid.status,
+    created_at: bid.createdAt,
+  }));
+  for (const bid of [...ownedCampaignBidRows, ...appliedCampaignBids]) {
+    const auctionId = asText(bid.auction_id);
+    if (!auctionId) {
+      continue;
+    }
+    const list = campaignBidMap.get(auctionId) ?? [];
+    if (!list.some((item) => item.id === bid.id)) {
+      list.push(bid);
+      campaignBidMap.set(auctionId, list);
+    }
+  }
 
-    if (authorId === actorId) {
+  const campaignMap = new Map<string, { id: string; title: string; authorId: string; winnerBidId: string }>();
+  for (const auction of ownedCampaigns) {
+    campaignMap.set(auction.id, {
+      id: auction.id,
+      title: auction.title,
+      authorId: asText(auction.authorId),
+      winnerBidId: asText(auction.winnerBidId),
+    });
+  }
+  for (const row of appliedCampaigns) {
+    const id = asText(row.id);
+    if (!id || campaignMap.has(id)) {
+      continue;
+    }
+    campaignMap.set(id, {
+      id,
+      title: asText(row.title) || '오픈 캠페인',
+      authorId: asText(row.author_id),
+      winnerBidId: asText(row.winner_bid_id),
+    });
+  }
+
+  for (const auction of campaignMap.values()) {
+    const title = asText(auction.title) || '오픈 캠페인';
+    const bids = campaignBidMap.get(auction.id) ?? [];
+    const winner = auction.winnerBidId
+      ? bids.find((bid) => asText(bid.id) === auction.winnerBidId)
+      : undefined;
+    const winnerCreatorId = asText(winner?.creator_id);
+    const paidAt = paid.get(auction.id) ?? '';
+
+    if (auction.authorId === actorId) {
       for (const bid of bids) {
         const bidId = asText(bid.id);
         if (!bidId) {
@@ -361,7 +388,7 @@ export async function listInboxNotifications(userId: string): Promise<AppNotific
             type: 'bid_received',
             title: '지원 접수',
             body: `${creatorName}님이 "${title}"에 지원했습니다.`,
-            href: campaignHref(auctionId),
+            href: campaignHref(auction.id),
             createdAt: asIso(bid.created_at, nowIso),
           }),
         );
@@ -371,12 +398,12 @@ export async function listInboxNotifications(userId: string): Promise<AppNotific
     if (winnerCreatorId === actorId && paidAt) {
       items.push(
         makeItem({
-          id: `campaign-paid-${auctionId}`,
+          id: `campaign-paid-${auction.id}`,
           userId: actorId,
           type: 'payment_complete',
           title: '결제 완료 · 제작/납품 요청',
           body: `"${title}" 에스크로 결제가 완료되었습니다. 결과물을 납품해 주세요.`,
-          href: campaignHref(auctionId),
+          href: campaignHref(auction.id),
           createdAt: paidAt,
         }),
       );

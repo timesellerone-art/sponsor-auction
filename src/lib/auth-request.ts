@@ -19,7 +19,12 @@ async function accessTokenFromBrowserSession() {
     }
     await supabase.auth.getUser().catch(() => null);
     const retry = await supabase.auth.getSession();
-    return retry.data.session?.access_token?.trim() ?? '';
+    const retryToken = retry.data.session?.access_token?.trim() ?? '';
+    if (retryToken) {
+      return retryToken;
+    }
+    const refreshed = await supabase.auth.refreshSession().catch(() => null);
+    return refreshed?.data.session?.access_token?.trim() ?? '';
   } catch {
     return '';
   }

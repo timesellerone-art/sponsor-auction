@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Bell, Trash2 } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
@@ -19,10 +19,10 @@ import type { AppNotification, NotificationType } from '@/types/notification';
 
 const TYPE_LABEL: Record<NotificationType, string> = {
   bid_received: '지원 접수',
-  award_complete: '결제 대기',
+  award_complete: '광고주 선정 · 결제 대기',
   payment_complete: '결제 완료',
   chat_message: '새 메시지',
-  timeslot_bid: '제작 신청',
+  timeslot_bid: '새 광고주 신청 접수',
   delivery_complete: '납품 완료',
   purchase_confirmed: '구매 확정',
   business_review: '사업자 심사',
@@ -60,11 +60,13 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<AppNotification[]>([]);
   const [unread, setUnread] = useState(0);
+  const refreshRef = useRef<() => Promise<void>>(async () => undefined);
 
   useEffect(() => {
     if (!user?.id) {
       setItems([]);
       setUnread(0);
+      refreshRef.current = async () => undefined;
       return;
     }
 
@@ -76,7 +78,10 @@ export function NotificationBell() {
       try {
         const response = await fetch(
           '/api/notifications',
-          await authRequestInit({ cache: 'no-store' }),
+          await authRequestInit({
+            method: 'GET',
+            cache: 'no-store',
+          }),
         );
         const payload = (await response.json().catch(() => null)) as {
           data?: AppNotification[];
@@ -95,6 +100,7 @@ export function NotificationBell() {
       setUnread(next.filter((item) => !item.read).length);
     };
 
+    refreshRef.current = refresh;
     void refresh();
     const unsubscribe = onNotificationsChanged(() => {
       void refresh();
@@ -163,7 +169,13 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => {
-          setOpen((current) => !current);
+          setOpen((current) => {
+            const next = !current;
+            if (next) {
+              void refreshRef.current();
+            }
+            return next;
+          });
         }}
       >
         <Bell className="size-5" aria-hidden />
