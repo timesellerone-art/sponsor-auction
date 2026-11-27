@@ -371,10 +371,40 @@ export function AdminUserTable({
   const [filter, setFilter] = useState<ProfileAdminFilter>('all');
   const [sort, setSort] = useState<AdminListSort>('newest');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [detailById, setDetailById] = useState<Record<string, Partial<ProfileItem>>>({});
+
+  const loadBusinessDetail = async (userId: string) => {
+    try {
+      const response = await fetch(
+        `/api/admin/profiles/business?userId=${encodeURIComponent(userId)}`,
+        await authRequestInit({ cache: 'no-store' }),
+      );
+      const payload = (await response.json().catch(() => null)) as {
+        data?: Partial<ProfileItem>;
+      } | null;
+      if (!response.ok || !payload?.data) {
+        return;
+      }
+      setDetailById((current) => ({ ...current, [userId]: payload.data ?? {} }));
+    } catch {
+      return;
+    }
+  };
 
   const toggleDetail = (profile: ProfileItem) => {
-    setOpenId((current) => (current === profile.id ? null : profile.id));
+    setOpenId((current) => {
+      const next = current === profile.id ? null : profile.id;
+      if (next) {
+        void loadBusinessDetail(next);
+      }
+      return next;
+    });
   };
+
+  const profileForDetail = (profile: ProfileItem): ProfileItem => ({
+    ...profile,
+    ...detailById[profile.id],
+  });
 
   const keyword = query.trim().toLowerCase();
   const searched = useMemo(() => {
@@ -541,7 +571,7 @@ export function AdminUserTable({
                 {detailOpen ? (
                   <div className="mt-3" onClick={(event) => event.stopPropagation()}>
                     <BusinessReviewPanel
-                      profile={profile}
+                      profile={profileForDetail(profile)}
                       anyBusy={anyBusy}
                       onReviewBusiness={onReviewBusiness}
                     />
@@ -637,7 +667,7 @@ export function AdminUserTable({
                     <tr className="border-b border-zinc-100 last:border-0 bg-white">
                       <td colSpan={6} className="px-2 py-2">
                         <BusinessReviewPanel
-                          profile={profile}
+                          profile={profileForDetail(profile)}
                           anyBusy={anyBusy}
                           onReviewBusiness={onReviewBusiness}
                         />

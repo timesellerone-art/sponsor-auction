@@ -205,6 +205,12 @@ export function BusinessRegistrationForm() {
             companyName,
             address,
             contact,
+            business_registration_number: number,
+            business_representative_name: representativeName,
+            business_opened_on: normalizeOpeningDate(openedOn),
+            business_company_name: companyName,
+            business_address: address,
+            business_contact: contact,
           }),
         }),
       );

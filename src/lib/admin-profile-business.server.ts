@@ -8,33 +8,7 @@ import {
 import type { Database } from '@/types/database';
 import type { ProfileItem } from '@/types/admin';
 
-const BUSINESS_SELECTS = [
-  'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type, business_representative_name, business_opened_on, business_certificate_path, business_certificate_name, business_company_name, business_address, business_contact',
-  'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type, business_representative_name, business_opened_on, business_certificate_path, business_certificate_name',
-  'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type',
-  'id, business_registration_number, business_verification_status, business_status_detail, business_review_note',
-] as const;
-
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
-
-type BusinessRow = Pick<ProfileRow, 'id'> &
-  Partial<
-    Pick<
-      ProfileRow,
-      | 'business_registration_number'
-      | 'business_verification_status'
-      | 'business_status_detail'
-      | 'business_review_note'
-      | 'settlement_type'
-      | 'business_representative_name'
-      | 'business_opened_on'
-      | 'business_certificate_path'
-      | 'business_certificate_name'
-      | 'business_company_name'
-      | 'business_address'
-      | 'business_contact'
-    >
-  >;
 
 type BaseProfile = {
   id: string;
@@ -54,116 +28,121 @@ function textField(row: object, ...keys: string[]) {
     if (typeof value === 'string') {
       return value;
     }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
   }
   return undefined;
 }
 
-function asBusinessRow(row: Partial<ProfileRow> | object | null | undefined): BusinessRow | null {
-  const source = row ?? {};
-  const id = textField(source, 'id');
-  if (!id) {
-    return null;
-  }
+export function adminBusinessFieldsFromRow(row: object): Pick<
+  ProfileItem,
+  | 'businessRegistrationNumber'
+  | 'businessVerificationStatus'
+  | 'businessStatusDetail'
+  | 'businessReviewNote'
+  | 'businessRepresentativeName'
+  | 'businessOpenedOn'
+  | 'businessCompanyName'
+  | 'businessAddress'
+  | 'businessContact'
+  | 'businessCertificateName'
+  | 'hasBusinessCertificate'
+  | 'settlementType'
+> {
+  const statusRaw = textField(row, 'business_verification_status', 'businessVerificationStatus') ?? '';
+  const status = isBusinessVerificationStatus(statusRaw) ? statusRaw : 'unregistered';
+  const settlementRaw = textField(row, 'settlement_type', 'settlementType');
+  const number = textField(row, 'business_registration_number', 'businessRegistrationNumber');
+  const certPath = textField(row, 'business_certificate_path', 'businessCertificatePath') ?? '';
+  const certName = textField(row, 'business_certificate_name', 'businessCertificateName') ?? '';
   return {
-    id,
-    business_registration_number: textField(
-      source,
-      'business_registration_number',
-      'businessRegistrationNumber',
-    ),
-    business_verification_status: textField(
-      source,
-      'business_verification_status',
-      'businessVerificationStatus',
-    ) as ProfileRow['business_verification_status'] | undefined,
-    business_status_detail: textField(source, 'business_status_detail', 'businessStatusDetail'),
-    business_review_note: textField(source, 'business_review_note', 'businessReviewNote'),
-    settlement_type: textField(source, 'settlement_type', 'settlementType') as
-      | ProfileRow['settlement_type']
-      | undefined,
-    business_representative_name: textField(
-      source,
-      'business_representative_name',
-      'businessRepresentativeName',
-    ),
-    business_opened_on: textField(source, 'business_opened_on', 'businessOpenedOn'),
-    business_certificate_path: textField(source, 'business_certificate_path', 'businessCertificatePath'),
-    business_certificate_name: textField(source, 'business_certificate_name', 'businessCertificateName'),
-    business_company_name: textField(source, 'business_company_name', 'businessCompanyName'),
-    business_address: textField(source, 'business_address', 'businessAddress'),
-    business_contact: textField(source, 'business_contact', 'businessContact'),
+    businessRegistrationNumber: typeof number === 'string' ? formatBusinessNumber(number) : '',
+    businessVerificationStatus: status,
+    businessStatusDetail: textField(row, 'business_status_detail', 'businessStatusDetail') ?? '',
+    businessReviewNote: textField(row, 'business_review_note', 'businessReviewNote') ?? '',
+    businessRepresentativeName:
+      textField(row, 'business_representative_name', 'businessRepresentativeName') ?? '',
+    businessOpenedOn: textField(row, 'business_opened_on', 'businessOpenedOn') ?? '',
+    businessCompanyName: textField(row, 'business_company_name', 'businessCompanyName') ?? '',
+    businessAddress: textField(row, 'business_address', 'businessAddress') ?? '',
+    businessContact: textField(row, 'business_contact', 'businessContact') ?? '',
+    businessCertificateName: certName,
+    hasBusinessCertificate: Boolean(certPath.trim() || certName.trim()),
+    settlementType:
+      settlementRaw === 'business' || settlementRaw === 'individual' ? settlementRaw : undefined,
   };
 }
 
-async function loadBusinessRowsByIds(client: SupabaseClient<Database>, ids: string[]) {
+async function loadProfileRowsByIds(client: SupabaseClient<Database>, ids: string[]) {
   if (ids.length === 0) {
-    return { rows: [] as BusinessRow[], error: null };
+    return { rows: [] as object[], error: null };
   }
-  const rows: BusinessRow[] = [];
+  const rows: object[] = [];
   for (let index = 0; index < ids.length; index += 100) {
     const chunk = ids.slice(index, index + 100);
-    let page: { data: Partial<ProfileRow>[] | null; error: { message?: string; code?: string } | null } | null =
-      null;
-    for (const columns of BUSINESS_SELECTS) {
-      const result = await client
-        .from('profiles')
-        .select(columns as '*')
-        .in('id', chunk)
-        .returns<Partial<ProfileRow>[]>();
-      if (!result.error) {
-        page = result;
-        break;
-      }
-      page = result;
+    const starred = await client.from('profiles').select('*').in('id', chunk);
+    if (starred.error) {
+      return { rows: [] as object[], error: starred.error };
     }
-    if (page?.error) {
-      return { rows: [] as BusinessRow[], error: page.error };
-    }
-    for (const row of page?.data ?? []) {
-      const mapped = asBusinessRow(row);
-      if (mapped) {
-        rows.push(mapped);
-      }
-    }
+    rows.push(...((starred.data ?? []) as ProfileRow[]));
   }
   return { rows, error: null };
+}
+
+export async function loadAdminBusinessFieldsByUserId(
+  client: SupabaseClient<Database>,
+  userId: string,
+) {
+  const loaded = await client.from('profiles').select('*').eq('id', userId).maybeSingle();
+  if (loaded.error) {
+    return { fields: null, error: loaded.error };
+  }
+  if (!loaded.data) {
+    return { fields: null, error: null };
+  }
+  return { fields: adminBusinessFieldsFromRow(loaded.data), error: null };
 }
 
 export async function attachAdminBusinessFields(
   client: SupabaseClient<Database>,
   profiles: BaseProfile[],
 ): Promise<ProfileItem[]> {
-  const loaded = await loadBusinessRowsByIds(
+  const loaded = await loadProfileRowsByIds(
     client,
     profiles.map((profile) => profile.id),
   );
-  const businessById = new Map(loaded.rows.map((row) => [row.id, row]));
+  if (loaded.error) {
+    console.warn('[SponsorAuction] 관리자 사업자 정보 조회 실패', loaded.error);
+  }
+  const businessById = new Map<string, object>();
+  for (const row of loaded.rows) {
+    const id = textField(row, 'id');
+    if (id) {
+      businessById.set(id, row);
+    }
+  }
   return profiles.map((profile) => {
     const extra = businessById.get(profile.id);
-    const statusRaw = extra?.business_verification_status ?? '';
-    const status = isBusinessVerificationStatus(statusRaw) ? statusRaw : 'unregistered';
-    const settlementType =
-      extra?.settlement_type === 'business' || extra?.settlement_type === 'individual'
-        ? extra.settlement_type
-        : undefined;
     return {
       ...profile,
       phone: profile.phone ?? null,
-      businessRegistrationNumber:
-        extra && typeof extra.business_registration_number === 'string'
-          ? formatBusinessNumber(extra.business_registration_number)
-          : '',
-      businessVerificationStatus: status,
-      businessStatusDetail: extra?.business_status_detail ?? '',
-      businessReviewNote: extra?.business_review_note ?? '',
-      businessRepresentativeName: extra?.business_representative_name ?? '',
-      businessOpenedOn: extra?.business_opened_on ?? '',
-      businessCompanyName: extra?.business_company_name ?? '',
-      businessAddress: extra?.business_address ?? '',
-      businessContact: extra?.business_contact ?? '',
-      businessCertificateName: extra?.business_certificate_name ?? '',
-      hasBusinessCertificate: Boolean(extra?.business_certificate_path?.trim()),
-      settlementType,
+      ...(extra
+        ? adminBusinessFieldsFromRow(extra)
+        : {
+            businessRegistrationNumber: '',
+            businessVerificationStatus: 'unregistered' as const,
+            businessStatusDetail: '',
+            businessReviewNote: '',
+            businessRepresentativeName: '',
+            businessOpenedOn: '',
+            businessCompanyName: '',
+            businessAddress: '',
+            businessContact: '',
+            businessCertificateName: '',
+            hasBusinessCertificate: false,
+            settlementType: undefined,
+          }),
     };
   });
 }

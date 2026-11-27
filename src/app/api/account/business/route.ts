@@ -42,50 +42,69 @@ function dbErrorMessage(error: { message?: string; code?: string } | null | unde
   }
   return message || code || '알 수 없는 오류';
 }
-const BASE_COLUMNS =
-  'business_registration_number, business_verification_status, business_status_detail, business_review_note, business_checked_at';
-const EXTRA_COLUMNS = 'business_representative_name, business_opened_on';
-const CERT_COLUMNS = 'business_certificate_path, business_certificate_name';
-const DETAIL_COLUMNS = 'business_company_name, business_address, business_contact';
-const COLUMNS = `${BASE_COLUMNS}, ${EXTRA_COLUMNS}`;
-const COLUMNS_WITH_CERT = `${COLUMNS}, ${CERT_COLUMNS}`;
-const COLUMNS_FULL = `${COLUMNS_WITH_CERT}, ${DETAIL_COLUMNS}`;
 
-type BusinessRow = {
-  business_registration_number?: string | null;
-  business_verification_status?: string | null;
-  business_status_detail?: string | null;
-  business_review_note?: string | null;
-  business_representative_name?: string | null;
-  business_opened_on?: string | null;
-  business_certificate_path?: string | null;
-  business_certificate_name?: string | null;
-  business_company_name?: string | null;
-  business_address?: string | null;
-  business_contact?: string | null;
-};
+function stringField(source: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string') {
+      return value;
+    }
+  }
+  return '';
+}
 
-function present(row: BusinessRow) {
-  const rawStatus = row.business_verification_status ?? '';
+function businessSaveBody(raw: Record<string, unknown>) {
+  return {
+    businessNumber: stringField(raw, 'businessNumber', 'business_registration_number'),
+    representativeName: stringField(raw, 'representativeName', 'business_representative_name'),
+    openedOn: stringField(raw, 'openedOn', 'business_opened_on'),
+    companyName: stringField(raw, 'companyName', 'business_company_name'),
+    address: stringField(raw, 'address', 'business_address'),
+    contact: stringField(raw, 'contact', 'business_contact'),
+  };
+}
+
+function present(row: object | null | undefined) {
+  const source = (row ?? {}) as Record<string, unknown>;
+  const text = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'string') {
+        return value;
+      }
+    }
+    return '';
+  };
+  const rawStatus = text('business_verification_status', 'businessVerificationStatus');
   const status: BusinessVerificationStatus = isBusinessVerificationStatus(rawStatus)
     ? rawStatus
     : 'unregistered';
-  const detail = row.business_status_detail ?? '';
-  const certificateName = row.business_certificate_name?.trim() ?? '';
+  const detail = text('business_status_detail', 'businessStatusDetail');
+  const certificateName = text('business_certificate_name', 'businessCertificateName').trim();
   return {
-    businessNumber: formatBusinessNumber(row.business_registration_number ?? ''),
-    representativeName: normalizeRepresentativeName(row.business_representative_name),
-    openedOn: formatOpeningDateInput(row.business_opened_on),
-    companyName: normalizeCompanyName(row.business_company_name),
-    address: normalizeBusinessAddress(row.business_address),
-    contact: normalizeBusinessContact(row.business_contact),
+    businessNumber: formatBusinessNumber(
+      text('business_registration_number', 'businessRegistrationNumber', 'businessNumber'),
+    ),
+    representativeName: normalizeRepresentativeName(
+      text('business_representative_name', 'businessRepresentativeName', 'representativeName'),
+    ),
+    openedOn: formatOpeningDateInput(text('business_opened_on', 'businessOpenedOn', 'openedOn')),
+    companyName: normalizeCompanyName(text('business_company_name', 'businessCompanyName', 'companyName')),
+    address: normalizeBusinessAddress(text('business_address', 'businessAddress', 'address')),
+    contact: normalizeBusinessContact(text('business_contact', 'businessContact', 'contact')),
     status,
     detail,
-    reviewNote: row.business_review_note ?? '',
+    reviewNote: text('business_review_note', 'businessReviewNote'),
     notice: businessStatusNotice(status, detail),
     ntsLabel: ntsBusinessLabelFromText(detail),
     certificateName,
-    hasCertificate: Boolean(row.business_certificate_path?.trim()),
+    hasCertificate: Boolean(text('business_certificate_path', 'businessCertificatePath').trim()),
   };
 }
 
@@ -93,29 +112,7 @@ async function loadBusinessRow(
   admin: NonNullable<ReturnType<typeof createAdminClient>>,
   userId: string,
 ) {
-  const full = await admin.from('profiles').select(COLUMNS_FULL).eq('id', userId).maybeSingle();
-  if (!full.error) {
-    return { ...full, extra: true as const };
-  }
-  if (isSchemaMismatch(full.error)) {
-    const withCert = await admin.from('profiles').select(COLUMNS_WITH_CERT).eq('id', userId).maybeSingle();
-    if (!withCert.error) {
-      return { ...withCert, extra: true as const };
-    }
-    if (isSchemaMismatch(withCert.error)) {
-      const withExtra = await admin.from('profiles').select(COLUMNS).eq('id', userId).maybeSingle();
-      if (!withExtra.error) {
-        return { ...withExtra, extra: true as const };
-      }
-      if (isSchemaMismatch(withExtra.error)) {
-        const basic = await admin.from('profiles').select(BASE_COLUMNS).eq('id', userId).maybeSingle();
-        return { ...basic, extra: false as const };
-      }
-      return { ...withExtra, extra: false as const };
-    }
-    return { ...withCert, extra: true as const };
-  }
-  return { ...full, extra: true as const };
+  return admin.from('profiles').select('*').eq('id', userId).maybeSingle();
 }
 
 export async function GET(request: Request) {
@@ -181,17 +178,11 @@ export async function POST(request: Request) {
     ) {
       return forbiddenJson('사업자등록번호는 광고주 또는 크리에이터 계정에서 관리합니다.');
     }
-    const body = (await request.json().catch(() => null)) as {
-      businessNumber?: unknown;
-      representativeName?: unknown;
-      openedOn?: unknown;
-      companyName?: unknown;
-      address?: unknown;
-      contact?: unknown;
-    } | null;
-    if (!body) {
+    const rawBody = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
       return failJson('요청 본문이 올바르지 않습니다.', 'INVALID_INPUT', 400);
     }
+    const body = businessSaveBody(rawBody);
     const parsed = parseBusinessIdentityInput(body);
     const details = parseBusinessDetailInput(body);
     const clearing =
@@ -279,10 +270,6 @@ export async function POST(request: Request) {
       !cert.error && typeof cert.data?.business_certificate_path === 'string'
         ? cert.data.business_certificate_path.trim()
         : '';
-    const certName =
-      !cert.error && typeof cert.data?.business_certificate_name === 'string'
-        ? cert.data.business_certificate_name.trim()
-        : '';
     if (!clearing && businessNumber && !mismatch && status !== 'closed') {
       if (details.error) {
         return failJson(details.error, details.errorCode ?? 'INVALID_INPUT', 400);
@@ -296,85 +283,45 @@ export async function POST(request: Request) {
       }
     }
 
-    const basePayload = {
-      business_registration_number: businessNumber,
-      business_verification_status: status,
-      business_status_detail: detail,
-      business_checked_at: new Date().toISOString(),
-    };
-    const extraPayload = {
-      ...basePayload,
-      business_representative_name: businessNumber ? representativeName : '',
-      business_opened_on: businessNumber ? openedOn : '',
-    };
-    const certPayload = cert.error
-      ? extraPayload
-      : {
-          ...extraPayload,
-          business_certificate_path: certPath,
-          business_certificate_name: certName,
-        };
-    const fullPayload = {
-      ...certPayload,
-      business_company_name: businessNumber ? companyName : '',
-      business_address: businessNumber ? address : '',
-      business_contact: businessNumber ? contact : '',
-    };
-
     type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
-    const applyUpdate = (payload: ProfileUpdate) =>
-      admin.from('profiles').update(payload).eq('id', userId);
-
-    let updated = await applyUpdate(fullPayload);
-    if (updated.error && isSchemaMismatch(updated.error)) {
-      const missingDetail = dbErrorMessage(updated.error);
-      const withCert = await applyUpdate(certPayload);
-      if (!withCert.error) {
+    const patches: ProfileUpdate[] = [
+      {
+        business_registration_number: businessNumber,
+        business_verification_status: status,
+        business_status_detail: detail,
+        business_checked_at: new Date().toISOString(),
+      },
+      {
+        business_representative_name: businessNumber ? representativeName : '',
+        business_opened_on: businessNumber ? openedOn : '',
+      },
+      {
+        business_company_name: businessNumber ? companyName : '',
+        business_address: businessNumber ? address : '',
+        business_contact: businessNumber ? contact : '',
+      },
+    ];
+    const schemaErrors: string[] = [];
+    for (const patch of patches) {
+      const updated = await admin.from('profiles').update(patch).eq('id', userId);
+      if (updated.error && isSchemaMismatch(updated.error)) {
+        schemaErrors.push(dbErrorMessage(updated.error));
+        continue;
+      }
+      if (updated.error) {
+        console.warn('[SponsorAuction] 사업자 정보 저장 실패', updated.error);
         return failJson(
-          `상호명·사업장 주소·사업자 연락처 컬럼이 없어 저장하지 못했습니다. (${missingDetail}) supabase/migrations/20261127_business_profile_details.sql 을 적용해 주세요.`,
-          'SCHEMA_MISSING',
-          503,
+          `사업자 정보를 저장하지 못했습니다: ${dbErrorMessage(updated.error)}`,
+          'SAVE_FAILED',
+          500,
         );
       }
-      if (!isSchemaMismatch(withCert.error)) {
-        updated = withCert;
-      } else {
-        const withExtra = await applyUpdate(extraPayload);
-        if (!withExtra.error) {
-          return failJson(
-            `사업자 정보 일부 컬럼이 없어 전체 항목을 저장하지 못했습니다. (${missingDetail}) 마이그레이션을 적용해 주세요.`,
-            'SCHEMA_MISSING',
-            503,
-          );
-        }
-        if (!isSchemaMismatch(withExtra.error)) {
-          updated = withExtra;
-        } else {
-          updated = await applyUpdate(basePayload);
-          if (!updated.error) {
-            return failJson(
-              `사업자 정보 일부 컬럼이 없어 전체 항목을 저장하지 못했습니다. (${missingDetail}) 마이그레이션을 적용해 주세요.`,
-              'SCHEMA_MISSING',
-              503,
-            );
-          }
-          if (isSchemaMismatch(updated.error)) {
-            return failJson(
-              `사업자 정보 컬럼이 없어 저장하지 못했습니다. (${dbErrorMessage(updated.error)}) 마이그레이션을 적용해 주세요.`,
-              'SCHEMA_MISSING',
-              503,
-            );
-          }
-        }
-      }
     }
-
-    if (updated.error) {
-      console.warn('[SponsorAuction] 사업자 정보 저장 실패', updated.error);
+    if (schemaErrors.length > 0) {
       return failJson(
-        `사업자 정보를 저장하지 못했습니다: ${dbErrorMessage(updated.error)}`,
-        'SAVE_FAILED',
-        500,
+        `사업자 정보 일부 컬럼이 없어 저장하지 못했습니다. (${schemaErrors[0]}) 마이그레이션을 적용해 주세요.`,
+        'SCHEMA_MISSING',
+        503,
       );
     }
 
@@ -386,16 +333,16 @@ export async function POST(request: Request) {
         500,
       );
     }
-    const row = loaded.data as BusinessRow;
+    const row = loaded.data;
+    const stored = present(row);
     const persistedIncomplete = Boolean(
       businessNumber &&
-        (normalizeBusinessNumber(row.business_registration_number) !== businessNumber ||
-          (representativeName &&
-            normalizeRepresentativeName(row.business_representative_name) !== representativeName) ||
-          (openedOn && formatOpeningDateInput(row.business_opened_on) !== formatOpeningDateInput(openedOn)) ||
-          (companyName && normalizeCompanyName(row.business_company_name) !== companyName) ||
-          (address && normalizeBusinessAddress(row.business_address) !== address) ||
-          (contact && normalizeBusinessContact(row.business_contact) !== contact)),
+        (normalizeBusinessNumber(stored.businessNumber) !== businessNumber ||
+          (representativeName && stored.representativeName !== representativeName) ||
+          (openedOn && formatOpeningDateInput(stored.openedOn) !== formatOpeningDateInput(openedOn)) ||
+          (companyName && stored.companyName !== companyName) ||
+          (address && stored.address !== address) ||
+          (contact && stored.contact !== contact)),
     );
     if (persistedIncomplete) {
       return failJson(
@@ -405,12 +352,9 @@ export async function POST(request: Request) {
       );
     }
     const presented = {
-      ...present(row),
+      ...stored,
       mismatch,
-      ntsLabel:
-        ntsLabel ||
-        ntsBusinessLabelFromText(row.business_status_detail) ||
-        ntsBusinessLabelFromText(detail),
+      ntsLabel: ntsLabel || ntsBusinessLabelFromText(stored.detail) || ntsBusinessLabelFromText(detail),
     };
     if (mismatch) {
       return NextResponse.json(
