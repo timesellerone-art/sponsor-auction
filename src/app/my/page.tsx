@@ -30,7 +30,7 @@ export default function MyPage() {
             <h1 className="text-xl font-bold text-zinc-950">마이페이지</h1>
             <p className="mt-2 text-sm leading-6 text-zinc-600">
               오픈 캠페인과 크리에이터는 바로 둘러볼 수 있습니다. 캠페인을 등록하거나 콘텐츠를
-              제안할 때 필요한 정보를 입력하면 됩니다.
+              지원할 때 필요한 정보를 입력하면 됩니다.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <Link

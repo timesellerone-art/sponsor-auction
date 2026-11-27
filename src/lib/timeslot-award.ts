@@ -58,7 +58,7 @@ export async function awardTimeslotSelection(
     return {
       ok: false,
       status: 400,
-      error: '상품 또는 제안 ID가 올바르지 않습니다.',
+      error: '상품 또는 신청 ID가 올바르지 않습니다.',
       errorCode: 'INVALID_AWARD',
     };
   }
@@ -77,7 +77,7 @@ export async function awardTimeslotSelection(
     return {
       ok: false,
       status: 409,
-      error: '이미 다른 제안이 채택된 상품입니다.',
+      error: '이미 다른 신청이 채택된 상품입니다.',
       errorCode: 'ALREADY_AWARDED',
     };
   }
@@ -90,7 +90,7 @@ export async function awardTimeslotSelection(
     return {
       ok: false,
       status: 400,
-      error: applied.error ?? '크리에이터 상품 낙찰 상태를 저장하지 못했습니다.',
+      error: applied.error ?? '크리에이터 상품 선정 상태를 저장하지 못했습니다.',
       errorCode: 'AWARD_FAILED',
     };
   }
@@ -112,7 +112,7 @@ export async function payTimeslotWithCredit(
     return {
       ok: false,
       status: 400,
-      error: '상품 또는 제안 ID가 올바르지 않습니다.',
+      error: '상품 또는 신청 ID가 올바르지 않습니다.',
       errorCode: 'INVALID_PAY',
     };
   }
@@ -131,7 +131,7 @@ export async function payTimeslotWithCredit(
     return {
       ok: false,
       status: 409,
-      error: '낙찰된 제안만 결제할 수 있습니다.',
+      error: '선정된 신청만 결제할 수 있습니다.',
       errorCode: 'NOT_AWARDED',
     };
   }

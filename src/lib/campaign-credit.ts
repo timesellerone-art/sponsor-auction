@@ -463,7 +463,7 @@ async function holdTimeslotPayment(
   }
   const winnerId = slotResult.data.winner_bid_id ?? null;
   if (!winnerId) {
-    return { ok: false, code: 'NOT_AWARDED', message: '낙찰된 제안만 결제할 수 있습니다.' };
+    return { ok: false, code: 'NOT_AWARDED', message: '선정된 지원만 결제할 수 있습니다.' };
   }
   if (winnerId !== input.bidId) {
     return { ok: false, code: 'ALREADY_AWARDED', message: '이미 다른 제안이 채택된 상품입니다.' };

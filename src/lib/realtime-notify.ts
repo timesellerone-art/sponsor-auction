@@ -163,8 +163,8 @@ export async function applyRealtimeChange(change: RealtimeChange, userId: string
       emitInApp({
         userId,
         type: 'award_complete',
-        title: '낙찰 완료',
-        body: `"${meta.title}" 제안이 선정되었습니다.`,
+        title: '선정 완료',
+        body: `"${meta.title}" 지원이 선정되었습니다.`,
         href,
       });
       return;
@@ -180,8 +180,8 @@ export async function applyRealtimeChange(change: RealtimeChange, userId: string
     emitInApp({
       userId,
       type: 'bid_received',
-      title: '새 제안',
-      body: `"${meta.title}"에 ${name}님의 제안(${formatWon(amount)})이 도착했습니다.`,
+      title: '새 지원',
+      body: `"${meta.title}"에 ${name}님의 지원(${formatWon(amount)})이 도착했습니다.`,
       href,
     });
     return;
@@ -209,8 +209,8 @@ export async function applyRealtimeChange(change: RealtimeChange, userId: string
     emitInApp({
       userId,
       type: 'timeslot_bid',
-      title: '상품 제안',
-      body: `"${meta.title}"에 ${name}님의 제안(${formatWon(amount)})이 도착했습니다.`,
+      title: '상품 신청',
+      body: `"${meta.title}"에 ${name}님의 신청(${formatWon(amount)})이 도착했습니다.`,
       href: `/timeslots/${slotId}`,
     });
     return;

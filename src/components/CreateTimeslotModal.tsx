@@ -233,7 +233,12 @@ export function CreateTimeslotModal({
   return createPortal(
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-zinc-950/40 p-0 sm:items-center sm:p-4">
       <button type="button" className="absolute inset-0" aria-label="닫기" onClick={onClose} />
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl"
+      >
         <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
           <h2 id={titleId} className="text-base font-bold text-zinc-950">
             크리에이터 상품 등록

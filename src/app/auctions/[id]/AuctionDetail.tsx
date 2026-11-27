@@ -87,7 +87,7 @@ export function AuctionDetail({ id }: { id: string }) {
       setBidsError(result.error);
     } catch {
       setBids([]);
-      setBidsError('제안 목록을 불러오지 못했습니다.');
+      setBidsError('지원 목록을 불러오지 못했습니다.');
     } finally {
       setBidsLoading(false);
     }

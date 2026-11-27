@@ -141,10 +141,11 @@ export function AdvertiserDashboard() {
   const endedDeals = deals.filter(
     (deal) => !openIds.has(deal.auction.id) && !awaitingPayIds.has(deal.auction.id),
   );
+  const campaignDeals = deals.filter((deal) => deal.kind !== 'timeslot');
   const counts: Record<AdvertiserView, number> = {
     open: openDeals.length,
     paid: paidDeals.length,
-    proposals: deals.length,
+    proposals: campaignDeals.length,
     ended: endedDeals.length,
   };
 
@@ -275,8 +276,8 @@ export function AdvertiserDashboard() {
             {view === 'paid' ? <PaidCampaignsPanel deals={paidDeals} /> : null}
             {view === 'proposals' ? (
               <ProposalStatusPanel
-                deals={deals}
-                selectedDeal={selectedDeal}
+                deals={campaignDeals}
+                selectedDeal={selectedDeal?.kind === 'timeslot' ? campaignDeals[0] ?? null : selectedDeal}
                 awardBusyId={awardBusyId}
                 onSelect={setSelectedCampaignId}
                 onAward={handleAward}
@@ -551,7 +552,7 @@ function ProposalStatusPanel({
   onAward: (auction: AuctionItem, bid: BidItem) => void | Promise<void>;
 }) {
   if (deals.length === 0) {
-    return <EmptyLine>제안 현황을 볼 캠페인이 없습니다.</EmptyLine>;
+    return <EmptyLine>지원 현황을 볼 캠페인이 없습니다.</EmptyLine>;
   }
 
   return (
@@ -576,7 +577,7 @@ function ProposalStatusPanel({
                     {deal.auction.title}
                   </span>
                   <span className="mt-0.5 block text-xs text-zinc-500">
-                    제안 {deal.bids.length}건
+                    지원 {deal.bids.length}건
                   </span>
                 </span>
                 <span className="shrink-0 rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-zinc-600">
@@ -596,7 +597,7 @@ function ProposalStatusPanel({
                 {selectedDeal.auction.title}
               </h2>
               <p className="mt-0.5 text-sm text-zinc-500">
-                {auctionStatusLabel(selectedDeal.auction.status)} · 제안 {selectedDeal.bids.length}건
+                {auctionStatusLabel(selectedDeal.auction.status)} · 지원 {selectedDeal.bids.length}건
               </p>
             </div>
             <Link
@@ -621,7 +622,7 @@ function ProposalStatusPanel({
           />
         </div>
       ) : (
-        <EmptyLine>캠페인을 선택하면 제안 현황을 볼 수 있습니다.</EmptyLine>
+        <EmptyLine>캠페인을 선택하면 지원 현황을 볼 수 있습니다.</EmptyLine>
       )}
     </div>
   );

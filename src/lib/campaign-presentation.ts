@@ -249,7 +249,7 @@ export function closedCampaignBadge(status?: AuctionStatus) {
     return '취소';
   }
   if (status === 'completed' || status === 'closed' || status === 'matched') {
-    return '낙찰 완료';
+    return '선정 완료';
   }
   return '최종 매칭 완료';
 }

@@ -51,8 +51,8 @@ export async function POST(
     if (!slot.data.winnerBidId) {
       return NextResponse.json(
         {
-          error: '낙찰된 제안만 결제할 수 있습니다.',
-          errorMessage: '낙찰된 제안만 결제할 수 있습니다.',
+          error: '선정된 신청만 결제할 수 있습니다.',
+          errorMessage: '선정된 신청만 결제할 수 있습니다.',
           errorCode: 'NOT_AWARDED',
         },
         { status: 409, headers: NO_STORE },

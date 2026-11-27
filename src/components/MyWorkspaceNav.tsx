@@ -12,7 +12,7 @@ export function MyWorkspaceNav({ current }: { current: MyWorkspaceTab }) {
     {
       id: 'dashboard',
       href: '/my',
-      label: activeRole === 'creator' ? '내 제안' : '내 캠페인',
+      label: activeRole === 'creator' ? '내 지원' : '내 캠페인',
     },
     { id: 'settings', href: '/my/settings', label: '계정 설정' },
   ];

@@ -38,7 +38,7 @@ export function CreditChargeModal({
             </h2>
             <p className="mt-1 text-sm text-zinc-500">
               {hint ??
-                `낙찰 총 차감액(공급가액 + 부가세 10%)은 ${formatWon(neededAmount)}입니다. 충전 후 다시 낙찰해 주세요.`}
+                `결제 총 차감액(공급가액 + 부가세 10%)은 ${formatWon(neededAmount)}입니다. 충전 후 다시 결제를 진행해 주세요.`}
             </p>
           </div>
           <button

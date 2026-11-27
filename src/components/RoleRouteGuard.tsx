@@ -23,7 +23,7 @@ function RoleRouteEffects() {
       syncRoleCookie(user.role, user.roles);
       syncAuthPresentCookie(true);
       syncActiveRoleCookie(
-        resolveActiveMemberRole(user, readActiveRoleCookie() ?? user.currentMode),
+        resolveActiveMemberRole(user, user.currentMode ?? readActiveRoleCookie()),
       );
     }
 

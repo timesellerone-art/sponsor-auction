@@ -34,10 +34,10 @@ type CreateAuctionModalProps = {
   onCreated?: () => void;
 };
 
-function defaultDeadline() {
-  const date = new Date();
-  date.setDate(date.getDate() + 7);
-  return date.toISOString().slice(0, 10);
+function defaultDeadline(now = new Date()) {
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 export function CreateAuctionModal({

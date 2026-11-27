@@ -119,7 +119,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubKnown = onKnownSession((session) => {
       setUser(session);
       setReady(true);
-      setRoleOverride(session ? readActiveRoleCookie() : null);
+      const cookieRole = session ? readActiveRoleCookie() : null;
+      setRoleOverride(
+        session && cookieRole && (!session.currentMode || cookieRole === session.currentMode)
+          ? cookieRole
+          : null,
+      );
     });
     const unsubscribe = subscribeAuthState(() => {
       void refresh('full');

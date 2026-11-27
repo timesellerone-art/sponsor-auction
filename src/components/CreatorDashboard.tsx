@@ -120,13 +120,13 @@ export function CreatorDashboard() {
         setSlotBids(Array.isArray(bidResult.data) ? bidResult.data : []);
         setError(
           list.length === 0 && slotRows.length === 0
-            ? '제출한 제안이 없습니다.'
+            ? '제출한 지원이 없습니다.'
             : result.error,
         );
       } catch {
         if (!cancelled) {
           setDeals([]);
-          setError('제안 목록을 불러오지 못했습니다.');
+          setError('지원 목록을 불러오지 못했습니다.');
         }
       } finally {
         if (!cancelled) {
@@ -185,7 +185,7 @@ export function CreatorDashboard() {
         showToast(payload?.errorMessage || payload?.error || '선정하지 못했습니다.');
         return;
       }
-      showToast('제안을 선정했습니다. 광고주 결제를 기다립니다.', 'success');
+      showToast('신청을 선정했습니다. 광고주 결제를 기다립니다.', 'success');
       window.dispatchEvent(new Event('timeslots:changed'));
       window.dispatchEvent(new Event('auctions:changed'));
     } finally {
@@ -293,7 +293,7 @@ export function CreatorDashboard() {
                 {isTimeSlotOpen(slot) ? (
                   <ul className="mt-3 flex flex-col gap-2 border-t border-zinc-100 pt-3">
                     {slotBids.filter((bid) => bid.timeSlotId === slot.id).length === 0 ? (
-                      <li className="text-xs text-zinc-400">아직 제안이 없습니다.</li>
+                      <li className="text-xs text-zinc-400">아직 신청이 없습니다.</li>
                     ) : (
                       slotBids
                         .filter((bid) => bid.timeSlotId === slot.id)
@@ -334,7 +334,7 @@ export function CreatorDashboard() {
       ) : deals.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-16 text-center">
           <p className="text-base font-medium text-zinc-800">
-            {error || '제출한 제안이 없습니다'}
+            {error || '제출한 지원이 없습니다'}
           </p>
           <Link
             href="/"
@@ -379,9 +379,9 @@ export function CreatorDashboard() {
           </DealSection>
 
           <DealSection
-            title="진행 중인 제안"
+            title="진행 중인 지원"
             count={pendingDeals.length}
-            emptyText="진행 중인 제안 0건"
+            emptyText="진행 중인 지원 0건"
             countClassName="bg-stone-100 text-stone-600"
           >
             {pendingDeals.map((deal) => (

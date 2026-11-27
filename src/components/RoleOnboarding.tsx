@@ -65,7 +65,7 @@ export function RoleOnboarding({
         ? `${name}님, 크리에이터 채널 정보를 입력해 주세요`
         : `${name}님, 역할을 선택해 주세요`;
   const description =
-    '캠페인 등록이나 제안을 하려면 역할을 선택해 주세요. 휴대폰 인증은 가입 시 1회만 완료하면 됩니다.';
+    '캠페인 등록이나 지원을 하려면 역할을 선택해 주세요. 휴대폰 인증은 가입 시 1회만 완료하면 됩니다.';
 
   const finishIfExistingMember = (result: PhoneVerifyResult) => {
     setPhoneVerified(true);

@@ -120,7 +120,7 @@ export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
             href={href}
             className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-clink px-3 text-sm font-semibold text-white hover:bg-stone-800"
           >
-            {open ? '제안하기' : '상세 보기'}
+            {open ? '신청하기' : '상세 보기'}
           </Link>
         )}
       </div>

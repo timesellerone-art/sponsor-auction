@@ -253,7 +253,7 @@ export function TimeslotDetail({ id }: { id: string }) {
         showToast(payload?.errorMessage || payload?.error || '선정하지 못했습니다.');
         return;
       }
-      showToast('제안을 선정했습니다. 광고주 결제를 기다립니다.', 'success');
+      showToast('신청을 선정했습니다. 광고주 결제를 기다립니다.', 'success');
       window.dispatchEvent(new Event('timeslots:changed'));
       window.dispatchEvent(new Event('auctions:changed'));
       window.dispatchEvent(new Event('payouts:changed'));
@@ -382,7 +382,7 @@ export function TimeslotDetail({ id }: { id: string }) {
                 <p className="font-semibold">{formatWon(slot.startingPrice)}</p>
               </div>
               <div>
-                <p className="text-xs text-zinc-400">지원 수</p>
+                <p className="text-xs text-zinc-400">신청 수</p>
                 <p className="font-semibold">{slot.bidsCount ?? 0}건</p>
               </div>
               <div>

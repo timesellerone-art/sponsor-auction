@@ -509,13 +509,13 @@ export async function listTimeSlotBids(
         const leading = bids[0]?.bidAmount ?? 0;
         return ok(bids.map((item) => ({ ...item, isLeading: item.bidAmount === leading })));
       }
-      return fail([], '제안 목록을 불러오지 못했습니다.');
+      return fail([], '신청 목록을 불러오지 못했습니다.');
     }
     const amounts = (data ?? []).map((row) => row.bid_amount ?? 0);
     const leading = computeBidEngineStats(amounts).highestBidAmount;
     return ok((data ?? []).map((row) => mapSlotBid(row, leading)));
   } catch {
-    return fail([], '제안 목록을 불러오지 못했습니다.');
+    return fail([], '신청 목록을 불러오지 못했습니다.');
   }
 }
 
@@ -629,7 +629,7 @@ export async function closeTimeSlot(
     return fail(null, '본인 상품만 마감할 수 있습니다.');
   }
   if (current.data.status === 'awarded' || current.data.winnerBidId) {
-    return fail(null, '낙찰된 상품은 마감할 수 없습니다. 숨김 처리를 이용해 주세요.');
+    return fail(null, '선정된 상품은 마감할 수 없습니다. 숨김 처리를 이용해 주세요.');
   }
   const supabase = client ?? (await getDataClient());
   if (!supabase || !isUuid(slotId)) {
@@ -709,13 +709,13 @@ export async function placeTimeSlotBid(
     }
     const live = applySlotExpiry(slot);
     if (live.isBlind) {
-      return fail(null, '숨김 처리된 상품에는 제안할 수 없습니다.');
+      return fail(null, '숨김 처리된 상품에는 신청할 수 없습니다.');
     }
     if (live.status !== 'open' || live.winnerBidId) {
-      return fail(null, '마감된 상품에는 제안할 수 없습니다.');
+      return fail(null, '마감된 상품에는 신청할 수 없습니다.');
     }
     if (input.advertiserId && slot.creatorId && input.advertiserId === slot.creatorId) {
-      return fail(null, '본인 상품에는 제안할 수 없습니다.');
+      return fail(null, '본인 상품에는 신청할 수 없습니다.');
     }
     const advertiserId = input.advertiserId?.trim() || '';
     if (advertiserId) {
@@ -737,7 +737,7 @@ export async function placeTimeSlotBid(
     }
     let message = '';
     try {
-      message = sanitizeUserText(input.message || '상품 제안', 'reject');
+      message = sanitizeUserText(input.message || '상품 신청', 'reject');
     } catch {
       return fail(null, VALIDATION.offPlatformContact);
     }
@@ -853,11 +853,11 @@ export async function listTimeSlotBidsForAdvertiser(
       if (isSchemaMismatch(error)) {
         return ok(slotBidsStore.filter((item) => item.advertiserId === advertiserId));
       }
-      return fail([], '제안 목록을 불러오지 못했습니다.');
+      return fail([], '신청 목록을 불러오지 못했습니다.');
     }
     return ok((data ?? []).map((row) => mapSlotBid(row)));
   } catch {
-    return fail([], '제안 목록을 불러오지 못했습니다.');
+    return fail([], '신청 목록을 불러오지 못했습니다.');
   }
 }
 
@@ -884,11 +884,11 @@ export async function listTimeSlotBidsBySlotIds(
       if (isSchemaMismatch(error)) {
         return ok(mockMatches);
       }
-      return fail([], '제안 목록을 불러오지 못했습니다.');
+      return fail([], '신청 목록을 불러오지 못했습니다.');
     }
     return ok((data ?? []).map((row) => mapSlotBid(row)));
   } catch {
-    return fail([], '제안 목록을 불러오지 못했습니다.');
+    return fail([], '신청 목록을 불러오지 못했습니다.');
   }
 }
 
@@ -904,7 +904,7 @@ export async function awardTimeSlotBid(
     return fail(null, slotResult.error ?? '크리에이터 상품을 찾을 수 없습니다.');
   }
   if (creatorId && slot.creatorId && slot.creatorId !== creatorId) {
-    return fail(null, '본인 상품만 낙찰할 수 있습니다.');
+    return fail(null, '본인 상품만 선정할 수 있습니다.');
   }
   if (slot.status !== 'open' || slot.winnerBidId) {
     return fail(null, '이미 마감된 상품입니다.');
@@ -913,7 +913,7 @@ export async function awardTimeSlotBid(
   const bids = await listTimeSlotBids(slotId, client);
   const winner = bids.data.find((item) => item.id === bidId);
   if (!winner) {
-    return fail(null, '선정할 제안을 찾을 수 없습니다.');
+    return fail(null, '선정할 신청을 찾을 수 없습니다.');
   }
 
   const supabase = client ?? (await getDataClient());
@@ -998,7 +998,7 @@ export async function deliverTimeSlot(
     return fail(null, '본인 상품만 납품할 수 있습니다.');
   }
   if (!slot.winnerBidId || slot.status !== 'awarded') {
-    return fail(null, '낙찰된 상품만 납품할 수 있습니다.');
+    return fail(null, '선정된 상품만 납품할 수 있습니다.');
   }
   if (!slot.paidAt) {
     return fail(null, '광고주 결제가 완료된 뒤에 납품할 수 있습니다.');
@@ -1049,7 +1049,7 @@ export async function confirmTimeSlotPurchase(
     return fail(null, current.error ?? '크리에이터 상품을 찾을 수 없습니다.');
   }
   if (!slot.winnerBidId || slot.status !== 'awarded') {
-    return fail(null, '낙찰된 상품만 구매 확정할 수 있습니다.');
+    return fail(null, '선정된 상품만 구매 확정할 수 있습니다.');
   }
   if (!slot.paidAt) {
     return fail(null, '광고주 결제가 완료된 뒤에 구매 확정할 수 있습니다.');
@@ -1060,7 +1060,7 @@ export async function confirmTimeSlotPurchase(
   const bids = await listTimeSlotBids(id, client);
   const winner = bids.data.find((item) => item.id === slot.winnerBidId);
   if (!winner) {
-    return fail(null, '선정된 제안을 찾을 수 없습니다.');
+    return fail(null, '선정된 신청을 찾을 수 없습니다.');
   }
   if (actorUserId && winner.advertiserId && winner.advertiserId !== actorUserId) {
     return fail(null, '선정된 광고주만 구매 확정할 수 있습니다.');

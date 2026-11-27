@@ -175,7 +175,7 @@ export function PaymentCheckoutModal({
     if (!checkout.auctionId || !checkout.bidId) {
       const info = parsePaymentError({
         code: 'PAYMENT_IDS_MISSING',
-        message: '캠페인/제안 정보가 없어 결제를 진행할 수 없습니다.',
+        message: '캠페인/지원 정보가 없어 결제를 진행할 수 없습니다.',
       });
       setPayError(info);
       showToast(formatPaymentToast(info).text, 'error', 9000);

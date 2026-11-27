@@ -32,10 +32,10 @@ export async function POST(
     }
     const actor = await getPaymentActor(request);
     if (!actor?.userId) {
-      return unauthorizedJson('낙찰하려면 로그인해 주세요.');
+      return unauthorizedJson('선정하려면 로그인해 주세요.');
     }
     if (!hasAuthRole(actor, 'creator') && !hasAuthRole(actor, 'admin')) {
-      return forbiddenJson('상품 낙찰은 크리에이터만 할 수 있습니다.');
+      return forbiddenJson('상품 선정은 크리에이터만 할 수 있습니다.');
     }
     const { id } = await context.params;
     const slotId = timeslotIdFromParam(id);
@@ -53,10 +53,10 @@ export async function POST(
     }
     const ownerId = slot.data.creatorId;
     if (ownerId && isUuid(ownerId) && ownerId !== actor.userId && !hasAuthRole(actor, 'admin')) {
-      return forbiddenJson('본인 상품만 낙찰할 수 있습니다.');
+      return forbiddenJson('본인 상품만 선정할 수 있습니다.');
     }
     if (ownerId && actor.userId && ownerId !== actor.userId && !hasAuthRole(actor, 'admin')) {
-      return forbiddenJson('본인 상품만 낙찰할 수 있습니다.');
+      return forbiddenJson('본인 상품만 선정할 수 있습니다.');
     }
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const bidId = asText(body?.bidId);
@@ -79,7 +79,7 @@ export async function POST(
   } catch (error) {
     rethrowPrerenderError(error);
     const message =
-      error instanceof Error ? error.message : '낙찰하지 못했습니다.';
+      error instanceof Error ? error.message : '선정하지 못했습니다.';
     return NextResponse.json(
       { error: message, errorMessage: message },
       { status: 500, headers: NO_STORE },

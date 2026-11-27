@@ -33,10 +33,10 @@ export async function POST(
 
     const actor = await getPaymentActor(request);
     if (!actor?.userId) {
-      return unauthorizedJson('낙찰하려면 로그인해 주세요.');
+      return unauthorizedJson('선정하려면 로그인해 주세요.');
     }
     if (!canPreparePayment(actor)) {
-      return forbiddenJson('낙찰은 광고주 계정만 할 수 있습니다.');
+      return forbiddenJson('선정은 광고주 계정만 할 수 있습니다.');
     }
 
     const { id } = await context.params;
@@ -89,7 +89,7 @@ export async function POST(
     );
   } catch (error) {
     rethrowPrerenderError(error);
-    const message = error instanceof Error ? error.message : '낙찰하지 못했습니다.';
+    const message = error instanceof Error ? error.message : '선정하지 못했습니다.';
     return NextResponse.json(
       { error: message, errorCode: 'AWARD_EXCEPTION' },
       { status: 500, headers: NO_STORE },

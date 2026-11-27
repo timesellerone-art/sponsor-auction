@@ -20,7 +20,6 @@ import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
 import { hasActiveCreatorBid, rememberMyBid } from '@/lib/my-bids';
 import { creatorFeeShortRatesCopy } from '@/lib/fee-policy';
 import { isCampaignAuthor } from '@/lib/my-campaigns';
-import { getAuctionOwnerId, pushNotification } from '@/lib/notifications';
 import { cn, formatWon } from '@/lib/utils';
 import {
   MIN_PROPOSAL_LENGTH,
@@ -346,17 +345,6 @@ export function BidModal({ open, auction, onClose, onCreated }: BidModalProps) {
         rememberMyBid(result.data.id);
         resetForm();
         showToast('캠페인 지원을 제출했습니다.', 'success');
-        const ownerId = getAuctionOwnerId(auction.id, latest.data?.authorId);
-        if (ownerId && ownerId !== user.id) {
-          pushNotification({
-            userId: ownerId,
-            type: 'bid_received',
-            title: '제안서 접수',
-            body: `"${auction.title || '캠페인'}"에 새 제안이 도착했습니다.`,
-            href: `/auctions/${auction.id}`,
-            toast: false,
-          });
-        }
         onCreated?.();
         window.dispatchEvent(new Event('auctions:changed'));
         onClose();

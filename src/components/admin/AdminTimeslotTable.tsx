@@ -150,7 +150,7 @@ export function AdminTimeslotTable({
             onClick={() => {
               downloadCsv(
                 `creator-products-${new Date().toISOString().slice(0, 10)}.csv`,
-                ['제목', '등록 크리에이터', '플랫폼', '제안 건수', '상태', '시작가', '생성일시'],
+                ['제목', '등록 크리에이터', '플랫폼', '신청 건수', '상태', '단가', '생성일시'],
                 filtered.map((slot) => [
                   slot.title,
                   slot.creatorName,
@@ -213,7 +213,7 @@ export function AdminTimeslotTable({
                       </dd>
                     </div>
                     <div className="min-w-0">
-                      <dt className="text-[11px] font-medium text-zinc-500">시작가</dt>
+                      <dt className="text-[11px] font-medium text-zinc-500">단가</dt>
                       <dd className="mt-0.5 break-all font-medium tabular-nums text-zinc-950">
                         {formatWon(slot.startingPrice)}
                       </dd>
@@ -249,9 +249,9 @@ export function AdminTimeslotTable({
                   <th className="px-1 py-1.5 font-medium sm:px-2">제목</th>
                   <th className="px-1 py-1.5 font-medium sm:px-2">등록 크리에이터</th>
                   <th className="px-1 py-1.5 font-medium sm:px-2">플랫폼</th>
-                  <th className="px-1 py-1.5 font-medium sm:px-2">제안 건수</th>
+                  <th className="px-1 py-1.5 font-medium sm:px-2">신청 건수</th>
                   <th className="px-1 py-1.5 font-medium sm:px-2">상태</th>
-                  <th className="px-1 py-1.5 font-medium sm:px-2">시작가</th>
+                  <th className="px-1 py-1.5 font-medium sm:px-2">단가</th>
                   <th className="px-1 py-1.5 font-medium sm:px-2">관리</th>
                 </tr>
               </thead>

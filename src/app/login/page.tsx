@@ -224,7 +224,7 @@ export default function LoginPage() {
         {mode === 'signup' ? '회원가입' : '로그인'}
       </h1>
       <p className="mt-2 text-sm text-zinc-500">
-        소셜 계정으로 바로 시작하고, 캠페인 등록이나 제안할 때 필요한 정보만 입력하면 됩니다.
+        소셜 계정으로 바로 시작하고, 캠페인 등록이나 지원할 때 필요한 정보만 입력하면 됩니다.
       </p>
       <div className="mt-4">
         <InAppBrowserBanner />

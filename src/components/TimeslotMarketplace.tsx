@@ -87,9 +87,9 @@ export function TimeslotMarketplace() {
       ) : (
         <div className="mt-8 flex flex-col gap-10">
           <section>
-            <h2 className="text-lg font-bold text-zinc-950">제안 가능</h2>
+            <h2 className="text-lg font-bold text-zinc-950">신청 가능</h2>
             {open.length === 0 ? (
-              <p className="mt-4 text-sm text-zinc-500">지금 제안 가능한 상품이 없습니다.</p>
+              <p className="mt-4 text-sm text-zinc-500">지금 신청 가능한 상품이 없습니다.</p>
             ) : (
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {open.map((slot) => (

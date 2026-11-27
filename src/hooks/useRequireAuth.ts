@@ -43,7 +43,7 @@ export function useRequireAuth() {
       if (!canPlaceBid) {
         showToast(
           hasAuthRole(user, 'creator')
-            ? '크리에이터 모드로 전환하면 콘텐츠를 제안할 수 있습니다.'
+            ? '크리에이터 모드로 전환하면 캠페인에 지원할 수 있습니다.'
             : authGuardMessage('creator-forbidden'),
         );
         return false;

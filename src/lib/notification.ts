@@ -34,9 +34,9 @@ export function buildNotificationText(input: LifecycleNotifyInput) {
   const name = (input.toName || '회원').trim();
   switch (input.event) {
     case 'bid_received':
-      return `새로운 크리에이터 제안이 도착했습니다. 캠페인: ${title}`;
+      return `새로운 크리에이터 지원이 도착했습니다. 캠페인: ${title}`;
     case 'award_paid':
-      return `${name}님, 제안이 낙찰되어 결제 완료되었습니다. 캠페인: ${title}`;
+      return `${name}님, 지원이 선정되어 결제 완료되었습니다. 캠페인: ${title}`;
     case 'payout_paid':
       return `${name}님, 정산금 입금이 완료되었습니다. 캠페인: ${title}${input.extra ? ` (${input.extra})` : ''}`;
     case 'auction_deadline':
