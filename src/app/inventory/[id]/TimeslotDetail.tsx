@@ -430,7 +430,9 @@ export function TimeslotDetail({ id }: { id: string }) {
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h2 className="text-lg font-bold text-zinc-950">신청 현황</h2>
-                <p className="mt-1 text-sm text-zinc-500">단가 조건으로 접수된 신청입니다.</p>
+                <p className="mt-1 text-sm text-zinc-500">
+                  접수된 단가 {Number(slot.startingPrice || 0).toLocaleString('ko-KR')}원입니다.
+                </p>
               </div>
               {awardedClosed && winnerBid ? (
                 <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">
