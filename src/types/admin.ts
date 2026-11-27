@@ -82,6 +82,7 @@ export type ProfileAdminFilter =
   | 'all'
   | 'active'
   | 'suspended'
+  | 'review_required'
   | 'verified'
   | 'unverified'
   | 'creator';

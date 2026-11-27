@@ -32,6 +32,7 @@ const FILTER_ORDER: ProfileAdminFilter[] = [
   'all',
   'active',
   'suspended',
+  'review_required',
   'verified',
   'unverified',
   'creator',
@@ -41,6 +42,7 @@ const FILTER_NAME: Record<ProfileAdminFilter, string> = {
   all: '전체',
   active: '정상 회원',
   suspended: '정지 회원',
+  review_required: '승인 대기',
   verified: '사업자 인증 회원',
   unverified: '사업자 미인증 회원',
   creator: '크리에이터 회원',
@@ -65,6 +67,9 @@ function matchesProfileFilter(profile: ProfileItem, filter: ProfileAdminFilter) 
   }
   if (filter === 'active' || filter === 'suspended') {
     return profile.status === filter;
+  }
+  if (filter === 'review_required') {
+    return profileBusinessStatus(profile) === 'review_required';
   }
   if (filter === 'verified') {
     return profileBusinessStatus(profile) === 'verified';
@@ -419,6 +424,7 @@ export function AdminUserTable({
       all: searched.length,
       active: 0,
       suspended: 0,
+      review_required: 0,
       verified: 0,
       unverified: 0,
       creator: 0,
@@ -429,6 +435,9 @@ export function AdminUserTable({
       }
       if (profile.status === 'suspended') {
         counts.suspended += 1;
+      }
+      if (matchesProfileFilter(profile, 'review_required')) {
+        counts.review_required += 1;
       }
       if (matchesProfileFilter(profile, 'verified')) {
         counts.verified += 1;
@@ -501,6 +510,11 @@ export function AdminUserTable({
           </button>
         }
       />
+      {filter === 'review_required' ? (
+        <p className="border-b border-amber-100 bg-amber-50 px-3 py-2.5 text-sm leading-6 text-amber-950 sm:px-4">
+          사업자등록증 사본과 기재 정보를 대조한 뒤 승인 처리하세요.
+        </p>
+      ) : null}
       {filtered.length === 0 ? (
         <div className="p-4">
           <AdminEmptyState message="조건에 맞는 회원이 없습니다." />
