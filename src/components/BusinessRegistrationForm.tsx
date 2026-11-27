@@ -34,6 +34,7 @@ type BusinessPayload = {
   mismatch?: boolean;
   error?: string;
   errorCode?: string;
+  errorMessage?: string;
   lookupError?: { code: string; message: string } | null;
   certificateName?: string;
   hasCertificate?: boolean;
@@ -51,6 +52,7 @@ export function BusinessRegistrationForm() {
   const [detail, setDetail] = useState('');
   const [ntsLabel, setNtsLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [certificateName, setCertificateName] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -126,6 +128,7 @@ export function BusinessRegistrationForm() {
     }
     setBusy(true);
     setError(null);
+    setSaveMessage(null);
     try {
       const response = await fetch(
         '/api/business/status',
@@ -175,6 +178,7 @@ export function BusinessRegistrationForm() {
       businessAddressError(address) ||
       businessContactError(contact);
     if (invalid) {
+      setSaveMessage(null);
       setError(invalid);
       return;
     }
@@ -182,11 +186,13 @@ export function BusinessRegistrationForm() {
       allowsBusinessCertificateUpload({ status, ntsLabel, mismatch }) &&
       !certificateName.trim()
     ) {
+      setSaveMessage(null);
       setError('사업자등록증 사본을 첨부한 뒤 저장해 주세요.');
       return;
     }
     setBusy(true);
     setError(null);
+    setSaveMessage(null);
     try {
       const response = await fetch(
         '/api/account/business',
@@ -203,25 +209,32 @@ export function BusinessRegistrationForm() {
         }),
       );
       const body = (await response.json().catch(() => null)) as BusinessPayload | null;
+      if (!response.ok) {
+        const detail =
+          body?.errorMessage?.trim() ||
+          body?.error?.replace(/^\[[A-Z_]+\]\s*/, '').trim() ||
+          body?.lookupError?.message ||
+          '알 수 없는 오류';
+        applyPayload(body);
+        setSaveMessage(null);
+        setError(`저장에 실패했습니다: [${response.status}] ${detail}`);
+        return;
+      }
       applyPayload(body);
-      if (body?.errorCode === 'MISMATCH' || body?.mismatch) {
-        setError(
-          body.error ||
-            body.lookupError?.message ||
-            '대표자 성명 또는 개업일자가 국세청 등록 정보와 일치하지 않습니다.',
-        );
-        return;
-      }
-      if (body?.errorCode === 'CERTIFICATE_REQUIRED') {
-        setError(body.error || '사업자등록증 사본을 첨부한 뒤 저장해 주세요.');
-        return;
-      }
-      if (!response.ok || !body?.status) {
-        throw new Error(body?.error || '사업자등록번호를 저장하지 못했습니다.');
+      const refreshed = await fetch('/api/account/business', await authRequestInit({ cache: 'no-store' }));
+      const latest = (await refreshed.json().catch(() => null)) as BusinessPayload | null;
+      if (refreshed.ok && latest) {
+        applyPayload(latest);
       }
       setError(null);
+      setSaveMessage('사업자 정보가 저장되었습니다. 관리자 검수 후 인증이 완료됩니다.');
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : '사업자 상태를 조회하지 못했습니다.');
+      setSaveMessage(null);
+      setError(
+        `저장에 실패했습니다: ${
+          reason instanceof Error ? reason.message : '네트워크 오류가 발생했습니다.'
+        }`,
+      );
     } finally {
       setBusy(false);
     }
@@ -519,9 +532,17 @@ export function BusinessRegistrationForm() {
           onClick={() => void persist()}
           className="h-10 rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
         >
-          저장
+          {busy ? '저장 중...' : '저장'}
         </button>
       </div>
+      {saveMessage ? (
+        <p
+          role="status"
+          className="mt-3 rounded-xl bg-emerald-50 px-3 py-3 text-base font-semibold leading-7 text-emerald-800"
+        >
+          {saveMessage}
+        </p>
+      ) : null}
       {error ? (
         <p
           role="alert"
