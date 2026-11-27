@@ -28,6 +28,10 @@ export interface ProfileItem {
   businessStatusDetail?: string;
   businessReviewNote?: string;
   businessRepresentativeName?: string;
+  businessOpenedOn?: string;
+  businessCertificateName?: string;
+  hasBusinessCertificate?: boolean;
+  phone?: string | null;
   settlementType?: 'individual' | 'business';
 }
 

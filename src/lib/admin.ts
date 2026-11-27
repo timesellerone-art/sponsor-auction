@@ -157,6 +157,10 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
           businessStatusDetail: item.businessStatusDetail,
           businessReviewNote: item.businessReviewNote,
           businessRepresentativeName: item.businessRepresentativeName,
+          businessOpenedOn: item.businessOpenedOn,
+          businessCertificateName: item.businessCertificateName,
+          hasBusinessCertificate: Boolean(item.hasBusinessCertificate || item.businessCertificateName),
+          phone: item.phone ?? null,
           settlementType:
             item.settlementType === 'business' || item.settlementType === 'individual'
               ? item.settlementType

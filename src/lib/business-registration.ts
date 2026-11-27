@@ -195,19 +195,27 @@ export const CAMPAIGN_BUSINESS_REQUIRED_MESSAGE =
 export const CAMPAIGN_BUSINESS_REQUIRED_NOTICE =
   '캠페인 모집 등록은 사업자 인증을 완료한 기업(사업자) 회원만 이용할 수 있습니다.';
 
+export const TIMESLOT_BUSINESS_REQUIRED_MESSAGE =
+  '사업자 인증이 완료된 계정만 크리에이터 상품을 등록할 수 있습니다.';
+
+export const TIMESLOT_BUSINESS_REQUIRED_NOTICE =
+  '크리에이터 상품 등록은 사업자 인증을 완료한 크리에이터(사업자) 회원만 이용할 수 있습니다.';
+
 export function businessActionBlock(
   status: string | null | undefined,
-  action: 'charge' | 'campaign',
+  action: 'charge' | 'campaign' | 'timeslot',
 ) {
   const raw = status ?? '';
   const normalized: BusinessVerificationStatus = isBusinessVerificationStatus(raw)
     ? raw
     : 'unregistered';
-  if (action === 'campaign') {
+  if (action === 'campaign' || action === 'timeslot') {
     if (normalized === 'verified') {
       return null;
     }
-    return CAMPAIGN_BUSINESS_REQUIRED_MESSAGE;
+    return action === 'timeslot'
+      ? TIMESLOT_BUSINESS_REQUIRED_MESSAGE
+      : CAMPAIGN_BUSINESS_REQUIRED_MESSAGE;
   }
   if (normalized !== 'closed' && normalized !== 'rejected') {
     return null;

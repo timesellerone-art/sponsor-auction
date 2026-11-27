@@ -2,6 +2,10 @@ import { rethrowPrerenderError } from '@/lib/prerender-error';
 import { connection } from 'next/server';
 import { NextResponse } from 'next/server';
 import {
+  businessActionBlock,
+  TIMESLOT_BUSINESS_REQUIRED_MESSAGE,
+} from '@/lib/business-registration';
+import {
   forbiddenJson,
   getPaymentActor,
   unauthorizedJson,
@@ -29,6 +33,17 @@ function asNumber(value: unknown) {
     return Number.isFinite(parsed) ? parsed : NaN;
   }
   return NaN;
+}
+
+function verificationForbidden() {
+  return NextResponse.json(
+    {
+      error: TIMESLOT_BUSINESS_REQUIRED_MESSAGE,
+      errorCode: 'BUSINESS_VERIFICATION_REQUIRED',
+      errorMessage: TIMESLOT_BUSINESS_REQUIRED_MESSAGE,
+    },
+    { status: 403, headers: NO_STORE },
+  );
 }
 
 export async function GET(request: Request) {
@@ -74,11 +89,38 @@ export async function POST(request: Request) {
       // 등록은 계속합니다.
     }
     const actor = await getPaymentActor(request);
-    if (!actor) {
+    if (!actor?.userId) {
       return unauthorizedJson('크리에이터 상품을 등록하려면 로그인해 주세요.');
     }
     if (!hasAuthRole(actor, 'creator') && !hasAuthRole(actor, 'admin')) {
       return forbiddenJson('크리에이터 상품 등록은 크리에이터만 할 수 있습니다.');
+    }
+
+    const writer = await timeslotWriter();
+    if (!writer) {
+      return verificationForbidden();
+    }
+    const business = await writer
+      .from('profiles')
+      .select('business_verification_status')
+      .eq('id', actor.userId)
+      .maybeSingle();
+    if (business.error) {
+      return verificationForbidden();
+    }
+    const blocked = businessActionBlock(
+      business.data?.business_verification_status,
+      'timeslot',
+    );
+    if (blocked) {
+      return NextResponse.json(
+        {
+          error: blocked,
+          errorCode: 'BUSINESS_VERIFICATION_REQUIRED',
+          errorMessage: blocked,
+        },
+        { status: 403, headers: NO_STORE },
+      );
     }
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
@@ -97,7 +139,7 @@ export async function POST(request: Request) {
         slotEnd: asText(body?.slotEnd),
         deadline: asText(body?.deadline),
       },
-      await timeslotWriter(),
+      writer,
     );
     if (result.error || !result.data) {
       const message = result.error ?? '크리에이터 상품을 등록하지 못했습니다.';

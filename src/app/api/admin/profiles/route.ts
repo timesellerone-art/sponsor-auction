@@ -49,12 +49,15 @@ export async function GET() {
       business_review_note?: string | null;
       settlement_type?: string | null;
       business_representative_name?: string | null;
+      business_opened_on?: string | null;
+      business_certificate_path?: string | null;
+      business_certificate_name?: string | null;
     };
     let businessRows: BusinessRow[] = [];
     const full = await client
       .from('profiles')
       .select(
-        'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type, business_representative_name',
+        'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type, business_representative_name, business_opened_on, business_certificate_path, business_certificate_name',
       );
     if (!full.error) {
       businessRows = (full.data ?? []) as BusinessRow[];
@@ -94,6 +97,9 @@ export async function GET() {
         businessStatusDetail: extra?.business_status_detail ?? '',
         businessReviewNote: extra?.business_review_note ?? '',
         businessRepresentativeName: extra?.business_representative_name?.trim() ?? '',
+        businessOpenedOn: extra?.business_opened_on?.trim() ?? '',
+        businessCertificateName: extra?.business_certificate_name?.trim() ?? '',
+        hasBusinessCertificate: Boolean(extra?.business_certificate_path?.trim()),
         settlementType,
       };
     });

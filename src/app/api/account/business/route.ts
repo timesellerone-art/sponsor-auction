@@ -23,7 +23,9 @@ const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate' } as c
 const BASE_COLUMNS =
   'business_registration_number, business_verification_status, business_status_detail, business_review_note, business_checked_at';
 const EXTRA_COLUMNS = 'business_representative_name, business_opened_on';
+const CERT_COLUMNS = 'business_certificate_path, business_certificate_name';
 const COLUMNS = `${BASE_COLUMNS}, ${EXTRA_COLUMNS}`;
+const COLUMNS_WITH_CERT = `${COLUMNS}, ${CERT_COLUMNS}`;
 
 type BusinessRow = {
   business_registration_number?: string | null;
@@ -32,6 +34,8 @@ type BusinessRow = {
   business_review_note?: string | null;
   business_representative_name?: string | null;
   business_opened_on?: string | null;
+  business_certificate_path?: string | null;
+  business_certificate_name?: string | null;
 };
 
 function present(row: BusinessRow) {
@@ -40,6 +44,7 @@ function present(row: BusinessRow) {
     ? rawStatus
     : 'unregistered';
   const detail = row.business_status_detail ?? '';
+  const certificateName = row.business_certificate_name?.trim() ?? '';
   return {
     businessNumber: formatBusinessNumber(row.business_registration_number ?? ''),
     representativeName: normalizeRepresentativeName(row.business_representative_name),
@@ -49,6 +54,8 @@ function present(row: BusinessRow) {
     reviewNote: row.business_review_note ?? '',
     notice: businessStatusNotice(status, detail),
     ntsLabel: ntsBusinessLabelFromText(detail),
+    certificateName,
+    hasCertificate: Boolean(row.business_certificate_path?.trim()),
   };
 }
 
@@ -56,12 +63,22 @@ async function loadBusinessRow(
   admin: NonNullable<ReturnType<typeof createAdminClient>>,
   userId: string,
 ) {
-  const withExtra = await admin.from('profiles').select(COLUMNS).eq('id', userId).maybeSingle();
-  if (withExtra.error && isSchemaMismatch(withExtra.error)) {
-    const basic = await admin.from('profiles').select(BASE_COLUMNS).eq('id', userId).maybeSingle();
-    return { ...basic, extra: false as const };
+  const withCert = await admin.from('profiles').select(COLUMNS_WITH_CERT).eq('id', userId).maybeSingle();
+  if (!withCert.error) {
+    return { ...withCert, extra: true as const };
   }
-  return { ...withExtra, extra: true as const };
+  if (isSchemaMismatch(withCert.error)) {
+    const withExtra = await admin.from('profiles').select(COLUMNS).eq('id', userId).maybeSingle();
+    if (!withExtra.error) {
+      return { ...withExtra, extra: true as const };
+    }
+    if (isSchemaMismatch(withExtra.error)) {
+      const basic = await admin.from('profiles').select(BASE_COLUMNS).eq('id', userId).maybeSingle();
+      return { ...basic, extra: false as const };
+    }
+    return { ...withExtra, extra: false as const };
+  }
+  return { ...withCert, extra: true as const };
 }
 
 export async function GET(request: Request) {
@@ -203,6 +220,29 @@ export async function POST(request: Request) {
       }
     }
 
+    const cert = await admin
+      .from('profiles')
+      .select('business_certificate_path, business_certificate_name')
+      .eq('id', actor.userId)
+      .maybeSingle();
+    const certPath =
+      !cert.error && typeof cert.data?.business_certificate_path === 'string'
+        ? cert.data.business_certificate_path.trim()
+        : '';
+    const certName =
+      !cert.error && typeof cert.data?.business_certificate_name === 'string'
+        ? cert.data.business_certificate_name.trim()
+        : '';
+    if (!clearing && businessNumber && !mismatch && status !== 'closed' && !cert.error && !certPath) {
+      return NextResponse.json(
+        {
+          error: '사업자등록증 사본을 첨부한 뒤 저장해 주세요.',
+          errorCode: 'CERTIFICATE_REQUIRED',
+        },
+        { status: 400, headers: NO_STORE },
+      );
+    }
+
     const payload = {
       business_registration_number: businessNumber,
       business_verification_status: status,
@@ -256,6 +296,8 @@ export async function POST(request: Request) {
         business_representative_name:
           row.business_representative_name ?? (businessNumber ? representativeName : ''),
         business_opened_on: row.business_opened_on ?? (businessNumber ? openedOn : ''),
+        business_certificate_path: row.business_certificate_path ?? certPath,
+        business_certificate_name: row.business_certificate_name ?? certName,
       }),
       mismatch,
       ntsLabel:

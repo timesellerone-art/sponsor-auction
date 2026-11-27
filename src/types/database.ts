@@ -300,6 +300,8 @@ export type Database = {
           business_checked_at: string | null;
           business_representative_name: string;
           business_opened_on: string;
+          business_certificate_path: string;
+          business_certificate_name: string;
           bank_name: string;
           account_number: string;
           account_holder: string;
@@ -327,6 +329,8 @@ export type Database = {
           business_checked_at?: string | null;
           business_representative_name?: string;
           business_opened_on?: string;
+          business_certificate_path?: string;
+          business_certificate_name?: string;
           bank_name?: string;
           account_number?: string;
           account_holder?: string;
@@ -352,6 +356,8 @@ export type Database = {
           business_checked_at?: string | null;
           business_representative_name?: string;
           business_opened_on?: string;
+          business_certificate_path?: string;
+          business_certificate_name?: string;
           bank_name?: string;
           account_number?: string;
           account_holder?: string;

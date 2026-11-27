@@ -4,10 +4,12 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import { createPortal } from 'react-dom';
 import { Loader2, X } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
+import { BusinessStatusNotice } from '@/components/BusinessStatusNotice';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { authRequestInit } from '@/lib/auth-request';
+import { TIMESLOT_BUSINESS_REQUIRED_NOTICE } from '@/lib/business-registration';
 import { SELECTABLE_PLATFORMS } from '@/lib/platforms';
 import { cn } from '@/lib/utils';
 import { validateTimeSlotForm, type TimeSlotFieldErrors } from '@/lib/validation';
@@ -56,7 +58,15 @@ export function CreateTimeslotModal({
   const [deadline, setDeadline] = useState('');
   const [errors, setErrors] = useState<TimeSlotFieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [businessBlocked, setBusinessBlocked] = useState(true);
   const { isBusy: isSubmitting, run } = useActionLock();
+
+  useEffect(() => {
+    if (open) {
+      setBusinessBlocked(true);
+      setSubmitError(null);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -104,6 +114,10 @@ export function CreateTimeslotModal({
     event.preventDefault();
     await run('timeslot', async () => {
       if (!requireCreator() || !user) {
+        return;
+      }
+      if (businessBlocked) {
+        setSubmitError(TIMESLOT_BUSINESS_REQUIRED_NOTICE);
         return;
       }
       const nextErrors = validateTimeSlotForm({
@@ -183,6 +197,15 @@ export function CreateTimeslotModal({
         </div>
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" aria-labelledby={titleId}>
           <div className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto px-4 py-4">
+            <BusinessStatusNotice
+              intent="timeslot"
+              onChange={setBusinessBlocked}
+              onVerifyNavigate={onClose}
+            />
+            <fieldset
+              disabled={businessBlocked}
+              className={cn('flex flex-col gap-3', businessBlocked && 'pointer-events-none opacity-60')}
+            >
             <Field label="상품 제목" htmlFor="slot-title" error={errors.title}>
               <input
                 ref={firstFieldRef}
@@ -266,12 +289,13 @@ export function CreateTimeslotModal({
                 {submitError}
               </p>
             ) : null}
+            </fieldset>
           </div>
           <div className="border-t border-zinc-200 px-4 py-3">
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
+              disabled={isSubmitting || businessBlocked}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
               {isSubmitting ? '등록 중...' : '크리에이터 상품 등록'}

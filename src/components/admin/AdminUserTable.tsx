@@ -4,7 +4,9 @@ import { useMemo, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
+import { showToast } from '@/components/Toast';
 import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
+import { authRequestInit } from '@/lib/auth-request';
 import { formatAdminTimestamp } from '@/lib/utils';
 import {
   businessVerificationLabel,
@@ -129,6 +131,8 @@ function BusinessStatusBlock({ profile }: { profile: ProfileItem }) {
   const label = status === 'unregistered' ? '사업자 미등록' : businessVerificationLabel(status);
   const number = profile.businessRegistrationNumber?.trim() || '';
   const representative = profile.businessRepresentativeName?.trim() || '';
+  const openedOn = profile.businessOpenedOn?.trim() || '';
+  const contact = profile.phone?.trim() || profile.email || '';
   return (
     <div className="min-w-0">
       <span className={businessStatusClass(status)}>{label}</span>
@@ -136,12 +140,31 @@ function BusinessStatusBlock({ profile }: { profile: ProfileItem }) {
         <p className="mt-1 break-all text-[11px] leading-4 text-zinc-600" title={number}>
           {number}
           {representative ? ` · ${representative}` : ''}
+          {openedOn ? ` · ${openedOn}` : ''}
         </p>
       ) : status === 'verified' ? (
         <p className="mt-1 text-[11px] leading-4 text-zinc-500">사업자번호 없음</p>
       ) : null}
+      {contact && number ? (
+        <p className="mt-0.5 truncate text-[11px] leading-4 text-zinc-500" title={contact}>
+          {contact}
+        </p>
+      ) : null}
     </div>
   );
+}
+
+async function openBusinessCertificate(userId: string) {
+  const response = await fetch(
+    `/api/admin/business/certificate?userId=${encodeURIComponent(userId)}`,
+    await authRequestInit({ cache: 'no-store' }),
+  );
+  const body = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+  if (!response.ok || !body?.url) {
+    showToast(body?.error || '사업자등록증을 열 수 없습니다.');
+    return;
+  }
+  window.open(body.url, '_blank', 'noopener,noreferrer');
 }
 
 function UserManageButtons({
@@ -168,8 +191,21 @@ function UserManageButtons({
     profile.businessVerificationStatus &&
     profile.businessVerificationStatus !== 'unregistered' &&
     profile.businessVerificationStatus !== 'closed';
+  const hasCertificate = Boolean(profile.hasBusinessCertificate || profile.businessCertificateName);
   return (
     <div className={compact ? 'flex flex-wrap gap-1' : 'flex flex-wrap gap-2'}>
+      {hasCertificate ? (
+        <button
+          type="button"
+          disabled={anyBusy}
+          onClick={() => {
+            void openBusinessCertificate(profile.id);
+          }}
+          className={`${base} border border-zinc-200 text-zinc-700 hover:bg-zinc-50`}
+        >
+          사업자등록증 보기
+        </button>
+      ) : null}
       {canReview ? (
         <>
           <button
