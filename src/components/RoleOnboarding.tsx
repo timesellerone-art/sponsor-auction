@@ -68,11 +68,10 @@ export function RoleOnboarding({
     '캠페인 등록이나 제안을 하려면 역할을 선택해 주세요. 휴대폰 인증은 가입 시 1회만 완료하면 됩니다.';
 
   const finishIfExistingMember = (result: PhoneVerifyResult) => {
-    if (result.duplicate) {
-      showToast(result.message || '이미 가입된 번호입니다. 기존 계정으로 로그인해 주세요.');
-      return true;
-    }
     setPhoneVerified(true);
+    if (result.merged) {
+      showToast(result.message || ACCOUNT_UNIFIED_MESSAGE, 'success');
+    }
     if (result.onboardingComplete && result.roles.length > 0) {
       onCompleted(result.roles);
       return true;

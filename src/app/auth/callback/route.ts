@@ -33,12 +33,7 @@ import { shareOAuthAttempt } from '@/lib/oauth-once';
 import { getSupabaseEnv } from '@/lib/supabase/env';
 import { requestAppOrigin } from '@/lib/site-origin';
 import { reconcileSocialIdentities } from '@/lib/auth-identity';
-import {
-  isMemberRole,
-  parseAuthRoles,
-  primaryAuthRole,
-  type SessionUser,
-} from '@/types/auth';
+import { sessionUserWithProfileRoles } from '@/lib/auth-session';
 
 function callbackOrigin(request: Request) {
   return requestAppOrigin(request);
@@ -85,34 +80,13 @@ function failRedirect(
 async function sessionLikeFor(
   supabase: ReturnType<typeof createServerClient>,
   authUser: User,
-): Promise<SessionUser> {
+) {
   const profile = await supabase
     .from('profiles')
-    .select('role, roles')
+    .select('role, roles, phone')
     .eq('id', authUser.id)
     .maybeSingle();
-  const roles = parseAuthRoles(
-    profile.data?.roles,
-    profile.data?.role,
-    authUser.user_metadata?.roles,
-    authUser.user_metadata?.role,
-  );
-  return {
-    id: authUser.id,
-    email: authUser.email?.includes('@')
-      ? authUser.email
-      : `user.${authUser.id.replace(/-/g, '').slice(0, 12)}@oauth.sponsor-auction.local`,
-    name: '',
-    role: primaryAuthRole(roles),
-    roles,
-    createdAt: authUser.created_at,
-    lastSignInAt: authUser.last_sign_in_at,
-    onboardingComplete: authUser.user_metadata?.onboarding_complete === true,
-    phoneVerified: authUser.user_metadata?.phone_verified === true,
-    currentMode: isMemberRole(authUser.user_metadata?.current_mode)
-      ? authUser.user_metadata.current_mode
-      : null,
-  };
+  return sessionUserWithProfileRoles(authUser, profile.data);
 }
 
 export async function GET(request: NextRequest) {

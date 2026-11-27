@@ -88,7 +88,10 @@ export function needsPhoneOnboarding(source: unknown): boolean {
   if (!source || typeof source !== 'object') {
     return false;
   }
-  const record = source as SessionUser & { phone_verified?: unknown };
+  const record = source as SessionUser & {
+    phone_verified?: unknown;
+    user_metadata?: { phone_verified?: unknown; onboarding_complete?: unknown } | null;
+  };
   if (!record.id) {
     return false;
   }
@@ -96,10 +99,14 @@ export function needsPhoneOnboarding(source: unknown): boolean {
   if (roles.includes('admin') || roles.some(isMemberRole)) {
     return false;
   }
-  if (record.phoneVerified === true || record.phone_verified === true) {
+  if (
+    record.phoneVerified === true ||
+    record.phone_verified === true ||
+    record.user_metadata?.phone_verified === true
+  ) {
     return false;
   }
-  if (record.onboardingComplete === true) {
+  if (record.onboardingComplete === true || record.user_metadata?.onboarding_complete === true) {
     return false;
   }
   return true;

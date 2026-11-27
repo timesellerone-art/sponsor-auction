@@ -8,6 +8,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { PhoneOtpForm } from '@/components/PhoneOtpForm';
 import { useAuth } from '@/components/AuthProvider';
 import { showToast } from '@/components/Toast';
+import { ACCOUNT_UNIFIED_MESSAGE } from '@/lib/account-unify';
 import { linkSocialIdentity } from '@/lib/auth';
 import { loginPath } from '@/lib/auth-guard';
 import {
@@ -481,12 +482,8 @@ export function LinkedAccountsPanel() {
                     verified={false}
                     disabled={phoneBusy}
                     onVerified={(result) => {
-                      if (result.duplicate) {
-                        showToast(
-                          result.message ||
-                            '이미 가입된 번호입니다. 기존 계정으로 로그인해 주세요.',
-                        );
-                        return;
+                      if (result.merged) {
+                        showToast(result.message || ACCOUNT_UNIFIED_MESSAGE, 'success');
                       }
                       void handlePhoneVerified();
                     }}

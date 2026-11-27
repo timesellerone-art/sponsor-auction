@@ -29,6 +29,10 @@ describe('phone signup uniqueness', () => {
   it('미인증 임시 소셜 세션만 휴대폰 온보딩 대상이다', () => {
     assert.equal(needsPhoneOnboarding({ id: 'usr-1', roles: [] }), true);
     assert.equal(needsPhoneOnboarding({ id: 'usr-1', roles: [], phoneVerified: true }), false);
+    assert.equal(
+      needsPhoneOnboarding({ id: 'usr-1', roles: [], user_metadata: { phone_verified: true } }),
+      false,
+    );
     assert.equal(needsPhoneOnboarding({ id: 'usr-1', roles: ['advertiser'] }), false);
     assert.equal(needsPhoneOnboarding({ roles: [] }), false);
     assert.equal(

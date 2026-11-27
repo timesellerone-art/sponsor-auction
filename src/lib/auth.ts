@@ -176,7 +176,7 @@ function mapSessionUser(
     createdAt: authUser?.created_at,
     lastSignInAt: authUser?.last_sign_in_at,
     onboardingComplete: meta.onboarding_complete === true,
-    phoneVerified: meta.phone_verified === true,
+    phoneVerified: meta.phone_verified === true || Boolean(phone?.trim()),
     currentMode: isMemberRole(modeRaw) ? modeRaw : null,
   };
 }

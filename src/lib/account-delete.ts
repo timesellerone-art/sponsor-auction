@@ -5,14 +5,15 @@ import {
   type SocialIdentityProvider,
 } from '@/lib/auth-identities';
 import { collectAuthEmails } from '@/lib/auth-emails';
-import { findExistingAccountByContact } from '@/lib/auth-identity';
+import {
+  findExistingAccountByContact,
+  generateMagicLinkHash,
+  mergeUserInto,
+} from '@/lib/auth-identity';
+import { ACCOUNT_UNIFIED_MESSAGE } from '@/lib/account-unify';
 import { normalizePhone, toE164Kr } from '@/lib/contact';
 import { clearedPhoneOtpMetadata } from '@/lib/phone-otp';
-import {
-  existingAccountLoginMessage,
-  isProvisionalSignupUser,
-  signupMethodLabels,
-} from '@/lib/phone-signup';
+import { signupMethodLabels } from '@/lib/phone-signup';
 import { upsertAppProfile } from '@/lib/supabase/profile-sync';
 import { isMemberRole, parseAuthRoles, type MemberRole } from '@/types/auth';
 
@@ -120,18 +121,11 @@ export type VerifiedPhoneResult = {
   tokenHash: string | null;
   roles: MemberRole[];
   onboardingComplete: boolean;
+  phone: string | null;
 };
 
-async function deleteProvisionalAuthUser(admin: AdminClient, userId: string) {
-  await admin.from('profiles').delete().eq('id', userId);
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    await admin.auth.admin.deleteUser(userId);
-    const remaining = await admin.auth.admin.getUserById(userId);
-    if (!remaining.data.user) {
-      return;
-    }
-  }
-  throw new Error('임시 계정을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+function memberRolesOf(user: User | null | undefined): MemberRole[] {
+  return parseAuthRoles(user?.user_metadata?.roles, user?.user_metadata?.role).filter(isMemberRole);
 }
 
 export async function completeVerifiedPhone(
@@ -150,22 +144,25 @@ export async function completeVerifiedPhone(
     excludeUserId: user.id,
   });
   if (existing) {
-    const existingMethods = signupMethodLabels(existing);
-    const message = existingAccountLoginMessage(existingMethods);
-    const provisional = isProvisionalSignupUser(user);
-    if (provisional) {
-      await deleteProvisionalAuthUser(admin, user.id);
+    const mergedUser = await mergeUserInto(user, existing, { phone });
+    const tokenHash = await generateMagicLinkHash(admin, mergedUser);
+    if (!tokenHash) {
+      throw new Error(
+        '계정을 통합했지만 세션을 전환하지 못했습니다. 잠시 후 다시 로그인해 주세요.',
+      );
     }
+    const roles = memberRolesOf(mergedUser);
     return {
-      user: provisional ? null : user,
-      duplicate: true,
-      deleted: provisional,
-      existingMethods,
-      merged: false,
-      message,
-      tokenHash: null,
-      roles: [],
-      onboardingComplete: false,
+      user: mergedUser,
+      duplicate: false,
+      deleted: false,
+      existingMethods: signupMethodLabels(mergedUser),
+      merged: true,
+      message: ACCOUNT_UNIFIED_MESSAGE,
+      tokenHash,
+      roles,
+      onboardingComplete: true,
+      phone,
     };
   }
 
@@ -214,10 +211,7 @@ export async function completeVerifiedPhone(
   const refreshed = (await admin.auth.admin.getUserById(user.id)).data.user
     ?? withPhone.data.user
     ?? user;
-  const roles = parseAuthRoles(
-    refreshed.user_metadata?.roles,
-    refreshed.user_metadata?.role,
-  ).filter(isMemberRole);
+  const roles = memberRolesOf(refreshed);
 
   return {
     user: refreshed,
@@ -229,5 +223,6 @@ export async function completeVerifiedPhone(
     tokenHash: null,
     roles,
     onboardingComplete: true,
+    phone,
   };
 }

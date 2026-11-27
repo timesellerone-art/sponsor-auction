@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
           message: result.message,
           roles: result.roles,
           onboardingComplete: result.onboardingComplete,
+          phone: result.phone,
         },
         sessionSwitch: result.tokenHash ? { tokenHash: result.tokenHash } : undefined,
       },
