@@ -98,7 +98,7 @@ export function SettlementAccountForm() {
     >
       <h2 className="text-lg font-bold text-zinc-950">정산 계좌</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
-        정산 입금 계좌와 유형을 저장하면 이후 제안·정산에 기본값으로 불러옵니다.
+        정산 입금 계좌와 유형을 저장하면 이후 캠페인 참여·정산 시 기본값으로 불러옵니다.
       </p>
 
       <fieldset className="mt-4">
@@ -130,13 +130,15 @@ export function SettlementAccountForm() {
         </div>
       </fieldset>
 
+      <p className="mt-3 text-sm leading-6 text-zinc-500">
+        개인 프리랜서는 캠페인 참여·지원 정산(원천징수) 기준으로 이용됩니다. 크리에이터 상품 직접
+        등록은 사업자 인증을 완료한 회원만 가능합니다.
+      </p>
       {settlementType === 'business' ? (
-        <p className="mt-3 text-sm text-zinc-500">
+        <p className="mt-2 text-sm text-zinc-500">
           사업자등록번호는 계정 설정에서 저장하고, 관리자 검증이 끝나면 세금계산서로 정산됩니다.
         </p>
-      ) : (
-        <p className="mt-3 text-sm text-zinc-500">개인 프리랜서는 원천징수 기준으로 정산됩니다.</p>
-      )}
+      ) : null}
 
       <label className="mt-4 block text-sm font-medium text-zinc-700" htmlFor="settlement-bank-name">
         은행명
@@ -172,6 +174,9 @@ export function SettlementAccountForm() {
         autoComplete="name"
         className={inputClass}
       />
+      <p className="mt-1 text-xs leading-5 text-zinc-500">
+        정산 계좌 예금주는 본인(또는 사업자등록증상 대표자·법인) 명의 계좌를 입력해 주세요.
+      </p>
 
       <div className="mt-4">
         <button
