@@ -133,16 +133,16 @@ export function TimeslotBidForm({
     <form onSubmit={handleSubmit} className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
       <h2 className="text-base font-bold text-zinc-950">크리에이터 상품 신청</h2>
       <p className="mt-1 text-sm text-zinc-500">
-        확정 캠페인 단가 {formatWon(bidAmount)}에 동의한 뒤 콘셉트·제작 방향으로 신청합니다.
+        캠페인 단가 {formatWon(bidAmount)}에 동의한 뒤 콘셉트·제작 방향으로 신청합니다.
       </p>
       <div className="mt-3">
         <EscrowNotice compact />
       </div>
       <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3">
-        <p className="text-xs font-semibold tracking-wide text-zinc-500">확정 캠페인 단가</p>
+        <p className="text-xs font-semibold tracking-wide text-zinc-500">캠페인 단가</p>
         <p className="mt-1 text-lg font-bold tabular-nums text-zinc-950">{formatWon(bidAmount)}</p>
         <p className="mt-1 text-xs leading-5 text-zinc-500">
-          크리에이터가 사전에 책정한 확정 금액입니다. 금액은 수정할 수 없습니다.
+          크리에이터가 사전에 책정한 금액입니다. 금액은 수정할 수 없습니다.
         </p>
       </div>
       <label className="mt-3 block text-sm font-medium text-zinc-800" htmlFor="slot-bid-message">
@@ -160,7 +160,7 @@ export function TimeslotBidForm({
         <FeeBreakdownCard role="advertiser" amount={bidAmount} />
       </div>
       <p className="mt-3 text-xs leading-5 text-zinc-500">
-        크리에이터가 신청을 선정하면 확정 단가 1건을 토스페이먼츠 에스크로로 결제합니다.
+        크리에이터가 신청을 선정하면 단가 1건을 토스페이먼츠 에스크로로 결제합니다.
       </p>
       {error ? (
         <p className="mt-2 text-sm text-rose-600" role="alert">

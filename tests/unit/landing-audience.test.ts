@@ -20,7 +20,7 @@ describe('랜딩 역할별 소개 카피', () => {
     );
     assert.equal(
       LANDING_INTRO.advertiser.sub,
-      '제품 정보와 확정 캠페인 단가를 등록하면 AI가 촬영 가이드를 정리하고, 여러 크리에이터가 콘셉트·포트폴리오로 지원합니다.',
+      '제품 정보와 캠페인 단가를 등록하면 AI가 촬영 가이드를 정리하고, 여러 크리에이터가 콘셉트·포트폴리오로 지원합니다.',
     );
     assert.equal(LANDING_INTRO.advertiser.sub.includes('1명'), false);
     assert.equal(

@@ -239,7 +239,7 @@ export function CreateTimeslotModal({
                 className={inputClass(Boolean(errors.expectedViews))}
               />
             </Field>
-            <Field label="확정 캠페인 단가" htmlFor="slot-price" error={errors.startingPrice} hint="최소 10,000원">
+            <Field label="캠페인 단가" htmlFor="slot-price" error={errors.startingPrice} hint="최소 10,000원">
               <input
                 id="slot-price"
                 inputMode="numeric"

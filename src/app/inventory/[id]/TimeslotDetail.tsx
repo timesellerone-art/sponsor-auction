@@ -336,7 +336,7 @@ export function TimeslotDetail({ id }: { id: string }) {
             </p>
             <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-xs text-zinc-400">확정 캠페인 단가</p>
+                <p className="text-xs text-zinc-400">캠페인 단가</p>
                 <p className="font-semibold">{formatWon(slot.startingPrice)}</p>
               </div>
               <div>
@@ -430,7 +430,7 @@ export function TimeslotDetail({ id }: { id: string }) {
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h2 className="text-lg font-bold text-zinc-950">신청 현황</h2>
-                <p className="mt-1 text-sm text-zinc-500">확정 단가 조건으로 접수된 신청입니다.</p>
+                <p className="mt-1 text-sm text-zinc-500">단가 조건으로 접수된 신청입니다.</p>
               </div>
               {awardedClosed && winnerBid ? (
                 <span className="rounded-full bg-clink-peach px-2.5 py-1 text-xs font-semibold text-clink-accent">

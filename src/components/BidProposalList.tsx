@@ -70,7 +70,7 @@ export function BidProposalList({
           </h2>
           <p className="mt-1 text-sm text-zinc-500">
             채널, 평판, 콘셉트·포트폴리오를 비교한 뒤 크리에이터를 선정합니다. 지급액은 등록 시
-            고지한 확정 캠페인 단가입니다.
+            고지한 캠페인 단가입니다.
           </p>
           {auction.budget > 0 ? (
             <p className="mt-2 text-xs text-zinc-500">

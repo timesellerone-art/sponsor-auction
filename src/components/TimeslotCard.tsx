@@ -69,7 +69,7 @@ export function TimeslotCard({ slot }: { slot: TimeSlotItem }) {
       />
       <p className="mt-2 line-clamp-2 text-sm text-zinc-500">{slot.description}</p>
       <p className="mt-4 text-lg font-bold text-zinc-950">
-        확정 단가 {formatWon(slot.startingPrice)}
+        단가 {formatWon(slot.startingPrice)}
       </p>
       <p className="mt-1 text-xs text-zinc-500">예상 조회수 {formatViews(slot.expectedViews)}</p>
       <div className="mt-auto flex items-center justify-between gap-2 pt-4 text-xs">
