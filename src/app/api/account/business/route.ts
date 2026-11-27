@@ -6,8 +6,12 @@ import {
   formatBusinessNumber,
   formatOpeningDateInput,
   isBusinessVerificationStatus,
+  normalizeBusinessAddress,
+  normalizeBusinessContact,
+  normalizeCompanyName,
   normalizeRepresentativeName,
   ntsBusinessLabelFromText,
+  parseBusinessDetailInput,
   parseBusinessIdentityInput,
   profileStatusFromNts,
   profileStatusFromNtsAndValidate,
@@ -24,8 +28,10 @@ const BASE_COLUMNS =
   'business_registration_number, business_verification_status, business_status_detail, business_review_note, business_checked_at';
 const EXTRA_COLUMNS = 'business_representative_name, business_opened_on';
 const CERT_COLUMNS = 'business_certificate_path, business_certificate_name';
+const DETAIL_COLUMNS = 'business_company_name, business_address, business_contact';
 const COLUMNS = `${BASE_COLUMNS}, ${EXTRA_COLUMNS}`;
 const COLUMNS_WITH_CERT = `${COLUMNS}, ${CERT_COLUMNS}`;
+const COLUMNS_FULL = `${COLUMNS_WITH_CERT}, ${DETAIL_COLUMNS}`;
 
 type BusinessRow = {
   business_registration_number?: string | null;
@@ -36,6 +42,9 @@ type BusinessRow = {
   business_opened_on?: string | null;
   business_certificate_path?: string | null;
   business_certificate_name?: string | null;
+  business_company_name?: string | null;
+  business_address?: string | null;
+  business_contact?: string | null;
 };
 
 function present(row: BusinessRow) {
@@ -49,6 +58,9 @@ function present(row: BusinessRow) {
     businessNumber: formatBusinessNumber(row.business_registration_number ?? ''),
     representativeName: normalizeRepresentativeName(row.business_representative_name),
     openedOn: formatOpeningDateInput(row.business_opened_on),
+    companyName: normalizeCompanyName(row.business_company_name),
+    address: normalizeBusinessAddress(row.business_address),
+    contact: normalizeBusinessContact(row.business_contact),
     status,
     detail,
     reviewNote: row.business_review_note ?? '',
@@ -63,22 +75,29 @@ async function loadBusinessRow(
   admin: NonNullable<ReturnType<typeof createAdminClient>>,
   userId: string,
 ) {
-  const withCert = await admin.from('profiles').select(COLUMNS_WITH_CERT).eq('id', userId).maybeSingle();
-  if (!withCert.error) {
+  const full = await admin.from('profiles').select(COLUMNS_FULL).eq('id', userId).maybeSingle();
+  if (!full.error) {
+    return { ...full, extra: true as const };
+  }
+  if (isSchemaMismatch(full.error)) {
+    const withCert = await admin.from('profiles').select(COLUMNS_WITH_CERT).eq('id', userId).maybeSingle();
+    if (!withCert.error) {
+      return { ...withCert, extra: true as const };
+    }
+    if (isSchemaMismatch(withCert.error)) {
+      const withExtra = await admin.from('profiles').select(COLUMNS).eq('id', userId).maybeSingle();
+      if (!withExtra.error) {
+        return { ...withExtra, extra: true as const };
+      }
+      if (isSchemaMismatch(withExtra.error)) {
+        const basic = await admin.from('profiles').select(BASE_COLUMNS).eq('id', userId).maybeSingle();
+        return { ...basic, extra: false as const };
+      }
+      return { ...withExtra, extra: false as const };
+    }
     return { ...withCert, extra: true as const };
   }
-  if (isSchemaMismatch(withCert.error)) {
-    const withExtra = await admin.from('profiles').select(COLUMNS).eq('id', userId).maybeSingle();
-    if (!withExtra.error) {
-      return { ...withExtra, extra: true as const };
-    }
-    if (isSchemaMismatch(withExtra.error)) {
-      const basic = await admin.from('profiles').select(BASE_COLUMNS).eq('id', userId).maybeSingle();
-      return { ...basic, extra: false as const };
-    }
-    return { ...withExtra, extra: false as const };
-  }
-  return { ...withCert, extra: true as const };
+  return { ...full, extra: true as const };
 }
 
 export async function GET(request: Request) {
@@ -136,6 +155,7 @@ export async function POST(request: Request) {
     if (!actor?.userId) {
       return unauthorizedJson('사업자등록번호를 저장하려면 로그인해 주세요.');
     }
+    const userId = actor.userId;
     if (
       !hasAuthRole(actor, 'advertiser') &&
       !hasAuthRole(actor, 'creator') &&
@@ -143,13 +163,16 @@ export async function POST(request: Request) {
     ) {
       return forbiddenJson('사업자등록번호는 광고주 또는 크리에이터 계정에서 관리합니다.');
     }
-    const parsed = parseBusinessIdentityInput(
-      (await request.json().catch(() => null)) as {
-        businessNumber?: unknown;
-        representativeName?: unknown;
-        openedOn?: unknown;
-      } | null,
-    );
+    const body = (await request.json().catch(() => null)) as {
+      businessNumber?: unknown;
+      representativeName?: unknown;
+      openedOn?: unknown;
+      companyName?: unknown;
+      address?: unknown;
+      contact?: unknown;
+    } | null;
+    const parsed = parseBusinessIdentityInput(body);
+    const details = parseBusinessDetailInput(body);
     const clearing = !parsed.businessNumber && !parsed.representativeName && !parsed.openedOn;
     if (!clearing && parsed.error) {
       return NextResponse.json(
@@ -160,6 +183,9 @@ export async function POST(request: Request) {
     const businessNumber = clearing ? '' : parsed.businessNumber;
     const representativeName = clearing ? '' : parsed.representativeName;
     const openedOn = clearing ? '' : parsed.openedOn;
+    const companyName = clearing ? '' : details.companyName;
+    const address = clearing ? '' : details.address;
+    const contact = clearing ? '' : details.contact;
 
     const admin = createAdminClient();
     if (!admin) {
@@ -223,7 +249,7 @@ export async function POST(request: Request) {
     const cert = await admin
       .from('profiles')
       .select('business_certificate_path, business_certificate_name')
-      .eq('id', actor.userId)
+      .eq('id', userId)
       .maybeSingle();
     const certPath =
       !cert.error && typeof cert.data?.business_certificate_path === 'string'
@@ -233,14 +259,22 @@ export async function POST(request: Request) {
       !cert.error && typeof cert.data?.business_certificate_name === 'string'
         ? cert.data.business_certificate_name.trim()
         : '';
-    if (!clearing && businessNumber && !mismatch && status !== 'closed' && !cert.error && !certPath) {
-      return NextResponse.json(
-        {
-          error: '사업자등록증 사본을 첨부한 뒤 저장해 주세요.',
-          errorCode: 'CERTIFICATE_REQUIRED',
-        },
-        { status: 400, headers: NO_STORE },
-      );
+    if (!clearing && businessNumber && !mismatch && status !== 'closed') {
+      if (details.error) {
+        return NextResponse.json(
+          { error: details.error, errorCode: details.errorCode },
+          { status: 400, headers: NO_STORE },
+        );
+      }
+      if (!cert.error && !certPath) {
+        return NextResponse.json(
+          {
+            error: '사업자등록증 사본을 첨부한 뒤 저장해 주세요.',
+            errorCode: 'CERTIFICATE_REQUIRED',
+          },
+          { status: 400, headers: NO_STORE },
+        );
+      }
     }
 
     const payload = {
@@ -250,27 +284,48 @@ export async function POST(request: Request) {
       business_checked_at: new Date().toISOString(),
       business_representative_name: businessNumber ? representativeName : '',
       business_opened_on: businessNumber ? openedOn : '',
+      business_company_name: businessNumber ? companyName : '',
+      business_address: businessNumber ? address : '',
+      business_contact: businessNumber ? contact : '',
     };
 
     const updated = await admin
       .from('profiles')
       .update(payload)
-      .eq('id', actor.userId)
-      .select(COLUMNS)
+      .eq('id', userId)
+      .select(COLUMNS_FULL)
       .maybeSingle();
     const savedRow =
       updated.error && isSchemaMismatch(updated.error)
-        ? await admin
-            .from('profiles')
-            .update({
-              business_registration_number: businessNumber,
-              business_verification_status: status,
-              business_status_detail: detail,
-              business_checked_at: new Date().toISOString(),
-            })
-            .eq('id', actor.userId)
-            .select(BASE_COLUMNS)
-            .maybeSingle()
+        ? await (async () => {
+            const withCert = await admin
+              .from('profiles')
+              .update({
+                business_registration_number: businessNumber,
+                business_verification_status: status,
+                business_status_detail: detail,
+                business_checked_at: new Date().toISOString(),
+                business_representative_name: businessNumber ? representativeName : '',
+                business_opened_on: businessNumber ? openedOn : '',
+              })
+              .eq('id', userId)
+              .select(COLUMNS_WITH_CERT)
+              .maybeSingle();
+            if (!withCert.error || !isSchemaMismatch(withCert.error)) {
+              return withCert;
+            }
+            return admin
+              .from('profiles')
+              .update({
+                business_registration_number: businessNumber,
+                business_verification_status: status,
+                business_status_detail: detail,
+                business_checked_at: new Date().toISOString(),
+              })
+              .eq('id', userId)
+              .select(BASE_COLUMNS)
+              .maybeSingle();
+          })()
         : updated;
 
     if (savedRow.error && isSchemaMismatch(savedRow.error)) {
@@ -296,6 +351,9 @@ export async function POST(request: Request) {
         business_representative_name:
           row.business_representative_name ?? (businessNumber ? representativeName : ''),
         business_opened_on: row.business_opened_on ?? (businessNumber ? openedOn : ''),
+        business_company_name: row.business_company_name ?? (businessNumber ? companyName : ''),
+        business_address: row.business_address ?? (businessNumber ? address : ''),
+        business_contact: row.business_contact ?? (businessNumber ? contact : ''),
         business_certificate_path: row.business_certificate_path ?? certPath,
         business_certificate_name: row.business_certificate_name ?? certName,
       }),

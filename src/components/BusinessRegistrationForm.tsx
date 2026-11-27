@@ -7,8 +7,11 @@ import {
   validateBusinessCertificateFile,
 } from '@/lib/business-certificate';
 import {
+  businessAddressError,
+  businessContactError,
   businessNumberError,
   businessVerificationLabel,
+  companyNameError,
   formatBusinessNumber,
   formatOpeningDateInput,
   normalizeBusinessNumber,
@@ -34,6 +37,9 @@ type BusinessPayload = {
   lookupError?: { code: string; message: string } | null;
   certificateName?: string;
   hasCertificate?: boolean;
+  companyName?: string;
+  address?: string;
+  contact?: string;
 };
 
 export function BusinessRegistrationForm() {
@@ -47,6 +53,9 @@ export function BusinessRegistrationForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [certificateName, setCertificateName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [address, setAddress] = useState('');
+  const [contact, setContact] = useState('');
   const [mismatch, setMismatch] = useState(false);
 
   const applyPayload = (body: BusinessPayload | null) => {
@@ -61,6 +70,15 @@ export function BusinessRegistrationForm() {
     }
     if (typeof body.openedOn === 'string') {
       setOpenedOn(formatOpeningDateInput(body.openedOn));
+    }
+    if (typeof body.companyName === 'string') {
+      setCompanyName(body.companyName);
+    }
+    if (typeof body.address === 'string') {
+      setAddress(body.address);
+    }
+    if (typeof body.contact === 'string') {
+      setContact(body.contact);
     }
     if (body.status) {
       setStatus(body.status);
@@ -151,7 +169,11 @@ export function BusinessRegistrationForm() {
   };
 
   const persist = async () => {
-    const invalid = identityError();
+    const invalid =
+      identityError() ||
+      companyNameError(companyName) ||
+      businessAddressError(address) ||
+      businessContactError(contact);
     if (invalid) {
       setError(invalid);
       return;
@@ -174,6 +196,9 @@ export function BusinessRegistrationForm() {
             businessNumber: number,
             representativeName,
             openedOn: normalizeOpeningDate(openedOn),
+            companyName,
+            address,
+            contact,
           }),
         }),
       );
@@ -203,13 +228,19 @@ export function BusinessRegistrationForm() {
   };
 
   const uploadAllowed = allowsBusinessCertificateUpload({ status, ntsLabel, mismatch });
+  const detailsReady =
+    !identityError() &&
+    !companyNameError(companyName) &&
+    !businessAddressError(address) &&
+    !businessContactError(contact);
+  const canPersist = uploadAllowed && detailsReady && Boolean(certificateName.trim());
 
   return (
     <section className="mt-8 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
-      <h2 className="text-lg font-bold text-zinc-950">사업자등록번호</h2>
+      <h2 className="text-lg font-bold text-zinc-950">사업자 인증</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
-        사업자등록번호로 계속사업자·휴업·폐업을 조회하고, 대표자 성명과 개업일자로 국세청 진위확인을 합니다.
-        번호·성명·개업일자가 모두 일치하고 계속사업자이면 관리자 검수 후 인증됩니다.
+        사업자등록번호·대표자 성명·개업일자로 국세청 진위확인을 한 뒤, 상호명·사업장 주소·연락처와
+        사업자등록증 사본을 저장하면 관리자가 검수합니다. 대표자 성명은 가입자 이름과 달라도 됩니다.
       </p>
       <p
         className={
@@ -275,6 +306,24 @@ export function BusinessRegistrationForm() {
         placeholder="000-00-00000"
         className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-950"
       />
+      <label className="mt-4 block text-sm font-medium text-zinc-700" htmlFor="business-company">
+        상호명
+      </label>
+      <input
+        id="business-company"
+        value={companyName}
+        onChange={(event) => {
+          setCompanyName(event.target.value);
+          setError(null);
+        }}
+        onBlur={() => {
+          if (companyName.trim()) {
+            setError(companyNameError(companyName));
+          }
+        }}
+        placeholder="사업자등록증의 상호명"
+        className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-950"
+      />
       <label className="mt-4 block text-sm font-medium text-zinc-700" htmlFor="business-representative">
         대표자 성명
       </label>
@@ -290,8 +339,8 @@ export function BusinessRegistrationForm() {
             setError(representativeNameError(representativeName));
           }
         }}
-        placeholder="국세청에 등록된 대표자 성명"
-        autoComplete="name"
+        placeholder="사업자등록증의 대표자 성명 (가입자 이름과 달라도 됩니다)"
+        autoComplete="off"
         className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-950"
       />
       <label className="mt-4 block text-sm font-medium text-zinc-700" htmlFor="business-opened-on">
@@ -313,6 +362,46 @@ export function BusinessRegistrationForm() {
         className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-950"
       />
       <p className="mt-1 text-xs text-zinc-500">YYYYMMDD 기준이며, 상호명이 아닌 대표자 성명과 함께 진위확인합니다.</p>
+      <label className="mt-4 block text-sm font-medium text-zinc-700" htmlFor="business-address">
+        사업장 상세 주소
+      </label>
+      <input
+        id="business-address"
+        value={address}
+        onChange={(event) => {
+          setAddress(event.target.value);
+          setError(null);
+        }}
+        onBlur={() => {
+          if (address.trim()) {
+            setError(businessAddressError(address));
+          }
+        }}
+        placeholder="도로명 또는 지번 주소, 동·호수까지"
+        autoComplete="street-address"
+        className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-950"
+      />
+      <label className="mt-4 block text-sm font-medium text-zinc-700" htmlFor="business-contact">
+        사업자 연락처
+      </label>
+      <input
+        id="business-contact"
+        value={contact}
+        onChange={(event) => {
+          setContact(event.target.value);
+          setError(null);
+        }}
+        onBlur={() => {
+          if (contact.trim()) {
+            setError(businessContactError(contact));
+          }
+        }}
+        placeholder="02-0000-0000, 1544-0000, 080-000-0000, 010-0000-0000"
+        inputMode="tel"
+        autoComplete="tel"
+        className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-950"
+      />
+      <p className="mt-1 text-xs text-zinc-500">유선전화, 전국대표번호, 080, 휴대폰 모두 가능합니다.</p>
       <label className="mt-4 block text-sm font-medium text-zinc-700" htmlFor="business-certificate">
         사업자등록증 사본
       </label>
@@ -426,7 +515,7 @@ export function BusinessRegistrationForm() {
         </button>
         <button
           type="button"
-          disabled={busy || (uploadAllowed && !certificateName.trim())}
+          disabled={busy || !canPersist}
           onClick={() => void persist()}
           className="h-10 rounded-full bg-clink px-4 text-sm font-semibold text-white hover:bg-stone-800 disabled:opacity-60"
         >

@@ -29,6 +29,9 @@ export interface ProfileItem {
   businessReviewNote?: string;
   businessRepresentativeName?: string;
   businessOpenedOn?: string;
+  businessCompanyName?: string;
+  businessAddress?: string;
+  businessContact?: string;
   businessCertificateName?: string;
   hasBusinessCertificate?: boolean;
   phone?: string | null;

@@ -145,6 +145,101 @@ export function parseBusinessIdentityInput(body: {
   };
 }
 
+export function normalizeCompanyName(value: string | null | undefined) {
+  return (value ?? '').trim().replace(/\s+/g, ' ').slice(0, 100);
+}
+
+export function companyNameError(value: string | null | undefined) {
+  const name = normalizeCompanyName(value);
+  if (!name) {
+    return '상호명을 입력해 주세요.';
+  }
+  if (name.length < 2) {
+    return '상호명을 2자 이상 입력해 주세요.';
+  }
+  return null;
+}
+
+export function normalizeBusinessAddress(value: string | null | undefined) {
+  return (value ?? '').trim().replace(/\s+/g, ' ').slice(0, 200);
+}
+
+export function businessAddressError(value: string | null | undefined) {
+  const address = normalizeBusinessAddress(value);
+  if (!address) {
+    return '사업장 상세 주소를 입력해 주세요.';
+  }
+  if (address.length < 8) {
+    return '사업장 주소를 동·호수까지 입력해 주세요.';
+  }
+  return null;
+}
+
+export function normalizeBusinessContact(value: string | null | undefined) {
+  return (value ?? '').trim().replace(/\s+/g, ' ').slice(0, 20);
+}
+
+export function businessContactError(value: string | null | undefined) {
+  const contact = normalizeBusinessContact(value);
+  const digits = contact.replace(/\D/g, '');
+  if (!digits) {
+    return '사업자 연락처를 입력해 주세요.';
+  }
+  if (digits.length < 8 || digits.length > 12) {
+    return '유선·대표번호·080·휴대폰 번호를 확인해 주세요.';
+  }
+  return null;
+}
+
+export function parseBusinessDetailInput(body: {
+  companyName?: unknown;
+  address?: unknown;
+  contact?: unknown;
+} | null) {
+  const companyName = normalizeCompanyName(
+    typeof body?.companyName === 'string' ? body.companyName : '',
+  );
+  const address = normalizeBusinessAddress(typeof body?.address === 'string' ? body.address : '');
+  const contact = normalizeBusinessContact(typeof body?.contact === 'string' ? body.contact : '');
+  const companyError = companyNameError(companyName);
+  if (companyError) {
+    return {
+      companyName,
+      address,
+      contact,
+      error: companyError,
+      errorCode: 'INVALID_COMPANY_NAME' as const,
+    };
+  }
+  const addressError = businessAddressError(address);
+  if (addressError) {
+    return {
+      companyName,
+      address,
+      contact,
+      error: addressError,
+      errorCode: 'INVALID_ADDRESS' as const,
+    };
+  }
+  const contactError = businessContactError(contact);
+  if (contactError) {
+    return {
+      companyName,
+      address,
+      contact,
+      error: contactError,
+      errorCode: 'INVALID_CONTACT' as const,
+    };
+  }
+  return {
+    companyName,
+    address,
+    contact,
+    error: null,
+    errorCode: null,
+  };
+}
+
 export function openingDateError(value: string | null | undefined) {
   const digits = normalizeOpeningDate(value);
   if (!digits) {

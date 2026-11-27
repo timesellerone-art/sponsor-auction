@@ -52,31 +52,43 @@ export async function GET() {
       business_opened_on?: string | null;
       business_certificate_path?: string | null;
       business_certificate_name?: string | null;
+      business_company_name?: string | null;
+      business_address?: string | null;
+      business_contact?: string | null;
     };
     let businessRows: BusinessRow[] = [];
     const full = await client
       .from('profiles')
       .select(
-        'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type, business_representative_name, business_opened_on, business_certificate_path, business_certificate_name',
+        'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type, business_representative_name, business_opened_on, business_certificate_path, business_certificate_name, business_company_name, business_address, business_contact',
       );
     if (!full.error) {
       businessRows = (full.data ?? []) as BusinessRow[];
     } else {
-      const withSettlement = await client
+      const withCert = await client
         .from('profiles')
         .select(
-          'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type',
+          'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type, business_representative_name, business_opened_on, business_certificate_path, business_certificate_name',
         );
-      if (!withSettlement.error) {
-        businessRows = (withSettlement.data ?? []) as BusinessRow[];
+      if (!withCert.error) {
+        businessRows = (withCert.data ?? []) as BusinessRow[];
       } else {
-        const basic = await client
+        const withSettlement = await client
           .from('profiles')
           .select(
-            'id, business_registration_number, business_verification_status, business_status_detail, business_review_note',
+            'id, business_registration_number, business_verification_status, business_status_detail, business_review_note, settlement_type',
           );
-        if (!basic.error) {
-          businessRows = (basic.data ?? []) as BusinessRow[];
+        if (!withSettlement.error) {
+          businessRows = (withSettlement.data ?? []) as BusinessRow[];
+        } else {
+          const basic = await client
+            .from('profiles')
+            .select(
+              'id, business_registration_number, business_verification_status, business_status_detail, business_review_note',
+            );
+          if (!basic.error) {
+            businessRows = (basic.data ?? []) as BusinessRow[];
+          }
         }
       }
     }
@@ -98,8 +110,12 @@ export async function GET() {
         businessReviewNote: extra?.business_review_note ?? '',
         businessRepresentativeName: extra?.business_representative_name?.trim() ?? '',
         businessOpenedOn: extra?.business_opened_on?.trim() ?? '',
+        businessCompanyName: extra?.business_company_name?.trim() ?? '',
+        businessAddress: extra?.business_address?.trim() ?? '',
+        businessContact: extra?.business_contact?.trim() ?? '',
         businessCertificateName: extra?.business_certificate_name?.trim() ?? '',
         hasBusinessCertificate: Boolean(extra?.business_certificate_path?.trim()),
+        phone: profile.phone ?? null,
         settlementType,
       };
     });

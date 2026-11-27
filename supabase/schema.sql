@@ -1267,6 +1267,12 @@ alter table if exists public.profiles
 alter table if exists public.profiles
   add column if not exists business_certificate_name text not null default '';
 alter table if exists public.profiles
+  add column if not exists business_company_name text not null default '';
+alter table if exists public.profiles
+  add column if not exists business_address text not null default '';
+alter table if exists public.profiles
+  add column if not exists business_contact text not null default '';
+alter table if exists public.profiles
   add column if not exists bank_name text not null default '';
 alter table if exists public.profiles
   add column if not exists account_number text not null default '';

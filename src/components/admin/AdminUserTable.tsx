@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
 import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
@@ -10,6 +10,7 @@ import { authRequestInit } from '@/lib/auth-request';
 import { formatAdminTimestamp } from '@/lib/utils';
 import {
   businessVerificationLabel,
+  formatOpeningDateInput,
   type BusinessVerificationStatus,
 } from '@/lib/business-registration';
 import type { ProfileAdminFilter, ProfileItem, ProfileStatus } from '@/types/admin';
@@ -154,6 +155,111 @@ function BusinessStatusBlock({ profile }: { profile: ProfileItem }) {
   );
 }
 
+function displayValue(value: string | null | undefined) {
+  const text = value?.trim() || '';
+  return text || '미입력';
+}
+
+function canReviewBusiness(profile: ProfileItem) {
+  return (
+    Boolean(profile.businessRegistrationNumber) &&
+    profile.businessVerificationStatus &&
+    profile.businessVerificationStatus !== 'unregistered' &&
+    profile.businessVerificationStatus !== 'closed'
+  );
+}
+
+function ReviewField({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium text-zinc-500">{label}</dt>
+      <dd className="mt-0.5 break-words text-sm text-zinc-900">
+        {value}
+        {note ? <span className="ml-1 text-xs font-semibold text-amber-800">{note}</span> : null}
+      </dd>
+    </div>
+  );
+}
+
+function BusinessReviewPanel({
+  profile,
+  anyBusy,
+  onReviewBusiness,
+}: {
+  profile: ProfileItem;
+  anyBusy: boolean;
+  onReviewBusiness?: (profile: ProfileItem, decision: 'approve' | 'reject') => void;
+}) {
+  const memberName = profile.name?.trim() || '';
+  const representative = profile.businessRepresentativeName?.trim() || '';
+  const namesDiffer = Boolean(memberName && representative && memberName !== representative);
+  const hasCertificate = Boolean(profile.hasBusinessCertificate || profile.businessCertificateName);
+  const canReview = canReviewBusiness(profile);
+  const openedOn = profile.businessOpenedOn
+    ? formatOpeningDateInput(profile.businessOpenedOn)
+    : '';
+  return (
+    <div className="rounded-xl bg-zinc-50 p-3 sm:p-4">
+      <p className="text-xs font-semibold tracking-wide text-zinc-500">가입자 정보</p>
+      <dl className="mt-2 grid gap-2 sm:grid-cols-3">
+        <ReviewField label="가입자 이름" value={displayValue(memberName)} />
+        <ReviewField label="이메일" value={displayValue(profile.email)} />
+        <ReviewField label="가입 휴대폰 번호" value={displayValue(profile.phone)} />
+      </dl>
+      <p className="mt-4 text-xs font-semibold tracking-wide text-zinc-500">사업자등록증 기재 정보</p>
+      <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+        <ReviewField label="상호명" value={displayValue(profile.businessCompanyName)} />
+        <ReviewField
+          label="대표자 성명"
+          value={displayValue(representative)}
+          note={namesDiffer ? `가입자 이름(${memberName})과 다름` : undefined}
+        />
+        <ReviewField label="사업자등록번호" value={displayValue(profile.businessRegistrationNumber)} />
+        <ReviewField label="개업일자" value={displayValue(openedOn)} />
+        <ReviewField label="사업장 상세 주소" value={displayValue(profile.businessAddress)} />
+        <ReviewField label="사업자 연락처" value={displayValue(profile.businessContact)} />
+      </dl>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={anyBusy || !hasCertificate}
+          onClick={() => {
+            void openBusinessCertificate(profile.id);
+          }}
+          className="inline-flex h-9 items-center justify-center rounded-full border border-zinc-200 px-3 text-xs font-semibold text-zinc-800 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          사업자등록증 사본 열기
+        </button>
+        {canReview ? (
+          <>
+            <button
+              type="button"
+              disabled={anyBusy || profile.businessVerificationStatus === 'verified'}
+              onClick={() => onReviewBusiness?.(profile, 'approve')}
+              className="inline-flex h-9 items-center justify-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              승인
+            </button>
+            <button
+              type="button"
+              disabled={anyBusy || profile.businessVerificationStatus === 'rejected'}
+              onClick={() => onReviewBusiness?.(profile, 'reject')}
+              className="inline-flex h-9 items-center justify-center rounded-full border border-rose-200 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              반려
+            </button>
+          </>
+        ) : null}
+      </div>
+      {!hasCertificate ? (
+        <p className="mt-2 text-xs text-zinc-500">첨부된 사업자등록증 사본이 없습니다.</p>
+      ) : profile.businessCertificateName ? (
+        <p className="mt-2 text-xs text-zinc-500">파일명: {profile.businessCertificateName}</p>
+      ) : null}
+    </div>
+  );
+}
+
 async function openBusinessCertificate(userId: string) {
   const response = await fetch(
     `/api/admin/business/certificate?userId=${encodeURIComponent(userId)}`,
@@ -172,6 +278,8 @@ function UserManageButtons({
   busy,
   anyBusy,
   compact,
+  detailOpen,
+  onToggleDetail,
   onToggleStatus,
   onReviewBusiness,
 }: {
@@ -179,6 +287,8 @@ function UserManageButtons({
   busy: boolean;
   anyBusy: boolean;
   compact?: boolean;
+  detailOpen?: boolean;
+  onToggleDetail: (profile: ProfileItem) => void;
   onToggleStatus: (profile: ProfileItem) => void;
   onReviewBusiness?: (profile: ProfileItem, decision: 'approve' | 'reject') => void;
 }) {
@@ -186,26 +296,17 @@ function UserManageButtons({
   const base = compact
     ? 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-50'
     : 'inline-flex min-h-10 min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50';
-  const canReview =
-    Boolean(profile.businessRegistrationNumber) &&
-    profile.businessVerificationStatus &&
-    profile.businessVerificationStatus !== 'unregistered' &&
-    profile.businessVerificationStatus !== 'closed';
-  const hasCertificate = Boolean(profile.hasBusinessCertificate || profile.businessCertificateName);
+  const canReview = canReviewBusiness(profile);
   return (
     <div className={compact ? 'flex flex-wrap gap-1' : 'flex flex-wrap gap-2'}>
-      {hasCertificate ? (
-        <button
-          type="button"
-          disabled={anyBusy}
-          onClick={() => {
-            void openBusinessCertificate(profile.id);
-          }}
-          className={`${base} border border-zinc-200 text-zinc-700 hover:bg-zinc-50`}
-        >
-          사업자등록증 보기
-        </button>
-      ) : null}
+      <button
+        type="button"
+        disabled={anyBusy}
+        onClick={() => onToggleDetail(profile)}
+        className={`${base} border border-zinc-200 text-zinc-700 hover:bg-zinc-50`}
+      >
+        {detailOpen ? '상세 닫기' : '사업자 상세'}
+      </button>
       {canReview ? (
         <>
           <button
@@ -263,6 +364,11 @@ export function AdminUserTable({
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ProfileAdminFilter>('all');
   const [sort, setSort] = useState<AdminListSort>('newest');
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const toggleDetail = (profile: ProfileItem) => {
+    setOpenId((current) => (current === profile.id ? null : profile.id));
+  };
 
   const keyword = query.trim().toLowerCase();
   const searched = useMemo(() => {
@@ -370,8 +476,13 @@ export function AdminUserTable({
             const suspended = profile.status === 'suspended';
             const busy = busyId === profile.id;
             const anyBusy = Boolean(busyId);
+            const detailOpen = openId === profile.id;
             return (
-              <li key={profile.id} className="rounded-2xl border border-zinc-200 bg-white p-3">
+              <li
+                key={profile.id}
+                className="rounded-2xl border border-zinc-200 bg-white p-3"
+                onClick={() => toggleDetail(profile)}
+              >
                 <p className="break-words text-sm font-semibold leading-5 text-zinc-950">
                   {profile.name || '이름 없음'}
                 </p>
@@ -410,15 +521,26 @@ export function AdminUserTable({
                     </dd>
                   </div>
                 </dl>
-                <div className="mt-3">
+                <div className="mt-3" onClick={(event) => event.stopPropagation()}>
                   <UserManageButtons
                     profile={profile}
                     busy={busy}
                     anyBusy={anyBusy}
+                    detailOpen={detailOpen}
+                    onToggleDetail={toggleDetail}
                     onToggleStatus={onToggleStatus}
                     onReviewBusiness={onReviewBusiness}
                   />
                 </div>
+                {detailOpen ? (
+                  <div className="mt-3" onClick={(event) => event.stopPropagation()}>
+                    <BusinessReviewPanel
+                      profile={profile}
+                      anyBusy={anyBusy}
+                      onReviewBusiness={onReviewBusiness}
+                    />
+                  </div>
+                ) : null}
               </li>
             );
           })}
@@ -448,10 +570,12 @@ export function AdminUserTable({
                 const suspended = profile.status === 'suspended';
                 const busy = busyId === profile.id;
                 const anyBusy = Boolean(busyId);
+                const detailOpen = openId === profile.id;
                 return (
+                  <Fragment key={profile.id}>
                   <tr
-                    key={profile.id}
-                    className="border-b border-zinc-100 last:border-0"
+                    className={`cursor-pointer border-b border-zinc-100 ${detailOpen ? 'bg-zinc-50' : ''} ${detailOpen ? '' : 'last:border-0'}`}
+                    onClick={() => toggleDetail(profile)}
                   >
                     <td className="min-w-0 overflow-hidden px-1 py-1.5 align-top sm:px-2">
                       <p
@@ -487,17 +611,34 @@ export function AdminUserTable({
                         {STATUS_LABEL[profile.status] ?? profile.status}
                       </span>
                     </td>
-                    <td className="min-w-0 px-1 py-1.5 sm:px-2 align-top">
+                    <td
+                      className="min-w-0 px-1 py-1.5 sm:px-2 align-top"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <UserManageButtons
                         profile={profile}
                         busy={busy}
                         anyBusy={anyBusy}
                         compact
+                        detailOpen={detailOpen}
+                        onToggleDetail={toggleDetail}
                         onToggleStatus={onToggleStatus}
                         onReviewBusiness={onReviewBusiness}
                       />
                     </td>
                   </tr>
+                  {detailOpen ? (
+                    <tr className="border-b border-zinc-100 last:border-0 bg-white">
+                      <td colSpan={6} className="px-2 py-2">
+                        <BusinessReviewPanel
+                          profile={profile}
+                          anyBusy={anyBusy}
+                          onReviewBusiness={onReviewBusiness}
+                        />
+                      </td>
+                    </tr>
+                  ) : null}
+                  </Fragment>
                 );
               })}
             </tbody>
