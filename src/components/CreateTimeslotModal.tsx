@@ -19,17 +19,35 @@ function pad(value: number) {
   return String(value).padStart(2, '0');
 }
 
-function localDateTime(daysFromNow: number, hour: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + daysFromNow);
-  date.setHours(hour, 0, 0, 0);
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+function calendarDate(now: Date, daysFromToday: number, hour = 0, minute = 0) {
+  return new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + daysFromToday,
+    hour,
+    minute,
+    0,
+    0,
+  );
 }
 
-function defaultDeadline() {
-  const date = new Date();
-  date.setDate(date.getDate() + 5);
+function toDateInputValue(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function toDateTimeLocalValue(date: Date) {
+  return `${toDateInputValue(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function defaultTimeslotSchedule(now = new Date()) {
+  const deadline = calendarDate(now, 3);
+  const slotStart = calendarDate(now, 4, 14, 0);
+  const slotEnd = calendarDate(now, 4, 16, 0);
+  return {
+    deadline: toDateInputValue(deadline),
+    slotStart: toDateTimeLocalValue(slotStart),
+    slotEnd: toDateTimeLocalValue(slotEnd),
+  };
 }
 
 function toIso(value: string) {
@@ -77,9 +95,10 @@ export function CreateTimeslotModal({
     setExpectedViews('100000');
     setStartingPrice('300000');
     setDescription('');
-    setSlotStart(localDateTime(3, 14));
-    setSlotEnd(localDateTime(3, 16));
-    setDeadline(defaultDeadline());
+    const schedule = defaultTimeslotSchedule();
+    setSlotStart(schedule.slotStart);
+    setSlotEnd(schedule.slotEnd);
+    setDeadline(schedule.deadline);
     setErrors({});
     setSubmitError(null);
   }, [open]);
