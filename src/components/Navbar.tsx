@@ -69,11 +69,11 @@ export function Navbar() {
   const navLinkClass =
     'shrink-0 whitespace-nowrap text-sm font-medium text-stone-600 transition-colors hover:text-stone-950';
   const accountButtonClass =
-    'inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-800 shadow-sm hover:shadow-md lg:h-10 lg:px-4 lg:text-sm';
+    'inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-800 shadow-sm hover:shadow-md sm:h-9 sm:px-4 sm:py-2 sm:text-sm lg:h-10';
 
   return (
-    <header className="sticky top-0 z-50 w-full overflow-x-clip border-b border-clink-border bg-[#FAF8F5]/80 backdrop-blur-md">
-      <div className="flex h-14 w-full items-center justify-between gap-3 px-4 sm:h-16 sm:px-6">
+    <header className="sticky top-0 z-50 w-full max-w-full overflow-x-clip border-b border-clink-border bg-[#FAF8F5]/80 px-3 backdrop-blur-md sm:px-6">
+      <div className="flex h-14 w-full max-w-full min-w-0 items-center justify-between gap-1.5 sm:h-16 sm:gap-3">
         {signedIn ? <span className="sr-only">{user?.name}</span> : null}
         <Link
           href="/"
@@ -129,7 +129,7 @@ export function Navbar() {
           </div>
         </nav>
 
-        <div className="flex shrink-0 items-center gap-1.5 md:hidden">
+        <div className="flex min-w-0 shrink-0 items-center gap-1.5 md:hidden">
           {signedIn ? (
             <>
               <NotificationBell />
@@ -138,7 +138,7 @@ export function Navbar() {
                 onClick={() => {
                   void handleSignOut();
                 }}
-                className={navLinkClass}
+                className="inline-flex shrink-0 items-center whitespace-nowrap px-1.5 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:text-stone-950 sm:px-2 sm:text-sm"
               >
                 로그아웃
               </button>
@@ -153,7 +153,7 @@ export function Navbar() {
           )}
           <button
             type="button"
-            className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-stone-800 hover:bg-white/80"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-stone-800 hover:bg-white/80 sm:size-10"
             aria-expanded={open}
             aria-controls={menuId}
             aria-label={open ? '메뉴 닫기' : '메뉴 열기'}

@@ -191,11 +191,11 @@ export function NotificationBell() {
           id={panelId}
           role="region"
           aria-label="알림 목록"
-          className="absolute top-full right-0 z-[70] mt-2 w-[min(22rem,calc(100vw-2rem))] max-h-[70vh] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl"
+          className="fixed top-14 right-3 left-3 z-[70] mt-2 w-auto max-h-[70vh] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl sm:absolute sm:top-full sm:right-0 sm:left-auto sm:w-[min(22rem,calc(100vw-2rem))]"
         >
-          <div className="flex items-center justify-between gap-2 border-b border-zinc-200 px-3 py-2">
-            <p className="text-sm font-semibold text-zinc-950">알림</p>
-            <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+          <div className="flex min-w-0 items-center justify-between gap-2 border-b border-zinc-200 px-3 py-2">
+            <p className="min-w-0 shrink-0 text-sm font-semibold text-zinc-950">알림</p>
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1">
               {items.length > 0 ? (
                 <>
                   <button
@@ -231,7 +231,7 @@ export function NotificationBell() {
                 <li key={item.id} className="border-b border-zinc-100 last:border-0">
                   <div
                     className={cn(
-                      'flex items-stretch',
+                      'flex min-w-0 items-stretch',
                       item.read
                         ? 'border-l-4 border-transparent bg-zinc-50'
                         : 'border-l-4 border-emerald-600 bg-emerald-50',
@@ -245,7 +245,7 @@ export function NotificationBell() {
                         setOpen(false);
                       }}
                     >
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex min-w-0 items-center gap-1.5">
                         {item.read ? null : (
                           <span
                             className="size-1.5 shrink-0 rounded-full bg-emerald-600"
@@ -254,25 +254,25 @@ export function NotificationBell() {
                         )}
                         <p
                           className={cn(
-                            'text-xs font-semibold',
+                            'min-w-0 truncate text-xs font-semibold',
                             item.read ? 'text-zinc-400' : 'text-emerald-800',
                           )}
                         >
                           {TYPE_LABEL[item.type] ?? item.title}
                         </p>
                         {item.read ? (
-                          <span className="rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium leading-none text-zinc-500">
+                          <span className="shrink-0 rounded-full bg-zinc-200 px-1.5 py-0.5 text-[10px] font-medium leading-none text-zinc-500">
                             읽음
                           </span>
                         ) : (
-                          <span className="rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
+                          <span className="shrink-0 rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
                             안 읽음
                           </span>
                         )}
                       </div>
                       <p
                         className={cn(
-                          'mt-0.5 text-sm',
+                          'mt-0.5 min-w-0 break-words text-sm',
                           item.read ? 'font-medium text-zinc-500' : 'font-semibold text-zinc-950',
                         )}
                       >
@@ -280,13 +280,15 @@ export function NotificationBell() {
                       </p>
                       <p
                         className={cn(
-                          'mt-0.5 text-xs leading-5',
+                          'mt-0.5 min-w-0 break-words text-xs leading-5',
                           item.read ? 'text-zinc-400' : 'text-zinc-700',
                         )}
                       >
                         {item.body}
                       </p>
-                      <p className="mt-1 text-[11px] text-zinc-400">{formatDateTime(item.createdAt)}</p>
+                      <p className="mt-1 min-w-0 truncate text-[11px] text-zinc-400">
+                        {formatDateTime(item.createdAt)}
+                      </p>
                     </Link>
                     <button
                       type="button"
