@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Download, Loader2 } from 'lucide-react';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
+import { ListingDeleteButton } from '@/components/ListingDeleteButton';
 import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
 import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
 import { platformLabel } from '@/lib/platforms';
@@ -36,6 +37,7 @@ type AdminTimeslotTableProps = {
   onBlind: (slot: TimeSlotItem) => void;
   onUnblind: (slot: TimeSlotItem) => void;
   onClose: (slot: TimeSlotItem) => void;
+  onDeleted?: () => void;
 };
 
 function TimeslotManageButtons({
@@ -46,6 +48,7 @@ function TimeslotManageButtons({
   onBlind,
   onUnblind,
   onClose,
+  onDeleted,
 }: {
   slot: TimeSlotItem;
   busy: boolean;
@@ -54,6 +57,7 @@ function TimeslotManageButtons({
   onBlind: (slot: TimeSlotItem) => void;
   onUnblind: (slot: TimeSlotItem) => void;
   onClose: (slot: TimeSlotItem) => void;
+  onDeleted?: () => void;
 }) {
   const blinded = Boolean(slot.isBlind);
   const canClose = canForceCloseTimeslot(slot);
@@ -92,6 +96,14 @@ function TimeslotManageButtons({
         {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
         {busy ? '처리 중...' : canClose ? '강제 마감' : '마감 불가'}
       </button>
+      <ListingDeleteButton
+        kind="timeslot"
+        id={slot.id}
+        admin
+        compact={compact}
+        className={`${base} border border-rose-200 text-rose-700 hover:bg-rose-50`}
+        onDeleted={onDeleted}
+      />
     </div>
   );
 }
@@ -102,6 +114,7 @@ export function AdminTimeslotTable({
   onBlind,
   onUnblind,
   onClose,
+  onDeleted,
 }: AdminTimeslotTableProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<TimeslotAdminFilter>('all');
@@ -227,6 +240,7 @@ export function AdminTimeslotTable({
                       onBlind={onBlind}
                       onUnblind={onUnblind}
                       onClose={onClose}
+                      onDeleted={onDeleted}
                     />
                   </div>
                 </li>
@@ -306,6 +320,7 @@ export function AdminTimeslotTable({
                           onBlind={onBlind}
                           onUnblind={onUnblind}
                           onClose={onClose}
+                      onDeleted={onDeleted}
                         />
                       </td>
                     </tr>

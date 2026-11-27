@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { AuctionCountdown } from '@/components/AuctionCountdown';
 import { useAuth } from '@/components/AuthProvider';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { ListingDeleteButton } from '@/components/ListingDeleteButton';
 import { CreatorRatingBadge } from '@/components/CreatorRatingBadge';
 import { TimeslotBidForm } from '@/components/TimeslotBidForm';
 import { TimeslotPaymentPanel } from '@/components/TimeslotPaymentPanel';
@@ -23,6 +24,7 @@ import {
 } from '@/lib/campaign-presentation';
 import { PLATFORM_LABELS } from '@/lib/platforms';
 import { authRequestInit } from '@/lib/auth-request';
+import { canOwnerDeleteTimeslot } from '@/lib/listing-delete';
 import { BID_STATUS_LABEL } from '@/lib/status-labels';
 import { getTimeSlotById, listTimeSlotBids } from '@/lib/timeslots';
 import { formatDateTime, formatViews, formatWon } from '@/lib/utils';
@@ -417,9 +419,20 @@ export function TimeslotDetail({ id }: { id: string }) {
             ) : !authSettled ? (
               <div className="mt-6 h-24 animate-pulse rounded-xl bg-zinc-100" aria-hidden />
             ) : isOwner ? (
-              <p className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                내가 등록한 크리에이터 상품입니다.
-              </p>
+              <div className="mt-6 rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
+                <p>내가 등록한 크리에이터 상품입니다.</p>
+                {canOwnerDeleteTimeslot(slot) ? (
+                  <div className="mt-3">
+                    <ListingDeleteButton
+                      kind="timeslot"
+                      id={slot.id}
+                      onDeleted={() => {
+                        router.push('/my');
+                      }}
+                    />
+                  </div>
+                ) : null}
+              </div>
             ) : isAdvertiserActing ? null : isCreatorActing ? (
               <div className="mt-6">
                 <button

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AuctionCardSkeleton } from '@/components/AuctionCard';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { ListingDeleteButton } from '@/components/ListingDeleteButton';
 import { CreateTimeslotModal } from '@/components/CreateTimeslotModal';
 import { PageContainer } from '@/components/PageContainer';
 import { useAuth } from '@/components/AuthProvider';
@@ -21,6 +22,7 @@ import {
   settlementAccountFromParts,
   type SettlementType,
 } from '@/lib/settlement-account';
+import { canOwnerDeleteTimeslot } from '@/lib/listing-delete';
 import { dealDetailHref } from '@/lib/timeslot-deal';
 import { auctionStatusLabel, creatorPayoutStatusLabel } from '@/lib/status-labels';
 import { cn, formatDateTime, formatWon } from '@/lib/utils';
@@ -249,25 +251,30 @@ export function CreatorDashboard() {
                     ) : null}
                   </div>
                   {slot.status === 'open' ? (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const response = await fetch(
-                          `/api/timeslots/${encodeURIComponent(slot.id)}`,
-                          await authRequestInit({
-                            method: 'PATCH',
-                            body: JSON.stringify({ status: 'closed' }),
-                          }),
-                        );
-                        if (!response.ok) {
-                          return;
-                        }
-                        window.dispatchEvent(new Event('timeslots:changed'));
-                      }}
-                      className="text-xs font-semibold text-zinc-600 hover:underline"
-                    >
-                      마감
-                    </button>
+                    <div className="flex flex-col items-end gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const response = await fetch(
+                            `/api/timeslots/${encodeURIComponent(slot.id)}`,
+                            await authRequestInit({
+                              method: 'PATCH',
+                              body: JSON.stringify({ status: 'closed' }),
+                            }),
+                          );
+                          if (!response.ok) {
+                            return;
+                          }
+                          window.dispatchEvent(new Event('timeslots:changed'));
+                        }}
+                        className="text-xs font-semibold text-zinc-600 hover:underline"
+                      >
+                        마감
+                      </button>
+                      {canOwnerDeleteTimeslot(slot) ? (
+                        <ListingDeleteButton kind="timeslot" id={slot.id} compact />
+                      ) : null}
+                    </div>
                   ) : (
                     <span
                       className={

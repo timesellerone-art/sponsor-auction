@@ -13,7 +13,6 @@ import { AdminTimeslotTable } from '@/components/admin/AdminTimeslotTable';
 import { AdminUserTable } from '@/components/admin/AdminUserTable';
 import { showToast } from '@/components/Toast';
 import { authRequestInit } from '@/lib/auth-request';
-import { isUuid } from '@/lib/uuid';
 import { useActionLock } from '@/hooks/useActionLock';
 import {
   ADMIN_UPDATE_FAIL_MESSAGE,
@@ -32,11 +31,7 @@ import { applyHoldPayoutLocal, applyPaidPayoutLocal, payoutsMatch } from '@/lib/
 import { canForceCloseTimeslot } from '@/lib/timeslot-admin';
 import { isCreatorProductAuction, timeSlotToAuctionItem } from '@/lib/timeslot-deal';
 import { VALIDATION } from '@/lib/validation';
-import {
-  UPDATE_FAIL_MESSAGE,
-  deleteAuction,
-  updateAuctionBlind,
-} from '@/lib/auctions';
+import { UPDATE_FAIL_MESSAGE, updateAuctionBlind } from '@/lib/auctions';
 import { cn } from '@/lib/utils';
 import type { PayoutItem, ProfileItem } from '@/types/admin';
 import { isAdmin, isAdvertiser, isCreator } from '@/types/auth';
@@ -373,64 +368,6 @@ export function AdminDashboard({
         }
 
         showToast('블라인드를 해제했습니다.', 'success');
-        await load();
-        window.dispatchEvent(new Event('auctions:changed'));
-      } catch {
-        showToast(UPDATE_FAIL_MESSAGE);
-      }
-    });
-  };
-
-  const handleDelete = async (auction: AuctionItem) => {
-    if (!auction?.id) {
-      return;
-    }
-    if (isBusy) {
-      showToast(VALIDATION.actionInFlight);
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `"${auction.title || '제목 없음'}"을 삭제할까요? 연결된 제안도 함께 사라질 수 있습니다.`,
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    await run(auction.id, async () => {
-      try {
-        const exists = auctions.some((item) => item.id === auction.id);
-        if (!exists) {
-          showToast(VALIDATION.alreadyProcessed);
-          return;
-        }
-
-        if (isUuid(auction.id)) {
-          const creditResponse = await fetch(
-            `/api/campaigns/${auction.id}/cancel`,
-            await authRequestInit({ method: 'POST' }),
-          );
-          const creditPayload = (await creditResponse.json().catch(() => null)) as {
-            error?: string;
-            errorMessage?: string;
-          } | null;
-          if (!creditResponse.ok) {
-            showToast(
-              creditPayload?.errorMessage ||
-                creditPayload?.error ||
-                '크레딧을 복구하지 못해 캠페인을 삭제하지 않았습니다.',
-            );
-            return;
-          }
-        }
-
-        const result = await deleteAuction(auction.id);
-        if (result.error || !result.data) {
-          showToast(result.error ?? UPDATE_FAIL_MESSAGE);
-          return;
-        }
-
-        showToast('삭제했습니다.', 'success');
         await load();
         window.dispatchEvent(new Event('auctions:changed'));
       } catch {
@@ -862,7 +799,9 @@ export function AdminDashboard({
               busyId={busyId}
               onBlind={handleBlind}
               onUnblind={handleUnblind}
-              onDelete={handleDelete}
+              onDeleted={() => {
+                void load();
+              }}
             />
           )
         ) : tab === 'timeslots' ? (
@@ -875,6 +814,9 @@ export function AdminDashboard({
               onBlind={handleTimeslotBlind}
               onUnblind={handleTimeslotUnblind}
               onClose={handleTimeslotClose}
+              onDeleted={() => {
+                void load();
+              }}
             />
           )
         ) : tab === 'users' ? (

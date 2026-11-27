@@ -10,6 +10,7 @@ import { AiAgentGuide } from '@/components/AiAgentGuide';
 import { useAuth } from '@/components/AuthProvider';
 import { BidModal } from '@/components/BidModal';
 import { BidProposalList } from '@/components/BidProposalList';
+import { ListingDeleteButton } from '@/components/ListingDeleteButton';
 import { PaymentCheckoutModal } from '@/components/PaymentCheckoutModal';
 import { TaxInvoiceStatus } from '@/components/TaxInvoiceStatus';
 import { showToast } from '@/components/Toast';
@@ -28,6 +29,7 @@ import {
 } from '@/lib/ai-guide';
 import { buildFallbackReport } from '@/lib/ai-report';
 import { isOpenForBid } from '@/lib/auction-browse';
+import { canOwnerDeleteCampaign } from '@/lib/listing-delete';
 import { getAuctionById, getBidsByAuctionId } from '@/lib/auctions';
 import { hasActiveCreatorBid, loadMyProposedAuctionIds } from '@/lib/my-bids';
 import { isCampaignAuthor, isOwnedAuction } from '@/lib/my-campaigns';
@@ -413,6 +415,17 @@ export function AuctionDetail({ id }: { id: string }) {
                 ) : null}
               </div>
             )}
+            {ownCampaign && canOwnerDeleteCampaign(auction) ? (
+              <div className="mt-4 flex justify-end">
+                <ListingDeleteButton
+                  kind="campaign"
+                  id={auction.id}
+                  onDeleted={() => {
+                    router.push('/my');
+                  }}
+                />
+              </div>
+            ) : null}
           </article>
 
           <BidProposalList

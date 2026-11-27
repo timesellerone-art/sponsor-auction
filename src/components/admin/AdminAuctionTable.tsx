@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Download, Loader2 } from 'lucide-react';
 import { AdminEmptyState } from '@/components/admin/AdminEmptyState';
+import { ListingDeleteButton } from '@/components/ListingDeleteButton';
 import { AdminFilterBar } from '@/components/admin/AdminFilterBar';
 import { downloadCsv, sortByAdminList, type AdminListSort } from '@/lib/admin-csv';
 import { AUCTION_STATUS_LABEL } from '@/lib/status-labels';
@@ -26,7 +27,7 @@ type AdminAuctionTableProps = {
   busyId: string | null;
   onBlind: (auction: AuctionItem) => void;
   onUnblind: (auction: AuctionItem) => void;
-  onDelete: (auction: AuctionItem) => void;
+  onDeleted?: () => void;
 };
 
 function isBlinded(auction: AuctionItem) {
@@ -58,7 +59,7 @@ function AuctionManageButtons({
   compact,
   onBlind,
   onUnblind,
-  onDelete,
+  onDeleted,
 }: {
   auction: AuctionItem;
   blinded: boolean;
@@ -67,7 +68,7 @@ function AuctionManageButtons({
   compact?: boolean;
   onBlind: (auction: AuctionItem) => void;
   onUnblind: (auction: AuctionItem) => void;
-  onDelete: (auction: AuctionItem) => void;
+  onDeleted?: () => void;
 }) {
   const base = compact
     ? 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold disabled:cursor-not-allowed disabled:opacity-50'
@@ -95,15 +96,14 @@ function AuctionManageButtons({
           {busy ? '처리 중...' : '블라인드 처리'}
         </button>
       )}
-      <button
-        type="button"
-        disabled={anyBusy}
-        onClick={() => onDelete(auction)}
+      <ListingDeleteButton
+        kind="campaign"
+        id={auction.id}
+        admin
+        compact={compact}
         className={`${base} border border-rose-200 text-rose-700 hover:bg-rose-50`}
-      >
-        {busy ? <Loader2 className="size-3 animate-spin" aria-hidden /> : null}
-        {busy ? '처리 중...' : '삭제'}
-      </button>
+        onDeleted={onDeleted}
+      />
     </div>
   );
 }
@@ -114,7 +114,7 @@ export function AdminAuctionTable({
   busyId,
   onBlind,
   onUnblind,
-  onDelete,
+  onDeleted,
 }: AdminAuctionTableProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<AuctionAdminFilter>('all');
@@ -255,7 +255,7 @@ export function AdminAuctionTable({
                       anyBusy={anyBusy}
                       onBlind={onBlind}
                       onUnblind={onUnblind}
-                      onDelete={onDelete}
+                      onDeleted={onDeleted}
                     />
                   </div>
                 </li>
@@ -327,7 +327,7 @@ export function AdminAuctionTable({
                         compact
                         onBlind={onBlind}
                         onUnblind={onUnblind}
-                        onDelete={onDelete}
+                        onDeleted={onDeleted}
                       />
                     </td>
                   </tr>

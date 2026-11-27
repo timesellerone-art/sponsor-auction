@@ -7,9 +7,11 @@ import {
   unauthorizedJson,
 } from '@/lib/payments/guard';
 import { campaignAwardOrderId, releaseCampaignPaymentIfOpen } from '@/lib/campaign-credit';
+import { deleteJson, deleteTimeslotListing } from '@/lib/listing-delete.server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { timeslotIdFromParam, timeslotWriter } from '@/lib/timeslot-http';
 import { closeTimeSlot, listTimeSlotBids, setTimeSlotBlind } from '@/lib/timeslots';
+import { hasAuthRole } from '@/types/auth';
 
 const NO_STORE = {
   'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -79,6 +81,40 @@ export async function PATCH(
     rethrowPrerenderError(error);
     const message =
       error instanceof Error ? error.message : '크리에이터 상품을 변경하지 못했습니다.';
+    return NextResponse.json(
+      { error: message, errorMessage: message },
+      { status: 500, headers: NO_STORE },
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  try {
+    await connection();
+    const actor = await getPaymentActor(request);
+    if (!actor) {
+      return unauthorizedJson('크리에이터 상품을 삭제하려면 로그인해 주세요.');
+    }
+    if (!hasAuthRole(actor, 'admin')) {
+      return forbiddenJson('크리에이터 상품 삭제는 관리자만 할 수 있습니다.');
+    }
+    const { id } = await context.params;
+    const result = await deleteTimeslotListing(timeslotIdFromParam(id), {
+      userId: actor.userId,
+      isAdmin: true,
+    });
+    const body = deleteJson(result);
+    return NextResponse.json(body, {
+      status: result.ok ? 200 : result.status,
+      headers: NO_STORE,
+    });
+  } catch (error) {
+    rethrowPrerenderError(error);
+    const message =
+      error instanceof Error ? error.message : '크리에이터 상품을 삭제하지 못했습니다.';
     return NextResponse.json(
       { error: message, errorMessage: message },
       { status: 500, headers: NO_STORE },

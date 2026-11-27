@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { AuctionCard, AuctionCardSkeleton } from '@/components/AuctionCard';
+import { ListingDeleteButton } from '@/components/ListingDeleteButton';
 import { PageContainer } from '@/components/PageContainer';
 import { BidProposalList } from '@/components/BidProposalList';
 import { FeeBreakdownCard } from '@/components/fee/FeeBreakdownCard';
@@ -12,6 +13,7 @@ import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { prepareAwardPayment } from '@/lib/payments/client';
 import { showToast } from '@/components/Toast';
 import { isOpenForBid } from '@/lib/auction-browse';
+import { canOwnerDeleteCampaign } from '@/lib/listing-delete';
 import { getAdvertiserDashboard } from '@/lib/dashboard';
 import { TimeslotPaymentPanel } from '@/components/TimeslotPaymentPanel';
 import { dealDetailHref } from '@/lib/timeslot-deal';
@@ -398,13 +400,18 @@ function OpenCampaignsPanel({
             auction={deal.auction}
             hideBidAction
             footerAction={
-              <button
-                type="button"
-                onClick={() => onOpenProposals(deal.auction.id)}
-                className="inline-flex h-10 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
-              >
-                지원 현황 보기
-              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => onOpenProposals(deal.auction.id)}
+                  className="inline-flex h-10 w-full items-center justify-center rounded-full bg-clink text-sm font-semibold text-white hover:bg-stone-800"
+                >
+                  지원 현황 보기
+                </button>
+                {canOwnerDeleteCampaign(deal.auction) ? (
+                  <ListingDeleteButton kind="campaign" id={deal.auction.id} className="inline-flex h-10 w-full items-center justify-center rounded-full border border-rose-200 text-sm font-semibold text-rose-700 hover:bg-rose-50" />
+                ) : null}
+              </div>
             }
           />
         ),
