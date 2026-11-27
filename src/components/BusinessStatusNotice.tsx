@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { authRequestInit } from '@/lib/auth-request';
 import {
   businessActionBlock,
@@ -12,9 +13,15 @@ import {
 type BusinessStatusNoticeProps = {
   intent: 'charge' | 'campaign';
   onChange?: (blocked: boolean) => void;
+  onVerifyNavigate?: () => void;
 };
 
-export function BusinessStatusNotice({ intent, onChange }: BusinessStatusNoticeProps) {
+export function BusinessStatusNotice({
+  intent,
+  onChange,
+  onVerifyNavigate,
+}: BusinessStatusNoticeProps) {
+  const router = useRouter();
   const campaignGate = intent === 'campaign';
   const [notice, setNotice] = useState('');
   const [blocked, setBlocked] = useState(campaignGate);
@@ -86,12 +93,16 @@ export function BusinessStatusNotice({ intent, onChange }: BusinessStatusNoticeP
     return (
       <div className="rounded-xl bg-rose-50 px-3 py-3 text-sm leading-6 text-rose-700">
         <p>{CAMPAIGN_BUSINESS_REQUIRED_NOTICE}</p>
-        <Link
-          href="/my/settings"
+        <button
+          type="button"
           className="mt-2 inline-flex h-9 items-center justify-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800"
+          onClick={() => {
+            onVerifyNavigate?.();
+            router.push('/my/settings');
+          }}
         >
           사업자 인증하러 가기
-        </Link>
+        </button>
       </div>
     );
   }

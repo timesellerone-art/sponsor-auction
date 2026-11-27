@@ -177,12 +177,42 @@ export function BusinessRegistrationForm() {
         사업자등록번호로 계속사업자·휴업·폐업을 조회하고, 대표자 성명과 개업일자로 국세청 진위확인을 합니다.
         번호·성명·개업일자가 모두 일치하고 계속사업자이면 관리자 검수 후 인증됩니다.
       </p>
-      <p className="mt-3 text-sm font-semibold text-zinc-800">
+      <p
+        className={
+          status === 'verified'
+            ? 'mt-4 text-lg font-bold leading-7 text-emerald-800'
+            : ntsLabel === '불일치' || status === 'rejected' || status === 'closed'
+              ? 'mt-4 text-lg font-bold leading-7 text-rose-700'
+              : status === 'review_required'
+                ? 'mt-4 text-lg font-bold leading-7 text-amber-900'
+                : 'mt-4 text-lg font-bold leading-7 text-zinc-950'
+        }
+      >
         현재 상태: {businessVerificationLabel(status)}
         {ntsLabel ? ` · ${ntsLabel}` : ''}
       </p>
-      {notice ? <p className="mt-1 text-sm text-zinc-600">{notice}</p> : null}
-      {detail && detail !== notice ? <p className="mt-1 text-sm text-zinc-500">{detail}</p> : null}
+      {notice ? (
+        <p
+          className={
+            ntsLabel === '불일치' || /불일치|일치하지 않습니다/.test(notice)
+              ? 'mt-3 rounded-xl bg-rose-50 px-3 py-3 text-base font-semibold leading-7 text-rose-700'
+              : 'mt-2 text-base font-medium leading-7 text-zinc-700'
+          }
+        >
+          {notice}
+        </p>
+      ) : null}
+      {detail && detail !== notice ? (
+        <p
+          className={
+            ntsLabel === '불일치' || /불일치|일치하지 않습니다/.test(detail)
+              ? 'mt-3 rounded-xl bg-rose-50 px-3 py-3 text-base font-semibold leading-7 text-rose-700'
+              : 'mt-2 text-base leading-7 text-zinc-600'
+          }
+        >
+          {detail}
+        </p>
+      ) : null}
       <label className="mt-4 block text-sm font-medium text-zinc-700" htmlFor="business-number">
         사업자등록번호
       </label>
@@ -268,7 +298,10 @@ export function BusinessRegistrationForm() {
         </button>
       </div>
       {error ? (
-        <p role="alert" className="mt-3 text-sm text-rose-600">
+        <p
+          role="alert"
+          className="mt-3 rounded-xl bg-rose-50 px-3 py-3 text-base font-semibold leading-7 text-rose-700"
+        >
           {error}
         </p>
       ) : null}

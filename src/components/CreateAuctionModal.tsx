@@ -232,7 +232,11 @@ export function CreateAuctionModal({
           noValidate
         >
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
-            <BusinessStatusNotice intent="campaign" onChange={setBusinessBlocked} />
+            <BusinessStatusNotice
+              intent="campaign"
+              onChange={setBusinessBlocked}
+              onVerifyNavigate={onClose}
+            />
             <fieldset
               disabled={businessBlocked}
               className={cn('space-y-4', businessBlocked && 'pointer-events-none opacity-60')}
