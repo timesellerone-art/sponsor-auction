@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   businessActionBlock,
+  CAMPAIGN_BUSINESS_REQUIRED_MESSAGE,
   businessNumberError,
   formatBusinessNumber,
   formatOpeningDateInput,
@@ -89,11 +90,13 @@ describe('business registration number', () => {
     assert.equal(matchedClosed.status, 'closed');
   });
 
-  it('휴폐업과 반려만 충전과 캠페인 등록을 막는다', () => {
+  it('캠페인 등록은 검증완료만 허용하고 충전은 휴폐업·반려만 막는다', () => {
+    assert.equal(businessActionBlock('verified', 'campaign'), null);
     assert.equal(businessActionBlock('verified', 'charge'), null);
-    assert.equal(businessActionBlock('review_required', 'campaign'), null);
+    assert.equal(businessActionBlock('review_required', 'campaign'), CAMPAIGN_BUSINESS_REQUIRED_MESSAGE);
+    assert.equal(businessActionBlock('unregistered', 'campaign'), CAMPAIGN_BUSINESS_REQUIRED_MESSAGE);
     assert.equal(businessActionBlock('unregistered', 'charge'), null);
     assert.match(businessActionBlock('closed', 'charge') ?? '', /충전/);
-    assert.match(businessActionBlock('rejected', 'campaign') ?? '', /캠페인/);
+    assert.equal(businessActionBlock('rejected', 'campaign'), CAMPAIGN_BUSINESS_REQUIRED_MESSAGE);
   });
 });

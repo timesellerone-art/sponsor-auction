@@ -189,6 +189,12 @@ export function creatorTaxKind(input: {
   return 'individual';
 }
 
+export const CAMPAIGN_BUSINESS_REQUIRED_MESSAGE =
+  '사업자 인증이 완료된 계정만 캠페인을 등록할 수 있습니다.';
+
+export const CAMPAIGN_BUSINESS_REQUIRED_NOTICE =
+  '캠페인 모집 등록은 사업자 인증을 완료한 기업(사업자) 회원만 이용할 수 있습니다.';
+
 export function businessActionBlock(
   status: string | null | undefined,
   action: 'charge' | 'campaign',
@@ -197,14 +203,17 @@ export function businessActionBlock(
   const normalized: BusinessVerificationStatus = isBusinessVerificationStatus(raw)
     ? raw
     : 'unregistered';
+  if (action === 'campaign') {
+    if (normalized === 'verified') {
+      return null;
+    }
+    return CAMPAIGN_BUSINESS_REQUIRED_MESSAGE;
+  }
   if (normalized !== 'closed' && normalized !== 'rejected') {
     return null;
   }
   const label = businessVerificationLabel(normalized);
-  if (action === 'charge') {
-    return `사업자 상태가 ${label}이라 크레딧을 충전할 수 없습니다. 계정 설정에서 번호를 확인해 주세요.`;
-  }
-  return `사업자 상태가 ${label}이라 캠페인을 등록할 수 없습니다. 계정 설정에서 번호를 확인해 주세요.`;
+  return `사업자 상태가 ${label}이라 크레딧을 충전할 수 없습니다. 계정 설정에서 번호를 확인해 주세요.`;
 }
 
 export function ntsBusinessLabelFromText(value: string | null | undefined) {

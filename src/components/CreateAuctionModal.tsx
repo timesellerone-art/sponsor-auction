@@ -8,7 +8,9 @@ import { BusinessStatusNotice } from '@/components/BusinessStatusNotice';
 import { showToast } from '@/components/Toast';
 import { useActionLock } from '@/hooks/useActionLock';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
-import { INSERT_FAIL_MESSAGE, createAuction } from '@/lib/auctions';
+import { INSERT_FAIL_MESSAGE } from '@/lib/auctions';
+import { authRequestInit } from '@/lib/auth-request';
+import { CAMPAIGN_BUSINESS_REQUIRED_NOTICE } from '@/lib/business-registration';
 import {
   uploadCampaignCover,
   validateCampaignCoverFile,
@@ -57,8 +59,15 @@ export function CreateAuctionModal({
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [businessBlocked, setBusinessBlocked] = useState(false);
+  const [businessBlocked, setBusinessBlocked] = useState(true);
   const { isBusy: isSubmitting, run } = useActionLock();
+
+  useEffect(() => {
+    if (open) {
+      setBusinessBlocked(true);
+      setSubmitError(null);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -106,7 +115,7 @@ export function CreateAuctionModal({
         return;
       }
       if (businessBlocked) {
-        setSubmitError('사업자 상태를 확인한 뒤 캠페인을 등록해 주세요.');
+        setSubmitError(CAMPAIGN_BUSINESS_REQUIRED_NOTICE);
         return;
       }
 
@@ -134,22 +143,35 @@ export function CreateAuctionModal({
           }
         }
 
-        const result = await createAuction({
-          title: title.trim(),
-          platform,
-          category,
-          budget: Number(budget),
-          description: description.trim(),
-          deadline: new Date(`${deadline}T23:59:59+09:00`).toISOString(),
-          authorId: user?.id ?? null,
-          authorName: user?.name?.trim() || '',
-          imageUrl,
-        });
+        const response = await fetch(
+          '/api/auctions',
+          await authRequestInit({
+            method: 'POST',
+            body: JSON.stringify({
+              title: title.trim(),
+              platform,
+              category,
+              budget: Number(budget),
+              description: description.trim(),
+              deadline: new Date(`${deadline}T23:59:59+09:00`).toISOString(),
+              authorName: user?.name?.trim() || '',
+              imageUrl,
+            }),
+          }),
+        );
+        const payload = (await response.json().catch(() => null)) as {
+          data?: { id: string } | null;
+          error?: string;
+          errorMessage?: string;
+        } | null;
+        const apiMessage =
+          payload?.errorMessage?.trim() ||
+          payload?.error?.replace(/^\[[A-Z_]+\]\s*/, '').trim() ||
+          INSERT_FAIL_MESSAGE;
 
-        if (result.error || !result.data) {
-          const message = result.error ?? INSERT_FAIL_MESSAGE;
-          setSubmitError(message);
-          showToast(INSERT_FAIL_MESSAGE);
+        if (!response.ok || !payload?.data?.id) {
+          setSubmitError(apiMessage);
+          showToast(response.status === 403 ? apiMessage : INSERT_FAIL_MESSAGE);
           return;
         }
 
@@ -165,8 +187,8 @@ export function CreateAuctionModal({
         }
         setCoverPreview(null);
         setErrors({});
-        rememberMyAuction(result.data.id);
-        rememberAuctionOwner(result.data.id, user?.id);
+        rememberMyAuction(payload.data.id);
+        rememberAuctionOwner(payload.data.id, user?.id);
         onCreated?.();
         window.dispatchEvent(new Event('auctions:changed'));
         onClose();
@@ -211,6 +233,10 @@ export function CreateAuctionModal({
         >
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
             <BusinessStatusNotice intent="campaign" onChange={setBusinessBlocked} />
+            <fieldset
+              disabled={businessBlocked}
+              className={cn('space-y-4', businessBlocked && 'pointer-events-none opacity-60')}
+            >
             <Field
               label="제목"
               htmlFor="auction-title"
@@ -370,6 +396,7 @@ export function CreateAuctionModal({
                 {submitError}
               </p>
             ) : null}
+            </fieldset>
           </div>
 
           <div className="shrink-0 border-t border-zinc-200 bg-white px-4 py-3 sm:px-5">
