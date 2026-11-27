@@ -27,6 +27,7 @@ import { cn, formatDateTime, formatWon } from '@/lib/utils';
 import {
   isTimeSlotOpen,
   isTimeslotAwaitingPayment,
+  isTimeslotEscrowed,
   type TimeSlotBidItem,
   type TimeSlotItem,
 } from '@/types/timeslot';
@@ -235,6 +236,17 @@ export function CreatorDashboard() {
                     </p>
                     {isTimeslotAwaitingPayment(slot) ? (
                       <p className="mt-1 text-xs text-amber-800">광고주 최종 결제를 기다리고 있습니다.</p>
+                    ) : null}
+                    {isTimeslotEscrowed(slot) &&
+                    !slot.deliveredAt &&
+                    !slot.deliveryUrl &&
+                    !slot.purchaseConfirmedAt ? (
+                      <Link
+                        href={`/timeslots/${slot.id}`}
+                        className="mt-2 inline-flex h-8 items-center rounded-full bg-clink px-3 text-xs font-semibold text-white hover:bg-stone-800"
+                      >
+                        납품하기
+                      </Link>
                     ) : null}
                   </div>
                   {slot.status === 'open' ? (
@@ -506,7 +518,12 @@ function DealCard({
         deal.fulfillment?.paidAt &&
         !deal.fulfillment?.deliveredAt &&
         !deal.fulfillment?.deliveryUrl ? (
-          <span>납품 필요</span>
+          <Link
+            href={href}
+            className="inline-flex h-7 items-center rounded-full bg-clink px-2.5 text-xs font-semibold text-white hover:bg-stone-800"
+          >
+            납품하기
+          </Link>
         ) : null}
         {deal.kind === 'timeslot' && awarded && (deal.fulfillment?.deliveredAt || deal.fulfillment?.deliveryUrl) && !deal.fulfillment?.purchaseConfirmedAt ? (
           <span>구매 확정 대기</span>
