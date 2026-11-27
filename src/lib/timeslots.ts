@@ -405,7 +405,7 @@ export async function listTimeSlots(options?: {
     const { data, error } = await query;
     if (error) {
       if (isSchemaMismatch(error)) {
-        return ok(await withScores(mockSlotList(creatorId)));
+        return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');
       }
       console.warn('[SponsorAuction] 크리에이터 상품 목록 조회 실패', error.message);
       return fail([], '크리에이터 상품 목록을 불러오지 못했습니다.');

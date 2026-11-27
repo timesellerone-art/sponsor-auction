@@ -17,7 +17,7 @@ import { DEMO_ADVERTISER_ID } from '@/lib/auth-mock';
 import { isCampaignAuthor } from '@/lib/my-campaigns';
 import { notifyLifecycleEvent } from '@/lib/notification';
 import { type SponsorAuctionClient } from '@/lib/supabase';
-import { getDataClient } from '@/lib/supabase/data-client';
+import { getDataClient, getPublicListingClient } from '@/lib/supabase/data-client';
 import {
   businessActionBlock,
   CAMPAIGN_BUSINESS_REQUIRED_MESSAGE,
@@ -297,7 +297,7 @@ function logDbError(action: string, error: unknown) {
 }
 
 export async function getAuctions(): Promise<DataResult<AuctionItem[]>> {
-  const supabase = await getDataClient();
+  const supabase = await getPublicListingClient();
   if (!supabase) {
     return getMockAuctions();
   }
@@ -309,18 +309,14 @@ export async function getAuctions(): Promise<DataResult<AuctionItem[]>> {
 
     if (error) {
       logDbError('경매 목록 조회', error);
-      return getMockAuctions();
+      return fail([], '캠페인 목록을 불러오지 못했습니다.');
     }
 
     const auctions = await overlayPaidAuctions(supabase, (data ?? []).map((row) => mapAuction(row)));
-    if (auctions.length === 0) {
-      return getMockAuctions();
-    }
-
     return ok(auctions);
   } catch (error) {
     logDbError('경매 목록 조회 예외', error);
-    return getMockAuctions();
+    return fail([], '캠페인 목록을 불러오지 못했습니다.');
   }
 }
 
@@ -453,7 +449,7 @@ export async function getAuctionById(
   options?: AuctionQueryOptions,
 ): Promise<DataResult<AuctionItem | null>> {
   const auctionId = id.trim();
-  const supabase = await resolveAuctionClient(options);
+  const supabase = options?.client ?? (await getPublicListingClient());
   if (!supabase) {
     return getMockAuctionById(auctionId);
   }
@@ -473,16 +469,13 @@ export async function getAuctionById(
     if (error) {
       logDbError('경매 단건 조회', error);
       if (isInvalidUuidError(error)) {
-        return getMockAuctionById(auctionId);
+        return fail(null, '해당 캠페인을 찾을 수 없습니다.');
       }
       return fail(null, '캠페인 정보를 불러오지 못했습니다.');
     }
 
     if (!data) {
-      if (options?.client) {
-        return fail(null, '해당 캠페인을 찾을 수 없습니다.');
-      }
-      return getMockAuctionById(auctionId);
+      return fail(null, '해당 캠페인을 찾을 수 없습니다.');
     }
 
     return ok(mapAuction(data));
