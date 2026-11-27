@@ -125,11 +125,14 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
   let fromDb: ProfileItem[] = [];
 
   try {
-    const response = await fetch('/api/admin/profiles', {
-      method: 'GET',
-      cache: 'no-store',
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    const response = await fetch(
+      '/api/admin/profiles',
+      await authRequestInit({
+        method: 'GET',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-store' },
+      }),
+    );
     const payload = await parseAdminJson(response, 'GET');
     if (response.ok && Array.isArray(payload?.data)) {
       const next: ProfileItem[] = [];
@@ -150,20 +153,40 @@ export async function getProfiles(): Promise<DataResult<ProfileItem[]>> {
         if (!mapped) {
           continue;
         }
+        const raw = row as Partial<ProfileItem> & Record<string, unknown>;
+        const text = (...keys: string[]) => {
+          for (const key of keys) {
+            const value = raw[key];
+            if (typeof value === 'string') {
+              return value;
+            }
+          }
+          return undefined;
+        };
         next.push({
           ...mapped,
-          businessRegistrationNumber: item.businessRegistrationNumber,
-          businessVerificationStatus: item.businessVerificationStatus,
-          businessStatusDetail: item.businessStatusDetail,
-          businessReviewNote: item.businessReviewNote,
-          businessRepresentativeName: item.businessRepresentativeName,
-          businessOpenedOn: item.businessOpenedOn,
-          businessCompanyName: item.businessCompanyName,
-          businessAddress: item.businessAddress,
-          businessContact: item.businessContact,
-          businessCertificateName: item.businessCertificateName,
-          hasBusinessCertificate: Boolean(item.hasBusinessCertificate || item.businessCertificateName),
-          phone: item.phone ?? null,
+          businessRegistrationNumber: text('businessRegistrationNumber', 'business_registration_number'),
+          businessVerificationStatus: text(
+            'businessVerificationStatus',
+            'business_verification_status',
+          ) as ProfileItem['businessVerificationStatus'],
+          businessStatusDetail: text('businessStatusDetail', 'business_status_detail'),
+          businessReviewNote: text('businessReviewNote', 'business_review_note'),
+          businessRepresentativeName: text(
+            'businessRepresentativeName',
+            'business_representative_name',
+          ),
+          businessOpenedOn: text('businessOpenedOn', 'business_opened_on'),
+          businessCompanyName: text('businessCompanyName', 'business_company_name'),
+          businessAddress: text('businessAddress', 'business_address'),
+          businessContact: text('businessContact', 'business_contact'),
+          businessCertificateName: text('businessCertificateName', 'business_certificate_name'),
+          hasBusinessCertificate: Boolean(
+            raw.hasBusinessCertificate ||
+              raw.has_business_certificate ||
+              text('businessCertificateName', 'business_certificate_name'),
+          ),
+          phone: text('phone') ?? item.phone ?? null,
           settlementType:
             item.settlementType === 'business' || item.settlementType === 'individual'
               ? item.settlementType

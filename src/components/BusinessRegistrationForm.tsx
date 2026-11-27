@@ -252,7 +252,7 @@ export function BusinessRegistrationForm() {
     <section className="mt-8 rounded-2xl border border-zinc-200 bg-white p-5 sm:p-6">
       <h2 className="text-lg font-bold text-zinc-950">사업자 인증</h2>
       <p className="mt-2 text-sm leading-6 text-zinc-500">
-        사업자등록번호·대표자 성명·개업일자로 국세청 진위확인을 한 뒤, 상호명·사업장 주소·연락처와
+        사업자등록번호·대표자 성명·개업일자로 국세청 상태 조회를 한 뒤, 상호명·사업장 주소·연락처와
         사업자등록증 사본을 저장하면 관리자가 검수합니다. 대표자 성명은 가입자 이름과 달라도 됩니다.
       </p>
       <p
@@ -374,7 +374,7 @@ export function BusinessRegistrationForm() {
         }}
         className="mt-2 h-11 w-full rounded-xl border border-zinc-200 px-3 text-sm outline-none focus:border-zinc-950"
       />
-      <p className="mt-1 text-xs text-zinc-500">YYYYMMDD 기준이며, 상호명이 아닌 대표자 성명과 함께 진위확인합니다.</p>
+      <p className="mt-1 text-xs text-zinc-500">YYYYMMDD 기준이며, 상호명이 아닌 대표자 성명과 함께 상태 조회합니다.</p>
       <label className="mt-4 block text-sm font-medium text-zinc-700" htmlFor="business-address">
         사업장 상세 주소
       </label>
@@ -438,7 +438,7 @@ export function BusinessRegistrationForm() {
                     return;
                   }
                   if (!allowsBusinessCertificateUpload({ status, ntsLabel, mismatch })) {
-                    setError('국세청 진위확인이 정상인 경우에만 사업자등록증을 올릴 수 있습니다.');
+                    setError('국세청 상태 조회가 정상인 경우에만 사업자등록증을 올릴 수 있습니다.');
                     return;
                   }
                   setBusy(true);
@@ -513,7 +513,7 @@ export function BusinessRegistrationForm() {
       </div>
       {!uploadAllowed ? (
         <p className="mt-1 text-xs leading-5 text-zinc-500">
-          국세청 진위확인이 정상(계속사업자)일 때만 첨부할 수 있습니다. 불일치·휴폐업이면 업로드가
+          국세청 상태 조회가 정상(계속사업자)일 때만 첨부할 수 있습니다. 불일치·휴폐업이면 업로드가
           차단됩니다.
         </p>
       ) : null}

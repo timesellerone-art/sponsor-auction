@@ -8,6 +8,7 @@ import {
   isBusinessVerificationStatus,
   normalizeBusinessAddress,
   normalizeBusinessContact,
+  normalizeBusinessNumber,
   normalizeCompanyName,
   normalizeRepresentativeName,
   ntsBusinessLabelFromText,
@@ -188,9 +189,18 @@ export async function POST(request: Request) {
       address?: unknown;
       contact?: unknown;
     } | null;
+    if (!body) {
+      return failJson('요청 본문이 올바르지 않습니다.', 'INVALID_INPUT', 400);
+    }
     const parsed = parseBusinessIdentityInput(body);
     const details = parseBusinessDetailInput(body);
-    const clearing = !parsed.businessNumber && !parsed.representativeName && !parsed.openedOn;
+    const clearing =
+      !parsed.businessNumber &&
+      !parsed.representativeName &&
+      !parsed.openedOn &&
+      !details.companyName &&
+      !details.address &&
+      !details.contact;
     if (!clearing && parsed.error) {
       return failJson(parsed.error, parsed.errorCode || 'INVALID_INPUT', 400);
     }
@@ -311,47 +321,46 @@ export async function POST(request: Request) {
       business_contact: businessNumber ? contact : '',
     };
 
-    const write = (
-      payload: Database['public']['Tables']['profiles']['Update'],
-      columns: string,
-    ) => admin.from('profiles').update(payload).eq('id', userId).select(columns).maybeSingle();
+    type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+    const applyUpdate = (payload: ProfileUpdate) =>
+      admin.from('profiles').update(payload).eq('id', userId);
 
-    let savedRow = await write(fullPayload, COLUMNS_FULL);
-    if (savedRow.error && isSchemaMismatch(savedRow.error)) {
-      const missingDetail = dbErrorMessage(savedRow.error);
-      const withCert = await write(certPayload, COLUMNS_WITH_CERT);
-      if (!withCert.error && withCert.data) {
+    let updated = await applyUpdate(fullPayload);
+    if (updated.error && isSchemaMismatch(updated.error)) {
+      const missingDetail = dbErrorMessage(updated.error);
+      const withCert = await applyUpdate(certPayload);
+      if (!withCert.error) {
         return failJson(
           `상호명·사업장 주소·사업자 연락처 컬럼이 없어 저장하지 못했습니다. (${missingDetail}) supabase/migrations/20261127_business_profile_details.sql 을 적용해 주세요.`,
           'SCHEMA_MISSING',
           503,
         );
       }
-      if (withCert.error && !isSchemaMismatch(withCert.error)) {
-        savedRow = withCert;
+      if (!isSchemaMismatch(withCert.error)) {
+        updated = withCert;
       } else {
-        const withExtra = await write(extraPayload, COLUMNS);
-        if (!withExtra.error && withExtra.data) {
+        const withExtra = await applyUpdate(extraPayload);
+        if (!withExtra.error) {
           return failJson(
             `사업자 정보 일부 컬럼이 없어 전체 항목을 저장하지 못했습니다. (${missingDetail}) 마이그레이션을 적용해 주세요.`,
             'SCHEMA_MISSING',
             503,
           );
         }
-        if (withExtra.error && !isSchemaMismatch(withExtra.error)) {
-          savedRow = withExtra;
+        if (!isSchemaMismatch(withExtra.error)) {
+          updated = withExtra;
         } else {
-          savedRow = await write(basePayload, BASE_COLUMNS);
-          if (!savedRow.error && savedRow.data) {
+          updated = await applyUpdate(basePayload);
+          if (!updated.error) {
             return failJson(
               `사업자 정보 일부 컬럼이 없어 전체 항목을 저장하지 못했습니다. (${missingDetail}) 마이그레이션을 적용해 주세요.`,
               'SCHEMA_MISSING',
               503,
             );
           }
-          if (savedRow.error && isSchemaMismatch(savedRow.error)) {
+          if (isSchemaMismatch(updated.error)) {
             return failJson(
-              `사업자 정보 컬럼이 없어 저장하지 못했습니다. (${dbErrorMessage(savedRow.error)}) 마이그레이션을 적용해 주세요.`,
+              `사업자 정보 컬럼이 없어 저장하지 못했습니다. (${dbErrorMessage(updated.error)}) 마이그레이션을 적용해 주세요.`,
               'SCHEMA_MISSING',
               503,
             );
@@ -360,26 +369,37 @@ export async function POST(request: Request) {
       }
     }
 
-    if (savedRow.error) {
-      console.warn('[SponsorAuction] 사업자 정보 저장 실패', savedRow.error);
+    if (updated.error) {
+      console.warn('[SponsorAuction] 사업자 정보 저장 실패', updated.error);
       return failJson(
-        `사업자 정보를 저장하지 못했습니다: ${dbErrorMessage(savedRow.error)}`,
+        `사업자 정보를 저장하지 못했습니다: ${dbErrorMessage(updated.error)}`,
         'SAVE_FAILED',
         500,
       );
     }
-    if (!savedRow.data) {
+
+    const loaded = await loadBusinessRow(admin, userId);
+    if (loaded.error || !loaded.data) {
       return failJson(
-        '프로필을 찾을 수 없어 사업자 정보를 저장하지 못했습니다. 다시 로그인한 뒤 저장해 주세요.',
-        'PROFILE_NOT_FOUND',
-        404,
+        '사업자 정보는 저장되었지만 다시 읽지 못했습니다. 페이지를 새로고침해 주세요.',
+        'LOOKUP_FAILED',
+        500,
       );
     }
-
-    const row = savedRow.data as BusinessRow;
-    if (businessNumber && !normalizeCompanyName(row.business_company_name) && companyName) {
+    const row = loaded.data as BusinessRow;
+    const persistedIncomplete = Boolean(
+      businessNumber &&
+        (normalizeBusinessNumber(row.business_registration_number) !== businessNumber ||
+          (representativeName &&
+            normalizeRepresentativeName(row.business_representative_name) !== representativeName) ||
+          (openedOn && formatOpeningDateInput(row.business_opened_on) !== formatOpeningDateInput(openedOn)) ||
+          (companyName && normalizeCompanyName(row.business_company_name) !== companyName) ||
+          (address && normalizeBusinessAddress(row.business_address) !== address) ||
+          (contact && normalizeBusinessContact(row.business_contact) !== contact)),
+    );
+    if (persistedIncomplete) {
       return failJson(
-        '상호명·사업장 주소·사업자 연락처가 DB에 반영되지 않았습니다. 마이그레이션을 적용한 뒤 다시 저장해 주세요.',
+        '상호명·대표자 성명·사업자등록번호·개업일자·주소·연락처가 DB에 반영되지 않았습니다. 마이그레이션을 적용한 뒤 다시 저장해 주세요.',
         'SCHEMA_MISSING',
         503,
       );

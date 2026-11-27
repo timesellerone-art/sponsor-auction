@@ -156,7 +156,13 @@ function BusinessStatusBlock({ profile }: { profile: ProfileItem }) {
 }
 
 function displayValue(value: string | null | undefined) {
-  const text = value?.trim() || '';
+  if (value === '') {
+    return '미입력';
+  }
+  if (typeof value !== 'string') {
+    return '미입력';
+  }
+  const text = value.trim();
   return text || '미입력';
 }
 
